@@ -1,0 +1,14 @@
+.astro
+.agents
+.git
+.opencode
+.playwright-cli
+.vercel
+coverage
+dist
+node_modules
+playwright-report
+supabase/.temp
+test-results
+.env*
+!.env.example

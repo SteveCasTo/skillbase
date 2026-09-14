@@ -1,0 +1,43 @@
+# Local agent configuration
+.opencode/
+
+# Dependencies and package manager caches
+node_modules/
+.bun/
+
+# Astro and build output
+.astro/
+dist/
+*.tsbuildinfo
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+
+# Vercel local state
+.vercel/
+
+# Tests and coverage
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright-cli/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
