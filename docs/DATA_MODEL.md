@@ -28,6 +28,15 @@ El schema real se mantendrá en Drizzle y sus migraciones.
 - createdAt
 - updatedAt
 
+Implementación de Fase 1:
+
+- `users.email` se persiste en minúsculas y sin espacios, con unicidad y validación DB.
+- `users.auth_user_id` es nullable y único: es `null` mientras el estado es `INVITED` y obligatorio para `ACTIVE`/`DISABLED`.
+- `roles` contiene los códigos cerrados `ADMIN` e `INSTRUCTOR`.
+- `user_roles` usa PK compuesta y permite múltiples roles por usuario.
+- las FK de `user_roles` están indexadas cuando la PK compuesta no cubre el acceso inverso.
+- todas las tablas públicas de Auth interno tienen RLS habilitado y los roles Data API `anon`/`authenticated`/`service_role` no reciben privilegios ni políticas.
+
 ### Course
 
 - id
@@ -201,6 +210,8 @@ Ejemplos que deben evaluarse a nivel DB:
 La tabla de dominio `User` se enlaza mediante `authUserId`.
 
 No duplicar secretos o credenciales OAuth.
+
+No se creó una FK cross-schema hacia `auth.users`. Supabase es propietario de ese schema y ha endurecido sus privilegios; la integridad se mantiene con UUID único, identidad validada por Auth y vinculación transaccional en el repository. Los tests locales crean primero la identidad Auth y luego su fixture interno. Drizzle sigue siendo propietario exclusivo de las tablas de aplicación y su migración.
 
 ## SOFT DELETE
 
