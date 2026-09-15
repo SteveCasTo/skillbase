@@ -241,3 +241,40 @@ Los objetos propios de la plataforma Supabase solo tendrán una migración espec
 - Existe una única fuente versionada para las entidades de aplicación.
 - Desarrollo, CI y producción ejecutan `drizzle-kit migrate`.
 - Foundation contiene metadata Drizzle, pero ninguna tabla de negocio anticipada.
+
+---
+
+## ADR-012 — IDENTIDAD AUTH E INVITACIONES INTERNAS
+
+**Fecha:** 2026-09-14
+
+**Estado:** Accepted
+
+### Contexto
+
+Supabase Auth controla identidades y sesiones, pero los permisos institucionales deben ser preaprovisionados, soportar múltiples roles y poder deshabilitarse sin eliminar la identidad externa.
+
+### Decisión
+
+Mantener `auth.users` fuera del schema Drizzle. Una invitación interna se identifica por correo normalizado y se vincula una sola vez al UUID Auth después de un Google OAuth exitoso con correo verificado. Roles y estado viven únicamente en tablas internas. No se añade FK cross-schema: se usa unicidad DB y vinculación transaccional en aplicación.
+
+Las tablas públicas quedan sin acceso por Data API para `anon`/`authenticated`; Astro con Drizzle aplica la autorización operativa.
+
+### Consecuencias
+
+- Deshabilitar el usuario interno corta acceso aunque la sesión Google siga siendo válida.
+- Los cambios de rol se observan en el siguiente request sin esperar a renovar JWT.
+- El proceso de preaprovisionamiento no necesita privilegios sobre el schema `auth`.
+- Los fixtures automatizados pueden crear identidades locales por Admin API sin alterar el mecanismo visible de login.
+
+---
+
+## ADR-013 — URLs DB SEPARADAS PARA RUNTIME Y MIGRACIONES
+
+**Fecha:** 2026-09-14
+
+**Estado:** Accepted
+
+### Decisión
+
+`DATABASE_URL` es la conexión server-side de runtime y `MIGRATION_DATABASE_URL` es la conexión directa preferida por Drizzle Kit. Localmente pueden ser iguales; en Vercel el runtime puede usar pooler mientras las migraciones conservan una conexión directa.

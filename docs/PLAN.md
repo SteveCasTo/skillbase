@@ -78,6 +78,39 @@ Foundation queda completa cuando este checklist, CI y ambas ramas están publica
 
 Administrador e instructor pueden autenticarse y acceder únicamente a las zonas correspondientes.
 
+### Checklist de implementación
+
+- [x] Añadir los clientes oficiales de Supabase para Auth SSR con versiones fijadas.
+- [ ] Configurar variables públicas y privadas separadas para local, CI y cloud.
+- [x] Modelar usuarios internos preaprovisionados con estados `INVITED`, `ACTIVE` y `DISABLED`.
+- [x] Modelar roles `ADMIN` e `INSTRUCTOR` como una relación multirol.
+- [x] Vincular una invitación interna con una identidad Google únicamente después de autenticar un correo verificado coincidente.
+- [x] Crear y verificar la migración Drizzle, restricciones, índices, privilegios y RLS correspondientes.
+- [x] Implementar clientes Supabase por request, renovación de cookies y contexto de autenticación en middleware.
+- [x] Implementar inicio de sesión Google mediante OAuth PKCE y callback con redirects validados.
+- [x] Implementar logout limitado a la sesión del navegador actual.
+- [x] Rechazar explícitamente identidades sin invitación, usuarios deshabilitados y usuarios sin permisos.
+- [x] Crear guards server-side reutilizables para sesión, estado y roles.
+- [x] Crear login, layout privado y navegación responsive accesible según permisos.
+- [x] Crear rutas privadas representativas para administración e instructores.
+- [x] Crear fixtures locales deterministas que no dependan de la interfaz de Google.
+- [x] Cubrir autenticación, sesión, logout, redirects y autorización con pruebas unitarias, de integración y E2E.
+- [x] Enlazar y verificar el proyecto dedicado de Supabase Cloud.
+- [x] Configurar Google OAuth local y cloud sin versionar secretos.
+- [x] Preaprovisionar el primer administrador cloud mediante su correo autorizado.
+- [x] Crear y configurar el proyecto Vercel con `master` como rama de producción.
+- [ ] Ejecutar migraciones y despliegue de producción únicamente después de superar los checks de CI.
+- [x] Actualizar documentación de arquitectura, datos, Auth, seguridad, testing y despliegue.
+
+### Decisiones de alcance
+
+- Google OAuth es el mecanismo visible de acceso; email/password solo podría utilizarse en fixtures automatizados locales. Los fixtures actuales usan sesiones de un solo uso generadas por Admin API porque el proveedor público de email está deshabilitado.
+- Una identidad autenticada no obtiene acceso por defecto. Debe existir una invitación interna previa y activa.
+- Un usuario puede tener simultáneamente los roles `ADMIN` e `INSTRUCTOR`.
+- El rol y el estado se consultan desde la base interna, no desde metadata editable ni desde el dominio del correo.
+- Las rutas y operaciones privadas validan autorización en servidor; la navegación filtrada no constituye un control de acceso.
+- Supabase Cloud y Vercel se configuran en esta fase, pero ningún secreto se almacena en Git.
+
 ## FASE 2 — LANDING Y CURSOS
 
 ### Objetivos

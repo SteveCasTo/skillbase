@@ -172,8 +172,9 @@ Usar `.env.example` como referencia. No se requieren entidades ni seeds de negoc
 - Rama: `master`.
 - Supabase Cloud.
 - Vercel.
-- El despliegue automático y las migraciones cloud se habilitarán después de crear y enlazar los recursos de producción.
-- Ningún workflow de Foundation recibe secretos o accede a servicios cloud.
+- URL: `https://skillbase.vercel.app`.
+- Supabase Cloud y Vercel están enlazados desde la Fase 1.
+- Los pushes a `master` despliegan únicamente después de superar CI y aplicar migraciones Drizzle pendientes.
 
 ## DOCUMENTACIÓN
 

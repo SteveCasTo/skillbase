@@ -1,0 +1,130 @@
+---
+import {
+  BookOpen,
+  CalendarCheck,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+} from "lucide-react";
+
+import { hasRole } from "@/domain/auth/policies";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+const user = Astro.locals.internalUser;
+if (!user)
+  throw new Error("PrivateLayout requires an authorized internal user");
+const navItems = [
+  { href: "/app", label: "Resumen", icon: LayoutDashboard, visible: true },
+  {
+    href: "/app/cursos",
+    label: "Cursos",
+    icon: BookOpen,
+    visible: hasRole(user, "ADMIN"),
+  },
+  {
+    href: "/app/asistencia",
+    label: "Asistencia",
+    icon: CalendarCheck,
+    visible: hasRole(user, "INSTRUCTOR"),
+  },
+].filter((item) => item.visible);
+const currentPath = Astro.url.pathname;
+---
+
+<BaseLayout title={`${title} | SkillBase`}>
+  <div class="min-h-svh bg-muted/35 lg:grid lg:grid-cols-[17rem_1fr]">
+    <aside class="hidden border-r bg-sidebar lg:flex lg:flex-col">
+      <a class="border-b px-6 py-6 text-lg font-semibold" href="/app">
+        SkillBase
+      </a>
+      <nav class="flex-1 p-4" aria-label="Navegación privada">
+        <ul class="space-y-1">
+          {navItems.map(({ href, label, icon: Icon }) => (
+            <li>
+              <a
+                href={href}
+                aria-current={currentPath === href ? "page" : undefined}
+                class:list={[
+                  "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
+                  currentPath === href
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
+                ]}
+              >
+                <Icon size={19} aria-hidden="true" />
+                {label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <div class="border-t p-4">
+        <p class="truncate px-2 text-sm font-medium">{user.name}</p>
+        <p class="truncate px-2 pb-3 text-xs text-muted-foreground">
+          {user.email}
+        </p>
+        <form method="post" action="/auth/logout">
+          <button
+            class="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-secondary"
+            type="submit"
+          >
+            <LogOut size={18} aria-hidden="true" /> Cerrar sesión
+          </button>
+        </form>
+      </div>
+    </aside>
+
+    <div class="min-w-0">
+      <header class="border-b bg-background lg:hidden">
+        <div class="flex min-h-16 items-center justify-between px-5">
+          <a class="font-semibold" href="/app">
+            SkillBase
+          </a>
+          <details class="relative">
+            <summary
+              class="flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center rounded-lg border"
+              aria-label="Abrir menú"
+            >
+              <Menu size={20} aria-hidden="true" />
+            </summary>
+            <div class="absolute right-0 z-20 mt-2 w-64 rounded-xl border bg-card p-3 shadow-lg">
+              <p class="truncate px-2 pt-1 text-sm font-semibold">
+                {user.name}
+              </p>
+              <nav class="my-3 border-y py-2" aria-label="Navegación móvil">
+                <ul>
+                  {navItems.map(({ href, label }) => (
+                    <li>
+                      <a
+                        class="block min-h-11 rounded-md px-2 py-3 text-sm hover:bg-secondary"
+                        href={href}
+                      >
+                        {label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+              <form method="post" action="/auth/logout">
+                <button
+                  class="min-h-11 w-full rounded-md px-2 text-left text-sm font-medium hover:bg-secondary"
+                  type="submit"
+                >
+                  Cerrar sesión
+                </button>
+              </form>
+            </div>
+          </details>
+        </div>
+      </header>
+      <main class="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
+        <slot />
+      </main>
+    </div>
+  </div>
+</BaseLayout>

@@ -12,6 +12,12 @@ permissions:
 env:
   BUN_VERSION: 1.4.2
   DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+  MIGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+  PUBLIC_SITE_URL: http://127.0.0.1:4321
+  PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+  PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-is-replaced-from-local-status-for-e2e
+  SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID: local-ci-placeholder
+  SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET: local-ci-placeholder
   SUPABASE_TELEMETRY_DISABLED: 1
 
 jobs:
@@ -44,3 +50,29 @@ jobs:
       - run: bun run test:e2e
       - if: always()
         run: bun run supabase:stop --no-backup
+
+  deploy:
+    if: github.event_name == 'push'
+    needs: [quality, integration-e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - name: Apply production migrations
+        run: bunx drizzle-kit migrate
+      - name: Pull Vercel production configuration
+        run: bunx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - name: Build Vercel production output
+        run: bunx vercel build --prod --token="$VERCEL_TOKEN"
+      - name: Deploy production output
+        run: bunx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"

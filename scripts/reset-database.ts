@@ -2,6 +2,8 @@ const bun = process.execPath;
 const localEnvironment = {
   ...process.env,
   DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+  MIGRATION_DATABASE_URL:
+    "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
 };
 
 const commands = [

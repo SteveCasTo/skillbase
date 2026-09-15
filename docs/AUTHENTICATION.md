@@ -78,3 +78,43 @@ No asumir que cualquier cuenta Google autenticada es automáticamente administra
 ## OFFBOARDING
 
 Deshabilitar un User interno debe impedir acceso incluso si su identidad Google continúa siendo válida.
+
+## IMPLEMENTACIÓN DE FASE 1
+
+El acceso visible usa Google OAuth con PKCE:
+
+```text
+POST /auth/google
+→ Supabase/Google
+→ GET /auth/callback?code=...
+→ exchangeCodeForSession
+→ identidad Google con correo verificado
+→ invitación interna por correo normalizado
+→ vínculo único con auth.users.id y activación
+→ /app
+```
+
+El callback acepta únicamente identidades que incluyan el proveedor `google`, correo y `email_confirmed_at`. Una invitación `INVITED` no tiene `authUserId`; el vínculo y el cambio a `ACTIVE` se realizan juntos bajo bloqueo de fila. Una invitación vinculada a otro UUID, una cuenta desconocida, deshabilitada o sin roles se rechaza y se cierra solamente la sesión local recién creada.
+
+En requests posteriores, el middleware crea un cliente `@supabase/ssr` ligado a las cookies del request, valida la identidad con `getUser()` y carga estado y roles desde PostgreSQL mediante Drizzle. No se usa `user_metadata`, dominio de correo ni navegación como autorización.
+
+El parámetro de retorno permite solo rutas relativas locales. El siguiente destino del OAuth se conserva en una cookie breve, `HttpOnly` y `SameSite=Lax`. Logout es `POST`, valida el origen y usa `signOut({ scope: "local" })`.
+
+### Configuración local
+
+- Site URL: `http://127.0.0.1:4321`.
+- Redirect permitido exacto: `http://127.0.0.1:4321/auth/callback`.
+- Callback que debe registrarse en Google para Supabase local: `http://127.0.0.1:54321/auth/v1/callback`.
+- Client ID y secret de Google se leen desde variables ignoradas por Git declaradas en `.env.example`.
+
+Email/password no aparece en la aplicación. Los fixtures locales crean usuarios de Auth confirmados mediante Admin API y obtienen sesiones E2E con enlaces de un solo uso generados por esa misma API, sin automatizar la UI de Google ni habilitar login público por email.
+
+El signup público por email/password está deshabilitado tanto en Supabase local como en el proyecto cloud; esto no impide que la Admin API local cree fixtures. Google es el único proveedor habilitado para el flujo visible de la aplicación.
+
+Las rutas privadas tienen políticas exactas: `/app` permite cualquier usuario interno activo con al menos un rol, `/app/cursos` exige `ADMIN` y `/app/asistencia` exige `INSTRUCTOR`. Cualquier ruta futura bajo `/app` se rechaza hasta declarar su política.
+
+### Configuración cloud
+
+El proyecto `SkillBase` está enlazado con referencia `fvzxqlezdrlzykyoevub`. Google OAuth, Site URL y el callback `https://skillbase.vercel.app/auth/callback` están configurados. El primer administrador permanece como invitación `INVITED` hasta completar su primer acceso Google, momento en que se vinculará su UUID Auth y pasará a `ACTIVE`.
+
+La prueba manual completa del callback queda pendiente hasta que la versión de esta fase se despliegue en Vercel.
