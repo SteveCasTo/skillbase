@@ -58,5 +58,8 @@ export function readServerEnvironment(
 }
 
 export function getServerEnvironment(): ServerEnvironment {
-  return readServerEnvironment(import.meta.env);
+  return {
+    ...readPublicAuthEnvironment(import.meta.env),
+    databaseUrl: required(process.env, "DATABASE_URL"),
+  };
 }
