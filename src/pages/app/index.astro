@@ -1,0 +1,39 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+
+const user = Astro.locals.internalUser!;
+---
+
+<PrivateLayout title="Resumen">
+  <header>
+    <p class="text-sm font-medium text-primary">Panel privado</p>
+    <h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+      Hola, {user.name}
+    </h1>
+    <p class="mt-3 max-w-2xl leading-7 text-muted-foreground">
+      Tu acceso está activo. Las secciones disponibles dependen de tus roles
+      asignados.
+    </p>
+  </header>
+  <section class="mt-9 grid gap-4 sm:grid-cols-2" aria-labelledby="roles-title">
+    <article class="rounded-xl border bg-card p-6 shadow-sm">
+      <h2 id="roles-title" class="text-lg font-semibold">
+        Roles habilitados
+      </h2>
+      <ul class="mt-4 flex flex-wrap gap-2">
+        {user.roles.map((role) => (
+          <li class="rounded-full bg-secondary px-3 py-1 text-sm font-medium">
+            {role === "ADMIN" ? "Administrador" : "Instructor"}
+          </li>
+        ))}
+      </ul>
+    </article>
+    <article class="rounded-xl border bg-card p-6 shadow-sm">
+      <h2 class="text-lg font-semibold">Estado operativo</h2>
+      <p class="mt-4 text-sm leading-6 text-muted-foreground">
+        La estructura privada está lista. Los flujos de cursos y asistencia se
+        incorporarán en las siguientes fases.
+      </p>
+    </article>
+  </section>
+</PrivateLayout>

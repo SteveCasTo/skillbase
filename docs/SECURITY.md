@@ -236,3 +236,17 @@ Si un secreto se expone:
 4. eliminarlo del repositorio e historial si corresponde;
 5. documentar la causa;
 6. introducir prevención.
+
+## POSTURA DE AUTH PRIVADO IMPLEMENTADA
+
+- Las cookies de sesión se leen y renuevan mediante un cliente Supabase nuevo por request; las cabeceras anti-cache entregadas por `@supabase/ssr` se copian a la respuesta.
+- La identidad se valida contra Supabase Auth con `getUser()`. Estado y roles se consultan siempre en las tablas internas mediante una conexión server-side.
+- El callback exige proveedor Google y correo verificado antes de vincular una invitación; los fixtures email/password ya se pre-vinculan y existen solo en tests.
+- Los endpoints mutables de inicio y cierre de sesión son `POST` y verifican el origen esperado.
+- Los redirects de retorno se restringen a paths relativos y la allowlist local contiene una URL exacta.
+- No existe service-role key en código de aplicación o browser. El setup E2E obtiene la key efímera local desde Supabase CLI, la conserva únicamente en el entorno del proceso de prueba y no la imprime.
+- `users`, `roles` y `user_roles` tienen RLS sin políticas para Data API y privilegios revocados a `anon`, `authenticated` y `service_role`. Los guards Astro/Drizzle siguen siendo autoritativos porque las conexiones owner/bypass RLS no quedan restringidas por esas políticas.
+- Supabase local deshabilita el signup público por email/password. La Admin API continúa disponible exclusivamente para crear fixtures controlados. La configuración cloud debe deshabilitar también signup público por email y cualquier proveedor no previsto antes de habilitar producción.
+- Las cookies SSR declaran `HttpOnly`, `SameSite=Lax`, path `/` y `Secure` cuando `PUBLIC_SITE_URL` usa HTTPS.
+- Las respuestas de `/app`, `/app/**`, `/login`, `/unauthorized` y `/auth/**` usan `Cache-Control: private, no-store`.
+- Toda ruta bajo `/app` requiere una política exacta registrada. Las rutas futuras no declaradas fallan cerradas; los endpoints de operaciones sensibles deben seguir invocando guards propios aunque una página ya esté protegida.

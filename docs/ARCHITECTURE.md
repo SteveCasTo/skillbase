@@ -363,3 +363,19 @@ Considerar Elysia + Bun únicamente cuando aparezca al menos una necesidad real:
 - necesidad clara de escalar backend y frontend independientemente.
 
 No extraer backend por anticipación.
+
+## AUTH EN EL MONOLITO MODULAR
+
+La Fase 1 mantiene los límites siguientes:
+
+```text
+middleware/endpoints Astro
+→ casos de uso Auth
+→ políticas y errores de dominio
+→ AuthUserRepository
+→ Drizzle/PostgreSQL
+```
+
+La integración Supabase SSR vive en infraestructura server-side y se instancia por request. `Astro.locals` expone el cliente validado y el usuario interno ya resuelto a presentación; las páginas no consultan PostgreSQL. Los guards de ruta reutilizan políticas de aplicación y la navegación solo refleja permisos ya evaluados.
+
+La conexión `DATABASE_URL` corresponde al runtime y puede apuntar a un pooler compatible con serverless. `MIGRATION_DATABASE_URL` prioriza una conexión directa para Drizzle Kit. En local ambas apuntan a `127.0.0.1:54322`.

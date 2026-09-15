@@ -168,11 +168,31 @@ El job `quality` instala con lockfile y ejecuta checks estáticos, unit tests y 
 
 El job `integration-e2e` levanta una sola instancia mínima de Supabase, aplica migraciones, ejecuta integration tests y E2E con Chromium, y detiene Supabase incluso ante fallos.
 
-Foundation no enlaza proyectos cloud ni ejecuta despliegues. Cuando existan Supabase Cloud y Vercel, el job de deploy deberá depender de ambos gates y utilizar estos GitHub Environment secrets de producción:
+El proyecto cloud Supabase `SkillBase` (`fvzxqlezdrlzykyoevub`) y el proyecto Vercel `stevecasto-projects/skillbase` están enlazados. El dominio de producción es `https://skillbase.vercel.app`.
 
-- `DATABASE_URL`: conexión directa de PostgreSQL con permiso para migraciones;
-- `VERCEL_TOKEN`;
-- `VERCEL_ORG_ID`;
-- `VERCEL_PROJECT_ID`.
+El job `deploy` se ejecuta únicamente en pushes a `master`, depende de `quality` e `integration-e2e`, aplica migraciones Drizzle y despliega el output preconstruido con Vercel CLI. La integración Git automática de Vercel está desconectada para impedir despliegues paralelos que omitan estos gates.
 
-Vercel debe usar Node.js 22 o posterior. El proyecto usa el adapter oficial con salida server-side. Los previews administrados fuera de este workflow no deben recibir credenciales de producción.
+El environment GitHub `production` restringe despliegues a ramas protegidas y contiene:
+
+- `DATABASE_URL`: conexión de runtime mediante pooler compatible con serverless, configurada en Vercel;
+- `MIGRATION_DATABASE_URL`: conexión de sesión con permiso para migraciones, almacenada como GitHub Environment secret;
+- `VERCEL_TOKEN`: GitHub Environment secret;
+- `VERCEL_ORG_ID`: GitHub Environment variable;
+- `VERCEL_PROJECT_ID`: GitHub Environment variable.
+
+Vercel usa el preset Astro, Bun con lockfile congelado y Node.js 24. El proyecto usa el adapter oficial con salida server-side. No se generan previews automáticos ni se entregan credenciales de producción a ramas de feature.
+
+## CONEXIONES POSTGRESQL EN SERVERLESS
+
+En Vercel, `DATABASE_URL` debe apuntar al pooler de Supabase apropiado para runtime serverless. El singleton por módulo limita cada instancia de función a una conexión (`max: 1`) y libera conexiones inactivas; esto reduce presión, pero no reemplaza el pooler porque Vercel puede ejecutar múltiples instancias.
+
+`MIGRATION_DATABASE_URL` utiliza el pooler en session mode para conservar una sesión PostgreSQL durante las migraciones de Drizzle. No ejecutar migraciones mediante el pooler en transaction mode. Localmente ambas URLs pueden apuntar a `127.0.0.1:54322`.
+
+Antes de habilitar Auth cloud se debe verificar explícitamente:
+
+- signup público por email/password deshabilitado;
+- únicamente Google entre los proveedores previstos;
+- Site URL y callback allowlist exactos;
+- variables públicas y privadas asignadas al entorno correcto sin exponer secretos.
+
+Estas comprobaciones quedaron aplicadas durante la Fase 1. La clave legacy `service_role` debe rotarse o deshabilitarse antes de operar con datos reales porque una inspección inicial del CLI la mostró completa aun sin solicitar `--reveal`.

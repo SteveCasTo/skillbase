@@ -223,5 +223,28 @@ Cuando aplique debe:
 - `bun run db:generate` genera migraciones Drizzle después de cambiar `src/server/db/schema`.
 - `bun run db:migrate` aplica migraciones Drizzle y requiere `DATABASE_URL`.
 - `bun run db:reset` reinicia Supabase local, aplica las migraciones Drizzle y ejecuta el seed de desarrollo.
-- `bun run db:seed` es intencionalmente vacío hasta que exista un caso de desarrollo real.
+- `bun run db:seed` preaprovisiona opcionalmente una invitación ADMIN cuando `DEV_INITIAL_ADMIN_EMAIL` está configurado; de otro modo no inserta datos.
 - El `Dockerfile` ofrece un contenedor mínimo de desarrollo. Supabase sigue siendo administrado exclusivamente por su CLI; no existe un segundo `docker-compose`.
+
+## AUTH LOCAL DE FASE 1
+
+Después de `bun run supabase:start` y `bun run db:reset`, se puede crear una invitación de desarrollo configurando `DEV_INITIAL_ADMIN_EMAIL` en el `.env` ignorado. El seed no crea una identidad Auth ni almacena contraseñas.
+
+Para preaprovisionar cualquier entorno de forma explícita se utiliza:
+
+```text
+DATABASE_URL=... PREPROVISION_EMAIL=... PREPROVISION_NAME=... PREPROVISION_ROLES=ADMIN,INSTRUCTOR bun run user:preprovision
+```
+
+El comando crea o completa una invitación; no vincula UUIDs ni administra `auth.users`. En cloud debe ejecutarse con variables seguras y una conexión autorizada, nunca con valores versionados.
+
+Solo una fila `INVITED` y sin vínculo Auth puede editarse mediante preaprovisionamiento. Los roles solicitados reemplazan atómicamente el conjunto anterior; una fila `ACTIVE`, `DISABLED` o vinculada se rechaza para evitar cambios accidentales sobre cuentas operativas.
+
+Variables relevantes:
+
+- `PUBLIC_SITE_URL`, `PUBLIC_SUPABASE_URL` y `PUBLIC_SUPABASE_PUBLISHABLE_KEY`: configuración pública Auth.
+- `DATABASE_URL`: runtime server-side; usar pooler cuando corresponda en Vercel.
+- `MIGRATION_DATABASE_URL`: conexión directa para migraciones.
+- variables `SUPABASE_AUTH_EXTERNAL_GOOGLE_*`: configuración local del provider; el secret solo vive en `.env`.
+
+La allowlist local y toda navegación usan `127.0.0.1`; no mezclar con `localhost` porque cambia origen y cookies.

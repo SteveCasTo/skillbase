@@ -232,6 +232,16 @@ La combinación CI definitiva se documentará en `DEPLOYMENT.md`.
 
 Antes de integración, ejecutar `bun run supabase:start` y `bun run db:reset`. Instalar el único navegador requerido con `bunx playwright install chromium`.
 
+### Fixtures Auth de Fase 1
+
+`tests/fixtures/setup-auth.ts` crea identidades locales confirmadas mediante la Admin API de Supabase y perfiles internos deterministas para ADMIN, INSTRUCTOR, multirol y DISABLED, además de una identidad desconocida. Las credenciales son datos ficticios exclusivos de test. El setup obtiene URL y keys de `supabase status --output env` sin imprimirlas; ninguna service-role key llega al web server ni al browser.
+
+`bun run test:e2e` usa un runner que inyecta esa configuración solo al proceso Playwright. Los tests generan enlaces de un solo uso mediante Admin API y canjean el token con el adaptador cookie oficial de SSR, sin ofrecer login por email en `/login` ni visitar Google. El seed de desarrollo y los fixtures de test permanecen separados.
+
+La cobertura de Auth incluye redirects no autenticados, roles individuales y múltiples, denegación por URL directa, identidad deshabilitada/desconocida, vinculación y restricciones DB, y cierre de solamente la sesión actual.
+
+También se verifica signup público deshabilitado, creación de fixture por Admin API, usuario activo sin roles, motivos exactos de denegación, políticas fail-closed, opciones de cookies, cache privado, origen de acciones Auth, reemplazo exacto de roles y vinculación concurrente. Los escenarios server-side se ejecutan una vez en Chromium desktop; mobile conserva únicamente Foundation y un smoke de navegación privada.
+
 ## GATES
 
 No desplegar `master` si falla:

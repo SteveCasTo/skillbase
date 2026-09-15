@@ -15,7 +15,15 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
     >
       SkillBase
     </a>
-    <ThemeSelector client:load />
+    <div class="flex items-center gap-2 sm:gap-4">
+      <a
+        class="min-h-11 rounded-lg px-3 py-3 text-sm font-semibold hover:bg-secondary"
+        href="/login"
+      >
+        Acceso del equipo
+      </a>
+      <ThemeSelector client:load />
+    </div>
   </header>
 
   <main>
