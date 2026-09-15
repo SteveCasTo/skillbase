@@ -111,6 +111,10 @@ Administrador e instructor pueden autenticarse y acceder únicamente a las zonas
 - Las rutas y operaciones privadas validan autorización en servidor; la navegación filtrada no constituye un control de acceso.
 - Supabase Cloud y Vercel se configuran en esta fase, pero ningún secreto se almacena en Git.
 
+### Estado
+
+Fase 1 completada y verificada en local, CI y cloud. El primer administrador puede autenticarse con Google y acceder a `/app`; las identidades no preaprovisionadas, deshabilitadas o sin roles quedan rechazadas en servidor.
+
 ## FASE 2 — LANDING Y CURSOS
 
 ### Objetivos
