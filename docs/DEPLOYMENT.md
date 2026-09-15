@@ -168,7 +168,7 @@ El job `quality` instala con lockfile y ejecuta checks estáticos, unit tests y 
 
 El job `integration-e2e` levanta una sola instancia mínima de Supabase, aplica migraciones, ejecuta integration tests y E2E con Chromium, y detiene Supabase incluso ante fallos.
 
-El proyecto cloud Supabase `SkillBase` (`fvzxqlezdrlzykyoevub`) y el proyecto Vercel `stevecasto-projects/skillbase` están enlazados. El dominio de producción es `https://skillbase.vercel.app`.
+El proyecto cloud Supabase `SkillBase` (`fvzxqlezdrlzykyoevub`) y el proyecto Vercel `stevecasto-projects/skillbase` están enlazados. El dominio de producción es `https://skillbase-alpha.vercel.app`; `skillbase.vercel.app` no está disponible porque pertenece a otra cuenta.
 
 El job `deploy` se ejecuta únicamente en pushes a `master`, depende de `quality` e `integration-e2e`, aplica migraciones Drizzle y despliega el output preconstruido con Vercel CLI. La integración Git automática de Vercel está desconectada para impedir despliegues paralelos que omitan estos gates.
 
