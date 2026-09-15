@@ -99,7 +99,7 @@ Administrador e instructor pueden autenticarse y acceder únicamente a las zonas
 - [x] Configurar Google OAuth local y cloud sin versionar secretos.
 - [x] Preaprovisionar el primer administrador cloud mediante su correo autorizado.
 - [x] Crear y configurar el proyecto Vercel con `master` como rama de producción.
-- [ ] Ejecutar migraciones y despliegue de producción únicamente después de superar los checks de CI.
+- [x] Ejecutar migraciones y despliegue de producción únicamente después de superar los checks de CI.
 - [x] Actualizar documentación de arquitectura, datos, Auth, seguridad, testing y despliegue.
 
 ### Decisiones de alcance

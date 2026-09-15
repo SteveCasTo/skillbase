@@ -172,7 +172,7 @@ Usar `.env.example` como referencia. No se requieren entidades ni seeds de negoc
 - Rama: `master`.
 - Supabase Cloud.
 - Vercel.
-- URL: `https://skillbase.vercel.app`.
+- URL: `https://skillbase-alpha.vercel.app`.
 - Supabase Cloud y Vercel están enlazados desde la Fase 1.
 - Los pushes a `master` despliegan únicamente después de superar CI y aplicar migraciones Drizzle pendientes.
 
