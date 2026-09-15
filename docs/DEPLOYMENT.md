@@ -174,6 +174,8 @@ El job `deploy` se ejecuta únicamente en pushes a `master`, depende de `quality
 
 Las variables de Supabase local están limitadas a los jobs de calidad e integración. `deploy` descarga su entorno de producción desde Vercel para evitar que valores locales sobrescriban URLs, claves públicas o conexiones del build final.
 
+Las variables públicas se incorporan durante el build desde la configuración descargada. `DATABASE_URL` se lee desde `process.env` en runtime, porque Vercel no revela valores sensibles al construir output prebuilt y los inyecta únicamente en la función desplegada.
+
 El environment GitHub `production` restringe despliegues a ramas protegidas y contiene:
 
 - `DATABASE_URL`: conexión de runtime mediante pooler compatible con serverless, configurada en Vercel;
