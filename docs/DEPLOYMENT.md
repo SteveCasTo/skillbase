@@ -172,6 +172,8 @@ El proyecto cloud Supabase `SkillBase` (`fvzxqlezdrlzykyoevub`) y el proyecto Ve
 
 El job `deploy` se ejecuta únicamente en pushes a `master`, depende de `quality` e `integration-e2e`, aplica migraciones Drizzle y despliega el output preconstruido con Vercel CLI. La integración Git automática de Vercel está desconectada para impedir despliegues paralelos que omitan estos gates.
 
+Las variables de Supabase local están limitadas a los jobs de calidad e integración. `deploy` descarga su entorno de producción desde Vercel para evitar que valores locales sobrescriban URLs, claves públicas o conexiones del build final.
+
 El environment GitHub `production` restringe despliegues a ramas protegidas y contiene:
 
 - `DATABASE_URL`: conexión de runtime mediante pooler compatible con serverless, configurada en Vercel;
