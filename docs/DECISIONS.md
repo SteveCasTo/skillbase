@@ -281,6 +281,34 @@ Las tablas públicas quedan sin acceso por Data API para `anon`/`authenticated`;
 
 ---
 
+## ADR-014 — NOMBRE DE PRODUCTO PROVISIONAL
+
+**Fecha:** 2026-09-15
+
+**Estado:** Proposed
+
+### Contexto
+
+`SkillBase` identifica actualmente al proyecto, pero todavía no existe una decisión definitiva de marca. Se estima en un 80 % la probabilidad de cambiar el nombre durante el desarrollo, cuando el alcance funcional y la identidad del producto estén más definidos.
+
+### Decisión
+
+Mantener `SkillBase` como nombre provisional sin iniciar por ahora un proceso de rebranding. La landing puede evolucionar durante esta etapa, pero la identidad visible debe permanecer centralizada y desacoplada de reglas de negocio, identificadores persistidos o integraciones que dificulten un cambio posterior.
+
+### Alternativas
+
+- Adoptar `SkillBase` como nombre definitivo desde esta etapa.
+- Cambiar el nombre antes de implementar los siguientes módulos.
+- Posponer la decisión hasta validar una parte mayor del flujo interno.
+
+### Consecuencias
+
+- Los dominios, textos de marca y metadatos podrán cambiar más adelante.
+- Los nombres técnicos existentes no se renombran sin una decisión posterior explícita.
+- La landing puede implementarse con la identidad provisional, evitando decisiones de marca difíciles de sustituir.
+
+---
+
 ## ADR-015 — CICLO EDITORIAL Y CONTRATOS DE CURSO
 
 **Fecha:** 2026-09-15
