@@ -278,3 +278,69 @@ Las tablas públicas quedan sin acceso por Data API para `anon`/`authenticated`;
 ### Decisión
 
 `DATABASE_URL` es la conexión server-side de runtime y `MIGRATION_DATABASE_URL` es la conexión directa preferida por Drizzle Kit. Localmente pueden ser iguales; en Vercel el runtime puede usar pooler mientras las migraciones conservan una conexión directa.
+
+---
+
+## ADR-014 — NOMBRE DE PRODUCTO PROVISIONAL
+
+**Fecha:** 2026-09-15
+
+**Estado:** Proposed
+
+### Contexto
+
+`SkillBase` identifica actualmente al proyecto, pero todavía no existe una decisión definitiva de marca. Se estima en un 80 % la probabilidad de cambiar el nombre durante el desarrollo, cuando el alcance funcional y la identidad del producto estén más definidos.
+
+### Decisión
+
+Mantener `SkillBase` como nombre provisional sin iniciar por ahora un proceso de rebranding. La landing puede evolucionar durante esta etapa, pero la identidad visible debe permanecer centralizada y desacoplada de reglas de negocio, identificadores persistidos o integraciones que dificulten un cambio posterior.
+
+### Alternativas
+
+- Adoptar `SkillBase` como nombre definitivo desde esta etapa.
+- Cambiar el nombre antes de implementar los siguientes módulos.
+- Posponer la decisión hasta validar una parte mayor del flujo interno.
+
+### Consecuencias
+
+- Los dominios, textos de marca y metadatos podrán cambiar más adelante.
+- Los nombres técnicos existentes no se renombran sin una decisión posterior explícita.
+- La landing puede implementarse con la identidad provisional, evitando decisiones de marca difíciles de sustituir.
+
+---
+
+## ADR-015 — CICLO EDITORIAL Y CONTRATOS DE CURSO
+
+**Fecha:** 2026-09-15
+
+**Estado:** Accepted
+
+### Contexto
+
+La gestión administrativa debe alimentar una experiencia pública posterior sin mezclar publicación editorial, disponibilidad de preinscripción ni calendario operativo de grupos. Los cambios sobre cursos publicados y precios necesitan trazabilidad.
+
+### Decisión
+
+Modelar el curso con estados `DRAFT`, `PUBLISHED` y `ARCHIVED`. Publicar transforma borrador en publicado; retirar transforma publicado en borrador y se audita como retiro; archivar no borra y es terminal en Fase 2A. La disponibilidad de preinscripción se deriva de una ventana opcional válida y no se persiste.
+
+Generar un slug único y normalizado al crear, resolver colisiones de forma transaccional y mantenerlo inmutable. Persistir precios obligatorios `STUDENT` y `EXTERNAL` como `numeric(12,2)` y strings TypeScript, con moneda `BOB`. Mantener DTO administrativo y DTO público separados; el segundo solo se produce para `PUBLISHED`. En Fase 2A el DTO público existe como contrato de repositorio, pero todavía no hay rutas HTTP públicas.
+
+Astro SSR coordina formularios POST en páginas dedicadas. Los casos de uso autorizan `ADMIN`, el repositorio Drizzle conserva atomicidad entre entidad, precios y `audit_events`, y no se expone Data API.
+
+Los valores `datetime-local` se definen como tiempo civil `America/La_Paz` y se convierten simétricamente con UTC-04, sin consultar el timezone del runtime. `updatedAt` actúa como revisión optimista para edición. Un advisory lock global serializa la asignación de slugs; las transiciones continúan usando bloqueo de fila. Todo éxito mutable finaliza con Post/Redirect/Get `303`.
+
+### Alternativas
+
+- Combinar publicación y preinscripción en un único estado.
+- Regenerar el slug al editar el nombre.
+- Persistir disponibilidad calculada.
+- Exponer las tablas mediante Supabase Data API.
+
+### Consecuencias
+
+- El calendario público actual es informativo; grupos futuros podrán definir el operativo sin reinterpretar cursos existentes.
+- Retirar conserva curso, URL y trazabilidad, pero lo oculta de lecturas públicas.
+- Editar contenido o precios publicados es posible y auditable.
+- Ediciones obsoletas se rechazan sin pérdida silenciosa y los no-op no generan eventos de cambio.
+- La serialización global sacrifica paralelismo mínimo durante la breve asignación de slug a cambio de unicidad determinista para bases solapadas.
+- Fase 2B puede consumir un contrato público estable sin acceder a campos administrativos ni cambiar la persistencia.

@@ -242,6 +242,19 @@ La cobertura de Auth incluye redirects no autenticados, roles individuales y mú
 
 También se verifica signup público deshabilitado, creación de fixture por Admin API, usuario activo sin roles, motivos exactos de denegación, políticas fail-closed, opciones de cookies, cache privado, origen de acciones Auth, reemplazo exacto de roles y vinculación concurrente. Los escenarios server-side se ejecutan una vez en Chromium desktop; mobile conserva únicamente Foundation y un smoke de navegación privada.
 
+### Cobertura Courses de Fase 2A
+
+- Unit cubre validación de campos, niveles, dinero decimal, fechas civiles Bolivia estrictas y simétricas, ventana opcional, nota explícita —incluido cero—, slug, transiciones, autorización activa, logging sanitizado y disponibilidad derivada.
+- Integration usa Supabase local para verificar schema, checks, índices de FK/consulta, RLS, privilegios, rollback atómico, auditoría exacta, validación transaccional de precios, concurrencia de slugs solapados, revisión optimista, persistencia UTC y proyecciones públicas.
+- E2E usa los usuarios Auth controlados existentes y recorre validación con valores preservados, creación, reedición sin desplazamiento horario, edición, publicación, edición publicada, retiro y archivo mediante Post/Redirect/Get. También comprueba operación sin JavaScript, denegación a instructor, protección de origen, layout mobile sin overflow y foco por teclado.
+- No se automatiza Google UI ni se crean rutas públicas de Fase 2B.
+
+### Resultado local de Fase 2A
+
+- 22 pruebas unitarias, 18 de integración y 15 E2E ejecutadas localmente.
+- Typecheck y build locales correctos; los advisors locales de Supabase también se ejecutaron correctamente.
+- El CI remoto todavía no se ha ejecutado. Estos resultados no cierran el gate remoto ni equivalen a un CI exitoso.
+
 ## GATES
 
 No desplegar `master` si falla:

@@ -1,27 +1,181 @@
 ---
+import { ArrowRight, BookOpen, Plus } from "lucide-react";
+
+import { listAdminCourses } from "@/application/courses/manage-courses";
+import type { AdminCourseDto } from "@/domain/courses/types";
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import {
+  COURSE_INFRASTRUCTURE_STATUS,
+  logCourseInfrastructureError,
+} from "@/server/courses/errors";
+import { getDatabase } from "@/server/db/client";
+import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
+import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
+
+const user = Astro.locals.internalUser;
+if (!user) throw new Error("Authorized user required");
+let courses: readonly AdminCourseDto[] = [];
+let loadError = false;
+try {
+  courses = await listAdminCourses(
+    new DrizzleCourseRepository(getDatabase()),
+    user,
+  );
+} catch (error) {
+  Astro.response.status = COURSE_INFRASTRUCTURE_STATUS;
+  loadError = true;
+  if (error instanceof CourseInfrastructureError)
+    logCourseInfrastructureError(error, { actorId: user.id });
+}
+const success = Astro.url.searchParams.get("success");
+const successMessage =
+  success === "created"
+    ? "Curso creado como borrador."
+    : success === "updated"
+      ? "Cambios guardados correctamente."
+      : null;
+const statusLabel = {
+  DRAFT: "Borrador",
+  PUBLISHED: "Publicado",
+  ARCHIVED: "Archivado",
+} as const;
+const levelLabel = {
+  BASIC: "Básico",
+  INTERMEDIATE: "Medio",
+  ADVANCED: "Avanzado",
+} as const;
 ---
 
 <PrivateLayout title="Cursos">
-  <header>
-    <p class="text-sm font-medium text-primary">Administración</p>
-    <h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-      Cursos
-    </h1>
-    <p class="mt-3 max-w-2xl leading-7 text-muted-foreground">
-      Esta zona representativa está reservada al rol Administrador.
-    </p>
+  <header class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">Cursos</h1>
+      <p class="mt-3 max-w-2xl leading-7 text-muted-foreground">
+        Gestiona la información editorial, precios y disponibilidad de cada
+        curso.
+      </p>
+    </div>
+    <a
+      href="/app/cursos/nuevo"
+      class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-xs hover:opacity-90"
+    >
+      <Plus size={18} aria-hidden="true" /> Nuevo curso
+    </a>
   </header>
-  <section
-    class="mt-9 rounded-xl border border-dashed bg-card p-7 text-center sm:p-10"
-    aria-labelledby="courses-empty-title"
-  >
-    <h2 id="courses-empty-title" class="text-lg font-semibold">
-      Todavía no hay cursos
-    </h2>
-    <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-      La gestión de cursos se implementará en la Fase 2. Por ahora, esta ruta
-      evidencia el límite de autorización administrativo.
+
+  {successMessage && (
+    <p
+      role="status"
+      class="mt-7 rounded-lg border bg-secondary px-4 py-3 text-sm text-secondary-foreground"
+    >
+      {successMessage}
     </p>
-  </section>
+  )}
+
+  {loadError ? (
+    <section
+      class="mt-9 rounded-xl border bg-card p-7 text-center sm:p-10"
+      role="alert"
+    >
+      <h2 class="text-lg font-semibold">No pudimos cargar los cursos</h2>
+      <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+        Inténtalo nuevamente en unos minutos.
+      </p>
+    </section>
+  ) : courses.length === 0 ? (
+    <section
+      class="mt-9 rounded-xl border border-dashed bg-card p-7 text-center sm:p-10"
+      aria-labelledby="courses-empty-title"
+    >
+      <BookOpen
+        className="mx-auto text-muted-foreground"
+        size={34}
+        aria-hidden="true"
+      />
+      <h2 id="courses-empty-title" class="mt-4 text-lg font-semibold">
+        Todavía no hay cursos
+      </h2>
+      <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+        Crea el primer borrador para organizar sus fechas, precios y contenido
+        antes de publicarlo.
+      </p>
+      <a
+        href="/app/cursos/nuevo"
+        class="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg border px-4 text-sm font-medium hover:bg-secondary"
+      >
+        Crear primer curso
+      </a>
+    </section>
+  ) : (
+    <section class="mt-8" aria-labelledby="courses-list-title">
+      <h2 id="courses-list-title" class="sr-only">
+        Listado de cursos
+      </h2>
+      <ul class="grid gap-4 lg:grid-cols-2">
+        {courses.map((course) => (
+          <li>
+            <article class="flex h-full flex-col rounded-xl border bg-card p-5 shadow-xs sm:p-6">
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <h3 class="text-lg font-semibold leading-snug">
+                    {course.name}
+                  </h3>
+                  <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
+                    /{course.slug}
+                  </p>
+                </div>
+                <span
+                  class:list={[
+                    "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold",
+                    course.status === "PUBLISHED"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground",
+                  ]}
+                >
+                  {statusLabel[course.status]}
+                </span>
+              </div>
+              <dl class="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                <div>
+                  <dt class="text-muted-foreground">Nivel</dt>
+                  <dd class="mt-1 font-medium">{levelLabel[course.level]}</dd>
+                </div>
+                <div>
+                  <dt class="text-muted-foreground">Duración</dt>
+                  <dd class="mt-1 font-medium">{course.totalHours} horas</dd>
+                </div>
+                <div>
+                  <dt class="text-muted-foreground">Estudiante</dt>
+                  <dd class="mt-1 font-medium tabular-nums">
+                    {
+                      course.prices.find((p) => p.participantType === "STUDENT")
+                        ?.amount
+                    }{" "}
+                    BOB
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-muted-foreground">Externo</dt>
+                  <dd class="mt-1 font-medium tabular-nums">
+                    {
+                      course.prices.find(
+                        (p) => p.participantType === "EXTERNAL",
+                      )?.amount
+                    }{" "}
+                    BOB
+                  </dd>
+                </div>
+              </dl>
+              <a
+                href={`/app/cursos/${course.id}/editar`}
+                class="mt-6 inline-flex min-h-11 items-center justify-between rounded-lg border px-4 text-sm font-medium hover:bg-secondary"
+              >
+                Revisar y editar <ArrowRight size={17} aria-hidden="true" />
+              </a>
+            </article>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
 </PrivateLayout>

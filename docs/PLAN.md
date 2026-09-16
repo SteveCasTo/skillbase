@@ -81,7 +81,7 @@ Administrador e instructor pueden autenticarse y acceder únicamente a las zonas
 ### Checklist de implementación
 
 - [x] Añadir los clientes oficiales de Supabase para Auth SSR con versiones fijadas.
-- [ ] Configurar variables públicas y privadas separadas para local, CI y cloud.
+- [x] Configurar variables públicas y privadas separadas para local, CI y cloud.
 - [x] Modelar usuarios internos preaprovisionados con estados `INVITED`, `ACTIVE` y `DISABLED`.
 - [x] Modelar roles `ADMIN` e `INSTRUCTOR` como una relación multirol.
 - [x] Vincular una invitación interna con una identidad Google únicamente después de autenticar un correo verificado coincidente.
@@ -115,25 +115,174 @@ Administrador e instructor pueden autenticarse y acceder únicamente a las zonas
 
 Fase 1 completada y verificada en local, CI y cloud. El primer administrador puede autenticarse con Google y acceder a `/app`; las identidades no preaprovisionadas, deshabilitadas o sin roles quedan rechazadas en servidor.
 
-## FASE 2 — LANDING Y CURSOS
+## FASE 2 — CURSOS Y EXPERIENCIA PÚBLICA
 
-### Objetivos
+La fase se divide en dos entregas consecutivas. Fase 2B no comienza hasta cerrar y verificar completamente Fase 2A.
 
-- Landing pública.
-- Catálogo de cursos.
-- Detalle público.
-- CRUD administrativo de cursos.
-- Niveles: básico, medio y avanzado.
-- Horas.
-- horarios.
-- precios.
-- estado de publicación.
-- periodos de preinscripción.
-- reglas configurables de aprobación.
+### Decisiones de alcance
 
-### Resultado demostrable
+- Las fechas y el horario del curso son información pública provisional; los grupos definirán después su calendario operativo definitivo.
+- La publicación editorial se modela por separado de la disponibilidad para preinscripción.
+- La disponibilidad para preinscripción se deriva de su ventana de fechas y no constituye un estado editorial.
+- Fase 2A configura únicamente la nota mínima de aprobación. El porcentaje de asistencia se pospone hasta confirmar la regla académica.
+- Los cursos no se eliminan físicamente desde la interfaz: pueden retirarse o archivarse.
+- Fase 2 no implementa participantes, preinscripciones, grupos, inscripciones, descuentos aplicados, pagos, sesiones ni elegibilidad académica.
 
-Administración crea un curso y puede publicarlo; el curso aparece automáticamente en la web pública.
+### FASE 2A — GESTIÓN DE CURSOS
+
+#### Objetivo
+
+Implementar un módulo administrativo de cursos sólido, seguro y capaz de alimentar posteriormente la experiencia pública.
+
+#### Checklist de definición
+
+- [x] Confirmar campos obligatorios y opcionales del curso.
+- [x] Definir los estados editoriales `DRAFT`, `PUBLISHED` y `ARCHIVED`.
+- [x] Definir las transiciones válidas de publicación, retiro y archivado.
+- [x] Definir la política de generación, unicidad y estabilidad del slug.
+- [x] Definir qué campos pueden modificarse después de publicar.
+- [x] Definir precios por tipo de participante y mantener la moneda explícita.
+- [x] Documentar casos válidos, inválidos y estados de borde antes de generar la migración.
+
+#### Checklist de dominio y datos
+
+- [x] Crear tipos de dominio para nivel básico, medio y avanzado.
+- [x] Implementar reglas y transiciones del estado editorial.
+- [x] Validar nombre, descripción, condiciones y horario informativo.
+- [x] Validar duración positiva y fechas públicas coherentes.
+- [x] Validar que la ventana de preinscripción sea coherente.
+- [x] Validar la nota mínima en el rango permitido sin calcular todavía resultados académicos.
+- [x] Normalizar y validar el slug.
+- [x] Validar montos no negativos y precisión monetaria.
+- [x] Diferenciar errores de dominio, aplicación e infraestructura.
+- [x] Añadir `courses`, `course_prices` y las restricciones necesarias al schema Drizzle.
+- [x] Añadir unicidad de slug y de precio por curso y tipo de participante.
+- [x] Añadir checks para duración, nota, fechas y montos.
+- [x] Usar timestamps con zona horaria e índices para las consultas administrativas y públicas.
+- [x] Revisar RLS y revocar privilegios Data API que no sean necesarios.
+- [x] Generar y verificar una migración Drizzle reproducible desde una base vacía.
+- [x] No crear anticipadamente tablas pertenecientes a las fases 3 a 5.
+
+#### Checklist de aplicación y persistencia
+
+- [x] Implementar el repositorio de cursos sin acoplarlo a HTTP ni a componentes UI.
+- [x] Implementar creación y edición transaccional de curso y precios.
+- [x] Implementar consulta y listado administrativo.
+- [x] Implementar publicación, retiro y archivado mediante transiciones válidas.
+- [x] Implementar las lecturas de repositorio para listado y consulta pública de cursos publicados (sin rutas HTTP públicas en Fase 2A).
+- [x] Separar los DTO administrativos de los DTO públicos.
+- [x] Garantizar que borradores, retirados y archivados no aparezcan en consultas públicas.
+- [x] Autorizar todas las escrituras exclusivamente para `ADMIN` en servidor.
+- [x] Registrar trazabilidad para creación, edición sensible, cambios de precio, publicación, retiro y archivado.
+
+#### Checklist de interfaz administrativa
+
+- [x] Sustituir el placeholder de `/app/cursos` por un listado administrativo responsive.
+- [x] Crear una página dedicada para registrar cursos.
+- [x] Crear una página dedicada para editar cursos.
+- [x] Incorporar formularios para información general, fechas, horario, precios y nota mínima.
+- [x] Incorporar acciones de publicar, retirar y archivar con confirmaciones de alcance limitado.
+- [x] Registrar cada ruta nueva en la política privada fail-closed.
+- [x] Validar entradas y permisos nuevamente en cada acción server-side.
+- [x] Mostrar labels, ayuda contextual y errores junto a los campos.
+- [x] Conservar valores después de errores recuperables y prevenir envíos duplicados.
+- [x] Diseñar estados loading, empty, success, error y disabled.
+- [x] Reutilizar el design system y validar mobile, tablet, desktop y navegación por teclado.
+
+#### Checklist de pruebas y documentación
+
+- [x] Crear fixtures mínimos para borrador, publicado, archivado y distintas ventanas de preinscripción.
+- [x] Cubrir niveles, estados, transiciones, slug, fechas, nota y precios con pruebas unitarias.
+- [x] Cubrir migraciones, constraints, repositorio, transacciones y consultas públicas con pruebas de integración.
+- [x] Cubrir creación, validación, edición, publicación, retiro, archivado y denegación a instructor con E2E.
+- [x] Verificar que ninguna consulta pública exponga borradores o campos administrativos.
+- [x] Actualizar arquitectura, modelo de datos, requisitos, seguridad y testing cuando las decisiones se implementen.
+
+#### Gate obligatorio para Fase 2B
+
+- [x] CRUD administrativo y transiciones editoriales completos.
+- [x] Precios, fechas, horario y nota mínima persistidos y validados.
+- [x] Migración reproducible y restricciones PostgreSQL verificadas.
+- [x] Contrato de lectura pública estable y sin exposición de borradores o datos internos.
+- [x] Autorización `ADMIN`, validación server-side y trazabilidad verificadas.
+- [x] Pruebas unitarias, de integración y E2E completas.
+- [ ] Formatter y lint verificados.
+- [x] Typecheck y build locales exitosos.
+- [x] Advisors locales de Supabase ejecutados correctamente.
+- [ ] CI remoto ejecutado y exitoso (todavía no ejecutado).
+- [x] Documentación sincronizada y revisión de cierre de Fase 2A completada.
+
+#### Resultado demostrable 2A
+
+Un administrador crea, edita, configura, publica, retira y archiva cursos. Los cursos publicados quedan disponibles mediante el contrato seguro de DTO/repositorio público, mientras los demás estados permanecen ocultos. Fase 2A todavía no expone rutas HTTP de catálogo o detalle.
+
+### FASE 2B — LANDING, CATÁLOGO Y DETALLE PÚBLICO
+
+#### Objetivo
+
+Construir una experiencia pública distintiva que presente la propuesta del sistema y convierta los cursos publicados en información oficial, vigente y accesible.
+
+#### Checklist de dirección visual
+
+- [ ] Confirmar que el gate de Fase 2A está completamente cerrado.
+- [ ] Cargar la skill `frontend-design` antes de proponer la interfaz.
+- [ ] Elaborar un brief con audiencia, objetivo, contenido real, tono y jerarquía.
+- [ ] Proponer una dirección visual con color, tipografía, layout y principios específicos del contexto educativo.
+- [ ] Preparar wireframes mobile y desktop y alinear la propuesta con los tokens existentes.
+- [ ] Mantener el branding provisional centralizado y fácil de sustituir.
+- [ ] Revisar la propuesta contra patrones genéricos antes de escribir código.
+- [ ] Presentar y validar la dirección visual antes de implementarla.
+
+#### Checklist de landing
+
+- [ ] Evolucionar `/` desde Foundation hacia la fuente pública oficial de información vigente.
+- [ ] Comunicar formación continua, cursos vigentes y propósito del sistema sin prometer módulos inexistentes.
+- [ ] Destacar nivel, duración, fechas, horario, precios y condiciones cuando corresponda.
+- [ ] Incorporar acceso principal al catálogo y mantener visible el acceso del equipo.
+- [ ] Mostrar cursos publicados destacados sin inventar cifras, testimonios ni contenido institucional.
+- [ ] Diseñar estados de catálogo vacío y error con una siguiente acción comprensible.
+
+#### Checklist de catálogo y detalle
+
+- [ ] Crear `/cursos` consumiendo exclusivamente el contrato público de Fase 2A.
+- [ ] Mostrar únicamente cursos publicados con nivel, horas, fechas, horario y precios públicos.
+- [ ] Indicar si la ventana de preinscripción está próxima, abierta o cerrada.
+- [ ] Mantener URLs estables mediante slug y evitar filtros sin una necesidad demostrada.
+- [ ] Crear `/cursos/[slug]` con descripción, condiciones y disponibilidad completas.
+- [ ] Responder de la misma forma ante un slug inexistente y un curso no público.
+- [ ] No implementar el formulario de preinscripción de Fase 3 ni presentar un CTA engañoso.
+- [ ] Mantener HTML semántico y no renderizar HTML no confiable.
+
+#### Checklist de revisión visual y calidad
+
+- [ ] Cargar la skill `playwright-cli` y revisar screenshots en mobile, tablet y desktop.
+- [ ] Revisar light, dark y system, incluido el flash inicial del tema.
+- [ ] Comparar la implementación con el brief y realizar una autocrítica visual.
+- [ ] Corregir jerarquía, densidad, ritmo y cualquier patrón visual genérico.
+- [ ] Verificar teclado, foco, contraste, zoom, objetivos táctiles y landmarks.
+- [ ] Verificar `prefers-reduced-motion` y ausencia de scroll horizontal.
+- [ ] Cargar `web-design-guidelines` para la auditoría final de UI.
+- [ ] Repetir screenshots y pruebas después de las correcciones.
+
+#### Checklist de pruebas y cierre
+
+- [ ] Verificar acceso público a landing, catálogo y detalle sin sesión.
+- [ ] Verificar navegación desde la landing hasta cada curso publicado.
+- [ ] Verificar que borradores, retirados y archivados no sean visibles.
+- [ ] Verificar 404 para cursos inexistentes o no públicos.
+- [ ] Verificar actualización pública después de publicar o retirar un curso.
+- [ ] Cubrir responsive y navegación por teclado con E2E enfocado.
+- [ ] Verificar títulos, metadata y contenido público permitido.
+- [ ] Ejecutar formatter, lint, typecheck, pruebas, build y CI.
+- [ ] Actualizar documentación y realizar la revisión final de Fase 2.
+
+#### Resultado demostrable 2B
+
+La landing presenta el sistema, el catálogo muestra automáticamente los cursos publicados y cada curso dispone de un detalle público vigente, responsive y accesible.
+
+### Resultado demostrable de Fase 2
+
+Administración crea y publica un curso; este aparece automáticamente en una experiencia pública completa sin exponer borradores ni información administrativa.
 
 ## FASE 3 — PREINSCRIPCIÓN
 

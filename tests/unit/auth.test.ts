@@ -95,6 +95,7 @@ describe("private route policies and caching", () => {
       "/app",
       "/app/asistencia",
       "/app/cursos",
+      "/app/cursos/nuevo",
     ]);
     expect(getPrivateRoutePolicy("/app")).toEqual({ access: "ACTIVE_USER" });
     expect(getPrivateRoutePolicy("/app/cursos")).toEqual({
@@ -105,6 +106,12 @@ describe("private route policies and caching", () => {
       access: "ROLES",
       roles: ["INSTRUCTOR"],
     });
+    expect(
+      getPrivateRoutePolicy(
+        "/app/cursos/10000000-0000-4000-8000-000000000001/editar",
+      ),
+    ).toEqual({ access: "ROLES", roles: ["ADMIN"] });
+    expect(getPrivateRoutePolicy("/app/cursos/not-an-id/editar")).toBeNull();
     expect(getPrivateRoutePolicy("/app/future")).toBeNull();
   });
 

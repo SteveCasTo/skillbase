@@ -46,12 +46,28 @@ Implementación de Fase 1:
 - level
 - totalHours
 - minimumGrade
-- minimumAttendance
 - status
+- schedule
+- conditions
+- startsAt
+- endsAt
 - registrationStartAt
 - registrationEndAt
 - createdAt
 - updatedAt
+
+Implementación de Fase 2A:
+
+- `course_status` contiene únicamente `DRAFT`, `PUBLISHED` y `ARCHIVED`; disponibilidad de preinscripción no se persiste como estado.
+- `course_level` contiene `BASIC`, `INTERMEDIATE` y `ADVANCED`.
+- nombre, descripción, horario informativo y condiciones son obligatorios y no vacíos.
+- duración es un entero positivo y `minimum_grade` está limitado a `0..100`; todavía no existe `minimum_attendance` ni cálculo académico.
+- fechas públicas de inicio y fin usan `timestamptz`, son obligatorias y mantienen `starts_at < ends_at`; la UI recibe tiempo civil estricto `YYYY-MM-DDTHH:mm` de `America/La_Paz` y lo convierte a instante UTC.
+- la ventana de preinscripción usa dos `timestamptz`: ambos son nulos o ambos existen con inicio anterior al fin. La conversión inversa UTC → Bolivia preserva exactamente la hora civil al reeditar.
+- el slug normalizado es único, se genera al crear bajo un advisory lock global de asignación, resuelve colisiones —incluidas bases solapadas concurrentes— con sufijo numérico y no se modifica después.
+- `updated_at` funciona como revisión optimista del agregado curso/precios; una edición con revisión obsoleta no actualiza ninguna fila.
+- no existe borrado físico de cursos en el contrato de aplicación; `ARCHIVED` es terminal durante esta fase.
+- la proyección `PublicCourseDto` solo se construye para cursos `PUBLISHED`, omite identificadores, estado, nota mínima y timestamps administrativos, y deriva la disponibilidad desde la ventana. En Fase 2A este contrato no tiene rutas HTTP públicas.
 
 ### CoursePrice
 
@@ -60,6 +76,8 @@ Implementación de Fase 1:
 - participantType
 - amount
 - currency
+
+Los tipos iniciales requeridos son `STUDENT` y `EXTERNAL`. Existe un único precio por curso y tipo. `amount` usa `numeric(12,2)`, se representa como string en TypeScript, no admite negativos y la moneda explícita queda restringida a `BOB`.
 
 ### Group
 
@@ -190,6 +208,8 @@ Implementación de Fase 1:
 - metadata
 - createdAt
 
+Fase 2A registra atómicamente `COURSE_CREATED`, `COURSE_UPDATED`, `COURSE_PRICES_UPDATED`, `COURSE_PUBLISHED`, `COURSE_WITHDRAWN` y `COURSE_ARCHIVED`. `actorId` referencia al usuario interno y está indexado; las consultas por entidad también están indexadas.
+
 ## RESTRICCIONES
 
 Ejemplos que deben evaluarse a nivel DB:
@@ -202,6 +222,8 @@ Ejemplos que deben evaluarse a nivel DB:
 - weight >= 0;
 - score dentro de rango;
 - montos no negativos.
+
+Las FK de Fase 2A están indexadas. `courses`, `course_prices` y `audit_events` tienen RLS habilitado sin políticas Data API, y privilegios revocados para `anon`, `authenticated` y `service_role`.
 
 ## AUTH
 
