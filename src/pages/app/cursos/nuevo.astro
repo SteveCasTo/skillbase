@@ -1,0 +1,91 @@
+---
+import { createCourse } from "@/application/courses/manage-courses";
+import CourseForm from "@/components/courses/CourseForm.astro";
+import { CourseDomainError } from "@/domain/courses/errors";
+import type { CourseInput } from "@/domain/courses/validation";
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import { requestHasExpectedOrigin } from "@/server/auth/redirects";
+import { courseInputFromFormData } from "@/server/courses/form";
+import {
+  COURSE_INFRASTRUCTURE_STATUS,
+  courseDomainStatus,
+  logCourseInfrastructureError,
+} from "@/server/courses/errors";
+import { getDatabase } from "@/server/db/client";
+import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
+import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
+import { getServerEnvironment } from "@/server/environment";
+
+const user = Astro.locals.internalUser;
+if (!user) throw new Error("Authorized user required");
+let values: CourseInput = {
+  minimumGrade: "70",
+  level: "",
+  studentAmount: "",
+  externalAmount: "",
+};
+let errors: Readonly<Record<string, string>> = {};
+let pageError: string | null = null;
+
+if (Astro.request.method === "POST") {
+  if (
+    !requestHasExpectedOrigin(Astro.request, getServerEnvironment().siteUrl)
+  ) {
+    Astro.response.status = 403;
+    pageError =
+      "La solicitud no tiene un origen válido. Recarga la página e inténtalo de nuevo.";
+  } else {
+    values = courseInputFromFormData(await Astro.request.formData());
+    try {
+      await createCourse(
+        new DrizzleCourseRepository(getDatabase()),
+        user,
+        values,
+      );
+      return Astro.redirect("/app/cursos?success=created", 303);
+    } catch (error) {
+      if (error instanceof CourseDomainError) {
+        Astro.response.status = courseDomainStatus(error);
+        errors = error.fieldErrors;
+        pageError = error.message;
+      } else if (error instanceof CourseInfrastructureError) {
+        Astro.response.status = COURSE_INFRASTRUCTURE_STATUS;
+        logCourseInfrastructureError(error, { actorId: user.id });
+        pageError = "No se pudo crear el curso. Inténtalo nuevamente.";
+      } else {
+        Astro.response.status = COURSE_INFRASTRUCTURE_STATUS;
+        pageError = "No se pudo crear el curso. Inténtalo nuevamente.";
+      }
+    }
+  }
+}
+---
+
+<PrivateLayout title="Nuevo curso">
+  <header>
+    <a
+      href="/app/cursos"
+      class="text-sm font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground"
+    >
+      ← Volver a cursos
+    </a>
+    <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
+      Crear curso
+    </h1>
+    <p class="mt-3 max-w-2xl leading-7 text-muted-foreground">
+      El curso se guardará como borrador. Su slug se genera una vez desde el
+      nombre y después permanece estable.
+    </p>
+  </header>
+  {pageError && (
+    <p
+      role="alert"
+      class="mt-7 rounded-lg border border-destructive/40 bg-card px-4 py-3 text-sm text-destructive"
+    >
+      {pageError}
+    </p>
+  )}
+  <div class="mt-8">
+    <CourseForm values={values} errors={errors} submitLabel="Crear borrador" />
+  </div>
+</PrivateLayout>
