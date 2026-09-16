@@ -295,17 +295,13 @@ No dividir artificialmente una operación atómica entre múltiples requests.
 
 Los estados importantes deben modelarse explícitamente.
 
-Ejemplos conceptuales:
+Para Fase 2A, el curso usa únicamente:
 
-Curso:
+- `DRAFT`;
+- `PUBLISHED`;
+- `ARCHIVED`.
 
-- draft
-- published
-- registration_open
-- registration_closed
-- in_progress
-- finished
-- archived
+La disponibilidad de preinscripción (`UNAVAILABLE`, `UPCOMING`, `OPEN`, `CLOSED`) se deriva de la ventana de fechas y no es un estado persistido. Los estados operativos de grupos y el resto del ciclo académico quedan para fases posteriores.
 
 Grupo:
 
@@ -351,6 +347,24 @@ Ejemplos:
 - emisión de certificado;
 - revocación;
 - cambios de rol.
+
+## MÓDULO COURSES EN FASE 2A
+
+El flujo implementado conserva los límites del monolito modular:
+
+```text
+páginas Astro SSR
+→ casos de uso Courses
+→ validación y políticas de dominio
+→ CourseRepository
+→ Drizzle/PostgreSQL
+```
+
+Las páginas administrativas hacen render server-side y usan POST tradicional para evitar una isla React innecesaria. Cada escritura vuelve a verificar origen y autorización `ADMIN`; el middleware registra de forma explícita el listado, alta y edición dinámica con UUID válido, y mantiene el comportamiento fail-closed para cualquier otra ruta `/app`.
+
+`DrizzleCourseRepository` agrupa curso, dos precios requeridos y auditoría en una misma transacción. El contrato administrativo incluye campos operativos; el contrato público independiente se construye solo desde filas `PUBLISHED`, omite estado, nota mínima, IDs y timestamps administrativos, y deriva disponibilidad de la ventana en tiempo de lectura. En Fase 2A ese contrato se limita a DTOs y lecturas del repositorio: todavía no existen rutas HTTP de catálogo o detalle.
+
+Los formularios `datetime-local` representan exclusivamente tiempo civil de `America/La_Paz`. La conversión pura de dominio aplica UTC-04 —Bolivia no utiliza horario de verano— tanto al persistir instantes UTC como al volver a editar, sin depender del timezone del proceso. La edición envía `updatedAt` como revisión optimista y el repositorio rechaza escrituras obsoletas. La asignación de slugs se serializa con un advisory lock transaccional global y estable para evitar colisiones incluso entre bases solapadas como `foo` y `foo-2`.
 
 ## CRITERIOS PARA EXTRAER UN BACKEND
 
