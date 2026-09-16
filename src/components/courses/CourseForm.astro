@@ -1,0 +1,305 @@
+---
+import type { CourseInput } from "@/domain/courses/validation";
+
+interface Props {
+  values: CourseInput;
+  errors?: Readonly<Record<string, string>>;
+  disabled?: boolean;
+  submitLabel: string;
+  intent?: "update";
+  revision?: string;
+}
+
+const {
+  values,
+  errors = {},
+  disabled = false,
+  submitLabel,
+  intent,
+  revision,
+} = Astro.props;
+const control =
+  "mt-2 min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";
+const area = `${control} min-h-28 resize-y`;
+const errorId = (name: string) => (errors[name] ? `${name}-error` : undefined);
+---
+
+<form method="post" class="course-form flex flex-col gap-8" novalidate>
+  {intent && <input type="hidden" name="intent" value={intent} />}
+  {revision && <input type="hidden" name="revision" value={revision} />}
+  <fieldset disabled={disabled} class="flex flex-col gap-8 disabled:opacity-70">
+    <section
+      class="rounded-xl border bg-card p-5 shadow-xs sm:p-7"
+      aria-labelledby="general-title"
+    >
+      <h2 id="general-title" class="text-xl font-semibold">
+        Información general
+      </h2>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Estos datos serán públicos cuando el curso esté publicado.
+      </p>
+      <div class="mt-6 grid gap-5 sm:grid-cols-2">
+        <label class="sm:col-span-2">
+          {" "}
+          <span class="text-sm font-medium">Nombre</span>
+          <input
+            class={control}
+            name="name"
+            value={values.name ?? ""}
+            required
+            aria-invalid={Boolean(errors.name)}
+            aria-describedby={errorId("name")}
+          />
+          {errors.name && (
+            <span id="name-error" class="mt-1 block text-sm text-destructive">
+              {errors.name}
+            </span>
+          )}
+        </label>
+        <label class="sm:col-span-2">
+          {" "}
+          <span class="text-sm font-medium">Descripción</span>
+          <textarea
+            class={area}
+            name="description"
+            required
+            aria-invalid={Boolean(errors.description)}
+            aria-describedby={errorId("description")}
+          >{values.description ?? ""}</textarea>
+          {errors.description && (
+            <span
+              id="description-error"
+              class="mt-1 block text-sm text-destructive"
+            >
+              {errors.description}
+            </span>
+          )}
+        </label>
+        <label>
+          <span class="text-sm font-medium">Nivel</span>
+          <select
+            class={control}
+            name="level"
+            required
+            aria-invalid={Boolean(errors.level)}
+            aria-describedby={errorId("level")}
+          >
+            <option value="">Selecciona un nivel</option>
+            <option value="BASIC" selected={values.level === "BASIC"}>
+              Básico
+            </option>
+            <option
+              value="INTERMEDIATE"
+              selected={values.level === "INTERMEDIATE"}
+            >
+              Medio
+            </option>
+            <option value="ADVANCED" selected={values.level === "ADVANCED"}>
+              Avanzado
+            </option>
+          </select>
+          {errors.level && (
+            <span id="level-error" class="mt-1 block text-sm text-destructive">
+              {errors.level}
+            </span>
+          )}
+        </label>
+        <label>
+          <span class="text-sm font-medium">Duración total (horas)</span>
+          <input
+            class={control}
+            name="totalHours"
+            type="number"
+            min="1"
+            step="1"
+            value={values.totalHours ?? ""}
+            required
+            aria-invalid={Boolean(errors.totalHours)}
+            aria-describedby={errorId("totalHours")}
+          />
+          {errors.totalHours && (
+            <span
+              id="totalHours-error"
+              class="mt-1 block text-sm text-destructive"
+            >
+              {errors.totalHours}
+            </span>
+          )}
+        </label>
+        <label class="sm:col-span-2">
+          <span class="text-sm font-medium">Horario informativo</span>
+          <input
+            class={control}
+            name="schedule"
+            value={values.schedule ?? ""}
+            required
+            aria-invalid={Boolean(errors.schedule)}
+            aria-describedby={errorId("schedule")}
+          />
+          <span class="mt-1 block text-xs text-muted-foreground">
+            Ejemplo: lunes y miércoles, 18:30–20:30.
+          </span>
+          {errors.schedule && (
+            <span
+              id="schedule-error"
+              class="mt-1 block text-sm text-destructive"
+            >
+              {errors.schedule}
+            </span>
+          )}
+        </label>
+        <label class="sm:col-span-2">
+          <span class="text-sm font-medium">Condiciones</span>
+          <textarea
+            class={area}
+            name="conditions"
+            required
+            aria-invalid={Boolean(errors.conditions)}
+            aria-describedby={errorId("conditions")}
+          >{values.conditions ?? ""}</textarea>
+          {errors.conditions && (
+            <span
+              id="conditions-error"
+              class="mt-1 block text-sm text-destructive"
+            >
+              {errors.conditions}
+            </span>
+          )}
+        </label>
+      </div>
+    </section>
+
+    <section
+      class="rounded-xl border bg-card p-5 shadow-xs sm:p-7"
+      aria-labelledby="dates-title"
+    >
+      <h2 id="dates-title" class="text-xl font-semibold">
+        Fechas y preinscripción
+      </h2>
+      <p class="mt-1 text-sm text-muted-foreground">
+        El calendario es provisional. La ventana de preinscripción puede quedar
+        sin configurar. Todas las horas se interpretan en America/La_Paz
+        (Bolivia).
+      </p>
+      <div class="mt-6 grid gap-5 sm:grid-cols-2">
+        {[
+          { name: "startsAt", label: "Inicio del curso" },
+          { name: "endsAt", label: "Finalización del curso" },
+          { name: "registrationStartAt", label: "Apertura de preinscripción" },
+          { name: "registrationEndAt", label: "Cierre de preinscripción" },
+        ].map(({ name, label }) => (
+          <label>
+            <span class="text-sm font-medium">{label}</span>
+            <input
+              class={control}
+              name={name}
+              type="datetime-local"
+              value={values[name] ?? ""}
+              required={name === "startsAt" || name === "endsAt"}
+              aria-invalid={Boolean(errors[name])}
+              aria-describedby={errorId(name)}
+            />
+            {errors[name] && (
+              <span
+                id={`${name}-error`}
+                class="mt-1 block text-sm text-destructive"
+              >
+                {errors[name]}
+              </span>
+            )}
+          </label>
+        ))}
+      </div>
+    </section>
+
+    <section
+      class="rounded-xl border bg-card p-5 shadow-xs sm:p-7"
+      aria-labelledby="prices-title"
+    >
+      <h2 id="prices-title" class="text-xl font-semibold">
+        Precios y aprobación
+      </h2>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Todos los montos se registran en bolivianos (BOB).
+      </p>
+      <div class="mt-6 grid gap-5 sm:grid-cols-3">
+        {[
+          { name: "studentAmount", label: "Precio estudiante" },
+          { name: "externalAmount", label: "Precio externo" },
+        ].map(({ name, label }) => (
+          <label>
+            <span class="text-sm font-medium">{label} (BOB)</span>
+            <input
+              class={control}
+              name={name}
+              inputmode="decimal"
+              value={values[name] ?? ""}
+              required
+              aria-invalid={Boolean(errors[name])}
+              aria-describedby={errorId(name)}
+            />
+            {errors[name] && (
+              <span
+                id={`${name}-error`}
+                class="mt-1 block text-sm text-destructive"
+              >
+                {errors[name]}
+              </span>
+            )}
+          </label>
+        ))}
+        <label>
+          <span class="text-sm font-medium">Nota mínima (0–100)</span>
+          <input
+            class={control}
+            name="minimumGrade"
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            value={values.minimumGrade ?? ""}
+            required
+            aria-invalid={Boolean(errors.minimumGrade)}
+            aria-describedby={errorId("minimumGrade")}
+          />
+          {errors.minimumGrade && (
+            <span
+              id="minimumGrade-error"
+              class="mt-1 block text-sm text-destructive"
+            >
+              {errors.minimumGrade}
+            </span>
+          )}
+        </label>
+      </div>
+    </section>
+  </fieldset>
+  <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+    <a
+      href="/app/cursos"
+      class="inline-flex min-h-11 items-center justify-center rounded-lg border px-5 text-sm font-medium hover:bg-secondary"
+    >
+      Cancelar
+    </a>
+    <button
+      type="submit"
+      disabled={disabled}
+      class="submit-button inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-xs hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      <span class="submit-label">{submitLabel}</span>
+      <span class="submit-pending hidden">Guardando…</span>
+    </button>
+  </div>
+</form>
+
+<script>
+  document.querySelectorAll<HTMLFormElement>(".course-form").forEach((form) => {
+    form.addEventListener("submit", () => {
+      const button = form.querySelector<HTMLButtonElement>(".submit-button");
+      if (!button) return;
+      button.disabled = true;
+      button.querySelector(".submit-label")?.classList.add("hidden");
+      button.querySelector(".submit-pending")?.classList.remove("hidden");
+    });
+  });
+</script>

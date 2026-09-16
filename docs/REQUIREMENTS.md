@@ -39,7 +39,7 @@ Un curso debe poder registrar al menos:
 - nivel;
 - duración en horas;
 - horario;
-- precio base;
+- precios por tipo de participante;
 - condiciones;
 - fechas;
 - estado.
@@ -52,6 +52,8 @@ El administrador debe poder publicar y retirar un curso.
 
 Los cursos publicados deben aparecer automáticamente en el catálogo público.
 
+La implementación HTTP de este requisito queda pendiente para Fase 2B. Fase 2A ya ofrece la proyección y las lecturas de repositorio únicamente para cursos `PUBLISHED`, pero todavía no expone rutas públicas de catálogo o detalle.
+
 ### RF-CUR-005
 
 Los niveles iniciales son:
@@ -59,6 +61,21 @@ Los niveles iniciales son:
 - Básico.
 - Medio.
 - Avanzado.
+
+### Reglas concretadas en Fase 2A
+
+- El curso nace como `DRAFT`, puede publicarse, retirarse de `PUBLISHED` a `DRAFT` y archivarse sin borrado físico. `ARCHIVED` es terminal en esta fase.
+- El slug se deriva del nombre al crear, es único y permanece inmutable aunque cambie el nombre.
+- Un curso publicado puede editar su información pública y precios; cada cambio queda auditado.
+- Nombre, descripción, nivel, duración entera positiva, horario informativo, condiciones, fechas públicas, nota mínima y precios `STUDENT`/`EXTERNAL` son obligatorios.
+- La nota mínima admite enteros de 0 a 100. No se configura aún asistencia mínima ni se calculan resultados académicos.
+- La ventana de preinscripción es opcional como conjunto: apertura y cierre deben estar ambos ausentes o ambos presentes, con apertura anterior al cierre. Su disponibilidad es derivada.
+- Los campos `datetime-local` se interpretan como tiempo civil de Bolivia (`America/La_Paz`, UTC-04 sin DST), validan exactamente `YYYY-MM-DDTHH:mm` y conservan la misma hora visible después de persistir y reeditar.
+- Una edición debe incluir la revisión observada del curso. Si otra operación cambió el agregado, el guardado obsoleto se rechaza sin sobrescribir y permite revisar/reintentar.
+- Todo monto se expresa como decimal de dos posiciones en moneda `BOB`; no se usan valores de punto flotante.
+- Solo un usuario interno activo con rol `ADMIN` puede crear, modificar o cambiar el estado de un curso.
+- La publicación exige exactamente un precio `STUDENT` y uno `EXTERNAL`, ambos en `BOB`, comprobados dentro de la misma transacción bloqueada.
+- El contrato público devuelve exclusivamente cursos `PUBLISHED` y no expone identificadores, estado, nota mínima ni timestamps administrativos. En Fase 2A es un DTO/repositorio sin rutas HTTP; el catálogo y detalle públicos pertenecen a Fase 2B.
 
 ## PREINSCRIPCIÓN
 
