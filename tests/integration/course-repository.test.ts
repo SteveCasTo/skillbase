@@ -24,8 +24,7 @@ async function rejectedValue(promise: Promise<unknown>): Promise<unknown> {
   }
 }
 
-afterAll(async () => database.close());
-beforeEach(async () => {
+async function clearCourseFixtures() {
   await database.db
     .delete(auditEvents)
     .where(eq(auditEvents.entityType, "COURSE"));
@@ -34,6 +33,14 @@ beforeEach(async () => {
   await database.db
     .delete(users)
     .where(eq(users.email, "course.actor@repository.test"));
+}
+
+afterAll(async () => {
+  await clearCourseFixtures();
+  await database.close();
+});
+beforeEach(async () => {
+  await clearCourseFixtures();
   const [actor] = await database.db
     .insert(users)
     .values({ email: "course.actor@repository.test", name: "Course Actor" })
