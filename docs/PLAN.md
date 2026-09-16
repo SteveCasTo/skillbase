@@ -206,15 +206,19 @@ Implementar un módulo administrativo de cursos sólido, seguro y capaz de alime
 - [x] Contrato de lectura pública estable y sin exposición de borradores o datos internos.
 - [x] Autorización `ADMIN`, validación server-side y trazabilidad verificadas.
 - [x] Pruebas unitarias, de integración y E2E completas.
-- [ ] Formatter y lint verificados.
+- [x] Formatter y lint verificados.
 - [x] Typecheck y build locales exitosos.
 - [x] Advisors locales de Supabase ejecutados correctamente.
-- [ ] CI remoto ejecutado y exitoso (todavía no ejecutado).
+- [x] CI remoto ejecutado y exitoso.
 - [x] Documentación sincronizada y revisión de cierre de Fase 2A completada.
 
 #### Resultado demostrable 2A
 
 Un administrador crea, edita, configura, publica, retira y archiva cursos. Los cursos publicados quedan disponibles mediante el contrato seguro de DTO/repositorio público, mientras los demás estados permanecen ocultos. Fase 2A todavía no expone rutas HTTP de catálogo o detalle.
+
+#### Estado 2A
+
+Fase 2A completada y verificada en local, CI y cloud. La migración está aplicada en Supabase, el flujo administrativo está desplegado en Vercel y Fase 2B no se inicia hasta definir y validar explícitamente su dirección visual.
 
 ### FASE 2B — LANDING, CATÁLOGO Y DETALLE PÚBLICO
 
