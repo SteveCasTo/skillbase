@@ -81,7 +81,7 @@ Administrador e instructor pueden autenticarse y acceder únicamente a las zonas
 ### Checklist de implementación
 
 - [x] Añadir los clientes oficiales de Supabase para Auth SSR con versiones fijadas.
-- [ ] Configurar variables públicas y privadas separadas para local, CI y cloud.
+- [x] Configurar variables públicas y privadas separadas para local, CI y cloud.
 - [x] Modelar usuarios internos preaprovisionados con estados `INVITED`, `ACTIVE` y `DISABLED`.
 - [x] Modelar roles `ADMIN` e `INSTRUCTOR` como una relación multirol.
 - [x] Vincular una invitación interna con una identidad Google únicamente después de autenticar un correo verificado coincidente.
