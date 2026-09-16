@@ -3,7 +3,13 @@ import { eq, inArray } from "drizzle-orm";
 
 import type { AuthRole, UserStatus } from "@/domain/auth/types";
 import { createDatabase } from "@/server/db/client";
-import { userRoles, users } from "@/server/db/schema";
+import {
+  auditEvents,
+  coursePrices,
+  courses,
+  userRoles,
+  users,
+} from "@/server/db/schema";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
 import { AUTH_FIXTURES } from "./auth-users";
@@ -69,6 +75,9 @@ export default async function setupAuthFixtures(): Promise<void> {
 
   const database = createDatabase(environment.databaseUrl);
   try {
+    await database.db.delete(auditEvents);
+    await database.db.delete(coursePrices);
+    await database.db.delete(courses);
     await database.db.delete(users).where(inArray(users.email, emails));
 
     const authIds = new Map<string, string>();
