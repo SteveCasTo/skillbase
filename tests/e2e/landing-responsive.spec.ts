@@ -189,6 +189,18 @@ test.describe("public landing responsive layout", () => {
   }
 });
 
+test("kantuta remains anchored to the viewport on ultrawide screens", async ({
+  page,
+}) => {
+  await openPreview(page, { width: 3840, height: 1800 });
+  const kantuta = await box(page.locator(".kantuta"));
+
+  expect(kantuta.x).toBeCloseTo(0, 0);
+  expect(kantuta.width).toBeGreaterThanOrEqual(895);
+  expect(kantuta.width).toBeLessThanOrEqual(897);
+  await expectNoDocumentOverflow(page);
+});
+
 test("skip link moves keyboard focus to the main content", async ({ page }) => {
   await openPreview(page, { width: 390, height: 844 });
   await page.keyboard.press("Tab");

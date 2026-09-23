@@ -2,7 +2,7 @@
   type="button"
   class="theme-toggle"
   data-theme-toggle
-  data-current-theme="system"
+  data-current-theme="light"
   aria-label="Cambiar a modo oscuro"
   title="Cambiar a modo oscuro"
 >
@@ -44,23 +44,6 @@
   >
     <path d="M20.985 12.486A9 9 0 1 1 11.514 3.015c.36-.04.553.41.342.706a6 6 0 0 0 8.423 8.423c.297-.21.747-.019.706.342"></path>
   </svg>
-  <svg
-    class="theme-toggle-system"
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="2"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    aria-hidden="true"
-  >
-    <rect width="20" height="14" x="2" y="3" rx="2"></rect>
-    <line x1="8" x2="16" y1="21" y2="21"></line>
-    <line x1="12" x2="12" y1="17" y2="21"></line>
-  </svg>
 </button>
 
 <script>
@@ -69,11 +52,8 @@
   );
 
   if (toggle) {
-    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
-
-    const applyTheme = (theme: "light" | "dark" | "system") => {
-      const isDark =
-        theme === "dark" || (theme === "system" && systemTheme.matches);
+    const applyTheme = (theme: "light" | "dark") => {
+      const isDark = theme === "dark";
       document.documentElement.classList.toggle("dark", isDark);
       document.documentElement.dataset.theme = theme;
       document.documentElement.style.colorScheme = isDark ? "dark" : "light";
@@ -81,18 +61,8 @@
 
     const syncToggle = () => {
       const selectedTheme = document.documentElement.dataset.theme;
-      const theme =
-        selectedTheme === "light" ||
-        selectedTheme === "dark" ||
-        selectedTheme === "system"
-          ? selectedTheme
-          : "system";
-      const nextThemeName =
-        theme === "system"
-          ? "oscuro"
-          : theme === "dark"
-            ? "claro"
-            : "del sistema";
+      const theme = selectedTheme === "dark" ? "dark" : "light";
+      const nextThemeName = theme === "dark" ? "claro" : "oscuro";
       toggle.dataset.currentTheme = theme;
       toggle.ariaLabel = `Cambiar a modo ${nextThemeName}`;
       toggle.title = `Cambiar a modo ${nextThemeName}`;
@@ -101,16 +71,9 @@
     syncToggle();
     toggle.addEventListener("click", () => {
       const theme = toggle.dataset.currentTheme;
-      const nextTheme =
-        theme === "system" ? "dark" : theme === "dark" ? "light" : "system";
+      const nextTheme = theme === "dark" ? "light" : "dark";
       localStorage.setItem("theme", nextTheme);
       applyTheme(nextTheme);
-      syncToggle();
-    });
-
-    systemTheme.addEventListener("change", () => {
-      if (toggle.dataset.currentTheme !== "system") return;
-      applyTheme("system");
       syncToggle();
     });
   }

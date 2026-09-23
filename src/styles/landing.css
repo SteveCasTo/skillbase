@@ -354,8 +354,7 @@ html.dark:has(.landing.warm-preview) {
   }
 
   .header-tools [data-current-theme="light"] .theme-toggle-sun,
-  .header-tools [data-current-theme="dark"] .theme-toggle-moon,
-  .header-tools [data-current-theme="system"] .theme-toggle-system {
+  .header-tools [data-current-theme="dark"] .theme-toggle-moon {
     opacity: 1;
     transform: rotate(0) scale(1);
   }
@@ -813,9 +812,9 @@ html.dark:has(.landing.warm-preview) {
     --kantuta-horizontal-fade: 78%;
     position: absolute;
     top: 0;
-    left: clamp(-6rem, -5vw, -3rem);
+    left: min(clamp(-6rem, -5vw, -3rem), calc((100% - 100vw) / 2));
     display: block;
-    width: min(42rem, 52vw);
+    width: clamp(42rem, 32vw, 56rem);
     height: auto;
     opacity: 0.68;
     filter: saturate(0.78) contrast(0.96);
@@ -933,6 +932,12 @@ html.dark:has(.landing.warm-preview) {
     color: var(--ink-soft);
     font-size: var(--type-body);
     line-height: 1.7;
+  }
+
+  @media (min-width: 120rem) {
+    .kantuta {
+      top: -8rem;
+    }
   }
 
   .certificates {
