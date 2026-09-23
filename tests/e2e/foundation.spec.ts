@@ -5,6 +5,7 @@ test("renders the foundation and persists a theme preference", async ({
 }) => {
   await page.goto("/?preview=courses");
 
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "El siguiente paso es tuyo.",
   );
@@ -36,10 +37,10 @@ test("renders the foundation and persists a theme preference", async ({
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
   await page.getByRole("button", { name: "Cambiar a modo claro" }).click();
-  await page
-    .getByRole("button", { name: "Cambiar a modo del sistema" })
-    .click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "system");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.emulateMedia({ colorScheme: "dark" });
-  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+  await expect(
+    page.getByRole("button", { name: "Cambiar a modo del sistema" }),
+  ).toHaveCount(0);
 });

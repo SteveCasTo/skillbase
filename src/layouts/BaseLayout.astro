@@ -12,6 +12,7 @@ interface Props {
   description?: string;
   showToasts?: boolean;
   noindex?: boolean;
+  allowSystemTheme?: boolean;
 }
 
 const {
@@ -19,11 +20,12 @@ const {
   description = "Gestión de cursos de formación continua y certificados verificables.",
   showToasts = true,
   noindex = false,
+  allowSystemTheme = true,
 } = Astro.props;
 ---
 
 <!doctype html>
-<html lang="es" data-theme="system">
+<html lang="es" data-theme={allowSystemTheme ? "system" : "light"}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
@@ -42,13 +44,17 @@ const {
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>{title}</title>
-    <script is:inline>
+    <script is:inline define:vars={{ allowSystemTheme }}>
       (() => {
         const saved = localStorage.getItem("theme");
         const theme =
-          saved === "light" || saved === "dark" || saved === "system"
+          saved === "light" || saved === "dark"
             ? saved
-            : "system";
+            : allowSystemTheme && saved === "system"
+              ? "system"
+              : allowSystemTheme
+                ? "system"
+                : "light";
         const dark =
           theme === "dark" ||
           (theme === "system" &&
