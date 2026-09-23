@@ -5,6 +5,7 @@ import { CourseDomainError } from "@/domain/courses/errors";
 import type { CourseInput } from "@/domain/courses/validation";
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
 import { requestHasExpectedOrigin } from "@/server/auth/redirects";
+import { requireInternalUser } from "@/server/auth/context";
 import { courseInputFromFormData } from "@/server/courses/form";
 import {
   COURSE_INFRASTRUCTURE_STATUS,
@@ -14,10 +15,9 @@ import {
 import { getDatabase } from "@/server/db/client";
 import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
-import { getServerEnvironment } from "@/server/environment";
+import { getPublicAuthEnvironment } from "@/server/environment";
 
-const user = Astro.locals.internalUser;
-if (!user) throw new Error("Authorized user required");
+const user = requireInternalUser(Astro.locals);
 let values: CourseInput = {
   minimumGrade: "70",
   level: "",
@@ -29,7 +29,7 @@ let pageError: string | null = null;
 
 if (Astro.request.method === "POST") {
   if (
-    !requestHasExpectedOrigin(Astro.request, getServerEnvironment().siteUrl)
+    !requestHasExpectedOrigin(Astro.request, getPublicAuthEnvironment().siteUrl)
   ) {
     Astro.response.status = 403;
     pageError =

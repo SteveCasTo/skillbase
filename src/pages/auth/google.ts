@@ -4,8 +4,9 @@ import {
   requestHasExpectedOrigin,
   safeRelativeRedirect,
 } from "@/server/auth/redirects";
+import { requireRequestSupabaseClient } from "@/server/auth/context";
 import { privateNoStoreResponse } from "@/server/auth/route-policy";
-import { getServerEnvironment } from "@/server/environment";
+import { getPublicAuthEnvironment } from "@/server/environment";
 
 export const POST: APIRoute = async ({
   request,
@@ -13,7 +14,8 @@ export const POST: APIRoute = async ({
   locals,
   redirect,
 }) => {
-  const environment = getServerEnvironment();
+  const environment = getPublicAuthEnvironment();
+  const supabase = requireRequestSupabaseClient(locals);
   if (!requestHasExpectedOrigin(request, environment.siteUrl))
     return privateNoStoreResponse("Invalid request origin", { status: 403 });
 
@@ -30,7 +32,7 @@ export const POST: APIRoute = async ({
     maxAge: 600,
   });
   const redirectTo = new URL("/auth/callback", environment.siteUrl).toString();
-  const { data, error } = await locals.supabase.auth.signInWithOAuth({
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo },
   });

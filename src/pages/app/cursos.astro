@@ -4,6 +4,7 @@ import { ArrowRight, BookOpen, Plus } from "lucide-react";
 import { listAdminCourses } from "@/application/courses/manage-courses";
 import type { AdminCourseDto } from "@/domain/courses/types";
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import { requireInternalUser } from "@/server/auth/context";
 import {
   COURSE_INFRASTRUCTURE_STATUS,
   logCourseInfrastructureError,
@@ -12,8 +13,7 @@ import { getDatabase } from "@/server/db/client";
 import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
 
-const user = Astro.locals.internalUser;
-if (!user) throw new Error("Authorized user required");
+const user = requireInternalUser(Astro.locals);
 let courses: readonly AdminCourseDto[] = [];
 let loadError = false;
 try {

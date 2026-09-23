@@ -7,10 +7,10 @@ import type { RequestSupabaseClient } from "@/server/auth/supabase";
 declare global {
   namespace App {
     interface Locals {
-      supabase: RequestSupabaseClient;
-      authUser: User | null;
-      internalUser: InternalUser | null;
-      authError: AuthorizationError | null;
+      supabase?: RequestSupabaseClient;
+      authUser?: User | null;
+      internalUser?: InternalUser | null;
+      authError?: AuthorizationError | null;
     }
   }
 }

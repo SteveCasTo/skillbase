@@ -8,9 +8,12 @@ export interface PublicAuthEnvironment {
   readonly supabasePublishableKey: string;
 }
 
-export interface ServerEnvironment extends PublicAuthEnvironment {
+export interface DatabaseEnvironment {
   readonly databaseUrl: string;
 }
+
+export interface ServerEnvironment
+  extends PublicAuthEnvironment, DatabaseEnvironment {}
 
 function required(source: EnvironmentSource, name: string): string {
   const value = source[name]?.trim();
@@ -57,9 +60,23 @@ export function readServerEnvironment(
   };
 }
 
+export function readDatabaseEnvironment(
+  source: EnvironmentSource,
+): DatabaseEnvironment {
+  return { databaseUrl: required(source, "DATABASE_URL") };
+}
+
+export function getPublicAuthEnvironment(): PublicAuthEnvironment {
+  return readPublicAuthEnvironment(import.meta.env);
+}
+
+export function getDatabaseEnvironment(): DatabaseEnvironment {
+  return readDatabaseEnvironment(process.env);
+}
+
 export function getServerEnvironment(): ServerEnvironment {
   return {
-    ...readPublicAuthEnvironment(import.meta.env),
-    databaseUrl: required(process.env, "DATABASE_URL"),
+    ...getPublicAuthEnvironment(),
+    ...getDatabaseEnvironment(),
   };
 }
