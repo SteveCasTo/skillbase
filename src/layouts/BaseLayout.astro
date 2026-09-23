@@ -3,8 +3,6 @@ import "@fontsource/montserrat/400.css";
 import "@fontsource/montserrat/500.css";
 import "@fontsource/montserrat/600.css";
 import "@fontsource/montserrat/700.css";
-import "@fontsource/merriweather/400.css";
-import "@fontsource/ubuntu-mono/400.css";
 import "@/styles/globals.css";
 
 import { SileoHost } from "@/components/SileoHost";
@@ -12,11 +10,15 @@ import { SileoHost } from "@/components/SileoHost";
 interface Props {
   title: string;
   description?: string;
+  showToasts?: boolean;
+  noindex?: boolean;
 }
 
 const {
   title,
   description = "Gestión de cursos de formación continua y certificados verificables.",
+  showToasts = true,
+  noindex = false,
 } = Astro.props;
 ---
 
@@ -27,6 +29,17 @@ const {
     <meta name="viewport" content="width=device-width" />
     <meta name="description" content={description} />
     <meta name="generator" content={Astro.generator} />
+    {noindex && <meta name="robots" content="noindex,nofollow" />}
+    <meta
+      name="theme-color"
+      content="#ffffff"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#0d1d28"
+      media="(prefers-color-scheme: dark)"
+    />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>{title}</title>
     <script is:inline>
@@ -48,6 +61,6 @@ const {
   </head>
   <body>
     <slot />
-    <SileoHost client:load />
+    {showToasts && <SileoHost client:load />}
   </body>
 </html>

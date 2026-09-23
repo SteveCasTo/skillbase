@@ -3,25 +3,43 @@ import { expect, test } from "@playwright/test";
 test("renders the foundation and persists a theme preference", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/?preview=courses");
 
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Formación continua",
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "El siguiente paso es tuyo.",
   );
   await expect(
-    page.getByRole("link", { name: "Ver la base técnica" }),
-  ).toHaveAttribute("data-slot", "button");
+    page.getByRole("link", { name: "Explorar cursos" }),
+  ).toHaveAttribute("href", "#cursos");
   await expect(
-    page.getByRole("link", { name: "Acceso del equipo" }),
+    page
+      .getByRole("contentinfo")
+      .getByRole("link", { name: "Acceso del equipo" }),
   ).toHaveAttribute("href", "/login");
-  const darkTheme = page.getByRole("button", { name: "Oscuro" });
-  await expect(async () => {
-    await darkTheme.click();
-    await expect(darkTheme).toHaveAttribute("aria-pressed", "true");
-  }).toPass();
+  await page.waitForFunction(
+    () =>
+      !document
+        .querySelector("astro-island:has([data-theme-toggle])")
+        ?.hasAttribute("ssr"),
+  );
+  await expect(
+    page.getByRole("button", { name: "Cambiar a modo oscuro" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cambiar a modo oscuro" }).click();
+  await expect(
+    page.getByRole("button", { name: "Cambiar a modo claro" }),
+  ).toBeVisible();
   await expect(page.locator("html")).toHaveClass(/dark/);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  await page.getByRole("button", { name: "Cambiar a modo claro" }).click();
+  await page
+    .getByRole("button", { name: "Cambiar a modo del sistema" })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "system");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.locator("html")).toHaveClass(/dark/);
 });
