@@ -1,7 +1,8 @@
 ---
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import { requireInternalUser } from "@/server/auth/context";
 
-const user = Astro.locals.internalUser!;
+const user = requireInternalUser(Astro.locals);
 ---
 
 <PrivateLayout title="Resumen">

@@ -1,0 +1,196 @@
+---
+import { ArrowRight } from "lucide-react";
+
+import type { PublicCourseDto } from "@/domain/courses/types";
+import CourseArtwork from "./CourseArtwork.astro";
+import { groupPosterRows } from "./course-poster-rows";
+import {
+  availabilityLabels,
+  courseDateRange,
+  levelLabels,
+} from "./course-presentation";
+
+interface Props {
+  featuredCourse: PublicCourseDto | undefined;
+  moreCourses: readonly PublicCourseDto[];
+  couldNotLoadCourses: boolean;
+  showPreviewArtwork?: boolean;
+}
+
+const {
+  featuredCourse,
+  moreCourses,
+  couldNotLoadCourses,
+  showPreviewArtwork = false,
+} = Astro.props;
+const posterRows = groupPosterRows(moreCourses);
+const maxRevealStepMs = 140;
+const maxRevealWindowMs = 1800;
+const revealStepMs = Math.min(
+  maxRevealStepMs,
+  maxRevealWindowMs / Math.max(moreCourses.length - 1, 1),
+);
+const revealDelayBySlug = new Map(
+  moreCourses.map(({ slug }, index) => [
+    slug,
+    Math.round(index * revealStepMs),
+  ]),
+);
+---
+
+<section id="cursos" class="courses" aria-labelledby="courses-title">
+  <h2 id="courses-title" class="sr-only">
+    Cursos publicados
+  </h2>
+  {featuredCourse ? (
+    <article class="featured-course">
+      <a
+        class="featured-course-link"
+        href={`/cursos/${featuredCourse.slug}`}
+        aria-label={`Ver curso: ${featuredCourse.name}`}
+      >
+        <CourseArtwork
+          slug={featuredCourse.slug}
+          name={featuredCourse.name}
+          priority
+          usePreviewPhoto={showPreviewArtwork}
+        />
+        <div class="featured-course-copy">
+          <p
+            class:list={[
+              "availability",
+              `availability-${featuredCourse.registrationAvailability.toLowerCase()}`,
+            ]}
+          >
+            <span aria-hidden="true" />
+            {availabilityLabels[featuredCourse.registrationAvailability]}
+          </p>
+          <h3>{featuredCourse.name}</h3>
+          <p class="course-description">{featuredCourse.description}</p>
+          <div class="editorial-rule" aria-hidden="true" />
+          <dl class="course-summary">
+            <div>
+              <dt>Fechas</dt>
+              <dd>{courseDateRange(featuredCourse)}</dd>
+            </div>
+            <div>
+              <dt>Nivel y duración</dt>
+              <dd>
+                {levelLabels[featuredCourse.level]} ·{" "}
+                {featuredCourse.totalHours} horas
+              </dd>
+            </div>
+          </dl>
+          <span class="course-link-label">
+            Ver curso <ArrowRight aria-hidden="true" />
+          </span>
+        </div>
+      </a>
+    </article>
+  ) : couldNotLoadCourses ? (
+    <div class="empty-offer load-error" role="alert">
+      <div class="error-signal" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+      <div>
+        <p class="availability">
+          <span aria-hidden="true" />
+          Consulta temporalmente no disponible
+        </p>
+        <h3>No pudimos cargar los cursos en este momento.</h3>
+        <p>
+          Intenta nuevamente más tarde. La información publicada volverá a
+          mostrarse aquí.
+        </p>
+      </div>
+    </div>
+  ) : (
+    <div class="empty-offer">
+      <p class="availability">
+        <span aria-hidden="true" />
+        Próxima oferta
+      </p>
+      <h3>Estamos preparando nuevas oportunidades de formación.</h3>
+      <p>
+        Cuando se publique una convocatoria, encontrarás aquí sus fechas y
+        detalles.
+      </p>
+    </div>
+  )}
+</section>
+
+{posterRows.length > 0 && (
+  <section class="more-courses" aria-labelledby="more-courses-title">
+    <div class="section-heading" data-signal-reveal="field">
+      <h2 id="more-courses-title">Más cursos</h2>
+      <p>Convocatorias publicadas</p>
+    </div>
+    <ol class="poster-rows" data-signal-reveal="list">
+      {posterRows.map((row, rowIndex) => (
+        <li
+          class:list={[
+            "poster-row",
+            `poster-row-${row.kind}`,
+            `poster-row-variant-${(rowIndex % 3) + 1}`,
+          ]}
+          data-row-size={row.items.length}
+          data-pair-emphasis={row.pairEmphasis}
+        >
+          <div class="poster-row-list">
+            {row.items.map((course) => (
+              <article
+                class="course-poster"
+                style={`--poster-reveal-delay: ${revealDelayBySlug.get(course.slug) ?? 0}ms`}
+              >
+                <a
+                  href={`/cursos/${course.slug}`}
+                  aria-label={`Ver curso: ${course.name}`}
+                >
+                  <CourseArtwork
+                    slug={course.slug}
+                    name={course.name}
+                    usePreviewPhoto={showPreviewArtwork}
+                  />
+                  <div class="course-poster-copy">
+                    <p
+                      class:list={[
+                        "availability",
+                        `availability-${course.registrationAvailability.toLowerCase()}`,
+                      ]}
+                    >
+                      <span aria-hidden="true" />
+                      {availabilityLabels[course.registrationAvailability]}
+                    </p>
+                    <h3 title={course.name}>{course.name}</h3>
+                    <p class="poster-description">{course.description}</p>
+                    <dl class="poster-facts">
+                      <div>
+                        <dt>Fechas</dt>
+                        <dd>{courseDateRange(course)}</dd>
+                      </div>
+                      <div>
+                        <dt>Nivel y duración</dt>
+                        <dd>
+                          {levelLabels[course.level]} · {course.totalHours}{" "}
+                          horas
+                        </dd>
+                      </div>
+                    </dl>
+                    <span class="course-link-label">
+                      {course.registrationAvailability === "CLOSED"
+                        ? "Ver información"
+                        : "Ver curso"}
+                      <ArrowRight aria-hidden="true" />
+                    </span>
+                  </div>
+                </a>
+              </article>
+            ))}
+          </div>
+        </li>
+      ))}
+    </ol>
+  </section>
+)}

@@ -1,0 +1,79 @@
+---
+import { getImage } from "astro:assets";
+
+import kantutaParticipation from "../../../assets/plates/kantuta-participation.png";
+import { responsiveSourceSet } from "./responsive-images";
+
+const widths = [280, 420, 640, 900, 1200, 1536] as const;
+const [avif, webp] = await Promise.all([
+  responsiveSourceSet(kantutaParticipation, widths, "avif", 52),
+  responsiveSourceSet(kantutaParticipation, widths, "webp", 82),
+]);
+const fallback = await getImage({
+  src: kantutaParticipation,
+  width: 900,
+  format: "webp",
+  quality: 82,
+});
+---
+
+<section
+  id="participar"
+  class="participation"
+  aria-labelledby="participation-title"
+>
+  <picture class="kantuta" aria-hidden="true">
+    <source
+      type="image/avif"
+      srcset={avif}
+      sizes="(max-width: 639px) 100vw, (max-width: 860px) 82vw, 52vw"
+    />
+    <source
+      type="image/webp"
+      srcset={webp}
+      sizes="(max-width: 639px) 100vw, (max-width: 860px) 82vw, 52vw"
+    />
+    <img
+      src={fallback.src}
+      width="900"
+      height="600"
+      alt=""
+      loading="lazy"
+      decoding="async"
+    />
+  </picture>
+  <div class="participation-intro" data-signal-reveal="field">
+    <h2 id="participation-title">Cómo participar</h2>
+    <p>
+      Una ruta clara para decidir con información antes de expresar tu interés.
+    </p>
+  </div>
+  <ol data-signal-reveal="route">
+    <li>
+      <span class="step-number">01</span>
+      <div>
+        <strong>Revisa la convocatoria</strong>
+        <p>Compara nivel, carga horaria, fechas, horario y precio.</p>
+      </div>
+    </li>
+    <li>
+      <span class="step-number">02</span>
+      <div>
+        <strong>Expresa tu interés</strong>
+        <p>
+          La preinscripción registra tu interés; no confirma una inscripción
+          definitiva.
+        </p>
+      </div>
+    </li>
+    <li>
+      <span class="step-number">03</span>
+      <div>
+        <strong>Espera la confirmación</strong>
+        <p>
+          La unidad responsable comunicará los siguientes pasos del proceso.
+        </p>
+      </div>
+    </li>
+  </ol>
+</section>

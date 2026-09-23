@@ -79,6 +79,47 @@ Implementación de Fase 2A:
 
 Los tipos iniciales requeridos son `STUDENT` y `EXTERNAL`. Existe un único precio por curso y tipo. `amount` usa `numeric(12,2)`, se representa como string en TypeScript, no admite negativos y la moneda explícita queda restringida a `BOB`.
 
+### Modelo objetivo aprobado, pendiente de implementación
+
+El modelo directo anterior es el estado actual de Fase 2A y queda marcado para refactorización. El modelo objetivo introduce:
+
+#### CourseType
+
+- id
+- name
+- active
+- createdAt
+- updatedAt
+
+Representa un Tipo de curso/formato administrado. `active` permite activarlo o desactivarlo sin borrar sus revisiones ni modificar cursos históricos.
+
+#### CourseTypeRevision
+
+- id
+- courseTypeId
+- revisionNumber
+- totalHours
+- createdAt
+
+Cada revisión es inmutable. Sus precios `STUDENT` y `EXTERNAL`, en `BOB`, pertenecen a esa revisión y no son overrides del curso.
+
+#### CourseTypeRevisionPrice
+
+- courseTypeRevisionId
+- participantType
+- amount
+- currency
+
+Debe existir un precio por revisión y tipo de participante. `amount` conserva `numeric(12,2)` y `currency` queda restringida a `BOB`, con la misma precisión monetaria definida para `CoursePrice`.
+
+#### Relación con Course
+
+Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no conserva campos editables independientes para horas o precios. Al editar un tipo se crea una nueva revisión y los cursos borrador/no publicados pasan a la revisión vigente; los cursos `PUBLISHED` y `ARCHIVED` mantienen la revisión exacta con la que fueron publicados o archivados.
+
+La refactorización también podrá asociar al curso una fotografía propia opcional y autorizada. Si falta, la lectura pública debe indicar o resolver el fallback gráfico de Cota Activa; no debe inventar una fotografía ni sustituirla por un icono genérico.
+
+La proyección pública actual todavía expone `totalHours`, `schedule` y `prices` desde el contrato de Fase 2A. La jerarquía objetivo de tarjetas omite los dos precios y el horario detallado; el futuro detalle `/cursos/[slug]` deberá presentarlos junto con las condiciones.
+
 ### Group
 
 - id

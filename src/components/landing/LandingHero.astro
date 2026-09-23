@@ -1,0 +1,76 @@
+---
+import { getImage } from "astro:assets";
+import { ArrowRight } from "lucide-react";
+
+import cotaActivaDesktop from "../../../assets/plates/cota-activa-desktop.png";
+import cotaActivaMobile from "../../../assets/plates/cota-activa-mobile.png";
+import { responsiveSourceSet } from "./responsive-images";
+
+const mobileWidths = [320, 480, 640, 960, 1198] as const;
+const desktopWidths = [640, 960, 1280, 1672] as const;
+const [mobileAvif, mobileWebp, desktopAvif, desktopWebp] = await Promise.all([
+  responsiveSourceSet(cotaActivaMobile, mobileWidths, "avif", 52),
+  responsiveSourceSet(cotaActivaMobile, mobileWidths, "webp", 82),
+  responsiveSourceSet(cotaActivaDesktop, desktopWidths, "avif", 52),
+  responsiveSourceSet(cotaActivaDesktop, desktopWidths, "webp", 82),
+]);
+const fallback = await getImage({
+  src: cotaActivaDesktop,
+  width: cotaActivaDesktop.width,
+  format: "webp",
+  quality: 82,
+});
+---
+
+<section class="hero" aria-labelledby="hero-title">
+  <picture class="hero-plate">
+    <source
+      media="(max-width: 639px)"
+      type="image/avif"
+      srcset={mobileAvif}
+      sizes="100vw"
+      width={cotaActivaMobile.width}
+      height={cotaActivaMobile.height}
+    />
+    <source
+      media="(max-width: 639px)"
+      type="image/webp"
+      srcset={mobileWebp}
+      sizes="100vw"
+      width={cotaActivaMobile.width}
+      height={cotaActivaMobile.height}
+    />
+    <source
+      media="(min-width: 640px)"
+      type="image/avif"
+      srcset={desktopAvif}
+      sizes="100vw"
+      width={cotaActivaDesktop.width}
+      height={cotaActivaDesktop.height}
+    />
+    <source
+      media="(min-width: 640px)"
+      type="image/webp"
+      srcset={desktopWebp}
+      sizes="100vw"
+      width={cotaActivaDesktop.width}
+      height={cotaActivaDesktop.height}
+    />
+    <img
+      src={fallback.src}
+      width={cotaActivaDesktop.width}
+      height={cotaActivaDesktop.height}
+      alt=""
+      loading="eager"
+      decoding="async"
+      fetchpriority="high"
+    />
+  </picture>
+  <div class="hero-copy">
+    <h1 id="hero-title">El siguiente paso es tuyo.</h1>
+    <p>Descubre nuevas formas de seguir creciendo.</p>
+    <a class="primary-action public-action" href="#cursos">
+      Explorar cursos <ArrowRight aria-hidden="true" />
+    </a>
+  </div>
+</section>

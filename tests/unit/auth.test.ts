@@ -12,6 +12,7 @@ import type { InternalUser } from "@/domain/auth/types";
 import { loginRedirect, safeRelativeRedirect } from "@/server/auth/redirects";
 import {
   applyPrivateNoStore,
+  getAuthRouteContext,
   getPrivateRoutePolicy,
   isSessionDependentPath,
   PRIVATE_ROUTE_POLICIES,
@@ -19,6 +20,7 @@ import {
 import { getSupabaseCookieOptions } from "@/server/auth/supabase";
 import { RUNTIME_DATABASE_OPTIONS } from "@/server/db/client";
 import {
+  readDatabaseEnvironment,
   readPublicAuthEnvironment,
   readServerEnvironment,
 } from "@/server/environment";
@@ -122,6 +124,16 @@ describe("private route policies and caching", () => {
     const response = new Response();
     applyPrivateNoStore(response);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  test("initializes Auth only for routes that depend on a session", () => {
+    expect(getAuthRouteContext("/")).toBe("NONE");
+    expect(getAuthRouteContext("/cursos/curso-publico")).toBe("NONE");
+    expect(getAuthRouteContext("/login")).toBe("FULL");
+    expect(getAuthRouteContext("/app/cursos")).toBe("FULL");
+    expect(getAuthRouteContext("/app/future")).toBe("FULL");
+    expect(getAuthRouteContext("/auth/google")).toBe("CLIENT");
+    expect(getAuthRouteContext("/auth/callback")).toBe("CLIENT");
   });
 });
 
@@ -228,6 +240,9 @@ describe("environment configuration", () => {
       "http://127.0.0.1:54321",
     );
     expect(
+      readDatabaseEnvironment({ DATABASE_URL: "postgresql://db" }).databaseUrl,
+    ).toBe("postgresql://db");
+    expect(
       readServerEnvironment({
         ...publicValues,
         DATABASE_URL: "postgresql://db",
@@ -250,5 +265,11 @@ describe("environment configuration", () => {
         PUBLIC_SITE_URL: "javascript:unsafe",
       }),
     ).toThrow("absolute HTTP(S) URL");
+    expect(() => readDatabaseEnvironment(publicValues)).toThrow(
+      "Missing required environment variable: DATABASE_URL",
+    );
+    expect(() =>
+      readDatabaseEnvironment({ DATABASE_URL: "postgresql://db" }),
+    ).not.toThrow();
   });
 });

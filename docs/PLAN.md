@@ -117,7 +117,7 @@ Fase 1 completada y verificada en local, CI y cloud. El primer administrador pue
 
 ## FASE 2 — CURSOS Y EXPERIENCIA PÚBLICA
 
-La fase se divide en dos entregas consecutivas. Fase 2B no comienza hasta cerrar y verificar completamente Fase 2A.
+La fase se divide en dos entregas consecutivas. La capa visual de la landing se puede validar de forma aislada sobre el contrato público actual y previews sintéticos, pero el catálogo, el detalle y el cierre completo de Fase 2B siguen bloqueados hasta cerrar y verificar completamente el gate de Fase 2A.
 
 ### Decisiones de alcance
 
@@ -218,7 +218,19 @@ Un administrador crea, edita, configura, publica, retira y archiva cursos. Los c
 
 #### Estado 2A
 
-Fase 2A completada y verificada en local, CI y cloud. La migración está aplicada en Supabase, el flujo administrativo está desplegado en Vercel y Fase 2B no se inicia hasta definir y validar explícitamente su dirección visual.
+Fase 2A completada y verificada en local, CI y cloud con el modelo actualmente implementado. La migración está aplicada en Supabase y el flujo administrativo está desplegado en Vercel. El refactor aprobado de Tipos de curso y revisiones inmutables sigue pendiente y debe superar el gate específico antes de cerrar Fase 2B.
+
+#### Refactor aprobado pendiente — gate previo al cierre de Fase 2B
+
+La implementación actual guarda `totalHours` y precios directamente por curso. ADR-016 acepta sustituir ese modelo, pero esta decisión todavía no está implementada.
+
+- [ ] Modelar Tipos de curso/formatos administrados, con activación y desactivación.
+- [ ] Modelar revisiones inmutables con duración y precios `STUDENT`/`EXTERNAL` en `BOB`.
+- [ ] Hacer obligatorio que cada curso seleccione una revisión y eliminar los overrides directos de horas y precios.
+- [ ] Aplicar la revisión vigente a cursos borrador/no publicados y preservar la revisión exacta en cursos publicados y archivados.
+- [ ] Migrar y verificar el contrato administrativo, el contrato público y la trazabilidad sin tratar la refactorización como completada antes de su verificación.
+- [ ] Incorporar la fotografía propia opcional autorizada con upload/storage administrativo real; el fallback gráfico de Cota Activa ya está implementado en la capa de presentación.
+- [ ] Ejecutar la revisión de cierre del gate y actualizar la documentación con el estado real.
 
 ### FASE 2B — LANDING, CATÁLOGO Y DETALLE PÚBLICO
 
@@ -228,28 +240,28 @@ Construir una experiencia pública distintiva que presente la propuesta del sist
 
 #### Checklist de dirección visual
 
-- [ ] Confirmar que el gate de Fase 2A está completamente cerrado.
-- [ ] Cargar la skill `frontend-design` antes de proponer la interfaz.
-- [ ] Elaborar un brief con audiencia, objetivo, contenido real, tono y jerarquía.
-- [ ] Proponer una dirección visual con color, tipografía, layout y principios específicos del contexto educativo.
-- [ ] Preparar wireframes mobile y desktop y alinear la propuesta con los tokens existentes.
-- [ ] Mantener el branding provisional centralizado y fácil de sustituir.
-- [ ] Revisar la propuesta contra patrones genéricos antes de escribir código.
-- [ ] Presentar y validar la dirección visual antes de implementarla.
+- [x] Confirmar que el gate de Fase 2A está completamente cerrado.
+- [x] Cargar la skill `frontend-design` antes de proponer la interfaz.
+- [x] Elaborar un brief con audiencia, objetivo, contenido real, tono y jerarquía.
+- [x] Proponer una dirección visual con color, tipografía, layout y principios específicos del contexto educativo.
+- [x] Preparar wireframes mobile y desktop y alinear la propuesta con los tokens existentes.
+- [x] Mantener el branding provisional centralizado y fácil de sustituir.
+- [x] Revisar la propuesta contra patrones genéricos antes de escribir código.
+- [x] Presentar y validar la dirección visual antes de implementarla.
 
 #### Checklist de landing
 
-- [ ] Evolucionar `/` desde Foundation hacia la fuente pública oficial de información vigente.
-- [ ] Comunicar formación continua, cursos vigentes y propósito del sistema sin prometer módulos inexistentes.
-- [ ] Destacar nivel, duración, fechas, horario, precios y condiciones cuando corresponda.
-- [ ] Incorporar acceso principal al catálogo y mantener visible el acceso del equipo.
-- [ ] Mostrar cursos publicados destacados sin inventar cifras, testimonios ni contenido institucional.
-- [ ] Diseñar estados de catálogo vacío y error con una siguiente acción comprensible.
+- [x] Evolucionar `/` desde Foundation hacia la fuente pública oficial de información vigente.
+- [x] Comunicar formación continua, cursos vigentes y propósito del sistema sin prometer módulos inexistentes.
+- [x] En la cartelera de landing, mostrar disponibilidad, título, descripción breve, inicio/fecha, nivel y duración; reservar horario exacto, condiciones y precios diferenciados para el futuro detalle público.
+- [x] Incorporar acceso principal a la oferta y mantener visible el acceso del equipo.
+- [x] Mostrar cursos publicados destacados sin inventar cifras, testimonios ni contenido institucional.
+- [x] Diseñar estados de oferta vacía y error con un mensaje comprensible.
 
 #### Checklist de catálogo y detalle
 
 - [ ] Crear `/cursos` consumiendo exclusivamente el contrato público de Fase 2A.
-- [ ] Mostrar únicamente cursos publicados con nivel, horas, fechas, horario y precios públicos.
+- [ ] Mostrar únicamente cursos publicados con el resumen público aprobado y sin exponer en las tarjetas los dos precios detallados ni el horario detallado.
 - [ ] Indicar si la ventana de preinscripción está próxima, abierta o cerrada.
 - [ ] Mantener URLs estables mediante slug y evitar filtros sin una necesidad demostrada.
 - [ ] Crear `/cursos/[slug]` con descripción, condiciones y disponibilidad completas.
@@ -259,14 +271,27 @@ Construir una experiencia pública distintiva que presente la propuesta del sist
 
 #### Checklist de revisión visual y calidad
 
-- [ ] Cargar la skill `playwright-cli` y revisar screenshots en mobile, tablet y desktop.
-- [ ] Revisar light, dark y system, incluido el flash inicial del tema.
-- [ ] Comparar la implementación con el brief y realizar una autocrítica visual.
-- [ ] Corregir jerarquía, densidad, ritmo y cualquier patrón visual genérico.
-- [ ] Verificar teclado, foco, contraste, zoom, objetivos táctiles y landmarks.
-- [ ] Verificar `prefers-reduced-motion` y ausencia de scroll horizontal.
-- [ ] Cargar `web-design-guidelines` para la auditoría final de UI.
-- [ ] Repetir screenshots y pruebas después de las correcciones.
+- [x] Cargar la skill `playwright-cli` y revisar screenshots en mobile, tablet y desktop.
+- [x] Revisar light, dark y system, incluido el flash inicial del tema.
+- [x] Comparar la implementación con el brief y realizar una autocrítica visual.
+- [x] Corregir jerarquía, densidad, ritmo y cualquier patrón visual genérico.
+- [x] Verificar teclado, foco, contraste, zoom, objetivos táctiles y landmarks.
+- [x] Verificar `prefers-reduced-motion` y ausencia de scroll horizontal.
+- [x] Cargar `web-design-guidelines` para la auditoría final de UI.
+- [x] Repetir screenshots y pruebas después de las correcciones.
+
+La dirección **Cartelera editorial** fue seleccionada el 2026-09-18 mediante una comparación visual con Catálogo visual modular y Agenda de convocatorias. La implementación visual en `/`, incluida su adaptación mobile, está completada y verificada. La cartelera restaura la transición difuminada y superpuesta entre hero y oferta, usa un enlace por tarjeta con CTA visual de botón, piezas redondeadas sin marco exterior, filas de tríos, dos pares cuando restan cuatro cursos y una fila completa para un único remanente; desktop cicla tres variantes de trío, tablet normaliza dos columnas y mobile una columna de afiches de igual ancho con artwork 4:3. Dark y warm-dark conservan el copy asociado a las placas luminosas sin reemplazar las imágenes, y el certificado enlaza visualmente con el footer mediante un fade sutil. La carga de artwork de producción —incluido picker y upload/storage— y el refactor de Tipos de curso/revisiones inmutables permanecen en el gate pendiente de Fase 2B.
+
+#### Estado actual de la cartelera
+
+- [x] Renderizar el curso destacado y los afiches secundarios desde el DTO público, con estado, fecha, nivel y duración.
+- [x] Resolver artwork local para previews sintéticos y fallback gráfico Cota Activa cuando un curso no tiene artwork.
+- [x] Admitir `?preview=courses&count=` con una muestra de 1 a 20 cursos sintéticos para revisar la composición.
+- [x] Verificar enlaces de tarjeta completa, orden de filas, ausencia de overflow, foco, temas claro/oscuro y paleta warm en E2E.
+- [x] Verificar la regresión de 20 cursos, incluyendo anchos de afiche mobile y tablet.
+- [x] Respetar `prefers-reduced-motion` en la composición y sus transiciones decorativas.
+- [ ] Sustituir el preview local por un picker y flujo administrativo de imagen propia autorizada con almacenamiento real.
+- [ ] Completar el refactor de Tipos de curso y revisiones inmutables antes del cierre de Fase 2B.
 
 #### Checklist de pruebas y cierre
 

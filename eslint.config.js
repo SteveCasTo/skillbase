@@ -8,6 +8,11 @@ export default defineConfig(
   {
     ignores: [
       ".astro/**",
+      ".agent/**",
+      ".agents/skills/**",
+      ".codex/**",
+      ".impeccable/**",
+      ".opencode/**",
       ".vercel/**",
       "dist/**",
       "node_modules/**",

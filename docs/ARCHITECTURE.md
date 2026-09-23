@@ -390,6 +390,8 @@ middleware/endpoints Astro
 → Drizzle/PostgreSQL
 ```
 
-La integración Supabase SSR vive en infraestructura server-side y se instancia por request. `Astro.locals` expone el cliente validado y el usuario interno ya resuelto a presentación; las páginas no consultan PostgreSQL. Los guards de ruta reutilizan políticas de aplicación y la navegación solo refleja permisos ya evaluados.
+La integración Supabase SSR vive en infraestructura server-side y se instancia por request únicamente en rutas dependientes de sesión. El middleware clasifica antes de inicializar dependencias: las rutas públicas ordinarias no crean contexto Auth; `/auth/**` recibe el cliente SSR ligado a cookies; `/login` y `/app/**` resuelven identidad y usuario interno. `Astro.locals` modela ese contexto como opcional y los consumidores protegidos lo exigen mediante assertions server-side. Los guards de ruta reutilizan políticas de aplicación, mantienen autorización fail-closed y la navegación solo refleja permisos ya evaluados.
 
 La conexión `DATABASE_URL` corresponde al runtime y puede apuntar a un pooler compatible con serverless. `MIGRATION_DATABASE_URL` prioriza una conexión directa para Drizzle Kit. En local ambas apuntan a `127.0.0.1:54322`.
+
+La configuración de base y la configuración pública de Auth se validan mediante accessors separados. Las lecturas de oferta pública reutilizan el singleton Drizzle y reintentan exclusivamente `listPublic` ante causas transitorias reconocidas, con tres intentos totales (esperas de 150 ms y 400 ms); errores de configuración, permisos, schema, validación y escrituras no se reintentan.

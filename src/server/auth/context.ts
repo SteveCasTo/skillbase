@@ -29,3 +29,17 @@ export async function loadRequestAuthContext(
     throw caught;
   }
 }
+
+export function requireRequestSupabaseClient(
+  locals: App.Locals,
+): RequestSupabaseClient {
+  if (!locals.supabase)
+    throw new Error("This route requires an initialized Auth client");
+  return locals.supabase;
+}
+
+export function requireInternalUser(locals: App.Locals): InternalUser {
+  if (!locals.internalUser)
+    throw new Error("This route requires an authorized internal user");
+  return locals.internalUser;
+}

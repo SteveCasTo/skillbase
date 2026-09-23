@@ -1,0 +1,133 @@
+<button
+  type="button"
+  class="theme-toggle"
+  data-theme-toggle
+  data-current-theme="system"
+  aria-label="Cambiar a modo oscuro"
+  title="Cambiar a modo oscuro"
+>
+  <svg
+    class="theme-toggle-sun"
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="12" r="4"></circle>
+    <path d="M12 2v2"></path>
+    <path d="M12 20v2"></path>
+    <path d="m4.93 4.93 1.41 1.41"></path>
+    <path d="m17.66 17.66 1.41 1.41"></path>
+    <path d="M2 12h2"></path>
+    <path d="M20 12h2"></path>
+    <path d="m6.34 17.66-1.41 1.41"></path>
+    <path d="m19.07 4.93-1.41 1.41"></path>
+  </svg>
+  <svg
+    class="theme-toggle-moon"
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M20.985 12.486A9 9 0 1 1 11.514 3.015c.36-.04.553.41.342.706a6 6 0 0 0 8.423 8.423c.297-.21.747-.019.706.342"></path>
+  </svg>
+  <svg
+    class="theme-toggle-system"
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    <rect width="20" height="14" x="2" y="3" rx="2"></rect>
+    <line x1="8" x2="16" y1="21" y2="21"></line>
+    <line x1="12" x2="12" y1="17" y2="21"></line>
+  </svg>
+</button>
+
+<script>
+  const toggle = document.querySelector<HTMLButtonElement>(
+    "[data-theme-toggle]",
+  );
+
+  if (toggle) {
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+
+    const applyTheme = (theme: "light" | "dark" | "system") => {
+      const isDark =
+        theme === "dark" || (theme === "system" && systemTheme.matches);
+      document.documentElement.classList.toggle("dark", isDark);
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+    };
+
+    const syncToggle = () => {
+      const selectedTheme = document.documentElement.dataset.theme;
+      const theme =
+        selectedTheme === "light" ||
+        selectedTheme === "dark" ||
+        selectedTheme === "system"
+          ? selectedTheme
+          : "system";
+      const nextThemeName =
+        theme === "system"
+          ? "oscuro"
+          : theme === "dark"
+            ? "claro"
+            : "del sistema";
+      toggle.dataset.currentTheme = theme;
+      toggle.ariaLabel = `Cambiar a modo ${nextThemeName}`;
+      toggle.title = `Cambiar a modo ${nextThemeName}`;
+    };
+
+    syncToggle();
+    toggle.addEventListener("click", () => {
+      const theme = toggle.dataset.currentTheme;
+      const nextTheme =
+        theme === "system" ? "dark" : theme === "dark" ? "light" : "system";
+      localStorage.setItem("theme", nextTheme);
+      applyTheme(nextTheme);
+      syncToggle();
+    });
+
+    systemTheme.addEventListener("change", () => {
+      if (toggle.dataset.currentTheme !== "system") return;
+      applyTheme("system");
+      syncToggle();
+    });
+  }
+</script>
+
+<style>
+  .theme-toggle {
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .theme-toggle svg {
+    width: 1rem;
+    height: 1rem;
+    pointer-events: none;
+  }
+</style>

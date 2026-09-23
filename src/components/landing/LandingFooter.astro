@@ -1,0 +1,87 @@
+---
+import { getImage } from "astro:assets";
+
+import cotaFooterDesktop from "../../../assets/plates/cota-footer-desktop.png";
+import cotaFooterMobile from "../../../assets/plates/cota-footer-mobile.png";
+import { responsiveSourceSet } from "./responsive-images";
+
+const mobileWidths = [320, 480, 640, 960, 1122] as const;
+const desktopWidths = [640, 960, 1280, 1600, 1916] as const;
+const [mobileAvif, mobileWebp, desktopAvif, desktopWebp] = await Promise.all([
+  responsiveSourceSet(cotaFooterMobile, mobileWidths, "avif", 52),
+  responsiveSourceSet(cotaFooterMobile, mobileWidths, "webp", 82),
+  responsiveSourceSet(cotaFooterDesktop, desktopWidths, "avif", 52),
+  responsiveSourceSet(cotaFooterDesktop, desktopWidths, "webp", 82),
+]);
+const fallback = await getImage({
+  src: cotaFooterDesktop,
+  width: cotaFooterDesktop.width,
+  format: "webp",
+  quality: 82,
+});
+---
+
+<footer class="site-footer">
+  <div class="footer-content" data-signal-reveal="field">
+    <div class="footer-heading">
+      <strong>Formación continua</strong>
+      <span>Departamento de Informática y Sistemas</span>
+    </div>
+    <nav aria-label="Navegación de pie de página">
+      <a href="#cursos">Cursos</a>
+      <a href="#participar">Cómo participar</a>
+      <a href="#certificados">Certificados</a>
+      <a href="/login">Acceso del equipo</a>
+    </nav>
+    <address class="footer-institution">
+      <strong>FCyT · UMSS</strong>
+      <span>Cochabamba, Bolivia</span>
+    </address>
+  </div>
+  <picture class="footer-plate" data-signal-reveal="image">
+    <source
+      media="(max-width: 639px)"
+      type="image/avif"
+      srcset={mobileAvif}
+      sizes="100vw"
+      width={cotaFooterMobile.width}
+      height={cotaFooterMobile.height}
+    />
+    <source
+      media="(max-width: 639px)"
+      type="image/webp"
+      srcset={mobileWebp}
+      sizes="100vw"
+      width={cotaFooterMobile.width}
+      height={cotaFooterMobile.height}
+    />
+    <source
+      media="(min-width: 640px)"
+      type="image/avif"
+      srcset={desktopAvif}
+      sizes="100vw"
+      width={cotaFooterDesktop.width}
+      height={cotaFooterDesktop.height}
+    />
+    <source
+      media="(min-width: 640px)"
+      type="image/webp"
+      srcset={desktopWebp}
+      sizes="100vw"
+      width={cotaFooterDesktop.width}
+      height={cotaFooterDesktop.height}
+    />
+    <img
+      src={fallback.src}
+      width={cotaFooterDesktop.width}
+      height={cotaFooterDesktop.height}
+      alt=""
+      loading="lazy"
+      decoding="async"
+    />
+  </picture>
+  <div class="footer-legal">
+    <span>Formación continua · FCyT · UMSS</span>
+    <span>Información de formación continua</span>
+  </div>
+</footer>
