@@ -201,6 +201,27 @@ test("kantuta remains anchored to the viewport on ultrawide screens", async ({
   await expectNoDocumentOverflow(page);
 });
 
+test("header becomes a floating island after scrolling", async ({ page }) => {
+  await openPreview(page, { width: 1440, height: 1000 });
+  const header = page.locator(".site-header");
+  const headerInner = header.locator(".header-inner");
+  const initialBounds = await box(headerInner);
+
+  await expect(header).not.toHaveClass(/is-scrolled/);
+  await expect(headerInner).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+
+  await page.evaluate(() => window.scrollTo(0, 200));
+  await expect(header).toHaveClass(/is-scrolled/);
+  await expect
+    .poll(async () => (await box(headerInner)).width)
+    .toBeLessThan(initialBounds.width - 50);
+  await expect(headerInner).not.toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+  expect((await box(headerInner)).y).toBeGreaterThan(0);
+});
+
 test("skip link moves keyboard focus to the main content", async ({ page }) => {
   await openPreview(page, { width: 390, height: 844 });
   await page.keyboard.press("Tab");
