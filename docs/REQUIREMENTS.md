@@ -37,9 +37,8 @@ Un curso debe poder registrar al menos:
 - nombre;
 - descripción;
 - nivel;
-- duración en horas;
+- un tipo/formato de curso administrado;
 - horario;
-- precios por tipo de participante;
 - condiciones;
 - fechas;
 - estado.
@@ -76,6 +75,18 @@ Los niveles iniciales son:
 - Solo un usuario interno activo con rol `ADMIN` puede crear, modificar o cambiar el estado de un curso.
 - La publicación exige exactamente un precio `STUDENT` y uno `EXTERNAL`, ambos en `BOB`, comprobados dentro de la misma transacción bloqueada.
 - El contrato público devuelve exclusivamente cursos `PUBLISHED` y no expone identificadores, estado, nota mínima ni timestamps administrativos. En Fase 2A es un DTO/repositorio sin rutas HTTP; el catálogo y detalle públicos pertenecen a Fase 2B.
+
+### Decisión aprobada pendiente de implementación
+
+La implementación actual de Fase 2A conserva duración (`totalHours`) y precios `STUDENT`/`EXTERNAL` directamente en cada curso. Estas reglas describen el modelo objetivo aceptado y requieren una refactorización antes de cerrar Fase 2B:
+
+- Administración debe poder gestionar Tipos de curso o formatos de curso, cada uno con duración y precios `STUDENT`/`EXTERNAL` en `BOB`.
+- Un curso debe seleccionar exactamente un tipo y no puede sobrescribir sus horas ni precios.
+- Editar un tipo crea una revisión inmutable. Los cursos `DRAFT` o no publicados deben adoptar la revisión vigente; los cursos `PUBLISHED` y `ARCHIVED` deben conservar exactamente la revisión utilizada.
+- Los tipos pueden activarse o desactivarse. Desactivar un tipo no elimina revisiones ni modifica cursos históricos.
+- Un curso puede tener una fotografía propia opcional únicamente si está autorizada. Si no la tiene, la presentación usa un fallback gráfico de Cota Activa, nunca un icono genérico ni fotografía ficticia.
+
+La decisión de persistencia y su relación con ADR-015 se registra en ADR-016; no se considera implementada mientras el repositorio siga usando los campos directos actuales.
 
 ## PREINSCRIPCIÓN
 
@@ -174,7 +185,7 @@ Valores iniciales conocidos:
 
 Estos valores no deben hardcodearse como reglas universales.
 
-Deben formar parte de la configuración del curso o política de precios.
+En el modelo objetivo deben formar parte de una revisión de Tipo de curso, no de valores independientes editables por curso. Hasta completar la refactorización, Fase 2A los mantiene directamente en cada curso.
 
 ## DESCUENTOS
 
@@ -370,6 +381,12 @@ Los cursos pueden difundirse fuera del sistema mediante:
 El sistema no necesita automatizar esos canales en MVP.
 
 La landing pública debe ser la fuente web oficial para información vigente.
+
+La jerarquía pública aprobada es:
+
+- las tarjetas de landing muestran disponibilidad, título, descripción breve, inicio/fecha, nivel y duración;
+- las tarjetas no muestran los dos precios detallados ni el horario detallado;
+- `/cursos/[slug]` contiene el horario exacto, las condiciones y los precios diferenciados.
 
 ## DOCUMENTOS
 

@@ -1,4 +1,6 @@
 ---
+import "@fontsource/ubuntu-mono/400.css";
+
 import {
   BookOpen,
   CalendarCheck,
@@ -9,15 +11,14 @@ import {
 
 import { hasRole } from "@/domain/auth/policies";
 import BaseLayout from "@/layouts/BaseLayout.astro";
+import { requireInternalUser } from "@/server/auth/context";
 
 interface Props {
   title: string;
 }
 
 const { title } = Astro.props;
-const user = Astro.locals.internalUser;
-if (!user)
-  throw new Error("PrivateLayout requires an authorized internal user");
+const user = requireInternalUser(Astro.locals);
 const navItems = [
   { href: "/app", label: "Resumen", icon: LayoutDashboard, visible: true },
   {

@@ -35,6 +35,14 @@ export function isPrivatePath(pathname: string): boolean {
   return pathname === "/app" || pathname.startsWith("/app/");
 }
 
+export type AuthRouteContext = "NONE" | "CLIENT" | "FULL";
+
+export function getAuthRouteContext(pathname: string): AuthRouteContext {
+  if (isPrivatePath(pathname) || pathname === "/login") return "FULL";
+  if (pathname.startsWith("/auth/")) return "CLIENT";
+  return "NONE";
+}
+
 export function isSessionDependentPath(pathname: string): boolean {
   return (
     isPrivatePath(pathname) ||

@@ -372,12 +372,15 @@ Tipografías propuestas:
 - Sans: Montserrat.
 - Serif: Merriweather.
 - Mono: Ubuntu Mono.
+- Display de la landing pública `Cota Activa`: Alef en peso 700.
 
 No utilizar `next/font` porque el proyecto no usa Next.js.
 
 Preferir fuentes self-hosted o un mecanismo compatible con Astro.
 
 La UI general debe usar Montserrat.
+
+Alef es la voz de titulares, nombres de curso y acentos de identidad de la landing pública `Cota Activa`. Esta excepción pertenece únicamente a esa superficie y no redefine la tipografía de las vistas operativas, de autenticación ni de otras páginas públicas.
 
 Merriweather debe reservarse para contenido editorial o acentos muy concretos.
 
@@ -425,3 +428,32 @@ Antes de crear un componente:
 2. Revisar si existe un componente compartido equivalente.
 3. Reutilizar variantes antes de duplicar.
 4. Mantener spacing, radius, typography y shadows del design system.
+
+## LANDING PÚBLICA COTA ACTIVA
+
+- La presentación pública de cursos sigue la dirección **Cartelera editorial**, seleccionada el 2026-09-18 frente a Catálogo visual modular y Agenda de convocatorias. La convocatoria principal usa una composición panorámica dominante y las restantes se presentan como afiches secundarios dentro del lenguaje territorial de Cota Activa. Esta cartelera ya está implementada en `/` y verificada con pruebas responsive y de interacción.
+- La transición del hero hacia la oferta vuelve a solaparse mediante un desplazamiento negativo y un degradado translúcido que difumina el encuentro con el curso destacado.
+- La convocatoria principal y cada afiche secundario son un único enlace que cubre toda la pieza; no se fragmenta el curso en acciones internas que compitan entre sí. Las piezas son suaves, redondeadas y sin marco exterior visible, y el CTA interno tiene tratamiento visual de botón sin crear un enlace anidado.
+- Las filas secundarias agrupan los cursos en tríos; cuando quedan cuatro, los dividen en dos pares para no dejar un afiche aislado; un remanente único ocupa una fila completa. En desktop los tríos ciclan tres variantes de proporción y desplazamiento vertical para conservar ritmo editorial; en tablet se normalizan a dos columnas y en mobile a una columna uniforme.
+- Las acciones públicas principales (hero, curso destacado y certificados) comparten altura, espaciado, flecha, foco y radio moderado.
+- Las ilustraciones territoriales usan composiciones separadas para mobile y desktop, con corte en `639px`, imágenes responsive optimizadas y formatos AVIF/WebP.
+- La procedencia y el carácter conceptual de las placas territoriales se registran en `assets/plates/cota-activa.provenance.md`; no deben presentarse como evidencia documental del campus real.
+- La kantuta funciona como motivo editorial decorativo de la ruta de participación: se recorta y recompone según el contexto, sin competir con el contenido ni transmitir información esencial.
+- La landing se compone por secciones Astro y usa una hoja de estilos local bajo el scope `.landing`; Alef, tokens semánticos, animaciones y arte responsive no se comparten accidentalmente con otras superficies.
+- El primer control es un skip link visible al foco que lleva a `main#main-content`. El acceso móvil del equipo permanece en el footer; la acción de cabecera se oculta hasta superar `860px`.
+- El fallo de carga de oferta y la ausencia real de convocatorias son estados visuales y semánticos distintos.
+- Los afiches secundarios se revelan uno a uno según su orden global, sin reiniciar la secuencia por fila. El intervalo se comprime cuando aumenta la oferta para que el último afiche comience antes de `1.8s`; la lista permanece legible si el observer no se activa.
+- La capa de movimiento respeta `prefers-reduced-motion`: se eliminan las animaciones espaciales, los desplazamientos de entrada y las transiciones decorativas, incluidos los efectos hover/focus de artwork y CTA, manteniendo el contenido y la navegación disponibles.
+- `?preview=courses` es un preview temporal de desarrollo para revisar la composición con cursos sintéticos; `count` permite generar de 1 a 20 elementos y `palette=warm` conserva la exploración cálida. Puede mantenerse accesible durante este avance, pero se marca `noindex,nofollow`, no representa oferta oficial y no constituye un flujo de upload de imágenes de producción.
+- Los temas dark y warm-dark conservan las mismas placas luminosas de hero y footer, con el copy asociado a sus superficies claras; el filtro cálido solo ajusta la paleta warm. El bloque de certificados desemboca en el footer mediante un fade superior sutil.
+
+### Jerarquía de información de cursos
+
+- Las tarjetas de landing muestran disponibilidad, título, descripción breve, inicio/fecha, nivel y duración.
+- Las tarjetas no muestran los dos precios detallados ni el horario detallado.
+- El futuro detalle público `/cursos/[slug]` deberá mostrar el horario exacto, las condiciones y los precios diferenciados; esa ruta todavía no está implementada.
+- La landing implementada muestra disponibilidad, título, descripción breve, rango de fechas, nivel y duración, sin precios diferenciados ni horario detallado. La persistencia aún conserva duración y precios directos por curso hasta completar el refactor de Tipos de curso y revisiones inmutables.
+- La capa actual usa artwork local de preview a sangre para muestras sintéticas y un fallback gráfico de Cota Activa cuando no hay artwork. La única muestra fotográfica actual es `assets/plates/course-python-preview.jpg`, usada para `fundamentos-de-python`; su procedencia está registrada en `assets/plates/course-python-preview.provenance.md` (Unsplash, recuperada el 2026-09-22) y está marcada como material sintético de desarrollo. La fotografía propia autorizada, el picker y el upload/storage desde administración siguen pendientes; no hay imágenes de producción.
+- El refactor de Tipos de curso y revisiones inmutables sigue pendiente; la persistencia actual conserva horas y precios directos por curso.
+- La diferencia de escala entre convocatoria principal y afiches secundarios debe expresar prioridad editorial, no convertir el conjunto en una retícula uniforme de cards.
+- La referencia compositiva aprobada se conserva en `.impeccable/mocks/decision/editorial-billboard.png`; la adaptación mobile está implementada y verificada en los breakpoints de la landing.

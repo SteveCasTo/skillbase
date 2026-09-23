@@ -247,13 +247,26 @@ También se verifica signup público deshabilitado, creación de fixture por Adm
 - Unit cubre validación de campos, niveles, dinero decimal, fechas civiles Bolivia estrictas y simétricas, ventana opcional, nota explícita —incluido cero—, slug, transiciones, autorización activa, logging sanitizado y disponibilidad derivada.
 - Integration usa Supabase local para verificar schema, checks, índices de FK/consulta, RLS, privilegios, rollback atómico, auditoría exacta, validación transaccional de precios, concurrencia de slugs solapados, revisión optimista, persistencia UTC y proyecciones públicas.
 - E2E usa los usuarios Auth controlados existentes y recorre validación con valores preservados, creación, reedición sin desplazamiento horario, edición, publicación, edición publicada, retiro y archivo mediante Post/Redirect/Get. También comprueba operación sin JavaScript, denegación a instructor, protección de origen, layout mobile sin overflow y foco por teclado.
-- No se automatiza Google UI ni se crean rutas públicas de Fase 2B.
+- No se automatiza Google UI ni se crean aún las rutas públicas de catálogo y detalle de Fase 2B.
 
-### Resultado local de Fase 2A
+La carga pública cuenta con unit tests deterministas para los tres intentos máximos, delays inyectados y exclusión de errores permanentes/configuración. La política de middleware prueba que las rutas públicas no inicializan Auth y que `/login`, `/auth/**` y `/app/**` conservan sus contextos requeridos.
 
-- 22 pruebas unitarias, 18 de integración y 15 E2E ejecutadas localmente.
-- Typecheck y build locales correctos; los advisors locales de Supabase también se ejecutaron correctamente.
-- El CI remoto todavía no se ha ejecutado. Estos resultados no cierran el gate remoto ni equivalen a un CI exitoso.
+### Cobertura de la landing Cartelera editorial
+
+- `tests/unit/public-course-loader.test.ts` verifica la lectura pública tras fallos transitorios, los dos delays de reintento y el límite de tres intentos, además de no reintentar errores permanentes o de configuración.
+- `tests/unit/course-poster-rows.test.ts` verifica listas vacías, remanentes de 1 a 4, tríos, la partición de cuatro elementos en dos pares, la conservación del orden y la alternancia de énfasis entre pares.
+- `tests/e2e/landing-responsive.spec.ts` recorre 320, 390, 667, 768, 1024 y 1440 px; verifica ausencia de overflow, landmarks y foco, objetivos táctiles, breakpoints del header, temas oscuro/warm y art direction responsive.
+- El mismo E2E verifica que el curso destacado y cada afiche secundario sean enlaces únicos de tarjeta completa, que la cartelera no exponga precios ni horario detallado, y que `count=8` preserve el orden con filas `3, 2, 2` en tablet y mobile.
+- La regresión de `count=20` verifica 19 afiches secundarios, anchos utilizables y uniformes en mobile, un mínimo usable en tablet y ausencia de overflow después del cambio de layout.
+- `previewCoursesForCount` limita el preview temporal al rango 1..20; las muestras sintéticas se marcan `noindex,nofollow`, no sustituyen fixtures de oferta real ni implican upload/storage administrativo.
+- La compatibilidad con `prefers-reduced-motion` está implementada en la hoja de estilos de la landing: desactiva las animaciones y las transiciones/transformaciones decorativas principales de portada, cursos y CTA. Las pruebas E2E conservan la validación de contenido y navegación sin depender de animaciones.
+- La fotografía de preview y su procedencia son material sintético de desarrollo; el picker, upload/storage de imágenes de producción y el refactor de Tipos de curso/revisiones no forman parte de esta cobertura y permanecen pendientes.
+
+### Resultado de cierre de Fase 2A
+
+- Fase 2A superó sus pruebas unitarias, de integración y E2E en local y CI.
+- Typecheck, build y advisors de Supabase se verificaron antes de cerrar el gate.
+- La cobertura nueva de la landing pertenece al avance parcial de Fase 2B y no implica que catálogo, detalle ni el gate completo de esa fase estén cerrados.
 
 ## GATES
 

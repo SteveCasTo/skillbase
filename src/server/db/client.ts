@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 import * as schema from "@/server/db/schema";
-import { getServerEnvironment } from "@/server/environment";
+import { getDatabaseEnvironment } from "@/server/environment";
 
 interface DatabaseConnectionOptions {
   readonly max?: number;
@@ -40,7 +40,7 @@ export function createDatabase(
 let runtimeDatabase: ReturnType<typeof createDatabase> | undefined;
 
 export function getDatabase() {
-  runtimeDatabase ??= createDatabase(getServerEnvironment().databaseUrl, {
+  runtimeDatabase ??= createDatabase(getDatabaseEnvironment().databaseUrl, {
     ...RUNTIME_DATABASE_OPTIONS,
   });
   return runtimeDatabase.db;

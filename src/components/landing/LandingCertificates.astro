@@ -1,0 +1,26 @@
+---
+import { ArrowRight, ShieldCheck } from "lucide-react";
+---
+
+<section
+  id="certificados"
+  class="certificates"
+  aria-labelledby="certificates-title"
+>
+  <div class="certificate-signal" aria-hidden="true">
+    <span />
+    <ShieldCheck />
+  </div>
+  <div class="certificate-heading" data-signal-reveal="field">
+    <h2 id="certificates-title">Una credencial debe poder comprobarse.</h2>
+  </div>
+  <div class="certificate-copy" data-signal-reveal="field">
+    <p>
+      La verificación pública permite confirmar la validez de un certificado sin
+      exponer información personal innecesaria.
+    </p>
+    <a class="public-action certificate-action" href="/certificados">
+      Verificar certificado <ArrowRight aria-hidden="true" />
+    </a>
+  </div>
+</section>

@@ -1,5 +1,14 @@
 # Local agent configuration
 .opencode/
+.agent/
+
+# Generated design workflow artifacts
+.impeccable/build/
+.impeccable/live/
+.impeccable/review/
+.impeccable/mocks/*
+!.impeccable/mocks/decision/
+!.impeccable/mocks/decision/**
 
 # Dependencies and package manager caches
 node_modules/
