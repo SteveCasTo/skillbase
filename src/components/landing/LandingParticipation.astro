@@ -26,12 +26,12 @@ const fallback = await getImage({
     <source
       type="image/avif"
       srcset={avif}
-      sizes="(max-width: 639px) 100vw, (max-width: 860px) 82vw, 52vw"
+      sizes="(max-width: 639px) 100vw, (max-width: 860px) 82vw, (max-width: 2099px) 672px, (min-width: 2800px) 896px, 32vw"
     />
     <source
       type="image/webp"
       srcset={webp}
-      sizes="(max-width: 639px) 100vw, (max-width: 860px) 82vw, 52vw"
+      sizes="(max-width: 639px) 100vw, (max-width: 860px) 82vw, (max-width: 2099px) 672px, (min-width: 2800px) 896px, 32vw"
     />
     <img
       src={fallback.src}

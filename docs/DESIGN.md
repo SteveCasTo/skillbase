@@ -439,6 +439,7 @@ Antes de crear un componente:
 - Las ilustraciones territoriales usan composiciones separadas para mobile y desktop, con corte en `639px`, imágenes responsive optimizadas y formatos AVIF/WebP.
 - La procedencia y el carácter conceptual de las placas territoriales se registran en `assets/plates/cota-activa.provenance.md`; no deben presentarse como evidencia documental del campus real.
 - La kantuta funciona como motivo editorial decorativo de la ruta de participación: se recorta y recompone según el contexto, sin competir con el contenido ni transmitir información esencial.
+- En pantallas ultrawide, la kantuta se ancla al borde izquierdo del viewport, crece fluidamente hasta un máximo de `56rem` y asciende para enmarcar el título sin cubrirlo; el contenido permanece limitado a `86rem` para no perder legibilidad.
 - La landing se compone por secciones Astro y usa una hoja de estilos local bajo el scope `.landing`; Alef, tokens semánticos, animaciones y arte responsive no se comparten accidentalmente con otras superficies.
 - El primer control es un skip link visible al foco que lleva a `main#main-content`. El acceso móvil del equipo permanece en el footer; la acción de cabecera se oculta hasta superar `860px`.
 - El fallo de carga de oferta y la ausencia real de convocatorias son estados visuales y semánticos distintos.
@@ -446,6 +447,7 @@ Antes de crear un componente:
 - La capa de movimiento respeta `prefers-reduced-motion`: se eliminan las animaciones espaciales, los desplazamientos de entrada y las transiciones decorativas, incluidos los efectos hover/focus de artwork y CTA, manteniendo el contenido y la navegación disponibles.
 - `?preview=courses` es un preview temporal de desarrollo para revisar la composición con cursos sintéticos; `count` permite generar de 1 a 20 elementos y `palette=warm` conserva la exploración cálida. Puede mantenerse accesible durante este avance, pero se marca `noindex,nofollow`, no representa oferta oficial y no constituye un flujo de upload de imágenes de producción.
 - Los temas dark y warm-dark conservan las mismas placas luminosas de hero y footer, con el copy asociado a sus superficies claras; el filtro cálido solo ajusta la paleta warm. El bloque de certificados desemboca en el footer mediante un fade superior sutil.
+- El control de tema de la landing alterna únicamente entre light y dark. El modo system se conserva como capacidad global para superficies operativas, pero no forma parte del selector público.
 
 ### Jerarquía de información de cursos
 
