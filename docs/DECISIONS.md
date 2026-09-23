@@ -344,3 +344,43 @@ Los valores `datetime-local` se definen como tiempo civil `America/La_Paz` y se 
 - Ediciones obsoletas se rechazan sin pérdida silenciosa y los no-op no generan eventos de cambio.
 - La serialización global sacrifica paralelismo mínimo durante la breve asignación de slug a cambio de unicidad determinista para bases solapadas.
 - Fase 2B puede consumir un contrato público estable sin acceder a campos administrativos ni cambiar la persistencia.
+
+**Nota de vigencia:** el almacenamiento directo de duración y precios descrito aquí refleja la implementación actual de Fase 2A. ADR-016 lo sustituirá únicamente cuando su refactorización sea implementada y verificada; el resto del ciclo editorial, slug, autorización y auditoría de ADR-015 permanece vigente.
+
+---
+
+## ADR-016 — TIPOS DE CURSO Y REVISIONES INMUTABLES
+
+**Fecha:** 2026-09-18
+
+**Estado:** Accepted — presentación implementada; refactor de modelo pendiente
+
+### Contexto
+
+Fase 2A almacena `totalHours` y los precios `STUDENT`/`EXTERNAL` directamente por curso. Este modelo permite duplicar valores y no expresa que duración y precios son una configuración administrativa reutilizable. También se aprobó una jerarquía pública que separa el resumen de una tarjeta de la información comercial y operativa detallada.
+
+### Decisión
+
+- Introducir Tipos de curso o formatos administrados. Cada tipo define duración y precios `STUDENT`/`EXTERNAL` en `BOB`.
+- Exigir que cada curso seleccione exactamente un tipo y no pueda sobrescribir sus horas ni precios.
+- Representar las ediciones mediante revisiones inmutables del tipo. Una edición crea una nueva revisión: cursos borrador/no publicados adoptan la revisión vigente, mientras que cursos publicados y archivados conservan exactamente la revisión utilizada.
+- Permitir activar o desactivar tipos sin eliminar revisiones ni alterar cursos históricos.
+- Permitir una fotografía propia opcional por curso solo cuando esté autorizada. La ausencia se resuelve con un fallback gráfico de Cota Activa, nunca con iconos genéricos o fotografía ficticia. El fallback ya está implementado en la presentación; la persistencia y el upload/storage administrativo de fotografías siguen pendientes.
+- En la landing, las tarjetas muestran disponibilidad, título, descripción breve, inicio/fecha, nivel y duración, sin los dos precios detallados ni el horario detallado. El horario exacto, las condiciones y los precios diferenciados deberán vivir en el futuro detalle `/cursos/[slug]`, que aún no está implementado.
+- Presentar las alternativas cartelera editorial, catálogo visual modular y agenda cronológica antes de cerrar la dirección pública. El 2026-09-18 se seleccionó **Cartelera editorial**: una convocatoria panorámica dominante, afiches secundarios, fotografía opcional y fallback gráfico Cota Activa.
+
+### Alternativas
+
+- Mantener duración y precios como campos directos de cada curso.
+- Mutar un único valor de tipo y propagarlo también a cursos publicados o archivados.
+- Copiar valores en cada curso sin conservar una revisión inmutable del tipo.
+
+### Consecuencias
+
+- La administración obtiene una fuente reutilizable y auditable para duración y precios.
+- Los borradores/no publicados siguen la configuración vigente, mientras que publicados y archivados conservan una representación histórica exacta.
+- Será necesario migrar el modelo directo actual, adaptar contratos administrativos y públicos, y verificar las reglas de asignación y publicación antes de cerrar Fase 2B.
+- La decisión de Tipos de curso y revisiones sigue aceptada como dirección de producto y dominio, pero no debe tratarse como comportamiento implementado hasta completar el refactor. La composición visual Cartelera editorial sí está implementada en la landing y verificada con pruebas responsive e interacción.
+- Una vez implementada, esta decisión sustituye únicamente las partes de ADR-015 relativas al almacenamiento directo y la edición de duración/precios; no reemplaza sus reglas de ciclo editorial, slug, autorización, auditoría ni fechas.
+- La landing actual usa artwork local de preview para muestras sintéticas y fallback gráfico Cota Activa para cursos sin artwork; esto no constituye un flujo de imágenes de producción ni cambia el modelo de datos pendiente.
+- La cartelera agrupa afiches en tríos, convierte cuatro remanentes en dos pares y deja un remanente único en una fila completa; desktop varía proporciones, tablet equilibra dos columnas y mobile usa una columna uniforme. Cada pieza es un enlace de tarjeta completa.
