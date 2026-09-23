@@ -106,14 +106,18 @@ const moreCourses = featuredCourse
 
   const showMobileHeader = () =>
     siteHeader?.classList.remove("is-scroll-hidden");
-  const updateMobileHeader = () => {
+  const updateHeader = () => {
     scrollFrame = 0;
-    if (!siteHeader || !mobileViewport.matches) {
+    if (!siteHeader) return;
+
+    const currentScrollY = Math.max(window.scrollY, 0);
+    siteHeader.classList.toggle("is-scrolled", currentScrollY > 24);
+
+    if (!mobileViewport.matches) {
       showMobileHeader();
-      lastScrollY = Math.max(window.scrollY, 0);
+      lastScrollY = currentScrollY;
       return;
     }
-    const currentScrollY = Math.max(window.scrollY, 0);
     const delta = currentScrollY - lastScrollY;
     if (currentScrollY < 96 || siteHeader.contains(document.activeElement)) {
       showMobileHeader();
@@ -127,10 +131,11 @@ const moreCourses = featuredCourse
   window.addEventListener(
     "scroll",
     () => {
-      if (!scrollFrame) scrollFrame = requestAnimationFrame(updateMobileHeader);
+      if (!scrollFrame) scrollFrame = requestAnimationFrame(updateHeader);
     },
     { passive: true },
   );
-  mobileViewport.addEventListener("change", updateMobileHeader);
+  mobileViewport.addEventListener("change", updateHeader);
   siteHeader?.addEventListener("focusin", showMobileHeader);
+  updateHeader();
 </script>
