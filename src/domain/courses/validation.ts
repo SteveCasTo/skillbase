@@ -1,11 +1,6 @@
 import { CourseDomainError } from "./errors";
 import { boliviaCivilToInstant } from "./bolivia-time";
-import {
-  COURSE_LEVELS,
-  PARTICIPANT_TYPES,
-  type CourseData,
-  type CourseLevel,
-} from "./types";
+import { COURSE_LEVELS, type CourseData, type CourseLevel } from "./types";
 
 export type CourseInput = Readonly<Record<string, string | undefined>>;
 
@@ -52,7 +47,7 @@ function optionalDate(
   return date;
 }
 
-function money(
+export function money(
   input: CourseInput,
   key: string,
   errors: Record<string, string>,
@@ -85,9 +80,9 @@ export function validateCourseData(input: CourseInput): CourseData {
   const levelRaw = input.level ?? "";
   if (!COURSE_LEVELS.some((level) => level === levelRaw))
     errors.level = "Selecciona un nivel válido.";
-  const totalHours = Number(input.totalHours);
-  if (!Number.isInteger(totalHours) || totalHours <= 0)
-    errors.totalHours = "La duración debe ser un número entero mayor que 0.";
+  const courseTypeId = input.courseTypeId?.trim() ?? "";
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(courseTypeId))
+    errors.courseTypeId = "Selecciona un formato válido.";
   const minimumGradeRaw = input.minimumGrade?.trim() ?? "";
   const minimumGrade = Number(minimumGradeRaw);
   if (
@@ -119,8 +114,6 @@ export function validateCourseData(input: CourseInput): CourseData {
   ) {
     errors.registrationEndAt = "El cierre debe ser posterior a la apertura.";
   }
-  const studentAmount = money(input, "studentAmount", errors);
-  const externalAmount = money(input, "externalAmount", errors);
   if (Object.keys(errors).length > 0)
     throw new CourseDomainError(
       "VALIDATION_FAILED",
@@ -129,9 +122,12 @@ export function validateCourseData(input: CourseInput): CourseData {
     );
   return {
     name,
+    courseTypeId,
     description,
     level: levelRaw as CourseLevel,
-    totalHours,
+    contentMarkdown: input.contentMarkdown?.trim() || null,
+    instructorName: input.instructorName?.trim() || null,
+    artwork: input.artwork?.trim() || null,
     schedule,
     conditions,
     startsAt,
@@ -139,10 +135,5 @@ export function validateCourseData(input: CourseInput): CourseData {
     registrationStartAt,
     registrationEndAt,
     minimumGrade,
-    prices: PARTICIPANT_TYPES.map((participantType) => ({
-      participantType,
-      amount: participantType === "STUDENT" ? studentAmount : externalAmount,
-      currency: "BOB" as const,
-    })),
   };
 }

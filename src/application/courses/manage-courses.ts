@@ -84,6 +84,15 @@ export async function archiveCourse(
   return repository.transition(id, "ARCHIVED", user.id);
 }
 
+export async function featureCourse(
+  repository: CourseRepository,
+  user: InternalUser,
+  id: string,
+) {
+  requireAdmin(user);
+  return repository.setFeatured(id, user.id);
+}
+
 export async function listAdminCourses(
   repository: CourseRepository,
   user: InternalUser,

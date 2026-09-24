@@ -13,7 +13,7 @@ El público principal de la experiencia pública son, con igual importancia:
 - estudiantes de la Universidad Mayor de San Simón;
 - personas externas a la universidad interesadas en formación continua.
 
-Los estudiantes que además participan como auxiliares de laboratorio forman un caso elegible para una política de descuento, no una audiencia principal separada. Su precio corresponde al 50 % del precio para estudiantes; por ejemplo, si el precio para estudiantes es `Bs 80`, el precio para auxiliares es `Bs 40`.
+Los estudiantes que además participan como auxiliares de laboratorio forman un caso sujeto a una política de descuento, no una audiencia principal separada. La regla conocida del 50 % está pendiente de definir/verificar en el flujo de elegibilidad e inscripción; el producto todavía no calcula ni publica un precio de auxiliar.
 
 También interactúan con el producto:
 
@@ -56,20 +56,20 @@ La landing y el catálogo constituyen la fuente web oficial de información vige
 - Los auxiliares de laboratorio elegibles pagan el 50 % del precio para estudiantes. La interfaz no debe calcular ni prometer este precio hasta que la elegibilidad y la regla estén implementadas en el sistema.
 - Durante desarrollo y en despliegues de prueba se permiten cursos sintéticos completos para modelar la experiencia con oferta. Deben poder sustituirse por datos reales sin cambiar la landing.
 - La experiencia pública debe contemplar explícitamente el escenario sin cursos publicados o disponibles y no depender de que existan datos sintéticos.
-- La capa de presentación actual admite artwork local de preview para muestras sintéticas y usa un fallback gráfico de Cota Activa cuando un curso no tiene artwork. La carga real de imágenes propias autorizadas y su almacenamiento desde administración todavía están pendientes; no se deben interpretar los previews como uploads de producción.
+- La capa de presentación admite artwork local de preview para muestras sintéticas y fallback gráfico de Cota Activa; la administración también dispone de un flujo de carga de artwork autorizado a Storage. No se deben interpretar los previews locales como fotografías de cursos reales.
 - El flujo objetivo incluye preinscripción, grupos, inscripciones, pagos administrativos, asistencia, evaluaciones, cierre, certificados, identificadores públicos, QR, descarga y revocación.
 - La verificación pública debe permitir comprobar una credencial sin exponer datos personales innecesarios.
 - La primera versión no requiere necesariamente una cuenta autenticada para participantes.
-- La implementación actual completó la gestión administrativa, el contrato de lectura pública de cursos y la cartelera editorial de la landing. El modelo actual todavía guarda `totalHours` y los precios `STUDENT`/`EXTERNAL` directamente por curso; esto es una solución transitoria aceptada, no el modelo objetivo. La landing muestra disponibilidad, fecha, nivel y duración, y reserva el horario detallado y los precios diferenciados para un futuro detalle público. Las rutas públicas de catálogo y detalle pertenecen a Fase 2B; los módulos posteriores del ciclo aún no están implementados.
+- La implementación actual incluye gestión administrativa con formatos y revisiones inmutables, contrato de lectura pública, landing/cartelera, catálogo `/cursos` y detalle SSR `/cursos/[slug]`. La landing muestra disponibilidad, fecha, nivel y duración, y reserva horario detallado/precios diferenciados para el detalle. El horario informativo sigue persistido como texto aunque el formulario ofrezca un constructor por días/horas. Los módulos posteriores del ciclo (incluida preinscripción y elegibilidad/descuento de auxiliares) aún no están implementados. La verificación actual de CI remoto y cloud no se afirma aquí.
 - El nombre `SkillBase` es provisional y debe permanecer desacoplado de reglas de negocio, datos persistidos e integraciones para permitir un cambio posterior.
 
-### Decisión de producto aprobada, pendiente de implementación
+### Decisión de producto implementada
 
 - La administración gestionará **Tipos de curso** o formatos de curso. Cada tipo definirá una duración y los precios `STUDENT` y `EXTERNAL` en `BOB`.
 - Cada curso deberá seleccionar un tipo y no podrá sobrescribir sus horas ni precios.
 - Las modificaciones de un tipo se expresarán mediante revisiones inmutables: los cursos borrador/no publicados adoptarán la revisión vigente, mientras que los publicados y archivados conservarán exactamente la revisión utilizada.
 - Los tipos podrán activarse o desactivarse sin alterar las revisiones históricas ni los cursos que ya las utilizan.
-- Esta refactorización está aceptada, pero aún no está implementada. Sustituirá el almacenamiento directo actual de duración y precios antes de cerrar el alcance correspondiente de Fase 2B.
+- El modelo está implementado mediante `course_types` y `course_type_revisions`; la migración preserva términos históricos y el seed local ofrece formatos de ejemplo editables. Esta decisión no implica que el gate ampliado de Fase 2B o su verificación remota estén cerrados.
 
 ## Brand Commitments
 
@@ -83,9 +83,9 @@ La landing y el catálogo constituyen la fuente web oficial de información vige
 - `README.md` y `docs/REQUIREMENTS.md` documentan propósito, actores, flujo completo y reglas de negocio.
 - `docs/PLAN.md` documenta el alcance y estado de Fase 2A y Fase 2B.
 - `docs/DECISIONS.md` confirma el nombre provisional y el contrato editorial de cursos.
-- `src/application/courses/course-repository.ts` y `src/server/db/repositories/course-repository.ts` contienen el contrato público y su proyección segura.
-- `src/pages/index.astro` contiene la landing pública con composición Cartelera editorial y carga el contrato público; no constituye contenido institucional aprobado.
-- Los assets gráficos actuales y el artwork local de preview son provisionales y de desarrollo; no hay todavía un flujo de upload/storage administrativo ni activos oficiales de identidad institucional.
+- `src/application/courses/course-repository.ts` y `src/server/db/repositories/course-repository.ts` contienen el contrato público, la proyección de formatos y las lecturas SSR.
+- `src/pages/index.astro`, `src/pages/cursos/index.astro` y `src/pages/cursos/[slug].astro` contienen landing, catálogo y detalle; no constituyen contenido institucional aprobado.
+- Los assets gráficos y el artwork local de preview son provisionales y de desarrollo. Existe un flujo administrativo de upload/storage, pero no hay prueba de fotografías de cursos reales autorizadas ni activos oficiales de identidad institucional.
 - No hay cursos reales, estadísticas, testimonios, casos de éxito, fotografías de cursos autorizadas, logotipos institucionales, acreditaciones ni certificaciones comerciales aprobadas en el repositorio. Se permiten cursos sintéticos y artwork local como datos temporales de desarrollo, pero no constituyen evidencia institucional ni oferta académica real.
 
 ## Product Principles

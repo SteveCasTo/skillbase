@@ -56,34 +56,23 @@ Implementación de Fase 1:
 - createdAt
 - updatedAt
 
-Implementación de Fase 2A:
+Implementación actual:
 
 - `course_status` contiene únicamente `DRAFT`, `PUBLISHED` y `ARCHIVED`; disponibilidad de preinscripción no se persiste como estado.
 - `course_level` contiene `BASIC`, `INTERMEDIATE` y `ADVANCED`.
 - nombre, descripción, horario informativo y condiciones son obligatorios y no vacíos.
-- duración es un entero positivo y `minimum_grade` está limitado a `0..100`; todavía no existe `minimum_attendance` ni cálculo académico.
+- `course_type_revision_id` es obligatorio; horas y precios se resuelven desde esa revisión en lugar de guardarse directamente en `courses`/`course_prices`.
+- `minimum_grade` está limitado a `0..100`; todavía no existe `minimum_attendance` ni cálculo académico.
+- `schedule` continúa como texto no vacío por compatibilidad. El constructor administrativo ayuda a ingresar días/horas, pero persiste una cadena informativa, no una estructura calendario.
+- `content_markdown` e `instructor_name` son campos de texto opcionales. `artwork` almacena una key canónica del objeto de Storage, no una URL arbitraria. `featured` solo puede ser true en un curso publicado y un índice parcial permite como máximo un destacado publicado.
 - fechas públicas de inicio y fin usan `timestamptz`, son obligatorias y mantienen `starts_at < ends_at`; la UI recibe tiempo civil estricto `YYYY-MM-DDTHH:mm` de `America/La_Paz` y lo convierte a instante UTC.
 - la ventana de preinscripción usa dos `timestamptz`: ambos son nulos o ambos existen con inicio anterior al fin. La conversión inversa UTC → Bolivia preserva exactamente la hora civil al reeditar.
 - el slug normalizado es único, se genera al crear bajo un advisory lock global de asignación, resuelve colisiones —incluidas bases solapadas concurrentes— con sufijo numérico y no se modifica después.
-- `updated_at` funciona como revisión optimista del agregado curso/precios; una edición con revisión obsoleta no actualiza ninguna fila.
+- `updated_at` funciona como revisión optimista del curso y su referencia a formato; una edición con revisión obsoleta no actualiza ninguna fila.
 - no existe borrado físico de cursos en el contrato de aplicación; `ARCHIVED` es terminal durante esta fase.
-- la proyección `PublicCourseDto` solo se construye para cursos `PUBLISHED`, omite identificadores, estado, nota mínima y timestamps administrativos, y deriva la disponibilidad desde la ventana. En Fase 2A este contrato no tiene rutas HTTP públicas.
+- la proyección pública solo se construye para cursos `PUBLISHED`, omite identificadores, estado, nota mínima y timestamps administrativos, y deriva la disponibilidad desde la ventana. La landing, catálogo y detalle consumen proyecciones server-side.
 
-### CoursePrice
-
-- id
-- courseId
-- participantType
-- amount
-- currency
-
-Los tipos iniciales requeridos son `STUDENT` y `EXTERNAL`. Existe un único precio por curso y tipo. `amount` usa `numeric(12,2)`, se representa como string en TypeScript, no admite negativos y la moneda explícita queda restringida a `BOB`.
-
-### Modelo objetivo aprobado, pendiente de implementación
-
-El modelo directo anterior es el estado actual de Fase 2A y queda marcado para refactorización. El modelo objetivo introduce:
-
-#### CourseType
+### CourseType (formato)
 
 - id
 - name
@@ -91,7 +80,7 @@ El modelo directo anterior es el estado actual de Fase 2A y queda marcado para r
 - createdAt
 - updatedAt
 
-Representa un Tipo de curso/formato administrado. `active` permite activarlo o desactivarlo sin borrar sus revisiones ni modificar cursos históricos.
+Representa un formato administrado. `active` permite activarlo o desactivarlo sin borrar sus revisiones ni modificar cursos históricos.
 
 #### CourseTypeRevision
 
@@ -99,26 +88,23 @@ Representa un Tipo de curso/formato administrado. `active` permite activarlo o d
 - courseTypeId
 - revisionNumber
 - totalHours
+- studentAmount
+- externalAmount
 - createdAt
 
-Cada revisión es inmutable. Sus precios `STUDENT` y `EXTERNAL`, en `BOB`, pertenecen a esa revisión y no son overrides del curso.
-
-#### CourseTypeRevisionPrice
-
-- courseTypeRevisionId
-- participantType
-- amount
-- currency
-
-Debe existir un precio por revisión y tipo de participante. `amount` conserva `numeric(12,2)` y `currency` queda restringida a `BOB`, con la misma precisión monetaria definida para `CoursePrice`.
+Cada revisión es inmutable. Sus precios `STUDENT` y `EXTERNAL`, en `BOB`, pertenecen directamente a esa revisión y no son overrides del curso. Los importes son `numeric(12,2)` y se representan como strings en TypeScript. Una restricción de base de datos rechaza UPDATE/DELETE de revisiones.
 
 #### Relación con Course
 
-Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no conserva campos editables independientes para horas o precios. Al editar un tipo se crea una nueva revisión y los cursos borrador/no publicados pasan a la revisión vigente; los cursos `PUBLISHED` y `ARCHIVED` mantienen la revisión exacta con la que fueron publicados o archivados.
+Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no conserva campos editables independientes para horas o precios. Al editar un tipo se crea una nueva revisión y los cursos `DRAFT` pasan a la revisión vigente; los cursos `PUBLISHED` y `ARCHIVED` mantienen la revisión exacta. Cursos históricos migrados reciben formatos/revisiones generados a partir de cada tupla distinta de duración y precios, sin sustituir sus valores por defaults.
 
-La refactorización también podrá asociar al curso una fotografía propia opcional y autorizada. Si falta, la lectura pública debe indicar o resolver el fallback gráfico de Cota Activa; no debe inventar una fotografía ni sustituirla por un icono genérico.
+### Campos editoriales añadidos
 
-La proyección pública actual todavía expone `totalHours`, `schedule` y `prices` desde el contrato de Fase 2A. La jerarquía objetivo de tarjetas omite los dos precios y el horario detallado; el futuro detalle `/cursos/[slug]` deberá presentarlos junto con las condiciones.
+- `contentMarkdown`: texto opcional interpretado/renderizado de forma segura en el detalle.
+- `instructorName`: texto opcional sin FK a la entidad `User`.
+- `artwork`: key de Storage opcional, canónica y vinculada al curso; si falta o es inválida se utiliza el fallback gráfico.
+- `featured`: booleano que solo puede aplicar a publicados; índice único parcial asegura singleton entre publicados.
+- La landing omite precios y horario detallados; `/cursos/[slug]` presenta términos de la revisión referenciada y los datos editoriales públicos permitidos.
 
 ### Group
 
@@ -264,7 +250,7 @@ Ejemplos que deben evaluarse a nivel DB:
 - score dentro de rango;
 - montos no negativos.
 
-Las FK de Fase 2A están indexadas. `courses`, `course_prices` y `audit_events` tienen RLS habilitado sin políticas Data API, y privilegios revocados para `anon`, `authenticated` y `service_role`.
+Las FK de aplicación están indexadas. `courses`, `course_types`, `course_type_revisions` y `audit_events` tienen RLS habilitado sin políticas Data API y privilegios revocados para `anon`, `authenticated` y `service_role`. La tabla directa `course_prices` se elimina en la migración del nuevo modelo.
 
 ## AUTH
 

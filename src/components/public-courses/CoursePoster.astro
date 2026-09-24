@@ -1,0 +1,63 @@
+---
+import { ArrowUpRight } from "lucide-react";
+import type { DisplayCourse } from "./course-details";
+import {
+  courseDateRange,
+  levelLabels,
+  availabilityLabels,
+} from "@/components/landing/course-presentation";
+import { publicArtworkUrl } from "@/server/courses/artwork";
+
+interface Props {
+  course: DisplayCourse;
+  prominent?: boolean;
+}
+const { course, prominent = false } = Astro.props;
+const artworkUrl = publicArtworkUrl(
+  course.artwork,
+  import.meta.env.PUBLIC_SUPABASE_URL,
+);
+---
+
+<article class:list={["catalog-poster", { prominent }]}>
+  <a
+    href={`/cursos/${encodeURIComponent(course.slug)}`}
+    aria-label={`Ver curso: ${course.name}`}
+  >
+    <div class="poster-art" aria-hidden="true">
+      {artworkUrl ? (
+        <img
+          src={artworkUrl}
+          alt=""
+          width="1200"
+          height="750"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : (
+        <>
+          <span class="poster-monogram">
+            {course.name.trim().slice(0, 1).toLocaleUpperCase("es-BO")}
+          </span>
+          <span class="poster-mark">Cota Activa / Formación continua</span>
+        </>
+      )}
+    </div>
+    <div class="poster-copy">
+      <p class="course-status">
+        {availabilityLabels[course.registrationAvailability]}
+      </p>
+      <h2>{course.name}</h2>
+      <p class="poster-excerpt">{course.description}</p>
+      <div class="poster-bottom">
+        <span>
+          {courseDateRange(course)} · {levelLabels[course.level]} ·{" "}
+          {course.totalHours} horas
+        </span>
+        <span class="poster-action">
+          Ver curso <ArrowUpRight aria-hidden="true" />
+        </span>
+      </div>
+    </div>
+  </a>
+</article>

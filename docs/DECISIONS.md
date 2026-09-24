@@ -345,7 +345,7 @@ Los valores `datetime-local` se definen como tiempo civil `America/La_Paz` y se 
 - La serialización global sacrifica paralelismo mínimo durante la breve asignación de slug a cambio de unicidad determinista para bases solapadas.
 - Fase 2B puede consumir un contrato público estable sin acceder a campos administrativos ni cambiar la persistencia.
 
-**Nota de vigencia:** el almacenamiento directo de duración y precios descrito aquí refleja la implementación actual de Fase 2A. ADR-016 lo sustituirá únicamente cuando su refactorización sea implementada y verificada; el resto del ciclo editorial, slug, autorización y auditoría de ADR-015 permanece vigente.
+**Nota de vigencia:** el almacenamiento directo de duración y precios descrito aquí refleja la implementación original de Fase 2A y quedó sustituido por ADR-016 y la refactorización local implementada. El resto del ciclo editorial, slug, autorización y auditoría de ADR-015 permanece vigente. El estado CI/cloud de los cambios actuales requiere verificación independiente.
 
 ---
 
@@ -353,7 +353,7 @@ Los valores `datetime-local` se definen como tiempo civil `America/La_Paz` y se 
 
 **Fecha:** 2026-09-18
 
-**Estado:** Accepted — presentación implementada; refactor de modelo pendiente
+**Estado:** Accepted — implementado localmente; verificación de cierre pendiente
 
 ### Contexto
 
@@ -365,8 +365,8 @@ Fase 2A almacena `totalHours` y los precios `STUDENT`/`EXTERNAL` directamente po
 - Exigir que cada curso seleccione exactamente un tipo y no pueda sobrescribir sus horas ni precios.
 - Representar las ediciones mediante revisiones inmutables del tipo. Una edición crea una nueva revisión: cursos borrador/no publicados adoptan la revisión vigente, mientras que cursos publicados y archivados conservan exactamente la revisión utilizada.
 - Permitir activar o desactivar tipos sin eliminar revisiones ni alterar cursos históricos.
-- Permitir una fotografía propia opcional por curso solo cuando esté autorizada. La ausencia se resuelve con un fallback gráfico de Cota Activa, nunca con iconos genéricos o fotografía ficticia. El fallback ya está implementado en la presentación; la persistencia y el upload/storage administrativo de fotografías siguen pendientes.
-- En la landing, las tarjetas muestran disponibilidad, título, descripción breve, inicio/fecha, nivel y duración, sin los dos precios detallados ni el horario detallado. El horario exacto, las condiciones y los precios diferenciados deberán vivir en el futuro detalle `/cursos/[slug]`, que aún no está implementado.
+- Permitir una fotografía propia opcional por curso solo cuando esté autorizada. La ausencia se resuelve con un fallback gráfico de Cota Activa. La persistencia de una key canónica y el upload/storage administrativo en bucket público controlado están implementados; el cliente no proporciona una URL arbitraria.
+- En la landing, las tarjetas muestran disponibilidad, título, descripción breve, inicio/fecha, nivel y duración, sin precios detallados ni horario detallado. El catálogo `/cursos` y el detalle `/cursos/[slug]` ya están implementados por SSR; el detalle publica horario informativo, condiciones y precios diferenciados.
 - Presentar las alternativas cartelera editorial, catálogo visual modular y agenda cronológica antes de cerrar la dirección pública. El 2026-09-18 se seleccionó **Cartelera editorial**: una convocatoria panorámica dominante, afiches secundarios, fotografía opcional y fallback gráfico Cota Activa.
 
 ### Alternativas
@@ -380,7 +380,9 @@ Fase 2A almacena `totalHours` y los precios `STUDENT`/`EXTERNAL` directamente po
 - La administración obtiene una fuente reutilizable y auditable para duración y precios.
 - Los borradores/no publicados siguen la configuración vigente, mientras que publicados y archivados conservan una representación histórica exacta.
 - Será necesario migrar el modelo directo actual, adaptar contratos administrativos y públicos, y verificar las reglas de asignación y publicación antes de cerrar Fase 2B.
-- La decisión de Tipos de curso y revisiones sigue aceptada como dirección de producto y dominio, pero no debe tratarse como comportamiento implementado hasta completar el refactor. La composición visual Cartelera editorial sí está implementada en la landing y verificada con pruebas responsive e interacción.
-- Una vez implementada, esta decisión sustituye únicamente las partes de ADR-015 relativas al almacenamiento directo y la edición de duración/precios; no reemplaza sus reglas de ciclo editorial, slug, autorización, auditoría ni fechas.
-- La landing actual usa artwork local de preview para muestras sintéticas y fallback gráfico Cota Activa para cursos sin artwork; esto no constituye un flujo de imágenes de producción ni cambia el modelo de datos pendiente.
+- Formatos administrados, revisiones inmutables, referencia obligatoria desde cada curso y migración del modelo directo están implementados. Las pruebas locales están en el repositorio; el estado actual de CI/cloud y el cierre de revisión no se dan por verificados por esta decisión.
+- Esta decisión sustituye únicamente las partes de ADR-015 relativas al almacenamiento directo y la edición de duración/precios; no reemplaza sus reglas de ciclo editorial, slug, autorización, auditoría ni fechas.
+- El bucket público `course-artwork` contiene únicamente artwork destinado a publicación. La carga se valida/autorizada en servidor; previews sintéticos y fallback gráfico siguen disponibles.
 - La cartelera agrupa afiches en tríos, convierte cuatro remanentes en dos pares y deja un remanente único en una fila completa; desktop varía proporciones, tablet equilibra dos columnas y mobile usa una columna uniforme. Cada pieza es un enlace de tarjeta completa.
+
+Los formatos de desarrollo seeded (20 horas: Bs 80/100; 30 horas: Bs 120/150) son valores iniciales editables de entorno local, no una tarifa universal ni un precio para auxiliares.

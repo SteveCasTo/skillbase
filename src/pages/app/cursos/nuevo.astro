@@ -1,5 +1,8 @@
 ---
 import { createCourse } from "@/application/courses/manage-courses";
+import { listFormats } from "@/application/courses/manage-formats";
+import type { CourseFormat } from "@/domain/courses/formats";
+import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import CourseForm from "@/components/courses/CourseForm.astro";
 import { CourseDomainError } from "@/domain/courses/errors";
 import type { CourseInput } from "@/domain/courses/validation";
@@ -15,19 +18,28 @@ import {
 import { getDatabase } from "@/server/db/client";
 import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
+import { DrizzleFormatRepository } from "@/server/db/repositories/format-repository";
 import { getPublicAuthEnvironment } from "@/server/environment";
 
 const user = requireInternalUser(Astro.locals);
 let values: CourseInput = {
   minimumGrade: "70",
   level: "",
-  studentAmount: "",
-  externalAmount: "",
+  courseTypeId: "",
 };
 let errors: Readonly<Record<string, string>> = {};
 let pageError: string | null = null;
+let formats: readonly CourseFormat[] = [];
+try {
+  formats = await listFormats(new DrizzleFormatRepository(getDatabase()), user);
+} catch (error) {
+  Astro.response.status = COURSE_INFRASTRUCTURE_STATUS;
+  pageError = "No se pudieron cargar los formatos. Inténtalo nuevamente.";
+  if (error instanceof CourseInfrastructureError)
+    logCourseInfrastructureError(error, { actorId: user.id });
+}
 
-if (Astro.request.method === "POST") {
+if (Astro.request.method === "POST" && !pageError) {
   if (
     !requestHasExpectedOrigin(Astro.request, getPublicAuthEnvironment().siteUrl)
   ) {
@@ -63,12 +75,7 @@ if (Astro.request.method === "POST") {
 
 <PrivateLayout title="Nuevo curso">
   <header>
-    <a
-      href="/app/cursos"
-      class="text-sm font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground"
-    >
-      ← Volver a cursos
-    </a>
+    <CourseBreadcrumbs current="Nuevo curso" />
     <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
       Crear curso
     </h1>
@@ -85,7 +92,28 @@ if (Astro.request.method === "POST") {
       {pageError}
     </p>
   )}
+  {!pageError && formats.length === 0 && (
+    <p
+      role="status"
+      class="mt-7 rounded-lg border bg-secondary px-4 py-3 text-sm text-secondary-foreground"
+    >
+      Antes de crear un curso,{" "}
+      <a
+        href="/app/formatos"
+        class="font-semibold underline underline-offset-4"
+      >
+        crea un formato
+      </a>{" "}
+      con duración y precios.
+    </p>
+  )}
   <div class="mt-8">
-    <CourseForm values={values} errors={errors} submitLabel="Crear borrador" />
+    <CourseForm
+      values={values}
+      errors={errors}
+      formats={formats}
+      disabled={Boolean(pageError) || formats.length === 0}
+      submitLabel="Crear borrador"
+    />
   </div>
 </PrivateLayout>

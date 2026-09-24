@@ -453,9 +453,12 @@ Antes de crear un componente:
 
 - Las tarjetas de landing muestran disponibilidad, título, descripción breve, inicio/fecha, nivel y duración.
 - Las tarjetas no muestran los dos precios detallados ni el horario detallado.
-- El futuro detalle público `/cursos/[slug]` deberá mostrar el horario exacto, las condiciones y los precios diferenciados; esa ruta todavía no está implementada.
-- La landing implementada muestra disponibilidad, título, descripción breve, rango de fechas, nivel y duración, sin precios diferenciados ni horario detallado. La persistencia aún conserva duración y precios directos por curso hasta completar el refactor de Tipos de curso y revisiones inmutables.
-- La capa actual usa artwork local de preview a sangre para muestras sintéticas y un fallback gráfico de Cota Activa cuando no hay artwork. La única muestra fotográfica actual es `assets/plates/course-python-preview.jpg`, usada para `fundamentos-de-python`; su procedencia está registrada en `assets/plates/course-python-preview.provenance.md` (Unsplash, recuperada el 2026-09-22) y está marcada como material sintético de desarrollo. La fotografía propia autorizada, el picker y el upload/storage desde administración siguen pendientes; no hay imágenes de producción.
-- El refactor de Tipos de curso y revisiones inmutables sigue pendiente; la persistencia actual conserva horas y precios directos por curso.
+- El detalle `/cursos/[slug]` está implementado y muestra horario informativo, condiciones, precios diferenciados y contenido autorizado del curso.
+- La landing muestra disponibilidad, título, descripción breve, rango de fechas, nivel y duración, sin precios diferenciados ni horario detallado. Los términos comerciales y duración proceden de la revisión de formato enlazada al curso.
+- La capa visual conserva artwork local de preview para muestras sintéticas y fallback gráfico de Cota Activa cuando falta imagen propia. El formulario administrativo permite seleccionar, recortar, previsualizar y subir artwork autorizado; no presentar el asset sintético de preview como fotografía de curso real.
+- El horario se puede componer por días y horas en el formulario, pero se conserva como una cadena informativa legada; no se representa como una agenda operativa.
+- En administración, el sidebar desktop puede reducirse a rail y expandirse en overlay por hover/foco, mientras el contenido conserva scroll independiente. Mobile utiliza menú de navegación dedicado; la preferencia de colapso desktop se guarda en `localStorage`.
+- El formulario de cursos combina un selector accesible de nivel/formato y calendario shadcn con edición textual de la hora civil boliviana. La administración de formatos indica y valida el patrón decimal antes de enviar, además de conservar la validación en servidor.
+- Las páginas de alta, edición y configuración de formatos muestran una ruta de navegación semántica hacia Resumen y Cursos, en lugar de depender de un único enlace «Volver».
 - La diferencia de escala entre convocatoria principal y afiches secundarios debe expresar prioridad editorial, no convertir el conjunto en una retícula uniforme de cards.
 - La referencia compositiva aprobada se conserva en `.impeccable/mocks/decision/editorial-billboard.png`; la adaptación mobile está implementada y verificada en los breakpoints de la landing.

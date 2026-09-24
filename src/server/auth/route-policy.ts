@@ -8,6 +8,8 @@ export const PRIVATE_ROUTE_POLICIES = {
   "/app": { access: "ACTIVE_USER" },
   "/app/cursos": { access: "ROLES", roles: ["ADMIN"] },
   "/app/cursos/nuevo": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/cursos/imagen": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/formatos": { access: "ROLES", roles: ["ADMIN"] },
   "/app/asistencia": { access: "ROLES", roles: ["INSTRUCTOR"] },
 } as const satisfies Readonly<Record<string, PrivateRoutePolicy>>;
 

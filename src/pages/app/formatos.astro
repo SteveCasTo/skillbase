@@ -1,0 +1,358 @@
+---
+import {
+  createFormat,
+  listFormats,
+  reviseFormat,
+  setFormatActive,
+} from "@/application/courses/manage-formats";
+import type { CourseFormat } from "@/domain/courses/formats";
+import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
+import { CourseDomainError } from "@/domain/courses/errors";
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import { requireInternalUser } from "@/server/auth/context";
+import { requestHasExpectedOrigin } from "@/server/auth/redirects";
+import { getDatabase } from "@/server/db/client";
+import { DrizzleFormatRepository } from "@/server/db/repositories/format-repository";
+import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
+import {
+  courseDomainStatus,
+  logCourseInfrastructureError,
+} from "@/server/courses/errors";
+import { getPublicAuthEnvironment } from "@/server/environment";
+
+const user = requireInternalUser(Astro.locals);
+const repository = new DrizzleFormatRepository(getDatabase());
+let formats: readonly CourseFormat[] = [];
+let pageError: string | null = null;
+let errors: Readonly<Record<string, string>> = {};
+let pending: Readonly<Record<string, string>> = {};
+let pendingId = "";
+let pendingIntent = "";
+const field = (data: FormData, name: string) => {
+  const value = data.get(name);
+  return typeof value === "string" ? value : "";
+};
+
+if (Astro.request.method === "POST") {
+  if (
+    !requestHasExpectedOrigin(Astro.request, getPublicAuthEnvironment().siteUrl)
+  ) {
+    Astro.response.status = 403;
+    pageError =
+      "La solicitud no tiene un origen válido. Recarga la página e inténtalo de nuevo.";
+  } else {
+    const data = await Astro.request.formData();
+    pendingIntent = field(data, "intent");
+    pendingId = field(data, "id");
+    pending = Object.fromEntries(
+      ["name", "totalHours", "studentAmount", "externalAmount"].map((name) => [
+        name,
+        field(data, name),
+      ]),
+    );
+    const validId = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(
+      pendingId,
+    );
+    try {
+      if (pendingIntent === "create") {
+        await createFormat(repository, user, {
+          name: pending.name ?? "",
+          totalHours: pending.totalHours ?? "",
+          studentAmount: pending.studentAmount ?? "",
+          externalAmount: pending.externalAmount ?? "",
+        });
+      } else if (pendingIntent === "revise" && validId) {
+        await reviseFormat(repository, user, pendingId, {
+          totalHours: pending.totalHours ?? "",
+          studentAmount: pending.studentAmount ?? "",
+          externalAmount: pending.externalAmount ?? "",
+        });
+      } else if (
+        (pendingIntent === "activate" || pendingIntent === "deactivate") &&
+        validId
+      ) {
+        await setFormatActive(
+          repository,
+          user,
+          pendingId,
+          pendingIntent === "activate",
+        );
+      } else {
+        Astro.response.status = 400;
+        pageError = "La acción solicitada no es válida.";
+      }
+      if (!pageError)
+        return Astro.redirect(`/app/formatos?success=${pendingIntent}`, 303);
+    } catch (error) {
+      if (error instanceof CourseDomainError) {
+        Astro.response.status =
+          error.code === "FORMAT_NOT_FOUND"
+            ? 404
+            : error.code === "FORMAT_INACTIVE"
+              ? 409
+              : courseDomainStatus(error);
+        errors = error.fieldErrors;
+        pageError = error.message;
+      } else {
+        Astro.response.status = 500;
+        pageError = "No se pudo completar la acción. Inténtalo nuevamente.";
+        if (error instanceof CourseInfrastructureError)
+          logCourseInfrastructureError(error, { actorId: user.id });
+      }
+    }
+  }
+}
+try {
+  formats = await listFormats(repository, user);
+} catch (error) {
+  Astro.response.status = 500;
+  pageError = "No se pudieron cargar los formatos. Inténtalo nuevamente.";
+  if (error instanceof CourseInfrastructureError)
+    logCourseInfrastructureError(error, { actorId: user.id });
+}
+const success = Astro.url.searchParams.get("success");
+const successMessages: Readonly<Record<string, string>> = {
+  create: "Formato creado.",
+  revise: "Nueva revisión guardada. Los borradores usan los valores vigentes.",
+  activate: "Formato activado.",
+  deactivate: "Formato desactivado.",
+};
+const inputClass =
+  "mt-2 min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+---
+
+<PrivateLayout title="Formatos de curso">
+  <header>
+    <CourseBreadcrumbs current="Formatos" />
+    <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
+      Formatos de curso
+    </h1>
+    <p class="mt-3 max-w-2xl leading-7 text-muted-foreground">
+      Define duración y precios en bolivianos. Una revisión actualiza los
+      borradores; los cursos publicados y archivados conservan sus valores
+      históricos.
+    </p>
+  </header>
+  {success && successMessages[success] && (
+    <p
+      role="status"
+      class="mt-6 rounded-lg border bg-secondary px-4 py-3 text-sm"
+    >
+      {successMessages[success]}
+    </p>
+  )}
+  {pageError && (
+    <p
+      role="alert"
+      class="mt-6 rounded-lg border border-destructive/40 p-4 text-sm text-destructive"
+    >
+      {pageError}
+    </p>
+  )}
+  <section
+    class="mt-8 rounded-xl border bg-card p-5 sm:p-7"
+    aria-labelledby="new-format-title"
+  >
+    <h2 id="new-format-title" class="text-xl font-semibold">
+      Crear formato
+    </h2>
+    <form
+      method="post"
+      class="mt-5 grid gap-5 sm:grid-cols-2"
+      aria-label="Crear formato"
+    >
+      <input type="hidden" name="intent" value="create" />
+      {[
+        { name: "name", label: "Nombre", type: "text" as const },
+        {
+          name: "totalHours",
+          label: "Duración total (horas)",
+          type: "number" as const,
+        },
+        {
+          name: "studentAmount",
+          label: "Precio estudiante (BOB)",
+          type: "text" as const,
+        },
+        {
+          name: "externalAmount",
+          label: "Precio externo (BOB)",
+          type: "text" as const,
+        },
+      ].map(({ name, label, type }) => (
+        <label class="text-sm font-medium">
+          {label}
+          <input
+            class={inputClass}
+            name={name}
+            type={type}
+            inputmode={name.includes("Amount") ? "decimal" : undefined}
+            pattern={
+              name.includes("Amount")
+                ? "(?:0|[1-9][0-9]{0,9})(?:\\.[0-9]{1,2})?"
+                : undefined
+            }
+            title={
+              name.includes("Amount")
+                ? "Ingresa un monto no negativo con hasta dos decimales, usando punto decimal."
+                : undefined
+            }
+            min={type === "number" ? "1" : undefined}
+            step={type === "number" ? "1" : undefined}
+            required
+            value={pendingIntent === "create" ? (pending[name] ?? "") : ""}
+            aria-invalid={pendingIntent === "create" && Boolean(errors[name])}
+            aria-describedby={
+              pendingIntent === "create" && errors[name]
+                ? `create-${name}-error`
+                : undefined
+            }
+          />
+          {pendingIntent === "create" && errors[name] && (
+            <span
+              id={`create-${name}-error`}
+              class="mt-1 block text-destructive"
+            >
+              {errors[name]}
+            </span>
+          )}
+        </label>
+      ))}
+      <button
+        type="submit"
+        class="min-h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground sm:col-span-2 sm:justify-self-start"
+      >
+        Crear formato
+      </button>
+    </form>
+  </section>
+  <section class="mt-10" aria-labelledby="formats-title">
+    <h2 id="formats-title" class="text-xl font-semibold">
+      Formatos existentes
+    </h2>
+    {formats.length === 0 ? (
+      <p class="mt-4 rounded-xl border border-dashed p-6 text-muted-foreground">
+        Aún no hay formatos. Crea uno para poder asignarlo a un curso.
+      </p>
+    ) : (
+      <ul class="mt-5 grid gap-5 lg:grid-cols-2">
+        {formats.map((format) => (
+          <li>
+            <article class="rounded-xl border bg-card p-5 sm:p-6">
+              <h3 class="text-lg font-semibold">{format.name}</h3>
+              <p class="mt-1 text-sm text-muted-foreground">
+                Revisión {format.revisionNumber} ·{" "}
+                {format.active ? "Activo" : "Inactivo"}
+              </p>
+              <p class="mt-2 text-sm">
+                {format.totalHours} horas · Estudiante {format.studentAmount}{" "}
+                BOB · Externo {format.externalAmount} BOB
+              </p>
+              {format.active && (
+                <details class="mt-5">
+                  <summary class="min-h-11 cursor-pointer py-3 font-medium">
+                    Editar duración y precios
+                  </summary>
+                  <form
+                    method="post"
+                    class="mt-3 grid gap-4 sm:grid-cols-3"
+                    aria-label={`Revisar ${format.name}`}
+                  >
+                    <input type="hidden" name="intent" value="revise" />
+                    <input type="hidden" name="id" value={format.id} />
+                    {[
+                      {
+                        name: "totalHours",
+                        label: "Horas",
+                        value: String(format.totalHours),
+                      },
+                      {
+                        name: "studentAmount",
+                        label: "Estudiante (BOB)",
+                        value: format.studentAmount,
+                      },
+                      {
+                        name: "externalAmount",
+                        label: "Externo (BOB)",
+                        value: format.externalAmount,
+                      },
+                    ].map(({ name, label, value }) => (
+                      <label class="text-sm font-medium">
+                        {label}
+                        <input
+                          class={inputClass}
+                          name={name}
+                          required
+                          value={
+                            pendingIntent === "revise" &&
+                            pendingId === format.id
+                              ? (pending[name] ?? "")
+                              : value
+                          }
+                          inputmode={
+                            name.includes("Amount") ? "decimal" : "numeric"
+                          }
+                          pattern={
+                            name.includes("Amount")
+                              ? "(?:0|[1-9][0-9]{0,9})(?:\\.[0-9]{1,2})?"
+                              : "[1-9][0-9]*"
+                          }
+                          aria-invalid={
+                            pendingIntent === "revise" &&
+                            pendingId === format.id &&
+                            Boolean(errors[name])
+                          }
+                          aria-describedby={
+                            pendingIntent === "revise" &&
+                            pendingId === format.id &&
+                            errors[name]
+                              ? `${format.id}-${name}-error`
+                              : undefined
+                          }
+                        />
+                        {pendingIntent === "revise" &&
+                          pendingId === format.id &&
+                          errors[name] && (
+                            <span
+                              class="mt-1 block text-destructive"
+                              id={`${format.id}-${name}-error`}
+                            >
+                              {errors[name]}
+                            </span>
+                          )}
+                      </label>
+                    ))}
+                    <p class="text-xs leading-5 text-muted-foreground sm:col-span-3">
+                      Los borradores adoptarán la nueva revisión. Los publicados
+                      y archivados no cambian.
+                    </p>
+                    <button
+                      type="submit"
+                      class="min-h-11 rounded-lg border px-4 text-sm font-semibold sm:col-span-3 sm:justify-self-start"
+                    >
+                      Guardar nueva revisión
+                    </button>
+                  </form>
+                </details>
+              )}
+              <form method="post" class="mt-5">
+                <input type="hidden" name="id" value={format.id} />
+                <input
+                  type="hidden"
+                  name="intent"
+                  value={format.active ? "deactivate" : "activate"}
+                />
+                <button
+                  type="submit"
+                  class="min-h-11 rounded-lg border px-4 text-sm font-semibold hover:bg-secondary"
+                >
+                  {format.active ? "Desactivar formato" : "Activar formato"}
+                </button>
+              </form>
+            </article>
+          </li>
+        ))}
+      </ul>
+    )}
+  </section>
+</PrivateLayout>

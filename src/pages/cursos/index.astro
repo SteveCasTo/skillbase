@@ -1,0 +1,82 @@
+---
+import { loadPublicCourses } from "@/application/courses/load-public-courses";
+import CourseShell from "@/components/public-courses/CourseShell.astro";
+import CoursePoster from "@/components/public-courses/CoursePoster.astro";
+import type { DisplayCourse } from "@/components/public-courses/course-details";
+import { getDatabase } from "@/server/db/client";
+import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
+import { isTransientPublicCourseReadError } from "@/server/db/repositories/transient-course-read";
+
+let courses: readonly DisplayCourse[] = [];
+let loadError = false;
+try {
+  courses = await loadPublicCourses(
+    new DrizzleCourseRepository(getDatabase()),
+    {
+      isTransientError: isTransientPublicCourseReadError,
+    },
+  );
+} catch {
+  loadError = true;
+  Astro.response.status = 503;
+}
+const featured =
+  courses.find((course) => course.featured === true) ?? courses[0];
+const remaining = courses.filter((course) => course.slug !== featured?.slug);
+---
+
+<CourseShell
+  title="Cursos publicados | Formación continua · UMSS"
+  description="Explora los cursos publicados de formación continua de Informática y Sistemas, FCyT · UMSS."
+  noindex={loadError}
+>
+  <div class="catalog-intro">
+    <a class="back-link" href="/">
+      ← Volver al inicio
+    </a>
+    <h1>Cursos para seguir aprendiendo.</h1>
+    <p>
+      Consulta las convocatorias publicadas y revisa fechas, requisitos y
+      precios antes de elegir un curso.
+    </p>
+  </div>
+  {loadError ? (
+    <section
+      class="catalog-state"
+      role="alert"
+      aria-labelledby="catalog-state-title"
+    >
+      <h2 id="catalog-state-title">No pudimos cargar los cursos.</h2>
+      <p>
+        La consulta no está disponible en este momento. Intenta de nuevo más
+        tarde.
+      </p>
+      <a href="/cursos">Volver a intentar</a>
+    </section>
+  ) : featured ? (
+    <section class="catalog-list" aria-labelledby="catalog-heading">
+      <h2 id="catalog-heading" class="section-label">
+        Cartelera de cursos
+      </h2>
+      <CoursePoster course={featured} prominent />
+      {remaining.length > 0 && (
+        <div class="catalog-grid">
+          {remaining.map((course) => (
+            <CoursePoster {course} />
+          ))}
+        </div>
+      )}
+    </section>
+  ) : (
+    <section class="catalog-state" aria-labelledby="catalog-state-title">
+      <h2 id="catalog-state-title">
+        Estamos preparando nuevas oportunidades de formación.
+      </h2>
+      <p>
+        Por ahora no hay cursos publicados. Vuelve a consultar esta página para
+        conocer las próximas convocatorias.
+      </p>
+      <a href="/">Volver al inicio</a>
+    </section>
+  )}
+</CourseShell>

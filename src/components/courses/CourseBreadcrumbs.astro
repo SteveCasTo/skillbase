@@ -1,0 +1,33 @@
+---
+interface Props {
+  current: string;
+}
+
+const { current } = Astro.props;
+---
+
+<nav aria-label="Ruta de navegación" class="text-sm text-muted-foreground">
+  <ol class="flex flex-wrap items-center gap-2">
+    <li>
+      <a
+        href="/app"
+        class="rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        Resumen
+      </a>
+    </li>
+    <li aria-hidden="true">/</li>
+    <li>
+      <a
+        href="/app/cursos"
+        class="rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        Cursos
+      </a>
+    </li>
+    <li aria-hidden="true">/</li>
+    <li aria-current="page" class="font-medium text-foreground">
+      {current}
+    </li>
+  </ol>
+</nav>

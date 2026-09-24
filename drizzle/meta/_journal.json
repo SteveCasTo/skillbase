@@ -15,6 +15,27 @@
       "when": 1789503662778,
       "tag": "0001_flimsy_aaron_stack",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790218902905,
+      "tag": "0002_slow_silhouette",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790218944025,
+      "tag": "0003_boring_golden_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790225760340,
+      "tag": "0004_pin-course-revision-trigger-path",
+      "breakpoints": true
     }
   ]
 }

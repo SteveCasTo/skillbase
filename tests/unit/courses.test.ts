@@ -1,6 +1,8 @@
 import { describe, expect, spyOn, test } from "bun:test";
 
 import { createCourse } from "@/application/courses/manage-courses";
+import { createFormat } from "@/application/courses/manage-formats";
+import type { FormatRepository } from "@/application/courses/format-repository";
 import type { CourseRepository } from "@/application/courses/course-repository";
 import type { InternalUser } from "@/domain/auth/types";
 import {
@@ -14,6 +16,7 @@ import {
   registrationAvailability,
 } from "@/domain/courses/policies";
 import { validateCourseData } from "@/domain/courses/validation";
+import { validateFormat } from "@/domain/courses/formats";
 import {
   COURSE_INFRASTRUCTURE_STATUS,
   courseDomainStatus,
@@ -22,6 +25,7 @@ import {
 import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
 
 const validInput = {
+  courseTypeId: "00000000-0000-4000-8000-000000000001",
   name: "  Programación Ágil  ",
   description: "Fundamentos y práctica.",
   level: "BASIC",
@@ -45,14 +49,15 @@ describe("course domain", () => {
     expect(() => normalizeSlug("---")).toThrow();
   });
 
-  test("accepts valid data and represents BOB prices as decimal strings", () => {
+  test("accepts valid data and keeps commercial terms on the format", () => {
     const result = validateCourseData(validInput);
     expect(result.name).toBe("Programación Ágil");
     expect(result.level).toBe("BASIC");
-    expect(result.prices).toEqual([
-      { participantType: "STUDENT", amount: "80.00", currency: "BOB" },
-      { participantType: "EXTERNAL", amount: "100.50", currency: "BOB" },
-    ]);
+    expect(result.courseTypeId).toBe(validInput.courseTypeId);
+    expect(validateFormat("Formato", "20", "80", "100.5")).toMatchObject({
+      studentAmount: "80.00",
+      externalAmount: "100.50",
+    });
     expect(result.startsAt.toISOString()).toBe("2027-01-10T22:00:00.000Z");
   });
 
@@ -82,6 +87,7 @@ describe("course domain", () => {
   });
 
   test("rejects invalid dates, partial registration windows, grade, duration and money", () => {
+    expect(() => validateFormat(" ", "0", "10.999", "-1")).toThrow();
     expect(() =>
       validateCourseData({
         ...validInput,
@@ -165,6 +171,46 @@ describe("course domain", () => {
         expect(error).toMatchObject({
           code: status === "DISABLED" ? "DISABLED" : "NOT_INVITED",
         });
+      }
+    }
+    expect(called).toBe(false);
+  });
+
+  test("format cases enforce active ADMIN and validate terms before storage", async () => {
+    let called = false;
+    const repository = {
+      create: async () => {
+        called = true;
+        throw new Error("should not persist");
+      },
+    } as unknown as FormatRepository;
+    const user: InternalUser = {
+      id: "user-id",
+      authUserId: null,
+      email: "user@example.test",
+      name: "User",
+      status: "ACTIVE",
+      roles: ["INSTRUCTOR"],
+    };
+    const form = {
+      name: "Ejemplo",
+      totalHours: "20",
+      studentAmount: "80",
+      externalAmount: "100",
+    };
+    for (const [actor, candidate, code] of [
+      [user, form, "FORBIDDEN"],
+      [
+        { ...user, roles: ["ADMIN"] },
+        { ...form, totalHours: "-1" },
+        "VALIDATION_FAILED",
+      ],
+    ] as const) {
+      try {
+        await createFormat(repository, actor, candidate);
+        throw new Error("Expected rejection");
+      } catch (error) {
+        expect(error).toMatchObject({ code });
       }
     }
     expect(called).toBe(false);

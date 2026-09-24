@@ -52,6 +52,7 @@ const revealDelayBySlug = new Map(
         <CourseArtwork
           slug={featuredCourse.slug}
           name={featuredCourse.name}
+          artwork={featuredCourse.artwork}
           priority
           usePreviewPhoto={showPreviewArtwork}
         />
@@ -151,6 +152,7 @@ const revealDelayBySlug = new Map(
                   <CourseArtwork
                     slug={course.slug}
                     name={course.name}
+                    artwork={course.artwork}
                     usePreviewPhoto={showPreviewArtwork}
                   />
                   <div class="course-poster-copy">
@@ -194,3 +196,50 @@ const revealDelayBySlug = new Map(
     </ol>
   </section>
 )}
+
+<div class="catalog-link-wrap">
+  <a class="catalog-link" href="/cursos">
+    Explorar todos los cursos <ArrowRight aria-hidden="true" />
+  </a>
+</div>
+
+<style>
+  .catalog-link-wrap {
+    width: min(100% - 3rem, 86rem);
+    margin: 2.5rem auto 5rem;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .catalog-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    min-height: 3rem;
+    padding: 0.7rem 1.25rem;
+    border-radius: 10px;
+    background: var(--deep);
+    color: var(--on-deep);
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .catalog-link:hover {
+    background: var(--blue);
+  }
+  .catalog-link:focus-visible {
+    outline: 3px solid var(--signal);
+    outline-offset: 4px;
+  }
+  .catalog-link :global(svg) {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+  @media (max-width: 639px) {
+    .catalog-link-wrap {
+      justify-content: stretch;
+    }
+    .catalog-link {
+      width: 100%;
+    }
+  }
+</style>

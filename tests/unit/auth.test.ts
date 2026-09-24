@@ -97,10 +97,20 @@ describe("private route policies and caching", () => {
       "/app",
       "/app/asistencia",
       "/app/cursos",
+      "/app/cursos/imagen",
       "/app/cursos/nuevo",
+      "/app/formatos",
     ]);
     expect(getPrivateRoutePolicy("/app")).toEqual({ access: "ACTIVE_USER" });
     expect(getPrivateRoutePolicy("/app/cursos")).toEqual({
+      access: "ROLES",
+      roles: ["ADMIN"],
+    });
+    expect(getPrivateRoutePolicy("/app/cursos/imagen")).toEqual({
+      access: "ROLES",
+      roles: ["ADMIN"],
+    });
+    expect(getPrivateRoutePolicy("/app/formatos")).toEqual({
       access: "ROLES",
       roles: ["ADMIN"],
     });

@@ -2,10 +2,14 @@
 import {
   archiveCourse,
   getAdminCourse,
+  featureCourse,
   publishCourse,
   updateCourse,
   withdrawCourse,
 } from "@/application/courses/manage-courses";
+import { listFormats } from "@/application/courses/manage-formats";
+import type { CourseFormat } from "@/domain/courses/formats";
+import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import CourseForm from "@/components/courses/CourseForm.astro";
 import { CourseDomainError } from "@/domain/courses/errors";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
@@ -23,15 +27,28 @@ import {
 import { getDatabase } from "@/server/db/client";
 import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
+import { DrizzleFormatRepository } from "@/server/db/repositories/format-repository";
 import { getPublicAuthEnvironment } from "@/server/environment";
+import {
+  ArtworkValidationError,
+  artworkKeyForCourse,
+  artworkStorage,
+  verifyArtworkForCourse,
+} from "@/server/courses/artwork";
 
 const user = requireInternalUser(Astro.locals);
 const id = Astro.params.id ?? "";
 const repository = new DrizzleCourseRepository(getDatabase());
 let course: AdminCourseDto | null = null;
 let loadError = false;
+let formats: readonly CourseFormat[] = [];
 try {
   course = await getAdminCourse(repository, user, id);
+  if (course)
+    formats = await listFormats(
+      new DrizzleFormatRepository(getDatabase()),
+      user,
+    );
   if (!course) Astro.response.status = 404;
 } catch (error) {
   Astro.response.status = COURSE_INFRASTRUCTURE_STATUS;
@@ -46,7 +63,10 @@ const valuesFromCourse = (item: AdminCourseDto): CourseInput => ({
   name: item.name,
   description: item.description,
   level: item.level,
-  totalHours: String(item.totalHours),
+  courseTypeId: item.courseTypeId,
+  contentMarkdown: item.contentMarkdown ?? "",
+  instructorName: item.instructorName ?? "",
+  artwork: item.artwork ?? "",
   schedule: item.schedule,
   conditions: item.conditions,
   startsAt: dateInput(item.startsAt),
@@ -54,12 +74,6 @@ const valuesFromCourse = (item: AdminCourseDto): CourseInput => ({
   registrationStartAt: dateInput(item.registrationStartAt),
   registrationEndAt: dateInput(item.registrationEndAt),
   minimumGrade: String(item.minimumGrade),
-  studentAmount:
-    item.prices.find((price) => price.participantType === "STUDENT")?.amount ??
-    "",
-  externalAmount:
-    item.prices.find((price) => price.participantType === "EXTERNAL")?.amount ??
-    "",
 });
 let values: CourseInput = course ? valuesFromCourse(course) : {};
 let errors: Readonly<Record<string, string>> = {};
@@ -69,6 +83,7 @@ const successMessages = {
   published: "Curso publicado.",
   withdrawn: "Curso retirado y devuelto a borrador.",
   archived: "Curso archivado.",
+  featured: "Curso seleccionado como destacado.",
 } as const;
 const successKey = Astro.url.searchParams.get("success");
 const successMessage =
@@ -89,6 +104,16 @@ if (course && Astro.request.method === "POST") {
     try {
       if (intent === "update") {
         values = courseInputFromFormData(formData);
+        const artwork =
+          typeof values.artwork === "string" ? values.artwork : "";
+        if (
+          artwork &&
+          artwork !== (course.artwork ?? "") &&
+          !artworkKeyForCourse(id, artwork)
+        )
+          throw new ArtworkValidationError("Imagen del curso inválida.");
+        if (artwork && artwork !== (course.artwork ?? ""))
+          await verifyArtworkForCourse(id, artwork, artworkStorage());
         course = await updateCourse(repository, user, id, values);
         return Astro.redirect(`/app/cursos/${id}/editar?success=updated`, 303);
       } else if (intent === "publish") {
@@ -106,6 +131,9 @@ if (course && Astro.request.method === "POST") {
       } else if (intent === "archive") {
         course = await archiveCourse(repository, user, id);
         return Astro.redirect(`/app/cursos/${id}/editar?success=archived`, 303);
+      } else if (intent === "feature") {
+        course = await featureCourse(repository, user, id);
+        return Astro.redirect(`/app/cursos/${id}/editar?success=featured`, 303);
       } else {
         Astro.response.status = 400;
         pageError = "La acción solicitada no es válida.";
@@ -116,6 +144,10 @@ if (course && Astro.request.method === "POST") {
         Astro.response.status = courseDomainStatus(error);
         errors = error.fieldErrors;
         pageError = error.message;
+      } else if (error instanceof ArtworkValidationError) {
+        Astro.response.status = 400;
+        errors = { artwork: error.message };
+        pageError = "Revisa la imagen seleccionada antes de guardar el curso.";
       } else if (error instanceof CourseInfrastructureError) {
         Astro.response.status = COURSE_INFRASTRUCTURE_STATUS;
         logCourseInfrastructureError(error, { actorId: user.id, courseId: id });
@@ -163,12 +195,7 @@ const statusLabel = {
     <>
       <header class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <a
-            href="/app/cursos"
-            class="text-sm font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground"
-          >
-            ← Volver a cursos
-          </a>
+          <CourseBreadcrumbs current={course.name} />
           <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
             Editar curso
           </h1>
@@ -199,11 +226,13 @@ const statusLabel = {
       <div class="mt-8">
         <CourseForm
           values={values}
+          formats={formats}
           errors={errors}
           disabled={course.status === "ARCHIVED"}
           submitLabel="Guardar cambios"
           intent="update"
           revision={course.updatedAt.toISOString()}
+          courseId={course.id}
         />
       </div>
       {course.status !== "ARCHIVED" && (
@@ -216,6 +245,22 @@ const statusLabel = {
             lo devuelve a borrador. Archivar es definitivo en esta fase.
           </p>
           <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            {course.status === "PUBLISHED" && !course.featured && (
+              <form method="post" class="mutation-form self-start">
+                <input type="hidden" name="intent" value="feature" />
+                <button
+                  type="submit"
+                  class="min-h-11 rounded-lg border px-4 text-sm font-semibold hover:bg-secondary"
+                >
+                  Destacar en la cartelera
+                </button>
+              </form>
+            )}
+            {course.featured && (
+              <p class="self-center text-sm font-semibold">
+                Destacado en la cartelera
+              </p>
+            )}
             {course.status === "DRAFT" && (
               <details class="rounded-lg border bg-card p-3">
                 <summary class="min-h-11 cursor-pointer px-2 py-3 text-sm font-semibold">
