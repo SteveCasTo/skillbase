@@ -41,6 +41,12 @@ export default defineConfig({
       PUBLIC_SUPABASE_URL: localSupabase.apiUrl,
       PUBLIC_SUPABASE_PUBLISHABLE_KEY: localSupabase.publishableKey,
       SUPABASE_SERVICE_ROLE_KEY: localSupabase.serviceRoleKey,
+      TEST_SUPABASE_URL: localSupabase.apiUrl,
+      TEST_SUPABASE_PUBLISHABLE_KEY: localSupabase.publishableKey,
+      TEST_SUPABASE_SERVICE_ROLE_KEY: localSupabase.serviceRoleKey,
+      TEST_DATABASE_URL: localSupabase.databaseUrl,
+      TEST_SUPABASE_WORKDIR: process.env.TEST_SUPABASE_WORKDIR!,
+      TEST_SUPABASE_PROJECT_ID: process.env.TEST_SUPABASE_PROJECT_ID!,
     },
   },
 });

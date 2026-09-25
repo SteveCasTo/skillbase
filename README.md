@@ -177,8 +177,7 @@ Usar `.env.example` como referencia; `.env` contiene credenciales locales y no s
 
 ### Testing
 
-- Entorno aislado.
-- Base reiniciable.
+- Cada ejecución de integración/E2E crea un Supabase temporal aislado y no accede a la base local de desarrollo.
 - Fixtures o seeds de prueba controlados.
 - Tests unitarios.
 - Tests de integración.
@@ -186,6 +185,8 @@ Usar `.env.example` como referencia; `.env` contiene credenciales locales y no s
 - Lint.
 - Typecheck.
 - Build de producción.
+
+Comandos, lifecycle de los stacks temporales y limpieza opcional de fixtures heredados: `docs/TESTING.md`.
 
 ### Producción
 
