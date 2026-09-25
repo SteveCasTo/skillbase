@@ -60,7 +60,7 @@ const fields = [
     key: "name",
     label: "Nombre",
     hint: "Un nombre reconocible al seleccionar el formato en un curso.",
-    pattern: undefined,
+    pattern: ".*\\S.*",
     inputmode: undefined,
   },
   {
@@ -149,7 +149,7 @@ const fields = [
     <div class="flex flex-wrap gap-3 sm:col-span-2 lg:col-span-3">
       <button
         type="submit"
-        class="min-h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground"
+        class="min-h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-40"
       >
         Crear formato
       </button>
@@ -161,4 +161,77 @@ const fields = [
       </a>
     </div>
   </form>
+  <script>
+    const form = document.querySelector<HTMLFormElement>(
+      'form[aria-label="Crear formato"]',
+    );
+    if (form) {
+      const button = form.querySelector<HTMLButtonElement>(
+        'button[type="submit"]',
+      );
+      const inputs = Array.from(
+        form.querySelectorAll<HTMLInputElement>('input[type="text"]'),
+      );
+      if (button) {
+        const allowed = (kind: string, value: string) => {
+          if (kind === "name")
+            return !Array.from(value).some(
+              (character) =>
+                character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+            );
+          if (kind === "totalHours")
+            return (
+              value === "" ||
+              (/^(?:0|[1-9]\d{0,9})$/.test(value) &&
+                Number(value) <= 2147483647)
+            );
+          return (
+            value === "" || /^(?:0|[1-9]\d{0,9})(?:\.\d{0,2})?$/.test(value)
+          );
+        };
+        const update = () => {
+          button.disabled = !inputs.every(
+            (input) =>
+              input.value.trim() !== "" &&
+              input.checkValidity() &&
+              allowed(input.name, input.value),
+          );
+        };
+        inputs.forEach((input) => {
+          let previous = input.value;
+          const valid = (value: string) => allowed(input.name, value);
+          const insert = (text: string) =>
+            valid(
+              input.value.slice(0, input.selectionStart ?? input.value.length) +
+                text +
+                input.value.slice(input.selectionEnd ?? input.value.length),
+            );
+          input.addEventListener("beforeinput", (event) => {
+            if (!event.isComposing && event.data && !insert(event.data))
+              event.preventDefault();
+          });
+          input.addEventListener("paste", (event) => {
+            if (!insert(event.clipboardData?.getData("text") ?? ""))
+              event.preventDefault();
+          });
+          input.addEventListener("drop", (event) => {
+            if (!insert(event.dataTransfer?.getData("text") ?? ""))
+              event.preventDefault();
+          });
+          input.addEventListener("input", () => {
+            if (valid(input.value)) previous = input.value;
+            else input.value = previous;
+            update();
+          });
+          input.addEventListener("compositionend", () => {
+            if (valid(input.value)) previous = input.value;
+            else input.value = previous;
+            update();
+          });
+          input.addEventListener("change", update);
+        });
+        update();
+      }
+    }
+  </script>
 </PrivateLayout>
