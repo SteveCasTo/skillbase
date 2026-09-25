@@ -11,10 +11,9 @@ import {
 } from "@/server/db/schema";
 import { validateCourseData } from "@/domain/courses/validation";
 import { COURSE_FIXTURES } from "../fixtures/courses";
+import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
-const connection =
-  process.env.DATABASE_URL ??
-  "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const connection = getTestSupabaseEnvironment().databaseUrl;
 const database = createDatabase(connection);
 const repository = new DrizzleCourseRepository(database.db);
 const formats = new DrizzleFormatRepository(database.db);
@@ -274,5 +273,77 @@ describe("course format persistence", () => {
       ),
     ).toBeInstanceOf(Error);
     expect(await formats.list()).toEqual(before);
+  });
+
+  test("deleting an unused format removes its revisions and records an audit", async () => {
+    await formats.revise(
+      formatId,
+      { totalHours: 35, studentAmount: "130.00", externalAmount: "155.00" },
+      actorId,
+    );
+    const revisions = await database.db
+      .select()
+      .from(courseTypeRevisions)
+      .where(eq(courseTypeRevisions.courseTypeId, formatId));
+    const format = await formats.get(formatId);
+    if (!format) throw new Error("Missing format");
+
+    await formats.delete(
+      formatId,
+      format.revisionId,
+      format.updatedAt,
+      actorId,
+    );
+
+    expect(await formats.get(formatId)).toBeNull();
+    expect(
+      await database.db
+        .select()
+        .from(courseTypeRevisions)
+        .where(eq(courseTypeRevisions.courseTypeId, formatId)),
+    ).toHaveLength(0);
+    expect(revisions).toHaveLength(2);
+    expect(
+      await database.db
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.entityId, formatId)),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "COURSE_TYPE_DELETED",
+          actorId,
+          entityType: "COURSE_TYPE",
+        }),
+      ]),
+    );
+  });
+
+  test("assigned formats cannot be deleted but can be deactivated", async () => {
+    await repository.create(input(), actorId);
+    const format = await formats.get(formatId);
+    if (!format) throw new Error("Missing format");
+
+    expect(
+      await failure(
+        formats.delete(formatId, format.revisionId, format.updatedAt, actorId),
+      ),
+    ).toMatchObject({ code: "INVALID_TRANSITION" });
+    expect(await formats.get(formatId)).toMatchObject({
+      id: formatId,
+      used: true,
+    });
+
+    const deactivated = await formats.setActive(formatId, false, actorId);
+    expect(deactivated).toMatchObject({
+      id: formatId,
+      active: false,
+      used: true,
+    });
+    expect(await formats.get(formatId)).toMatchObject({
+      id: formatId,
+      active: false,
+      used: true,
+    });
   });
 });

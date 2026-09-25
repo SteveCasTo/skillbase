@@ -80,7 +80,7 @@ Implementación actual:
 - createdAt
 - updatedAt
 
-Representa un formato administrado. `active` permite activarlo o desactivarlo sin borrar sus revisiones ni modificar cursos históricos.
+Representa un formato administrado. `active` permite activarlo o desactivarlo sin borrar sus revisiones ni modificar cursos históricos. `updatedAt` participa junto con la revisión vigente como token de frescura para cambios administrativos optimistas. El borrado físico está permitido solo si ninguna revisión del formato está referenciada por cursos; formatos usados se conservan y se desactivan cuando ya no deban ofrecerse.
 
 #### CourseTypeRevision
 

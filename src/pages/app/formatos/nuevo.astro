@@ -1,0 +1,164 @@
+---
+import { createFormat } from "@/application/courses/manage-formats";
+import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
+import { CourseDomainError } from "@/domain/courses/errors";
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import { requireInternalUser } from "@/server/auth/context";
+import { requestHasExpectedOrigin } from "@/server/auth/redirects";
+import {
+  logCourseInfrastructureError,
+  courseDomainStatus,
+} from "@/server/courses/errors";
+import { getDatabase } from "@/server/db/client";
+import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
+import { DrizzleFormatRepository } from "@/server/db/repositories/format-repository";
+import { getPublicAuthEnvironment } from "@/server/environment";
+
+const user = requireInternalUser(Astro.locals);
+let values: Record<string, string> = {};
+let errors: Readonly<Record<string, string>> = {};
+let pageError: string | null = null;
+if (Astro.request.method === "POST") {
+  if (
+    !requestHasExpectedOrigin(Astro.request, getPublicAuthEnvironment().siteUrl)
+  ) {
+    Astro.response.status = 403;
+    pageError =
+      "La solicitud no tiene un origen válido. Recarga la página e inténtalo de nuevo.";
+  } else {
+    const data = await Astro.request.formData();
+    values = Object.fromEntries(
+      ["name", "totalHours", "studentAmount", "externalAmount"].map((key) => [
+        key,
+        typeof data.get(key) === "string" ? String(data.get(key)) : "",
+      ]),
+    );
+    try {
+      await createFormat(new DrizzleFormatRepository(getDatabase()), user, {
+        name: values.name ?? "",
+        totalHours: values.totalHours ?? "",
+        studentAmount: values.studentAmount ?? "",
+        externalAmount: values.externalAmount ?? "",
+      });
+      return Astro.redirect("/app/formatos?success=created", 303);
+    } catch (error) {
+      if (error instanceof CourseDomainError) {
+        Astro.response.status = courseDomainStatus(error);
+        errors = error.fieldErrors;
+        pageError = error.message;
+      } else {
+        Astro.response.status = 500;
+        pageError = "No se pudo crear el formato. Inténtalo nuevamente.";
+        if (error instanceof CourseInfrastructureError)
+          logCourseInfrastructureError(error, { actorId: user.id });
+      }
+    }
+  }
+}
+const fields = [
+  {
+    key: "name",
+    label: "Nombre",
+    hint: "Un nombre reconocible al seleccionar el formato en un curso.",
+    pattern: undefined,
+    inputmode: undefined,
+  },
+  {
+    key: "totalHours",
+    label: "Duración total (horas)",
+    hint: "Número entero positivo de horas.",
+    pattern: "[1-9][0-9]*",
+    inputmode: "numeric" as const,
+  },
+  {
+    key: "studentAmount",
+    label: "Precio estudiante (BOB)",
+    hint: "Usa punto decimal y hasta dos decimales; por ejemplo, 80.50.",
+    pattern: "(?:0|[1-9][0-9]{0,9})(?:\\.[0-9]{1,2})?",
+    inputmode: "decimal" as const,
+  },
+  {
+    key: "externalAmount",
+    label: "Precio externo (BOB)",
+    hint: "Usa punto decimal y hasta dos decimales; por ejemplo, 100.00.",
+    pattern: "(?:0|[1-9][0-9]{0,9})(?:\\.[0-9]{1,2})?",
+    inputmode: "decimal" as const,
+  },
+];
+---
+
+<PrivateLayout title="Nuevo formato">
+  <header>
+    <CourseBreadcrumbs current="Nuevo formato" />
+    <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
+      Nuevo formato
+    </h1>
+    <p class="mt-3 leading-7 text-muted-foreground">
+      Define un nombre, duración y los dos precios en bolivianos. Los cursos que
+      elijan este formato usarán sus valores vigentes.
+    </p>
+  </header>
+  {pageError && (
+    <p
+      role="alert"
+      class="mt-7 rounded-lg border border-destructive/40 p-4 text-sm text-destructive"
+    >
+      {pageError}
+    </p>
+  )}
+  <form
+    method="post"
+    aria-label="Crear formato"
+    class="mt-8 grid gap-6 rounded-xl border bg-card p-5 sm:grid-cols-2 sm:p-7 lg:grid-cols-3"
+  >
+    {fields.map((field) => (
+      <div
+        class:list={[
+          "text-sm",
+          field.key === "name" && "sm:col-span-2 lg:col-span-3",
+        ]}
+      >
+        <label for={field.key} class="font-semibold">
+          {field.label}
+        </label>
+        <p
+          id={`${field.key}-hint`}
+          class="mt-1 text-xs leading-5 text-muted-foreground"
+        >
+          {field.hint}
+        </p>
+        <input
+          id={field.key}
+          name={field.key}
+          type="text"
+          required
+          pattern={field.pattern}
+          inputmode={field.inputmode}
+          value={values[field.key] ?? ""}
+          aria-invalid={Boolean(errors[field.key])}
+          aria-describedby={`${field.key}-hint${errors[field.key] ? ` ${field.key}-error` : ""}`}
+          class="mt-2 min-h-11 w-full rounded-lg border bg-background px-3 py-2 focus-visible:outline-2 focus-visible:outline-ring"
+        />
+        {errors[field.key] && (
+          <p id={`${field.key}-error`} class="mt-1 text-destructive">
+            {errors[field.key]}
+          </p>
+        )}
+      </div>
+    ))}
+    <div class="flex flex-wrap gap-3 sm:col-span-2 lg:col-span-3">
+      <button
+        type="submit"
+        class="min-h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground"
+      >
+        Crear formato
+      </button>
+      <a
+        href="/app/formatos"
+        class="inline-flex min-h-11 items-center rounded-lg border px-5 text-sm font-semibold hover:bg-secondary"
+      >
+        Cancelar
+      </a>
+    </div>
+  </form>
+</PrivateLayout>

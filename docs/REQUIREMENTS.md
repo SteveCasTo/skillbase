@@ -83,9 +83,12 @@ Los niveles iniciales son:
 
 - Administración puede crear y activar/desactivar formatos tarifarios, cada uno con duración y valores `STUDENT`/`EXTERNAL` en `BOB`.
 - Las revisiones del formato son inmutables. Un curso referencia una única revisión; cambios de formato desplazan cursos `DRAFT` a la vigente y preservan la revisión de cursos `PUBLISHED` y `ARCHIVED`.
+- La administración permite crear formatos en una página dedicada y abrir el detalle desde su tarjeta. Nombre, duración y cada precio se guardan como cambios individuales; una escritura con revisión obsoleta se rechaza para evitar sobrescribir datos concurrentes.
+- Un formato asociado a uno o más cursos no se puede eliminar; debe desactivarse para impedir nuevas selecciones y conservar las referencias históricas. Solo un formato todavía no usado puede eliminarse.
 - La migración asigna a cursos existentes formatos/revisiones construidos con sus valores históricos exactos.
 - Los formatos de 20 h (80/100 Bs) y 30 h (120/150 Bs) los crea el seed local como defaults editables de desarrollo, no como precios universales.
 - El upload de artwork opcional se limita a administradores autorizados, y al faltar imagen se conserva fallback gráfico Cota Activa.
+- Con JavaScript, el administrador puede seleccionar y recortar artwork en el alta. Al crear se persiste primero el borrador, luego se sube WebP mediante el endpoint autorizado y se asocia con una edición que usa revisión optimista. Si falla la carga, el borrador permanece y se ofrece reintentar o abrir su edición. Sin JavaScript se puede crear sin foto y añadirla después desde edición.
 - El descuento del 50 % para auxiliares no está implementado: no existe elegibilidad validada ni tercer precio; permanece para fases de inscripción/descuentos posteriores.
 
 ## PREINSCRIPCIÓN

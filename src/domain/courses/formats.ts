@@ -13,6 +13,21 @@ export interface CourseFormat extends FormatValues {
   readonly active: boolean;
   readonly revisionId: string;
   readonly revisionNumber: number;
+  readonly used: boolean;
+  readonly updatedAt: string;
+}
+
+export function validateFormatName(input: string): string {
+  const name = input.trim();
+  if (!name)
+    throw new CourseDomainError(
+      "VALIDATION_FAILED",
+      "Revisa los campos indicados.",
+      {
+        name: "El nombre es obligatorio.",
+      },
+    );
+  return name;
 }
 
 export function validateFormat(

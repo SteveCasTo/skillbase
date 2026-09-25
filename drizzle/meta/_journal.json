@@ -36,6 +36,13 @@
       "when": 1790225760340,
       "tag": "0004_pin-course-revision-trigger-path",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790282482005,
+      "tag": "0005_delete-unused-formats",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@ import { requireRoles } from "@/application/auth/authorize";
 import type { FormatRepository } from "./format-repository";
 import { AuthorizationError } from "@/domain/auth/errors";
 import type { InternalUser } from "@/domain/auth/types";
-import { validateFormat } from "@/domain/courses/formats";
+import { validateFormat, validateFormatName } from "@/domain/courses/formats";
 
 function requireAdmin(user: InternalUser) {
   if (user.status !== "ACTIVE")
@@ -19,6 +19,44 @@ export async function listFormats(
 ) {
   requireAdmin(user);
   return repository.list();
+}
+
+export async function getFormat(
+  repository: FormatRepository,
+  user: InternalUser,
+  id: string,
+) {
+  requireAdmin(user);
+  return repository.get(id);
+}
+
+export async function renameFormat(
+  repository: FormatRepository,
+  user: InternalUser,
+  id: string,
+  name: string,
+  revisionId: string,
+  updatedAt: string,
+) {
+  requireAdmin(user);
+  return repository.rename(
+    id,
+    validateFormatName(name),
+    revisionId,
+    updatedAt,
+    user.id,
+  );
+}
+
+export async function deleteFormat(
+  repository: FormatRepository,
+  user: InternalUser,
+  id: string,
+  revisionId: string,
+  updatedAt: string,
+) {
+  requireAdmin(user);
+  return repository.delete(id, revisionId, updatedAt, user.id);
 }
 
 export async function createFormat(
@@ -46,6 +84,8 @@ export async function reviseFormat(
   user: InternalUser,
   id: string,
   input: { totalHours: string; studentAmount: string; externalAmount: string },
+  revisionId?: string,
+  updatedAt?: string,
 ) {
   requireAdmin(user);
   const { totalHours, studentAmount, externalAmount } = validateFormat(
@@ -58,6 +98,8 @@ export async function reviseFormat(
     id,
     { totalHours, studentAmount, externalAmount },
     user.id,
+    revisionId,
+    updatedAt,
   );
 }
 
@@ -66,7 +108,9 @@ export async function setFormatActive(
   user: InternalUser,
   id: string,
   active: boolean,
+  revisionId?: string,
+  updatedAt?: string,
 ) {
   requireAdmin(user);
-  return repository.setActive(id, active, user.id);
+  return repository.setActive(id, active, user.id, revisionId, updatedAt);
 }
