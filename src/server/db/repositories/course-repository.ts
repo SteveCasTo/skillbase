@@ -1,6 +1,5 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-
 import type { CourseRepository } from "@/application/courses/course-repository";
 import { CourseDomainError } from "@/domain/courses/errors";
 import {
@@ -16,12 +15,12 @@ import type {
   PublicCourseDto,
 } from "@/domain/courses/types";
 import * as schema from "@/server/db/schema";
-
 import { CourseInfrastructureError } from "./course-infrastructure-error";
 
 type Database = PostgresJsDatabase<typeof schema>;
-type CourseRow = typeof schema.courses.$inferSelect;
-type PriceRow = typeof schema.coursePrices.$inferSelect;
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+type Row = typeof schema.courses.$inferSelect;
+type Revision = typeof schema.courseTypeRevisions.$inferSelect;
 
 async function persistence<T>(
   operation: string,
@@ -39,30 +38,27 @@ async function persistence<T>(
   }
 }
 
-function pricesFor(
-  courseId: string,
-  rows: readonly PriceRow[],
-): readonly CoursePrice[] {
-  return rows
-    .filter((row) => row.courseId === courseId)
-    .sort((left, right) =>
-      left.participantType.localeCompare(right.participantType),
-    )
-    .map(({ participantType, amount }) => ({
-      participantType,
-      amount,
+function prices(revision: Revision): readonly CoursePrice[] {
+  return [
+    {
+      participantType: "STUDENT",
+      amount: revision.studentAmount,
       currency: "BOB",
-    }));
+    },
+    {
+      participantType: "EXTERNAL",
+      amount: revision.externalAmount,
+      currency: "BOB",
+    },
+  ];
 }
 
-function toAdmin(
-  row: CourseRow,
-  prices: readonly PriceRow[],
-  now = new Date(),
-): AdminCourseDto {
+function admin(row: Row, revision: Revision, now = new Date()): AdminCourseDto {
   return {
     ...row,
-    prices: pricesFor(row.id, prices),
+    courseTypeId: revision.courseTypeId,
+    totalHours: revision.totalHours,
+    prices: prices(revision),
     registrationAvailability: registrationAvailability(
       row.registrationStartAt,
       row.registrationEndAt,
@@ -71,17 +67,22 @@ function toAdmin(
   };
 }
 
-function toPublic(
-  row: CourseRow,
-  prices: readonly PriceRow[],
+function publicDto(
+  row: Row,
+  revision: Revision,
   now = new Date(),
 ): PublicCourseDto {
   return {
     slug: row.slug,
     name: row.name,
     description: row.description,
+    contentMarkdown: row.contentMarkdown,
+    instructorName: row.instructorName,
+    artwork: row.artwork,
+    featured: row.featured,
     level: row.level,
-    totalHours: row.totalHours,
+    totalHours: revision.totalHours,
+    prices: prices(revision),
     schedule: row.schedule,
     conditions: row.conditions,
     startsAt: row.startsAt,
@@ -93,27 +94,69 @@ function toPublic(
       row.registrationEndAt,
       now,
     ),
-    prices: pricesFor(row.id, prices),
   };
 }
 
-async function loadPrices(
-  db: Database,
-  courseIds: readonly string[],
-): Promise<readonly PriceRow[]> {
-  if (courseIds.length === 0) return [];
-  return db
+async function revisions(
+  db: Database | Transaction,
+  rows: readonly Row[],
+): Promise<Map<string, Revision>> {
+  if (!rows.length) return new Map();
+  const found = await db
     .select()
-    .from(schema.coursePrices)
-    .where(inArray(schema.coursePrices.courseId, [...courseIds]));
+    .from(schema.courseTypeRevisions)
+    .where(
+      inArray(
+        schema.courseTypeRevisions.id,
+        rows.map((row) => row.courseTypeRevisionId),
+      ),
+    );
+  return new Map(found.map((row) => [row.id, row]));
 }
 
-function courseValues(input: CourseData) {
+function revisionFor(row: Row, found: Map<string, Revision>): Revision {
+  const revision = found.get(row.courseTypeRevisionId);
+  if (!revision) throw new Error("Course revision missing");
+  return revision;
+}
+
+async function currentRevision(
+  db: Transaction,
+  id: string,
+  requireActive = true,
+): Promise<Revision> {
+  const [type] = await db
+    .select()
+    .from(schema.courseTypes)
+    .where(eq(schema.courseTypes.id, id))
+    .for("update");
+  if (!type)
+    throw new CourseDomainError(
+      "FORMAT_NOT_FOUND",
+      "Selecciona un formato existente.",
+      { courseTypeId: "Selecciona un formato existente." },
+    );
+  if (requireActive && !type.active)
+    throw new CourseDomainError(
+      "FORMAT_INACTIVE",
+      "El formato está desactivado.",
+      { courseTypeId: "Selecciona un formato activo." },
+    );
+  const [revision] = await db
+    .select()
+    .from(schema.courseTypeRevisions)
+    .where(eq(schema.courseTypeRevisions.courseTypeId, id))
+    .orderBy(desc(schema.courseTypeRevisions.revisionNumber))
+    .limit(1);
+  if (!revision) throw new Error("Format has no revision");
+  return revision;
+}
+
+function values(input: CourseData) {
   return {
     name: input.name,
     description: input.description,
     level: input.level,
-    totalHours: input.totalHours,
     schedule: input.schedule,
     conditions: input.conditions,
     startsAt: input.startsAt,
@@ -121,47 +164,29 @@ function courseValues(input: CourseData) {
     registrationStartAt: input.registrationStartAt,
     registrationEndAt: input.registrationEndAt,
     minimumGrade: input.minimumGrade,
+    contentMarkdown: input.contentMarkdown,
+    instructorName: input.instructorName,
+    artwork: input.artwork,
   };
 }
 
-function priceValues(
-  courseId: string,
+function changed(
+  previous: Row,
   input: CourseData,
-  updatedAt = new Date(),
-) {
-  return input.prices.map((price) => ({ ...price, courseId, updatedAt }));
-}
-
-function changedFields(previous: CourseRow, input: CourseData): string[] {
-  const next = courseValues(input);
+  revisionId: string,
+): string[] {
+  const next = { ...values(input), courseTypeRevisionId: revisionId };
   return Object.entries(next).flatMap(([key, value]) => {
-    const oldValue = previous[key as keyof typeof next];
-    const oldComparable =
-      oldValue instanceof Date ? oldValue.toISOString() : oldValue;
-    const nextComparable = value instanceof Date ? value.toISOString() : value;
-    return oldComparable === nextComparable ? [] : [key];
+    const old = previous[key as keyof typeof next];
+    return (old instanceof Date ? old.toISOString() : old) ===
+      (value instanceof Date ? value.toISOString() : value)
+      ? []
+      : [key];
   });
 }
 
-function nextRevision(previous: Date): Date {
+function nextVersion(previous: Date) {
   return new Date(Math.max(Date.now(), previous.getTime() + 1));
-}
-
-function assertPublishablePrices(rows: readonly PriceRow[]): void {
-  const exactTypes = new Set(
-    rows.map(({ participantType }) => participantType),
-  );
-  const isComplete =
-    rows.length === 2 &&
-    exactTypes.size === 2 &&
-    exactTypes.has("STUDENT") &&
-    exactTypes.has("EXTERNAL") &&
-    rows.every(({ currency }) => currency === "BOB");
-  if (!isComplete)
-    throw new CourseDomainError(
-      "COURSE_PRICES_INCOMPLETE",
-      "El curso requiere exactamente los precios STUDENT y EXTERNAL en BOB antes de publicarse.",
-    );
 }
 
 export class DrizzleCourseRepository implements CourseRepository {
@@ -170,6 +195,8 @@ export class DrizzleCourseRepository implements CourseRepository {
   async create(input: CourseData, actorId: string): Promise<AdminCourseDto> {
     return persistence("create", () =>
       this.db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+        const revision = await currentRevision(tx, input.courseTypeId);
         const baseSlug = normalizeSlug(input.name);
         await tx.execute(sql`select pg_advisory_xact_lock(20260915, 1)`);
         const matching = await tx
@@ -178,28 +205,28 @@ export class DrizzleCourseRepository implements CourseRepository {
           .where(
             sql`${schema.courses.slug} = ${baseSlug} or ${schema.courses.slug} ~ ${`^${baseSlug}-[0-9]+$`}`,
           );
-        const used = new Set(matching.map(({ slug }) => slug));
+        const used = new Set(matching.map((row) => row.slug));
         let slug = baseSlug;
-        for (let suffix = 2; used.has(slug); suffix += 1)
+        for (let suffix = 2; used.has(slug); suffix++)
           slug = `${baseSlug}-${suffix}`;
-        const updatedAt = new Date();
-        const [course] = await tx
+        const [row] = await tx
           .insert(schema.courses)
-          .values({ ...courseValues(input), slug, updatedAt })
+          .values({
+            ...values(input),
+            courseTypeRevisionId: revision.id,
+            slug,
+            updatedAt: new Date(),
+          })
           .returning();
-        if (!course) throw new Error("Created course was not returned");
-        const prices = await tx
-          .insert(schema.coursePrices)
-          .values(priceValues(course.id, input))
-          .returning();
+        if (!row) throw new Error("Course insert failed");
         await tx.insert(schema.auditEvents).values({
           actorId,
-          action: "COURSE_CREATED",
           entityType: "COURSE",
-          entityId: course.id,
+          entityId: row.id,
+          action: "COURSE_CREATED",
           metadata: { slug },
         });
-        return toAdmin(course, prices);
+        return admin(row, revision);
       }),
     );
   }
@@ -212,11 +239,11 @@ export class DrizzleCourseRepository implements CourseRepository {
   ): Promise<AdminCourseDto> {
     return persistence("update", () =>
       this.db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
         const [previous] = await tx
           .select()
           .from(schema.courses)
           .where(eq(schema.courses.id, id))
-          .limit(1)
           .for("update");
         if (!previous)
           throw new CourseDomainError(
@@ -231,29 +258,31 @@ export class DrizzleCourseRepository implements CourseRepository {
         if (previous.updatedAt.getTime() !== expectedUpdatedAt.getTime())
           throw new CourseDomainError(
             "STALE_COURSE",
-            "El curso cambió desde que abriste esta página. Revisa los datos y vuelve a guardar.",
+            "El curso cambió desde que abriste esta página.",
           );
-        const oldPrices = await tx
-          .select()
-          .from(schema.coursePrices)
-          .where(eq(schema.coursePrices.courseId, id));
-        const changed = changedFields(previous, input);
-        const changedPriceTypes = input.prices.flatMap((price) => {
-          const old = oldPrices.find(
-            (candidate) => candidate.participantType === price.participantType,
+        const existing = revisionFor(previous, await revisions(tx, [previous]));
+        // Published content is editable, but its commercial terms remain pinned until withdrawn.
+        if (
+          previous.status === "PUBLISHED" &&
+          existing.courseTypeId !== input.courseTypeId
+        )
+          throw new CourseDomainError(
+            "INVALID_TRANSITION",
+            "Retira el curso antes de cambiar su formato.",
           );
-          return !old ||
-            old.amount !== price.amount ||
-            old.currency !== price.currency
-            ? [price.participantType]
-            : [];
-        });
-        if (changed.length === 0 && changedPriceTypes.length === 0)
-          return toAdmin(previous, oldPrices);
-        const updatedAt = nextRevision(previous.updatedAt);
-        const [course] = await tx
+        const revision =
+          previous.status === "PUBLISHED"
+            ? existing
+            : await currentRevision(tx, input.courseTypeId);
+        const fields = changed(previous, input, revision.id);
+        if (!fields.length) return admin(previous, revision);
+        const [row] = await tx
           .update(schema.courses)
-          .set({ ...courseValues(input), updatedAt })
+          .set({
+            ...values(input),
+            courseTypeRevisionId: revision.id,
+            updatedAt: nextVersion(previous.updatedAt),
+          })
           .where(
             and(
               eq(schema.courses.id, id),
@@ -261,49 +290,19 @@ export class DrizzleCourseRepository implements CourseRepository {
             ),
           )
           .returning();
-        if (!course)
+        if (!row)
           throw new CourseDomainError(
             "STALE_COURSE",
-            "El curso cambió antes de completar el guardado. Revisa los datos y vuelve a intentarlo.",
+            "El curso cambió antes de completar el guardado.",
           );
-        const prices = await Promise.all(
-          priceValues(id, input).map(async (price) => {
-            const [saved] = await tx
-              .insert(schema.coursePrices)
-              .values(price)
-              .onConflictDoUpdate({
-                target: [
-                  schema.coursePrices.courseId,
-                  schema.coursePrices.participantType,
-                ],
-                set: {
-                  amount: price.amount,
-                  currency: price.currency,
-                  updatedAt: price.updatedAt,
-                },
-              })
-              .returning();
-            if (!saved) throw new Error("Updated price was not returned");
-            return saved;
-          }),
-        );
-        if (changed.length > 0)
-          await tx.insert(schema.auditEvents).values({
-            actorId,
-            action: "COURSE_UPDATED",
-            entityType: "COURSE",
-            entityId: id,
-            metadata: { fields: changed.join(",") },
-          });
-        if (changedPriceTypes.length > 0)
-          await tx.insert(schema.auditEvents).values({
-            actorId,
-            action: "COURSE_PRICES_UPDATED",
-            entityType: "COURSE",
-            entityId: id,
-            metadata: { participantTypes: changedPriceTypes.sort().join(",") },
-          });
-        return toAdmin(course, prices);
+        await tx.insert(schema.auditEvents).values({
+          actorId,
+          entityType: "COURSE",
+          entityId: id,
+          action: "COURSE_UPDATED",
+          metadata: { fields: fields.join(",") },
+        });
+        return admin(row, revision);
       }),
     );
   }
@@ -315,11 +314,11 @@ export class DrizzleCourseRepository implements CourseRepository {
   ): Promise<AdminCourseDto> {
     return persistence("transition", () =>
       this.db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
         const [previous] = await tx
           .select()
           .from(schema.courses)
           .where(eq(schema.courses.id, id))
-          .limit(1)
           .for("update");
         if (!previous)
           throw new CourseDomainError(
@@ -327,29 +326,82 @@ export class DrizzleCourseRepository implements CourseRepository {
             "El curso no existe.",
           );
         assertTransition(previous.status, next);
-        const prices = await loadPrices(tx, [id]);
-        if (next === "PUBLISHED") assertPublishablePrices(prices);
-        const updatedAt = nextRevision(previous.updatedAt);
-        const [course] = await tx
+        const existing = revisionFor(previous, await revisions(tx, [previous]));
+        // Withdrawal is allowed even when the format was deactivated; publishing is not.
+        const revision =
+          next === "DRAFT"
+            ? await currentRevision(tx, existing.courseTypeId, false)
+            : next === "PUBLISHED"
+              ? await currentRevision(tx, existing.courseTypeId)
+              : existing;
+        const [row] = await tx
           .update(schema.courses)
-          .set({ status: next, updatedAt })
+          .set({
+            status: next,
+            featured: next === "PUBLISHED" ? previous.featured : false,
+            courseTypeRevisionId: revision.id,
+            updatedAt: nextVersion(previous.updatedAt),
+          })
           .where(eq(schema.courses.id, id))
           .returning();
-        if (!course) throw new Error("Transitioned course was not returned");
-        const action =
-          next === "PUBLISHED"
-            ? "COURSE_PUBLISHED"
-            : next === "DRAFT"
-              ? "COURSE_WITHDRAWN"
-              : "COURSE_ARCHIVED";
+        if (!row) throw new Error("Transition failed");
         await tx.insert(schema.auditEvents).values({
           actorId,
-          action,
           entityType: "COURSE",
           entityId: id,
+          action:
+            next === "PUBLISHED"
+              ? "COURSE_PUBLISHED"
+              : next === "DRAFT"
+                ? "COURSE_WITHDRAWN"
+                : "COURSE_ARCHIVED",
           metadata: { from: previous.status, to: next },
         });
-        return toAdmin(course, prices);
+        return admin(row, revision);
+      }),
+    );
+  }
+
+  async setFeatured(id: string, actorId: string): Promise<AdminCourseDto> {
+    return persistence("setFeatured", () =>
+      this.db.transaction(async (tx) => {
+        // Serialize competing selections; the partial unique index also protects direct writes.
+        await tx.execute(sql`select pg_advisory_xact_lock(20260915, 2)`);
+        const [target] = await tx
+          .select()
+          .from(schema.courses)
+          .where(eq(schema.courses.id, id))
+          .for("update");
+        if (!target || target.status !== "PUBLISHED")
+          throw new CourseDomainError(
+            "INVALID_TRANSITION",
+            "Solo un curso publicado puede destacarse.",
+          );
+        if (target.featured)
+          return admin(
+            target,
+            revisionFor(target, await revisions(tx, [target])),
+          );
+        await tx
+          .update(schema.courses)
+          .set({
+            featured: false,
+            updatedAt: sql`greatest(now(), ${schema.courses.updatedAt} + interval '1 millisecond')`,
+          })
+          .where(eq(schema.courses.featured, true));
+        const [row] = await tx
+          .update(schema.courses)
+          .set({ featured: true, updatedAt: nextVersion(target.updatedAt) })
+          .where(eq(schema.courses.id, id))
+          .returning();
+        if (!row) throw new Error("Featured course missing");
+        await tx.insert(schema.auditEvents).values({
+          actorId,
+          entityType: "COURSE",
+          entityId: id,
+          action: "COURSE_FEATURED",
+        });
+        return admin(row, revisionFor(row, await revisions(tx, [row])));
       }),
     );
   }
@@ -360,14 +412,10 @@ export class DrizzleCourseRepository implements CourseRepository {
         .select()
         .from(schema.courses)
         .orderBy(desc(schema.courses.createdAt));
-      const prices = await loadPrices(
-        this.db,
-        rows.map(({ id }) => id),
-      );
-      return rows.map((row) => toAdmin(row, prices));
+      const found = await revisions(this.db, rows);
+      return rows.map((row) => admin(row, revisionFor(row, found)));
     });
   }
-
   async getAdmin(id: string): Promise<AdminCourseDto | null> {
     return persistence("getAdmin", async () => {
       const [row] = await this.db
@@ -375,32 +423,29 @@ export class DrizzleCourseRepository implements CourseRepository {
         .from(schema.courses)
         .where(eq(schema.courses.id, id))
         .limit(1);
-      return row ? toAdmin(row, await loadPrices(this.db, [id])) : null;
+      return row
+        ? admin(row, revisionFor(row, await revisions(this.db, [row])))
+        : null;
     });
   }
-
   async listPublic(now = new Date()): Promise<readonly PublicCourseDto[]> {
     return persistence("listPublic", async () => {
       const rows = await this.db
         .select()
         .from(schema.courses)
         .where(eq(schema.courses.status, "PUBLISHED"))
-        .orderBy(asc(schema.courses.startsAt));
-      const prices = await loadPrices(
-        this.db,
-        rows.map(({ id }) => id),
-      );
-      return rows.map((row) => toPublic(row, prices, now));
+        .orderBy(desc(schema.courses.featured), asc(schema.courses.startsAt));
+      const found = await revisions(this.db, rows);
+      return rows.map((row) => publicDto(row, revisionFor(row, found), now));
     });
   }
-
   async getPublic(
     slug: string,
     now = new Date(),
   ): Promise<PublicCourseDto | null> {
-    let normalizedSlug: string;
+    let normalized: string;
     try {
-      normalizedSlug = normalizeSlug(slug);
+      normalized = normalizeSlug(slug);
     } catch (error) {
       if (error instanceof CourseDomainError) return null;
       throw error;
@@ -410,11 +455,14 @@ export class DrizzleCourseRepository implements CourseRepository {
         .select()
         .from(schema.courses)
         .where(
-          sql`${schema.courses.slug} = ${normalizedSlug} and ${schema.courses.status} = 'PUBLISHED'`,
+          and(
+            eq(schema.courses.slug, normalized),
+            eq(schema.courses.status, "PUBLISHED"),
+          ),
         )
         .limit(1);
       return row
-        ? toPublic(row, await loadPrices(this.db, [row.id]), now)
+        ? publicDto(row, revisionFor(row, await revisions(this.db, [row])), now)
         : null;
     });
   }

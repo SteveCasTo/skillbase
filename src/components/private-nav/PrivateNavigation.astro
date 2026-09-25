@@ -1,0 +1,96 @@
+---
+import {
+  BookOpen,
+  CalendarCheck,
+  ChevronDown,
+  LayoutDashboard,
+  Layers3,
+} from "lucide-react";
+
+interface Props {
+  mode: "desktop" | "mobile";
+  currentPath: string;
+  isAdmin: boolean;
+  isInstructor: boolean;
+}
+
+const { mode, currentPath, isAdmin, isInstructor } = Astro.props;
+const courseActive =
+  currentPath === "/app/cursos" || currentPath.startsWith("/app/cursos/");
+const formatActive = currentPath === "/app/formatos";
+---
+
+<nav
+  class="private-nav"
+  aria-label={mode === "desktop" ? "Navegación privada" : "Navegación móvil"}
+>
+  <ul class="private-nav-list">
+    <li>
+      <a
+        class="private-nav-link"
+        href="/app"
+        aria-current={currentPath === "/app" ? "page" : undefined}
+        title="Resumen"
+      >
+        <LayoutDashboard size={19} aria-hidden="true" />
+        <span class="private-label">Resumen</span>
+      </a>
+    </li>
+    {isAdmin && (
+      <li>
+        <details class="private-nav-group" open>
+          <summary
+            class:list={[
+              "private-nav-link",
+              (courseActive || formatActive) && "private-parent-active",
+            ]}
+            title="Cursos"
+          >
+            <BookOpen size={19} aria-hidden="true" />
+            <span class="private-label">Cursos</span>
+            <ChevronDown
+              className="private-label private-chevron"
+              size={16}
+              aria-hidden="true"
+            />
+          </summary>
+          <ul class="private-subnav">
+            <li>
+              <a
+                href="/app/cursos"
+                aria-current={courseActive ? "page" : undefined}
+                class="private-subnav-link"
+              >
+                <BookOpen size={17} aria-hidden="true" />
+                <span>Cursos</span>
+              </a>
+            </li>
+            <li>
+              <a
+                href="/app/formatos"
+                aria-current={formatActive ? "page" : undefined}
+                class="private-subnav-link"
+              >
+                <Layers3 size={17} aria-hidden="true" />
+                <span>Formatos</span>
+              </a>
+            </li>
+          </ul>
+        </details>
+      </li>
+    )}
+    {isInstructor && (
+      <li>
+        <a
+          class="private-nav-link"
+          href="/app/asistencia"
+          aria-current={currentPath === "/app/asistencia" ? "page" : undefined}
+          title="Asistencia"
+        >
+          <CalendarCheck size={19} aria-hidden="true" />
+          <span class="private-label">Asistencia</span>
+        </a>
+      </li>
+    )}
+  </ul>
+</nav>

@@ -1,0 +1,63 @@
+---
+import "@fontsource/alef/700.css";
+import "@/styles/public-courses.css";
+
+import ThemeToggle from "@/components/ThemeToggle.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+
+interface Props {
+  title: string;
+  description: string;
+  noindex?: boolean;
+}
+const { title, description, noindex = false } = Astro.props;
+---
+
+<BaseLayout
+  {title}
+  {description}
+  {noindex}
+  showToasts={false}
+  allowSystemTheme={false}
+>
+  <div class="public-courses">
+    <a class="skip-link" href="#main-content">
+      Saltar al contenido principal
+    </a>
+    <header class="course-header">
+      <div class="course-header-inner">
+        <a
+          class="course-brand"
+          href="/"
+          aria-label="Formación continua, inicio"
+        >
+          <strong>Formación continua</strong>
+          <span>Informática y Sistemas · FCyT · UMSS</span>
+        </a>
+        <nav aria-label="Navegación principal">
+          <a
+            href="/cursos"
+            aria-current={Astro.url.pathname === "/cursos" ? "page" : undefined}
+          >
+            Cursos
+          </a>
+          <a href="/#participar">Cómo participar</a>
+          <a href="/#certificados">Certificados</a>
+        </nav>
+        <ThemeToggle />
+      </div>
+    </header>
+    <main id="main-content" tabindex="-1">
+      <slot />
+    </main>
+    <footer class="course-footer">
+      <strong>Formación continua</strong>
+      <span>Departamento de Informática y Sistemas · FCyT · UMSS</span>
+      <nav aria-label="Navegación de pie de página">
+        <a href="/">Inicio</a>
+        <a href="/cursos">Cursos</a>
+        <a href="/login">Acceso del equipo</a>
+      </nav>
+    </footer>
+  </div>
+</BaseLayout>

@@ -218,19 +218,34 @@ Un administrador crea, edita, configura, publica, retira y archiva cursos. Los c
 
 #### Estado 2A
 
-Fase 2A completada y verificada en local, CI y cloud con el modelo actualmente implementado. La migración está aplicada en Supabase y el flujo administrativo está desplegado en Vercel. El refactor aprobado de Tipos de curso y revisiones inmutables sigue pendiente y debe superar el gate específico antes de cerrar Fase 2B.
+El estado previo del repositorio registraba el alcance original de gestión de cursos como completado. Esta revisión no revalida ese cierre histórico ni verifica un nuevo despliegue en Supabase/Vercel o un nuevo resultado de CI. El refactor de formatos y revisiones, que antes estaba pendiente, ya está implementado localmente; el cierre del gate ampliado de Fase 2B sigue pendiente de validación final.
 
-#### Refactor aprobado pendiente — gate previo al cierre de Fase 2B
+#### Refactor implementado — gate previo al cierre de Fase 2B
 
-La implementación actual guarda `totalHours` y precios directamente por curso. ADR-016 acepta sustituir ese modelo, pero esta decisión todavía no está implementada.
+La implementación original guardaba `totalHours` y precios directamente por curso. El refactor aprobado de ADR-016 ya está implementado mediante formatos y revisiones; el cierre del gate todavía requiere validación final.
 
-- [ ] Modelar Tipos de curso/formatos administrados, con activación y desactivación.
-- [ ] Modelar revisiones inmutables con duración y precios `STUDENT`/`EXTERNAL` en `BOB`.
-- [ ] Hacer obligatorio que cada curso seleccione una revisión y eliminar los overrides directos de horas y precios.
-- [ ] Aplicar la revisión vigente a cursos borrador/no publicados y preservar la revisión exacta en cursos publicados y archivados.
-- [ ] Migrar y verificar el contrato administrativo, el contrato público y la trazabilidad sin tratar la refactorización como completada antes de su verificación.
-- [ ] Incorporar la fotografía propia opcional autorizada con upload/storage administrativo real; el fallback gráfico de Cota Activa ya está implementado en la capa de presentación.
+- [x] Modelar Tipos de curso/formatos administrados, con activación y desactivación.
+- [x] Modelar revisiones inmutables con duración y precios `STUDENT`/`EXTERNAL` en `BOB`.
+- [x] Hacer obligatorio que cada curso seleccione una revisión y eliminar los overrides directos de horas y precios.
+- [x] Aplicar la revisión vigente a cursos borrador y preservar la revisión exacta en cursos publicados y archivados.
+- [x] Migrar el modelo directo preservando las tuplas históricas de duración y precios; adaptar contratos y trazabilidad.
+- [x] Incorporar la fotografía opcional con upload/storage administrativo, conservando el fallback gráfico de Cota Activa.
 - [ ] Ejecutar la revisión de cierre del gate y actualizar la documentación con el estado real.
+
+#### Alcance acordado para completar 2B (2026-09-24)
+
+Estas decisiones precisan el alcance acordado. El estado actualizado distingue implementación disponible de cierre/verificación del gate.
+
+- [x] Mantener la consulta SSR de cursos publicados en cada visita/recarga. No se requiere actualización en tiempo real ni SPA; `?preview=courses` sigue siendo contenido sintético.
+- [x] Administrar **Formatos** reutilizables con revisiones inmutables y migrar cursos preservando las tuplas históricas. El seed local agrega formatos de 20 h (80/100 Bs) y 30 h (120/150 Bs), editables y solo como defaults de desarrollo.
+- [x] Sustituir duración/precios individuales del formulario por selección de formato, mantener nivel separado, calendario shadcn para seleccionar fechas y validación inmediata de montos; preservar formularios Astro SSR/POST y validación server-side.
+- [x] Añadir contenido Markdown, nombre de instructor y un constructor de horario por días/horas que conserva el campo histórico como texto; no se introdujo un calendario operativo estructurado.
+- [x] Permitir designar un curso publicado destacado, con selección singleton y fallback determinista cuando no se designa uno.
+- [x] Añadir picker/arrastre, vista previa y recorte de foto autorizada, validación server-side y almacenamiento; conservar fallback Cota Activa.
+- [x] Completar catálogo `/cursos` y detalle `/cursos/[slug]` con información pública; tarjetas no exponen precios/horario detallados y cursos no públicos comparten 404 con slugs inexistentes.
+- [x] Verificar el flujo completo en local con migraciones, tests unitarios, integración y E2E (42 escenarios), responsive, teclado, formatter de archivos propios, lint, typecheck, build y advisors de Supabase sin avisos; documentación afectada revisada. CI remoto y cloud permanecen pendientes.
+
+El 50 % de descuento de auxiliares es una regla conocida, pero su elegibilidad y aplicación corresponden a inscripción/descuentos de fases posteriores; no se publica automáticamente un tercer precio ni se promete un beneficio sin validar condiciones.
 
 ### FASE 2B — LANDING, CATÁLOGO Y DETALLE PÚBLICO
 
@@ -260,14 +275,14 @@ Construir una experiencia pública distintiva que presente la propuesta del sist
 
 #### Checklist de catálogo y detalle
 
-- [ ] Crear `/cursos` consumiendo exclusivamente el contrato público de Fase 2A.
-- [ ] Mostrar únicamente cursos publicados con el resumen público aprobado y sin exponer en las tarjetas los dos precios detallados ni el horario detallado.
-- [ ] Indicar si la ventana de preinscripción está próxima, abierta o cerrada.
-- [ ] Mantener URLs estables mediante slug y evitar filtros sin una necesidad demostrada.
-- [ ] Crear `/cursos/[slug]` con descripción, condiciones y disponibilidad completas.
-- [ ] Responder de la misma forma ante un slug inexistente y un curso no público.
-- [ ] No implementar el formulario de preinscripción de Fase 3 ni presentar un CTA engañoso.
-- [ ] Mantener HTML semántico y no renderizar HTML no confiable.
+- [x] Crear `/cursos` consumiendo el contrato público y renderizando SSR.
+- [x] Mostrar únicamente cursos publicados con el resumen público aprobado y sin exponer en las tarjetas los dos precios detallados ni el horario detallado.
+- [x] Indicar si la ventana de preinscripción está próxima, abierta o cerrada.
+- [x] Mantener URLs estables mediante slug y evitar filtros sin una necesidad demostrada.
+- [x] Crear `/cursos/[slug]` con descripción, condiciones y disponibilidad completas.
+- [x] Responder 404 de la misma forma ante slug inexistente y curso no público.
+- [x] No implementar el formulario de preinscripción de Fase 3 ni presentar un CTA engañoso.
+- [x] Renderizar Markdown mediante nodos permitidos y filtrar destinos de enlaces, sin insertar HTML crudo.
 
 #### Checklist de revisión visual y calidad
 
@@ -280,7 +295,7 @@ Construir una experiencia pública distintiva que presente la propuesta del sist
 - [x] Cargar `web-design-guidelines` para la auditoría final de UI.
 - [x] Repetir screenshots y pruebas después de las correcciones.
 
-La dirección **Cartelera editorial** fue seleccionada el 2026-09-18 mediante una comparación visual con Catálogo visual modular y Agenda de convocatorias. La implementación visual en `/`, incluida su adaptación mobile, está completada y verificada. La cartelera restaura la transición difuminada y superpuesta entre hero y oferta, usa un enlace por tarjeta con CTA visual de botón, piezas redondeadas sin marco exterior, filas de tríos, dos pares cuando restan cuatro cursos y una fila completa para un único remanente; desktop cicla tres variantes de trío, tablet normaliza dos columnas y mobile una columna de afiches de igual ancho con artwork 4:3. Dark y warm-dark conservan el copy asociado a las placas luminosas sin reemplazar las imágenes, y el certificado enlaza visualmente con el footer mediante un fade sutil. La carga de artwork de producción —incluido picker y upload/storage— y el refactor de Tipos de curso/revisiones inmutables permanecen en el gate pendiente de Fase 2B.
+La dirección **Cartelera editorial** fue seleccionada el 2026-09-18 mediante una comparación visual con Catálogo visual modular y Agenda de convocatorias. La landing conserva la composición responsive y sus previews sintéticos. El refactor de formatos y el upload/storage administrativo de artwork ya están implementados; el cierre del gate funcional y su verificación remota siguen pendientes.
 
 #### Estado actual de la cartelera
 
@@ -290,20 +305,23 @@ La dirección **Cartelera editorial** fue seleccionada el 2026-09-18 mediante un
 - [x] Verificar enlaces de tarjeta completa, orden de filas, ausencia de overflow, foco, temas claro/oscuro y paleta warm en E2E.
 - [x] Verificar la regresión de 20 cursos, incluyendo anchos de afiche mobile y tablet.
 - [x] Respetar `prefers-reduced-motion` en la composición y sus transiciones decorativas.
-- [ ] Sustituir el preview local por un picker y flujo administrativo de imagen propia autorizada con almacenamiento real.
-- [ ] Completar el refactor de Tipos de curso y revisiones inmutables antes del cierre de Fase 2B.
+- [x] Incorporar picker y flujo administrativo de imagen propia autorizada con almacenamiento real.
+- [x] Completar el refactor de Tipos de curso y revisiones inmutables.
 
 #### Checklist de pruebas y cierre
 
-- [ ] Verificar acceso público a landing, catálogo y detalle sin sesión.
-- [ ] Verificar navegación desde la landing hasta cada curso publicado.
-- [ ] Verificar que borradores, retirados y archivados no sean visibles.
-- [ ] Verificar 404 para cursos inexistentes o no públicos.
-- [ ] Verificar actualización pública después de publicar o retirar un curso.
-- [ ] Cubrir responsive y navegación por teclado con E2E enfocado.
-- [ ] Verificar títulos, metadata y contenido público permitido.
-- [ ] Ejecutar formatter, lint, typecheck, pruebas, build y CI.
-- [ ] Actualizar documentación y realizar la revisión final de Fase 2.
+- [x] Implementar acceso público sin sesión, navegación a cursos publicados, ocultación de otros estados y 404 uniforme.
+- [x] Añadir cobertura E2E de catálogo/detalle, estados públicos y regresiones responsive/teclado.
+- [x] Implementar títulos, metadata y proyección de contenido público.
+- [x] Ejecutar y verificar el conjunto local de lint, typecheck, unit (41), integration (15), E2E (42) y build; los archivos propios pasan Prettier. El comando global de formatter incluye `.tmp-phase2b/` ajena a este cambio y sigue avisando por sus archivos sin seguimiento.
+- [ ] Verificar CI remoto, despliegue/migraciones de cloud y realizar la revisión final del gate de Fase 2B.
+- [x] Sincronizar documentación de implementación; la revisión final del gate sigue pendiente.
+
+#### Navegación privada
+
+- [x] Rediseñar el sidebar con secciones con iconos y subsecciones para Cursos y Formatos, sin buscador.
+- [x] Incorporar colapso a rail y expansión temporal superpuesta mediante hover/foco, con soporte de teclado/táctil y respeto de `prefers-reduced-motion`.
+- [x] Separar scroll del sidebar y contenido y mantener navegación móvil/foco mediante menú; la preferencia de colapso se persiste en `localStorage`.
 
 #### Resultado demostrable 2B
 

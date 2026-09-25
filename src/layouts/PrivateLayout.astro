@@ -1,14 +1,10 @@
 ---
 import "@fontsource/ubuntu-mono/400.css";
+import "@/styles/private-nav.css";
 
-import {
-  BookOpen,
-  CalendarCheck,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-} from "lucide-react";
+import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 
+import PrivateNavigation from "@/components/private-nav/PrivateNavigation.astro";
 import { hasRole } from "@/domain/auth/policies";
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import { requireInternalUser } from "@/server/auth/context";
@@ -19,113 +15,260 @@ interface Props {
 
 const { title } = Astro.props;
 const user = requireInternalUser(Astro.locals);
-const navItems = [
-  { href: "/app", label: "Resumen", icon: LayoutDashboard, visible: true },
-  {
-    href: "/app/cursos",
-    label: "Cursos",
-    icon: BookOpen,
-    visible: hasRole(user, "ADMIN"),
-  },
-  {
-    href: "/app/asistencia",
-    label: "Asistencia",
-    icon: CalendarCheck,
-    visible: hasRole(user, "INSTRUCTOR"),
-  },
-].filter((item) => item.visible);
+const isAdmin = hasRole(user, "ADMIN");
+const isInstructor = hasRole(user, "INSTRUCTOR");
 const currentPath = Astro.url.pathname;
 ---
 
 <BaseLayout title={`${title} | SkillBase`}>
-  <div class="min-h-svh bg-muted/35 lg:grid lg:grid-cols-[17rem_1fr]">
-    <aside class="hidden border-r bg-sidebar lg:flex lg:flex-col">
-      <a class="border-b px-6 py-6 text-lg font-semibold" href="/app">
-        SkillBase
-      </a>
-      <nav class="flex-1 p-4" aria-label="Navegación privada">
-        <ul class="space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => (
-            <li>
-              <a
-                href={href}
-                aria-current={currentPath === href ? "page" : undefined}
-                class:list={[
-                  "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
-                  currentPath === href
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
-                ]}
+  <div class="private-shell" data-private-shell>
+    <aside class="private-sidebar" aria-label="Barra lateral">
+      <div class="private-sidebar-panel">
+        <a
+          class="private-brand"
+          href="/app"
+          aria-label="SkillBase, ir al resumen"
+        >
+          <span class="private-brand-mark" aria-hidden="true">
+            S
+          </span>
+          <span class="private-label private-brand-name">SkillBase</span>
+        </a>
+        <PrivateNavigation
+          mode="desktop"
+          {currentPath}
+          {isAdmin}
+          {isInstructor}
+        />
+        <div class="private-sidebar-footer">
+          <div class="private-account">
+            <span class="private-avatar" aria-hidden="true">
+              {user.name.charAt(0).toUpperCase()}
+            </span>
+            <div class="private-label private-account-text">
+              <p class="truncate text-sm font-semibold">{user.name}</p>
+              <p class="truncate text-xs text-muted-foreground">{user.email}</p>
+            </div>
+          </div>
+          <div class="private-sidebar-actions">
+            <button
+              class="private-action private-collapse"
+              type="button"
+              data-sidebar-toggle
+              aria-label="Contraer barra lateral"
+              aria-expanded="true"
+              title="Contraer barra lateral"
+            >
+              <PanelLeftClose
+                className="private-expanded-icon"
+                size={19}
+                aria-hidden="true"
+              />
+              <PanelLeftOpen
+                className="private-collapsed-icon"
+                size={19}
+                aria-hidden="true"
+              />
+            </button>
+            <form method="post" action="/auth/logout">
+              <button
+                class="private-action"
+                type="submit"
+                title="Cerrar sesión"
+                aria-label="Cerrar sesión"
               >
-                <Icon size={19} aria-hidden="true" />
-                {label}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      <div class="border-t p-4">
-        <p class="truncate px-2 text-sm font-medium">{user.name}</p>
-        <p class="truncate px-2 pb-3 text-xs text-muted-foreground">
-          {user.email}
-        </p>
-        <form method="post" action="/auth/logout">
-          <button
-            class="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-secondary"
-            type="submit"
-          >
-            <LogOut size={18} aria-hidden="true" /> Cerrar sesión
-          </button>
-        </form>
+                <LogOut size={19} aria-hidden="true" />
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
     </aside>
 
-    <div class="min-w-0">
-      <header class="border-b bg-background lg:hidden">
-        <div class="flex min-h-16 items-center justify-between px-5">
-          <a class="font-semibold" href="/app">
-            SkillBase
-          </a>
-          <details class="relative">
-            <summary
-              class="flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center rounded-lg border"
-              aria-label="Abrir menú"
-            >
-              <Menu size={20} aria-hidden="true" />
-            </summary>
-            <div class="absolute right-0 z-20 mt-2 w-64 rounded-xl border bg-card p-3 shadow-lg">
-              <p class="truncate px-2 pt-1 text-sm font-semibold">
-                {user.name}
-              </p>
-              <nav class="my-3 border-y py-2" aria-label="Navegación móvil">
-                <ul>
-                  {navItems.map(({ href, label }) => (
-                    <li>
-                      <a
-                        class="block min-h-11 rounded-md px-2 py-3 text-sm hover:bg-secondary"
-                        href={href}
-                      >
-                        {label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-              <form method="post" action="/auth/logout">
-                <button
-                  class="min-h-11 w-full rounded-md px-2 text-left text-sm font-medium hover:bg-secondary"
-                  type="submit"
-                >
-                  Cerrar sesión
-                </button>
-              </form>
-            </div>
-          </details>
-        </div>
+    <div class="private-content">
+      <header class="private-mobile-header">
+        <button
+          class="private-mobile-trigger"
+          type="button"
+          data-menu-open
+          aria-label="Abrir menú"
+          aria-controls="private-mobile-panel"
+          aria-expanded="false"
+        >
+          <Menu size={21} aria-hidden="true" />
+        </button>
+        <a class="font-semibold" href="/app">
+          SkillBase
+        </a>
       </header>
-      <main class="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
-        <slot />
-      </main>
+      <div class="private-mobile-drawer" data-mobile-drawer hidden>
+        <div class="private-mobile-backdrop" data-menu-close></div>
+        <aside
+          class="private-mobile-panel"
+          id="private-mobile-panel"
+          aria-label="Menú privado"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="private-mobile-title"
+        >
+          <div class="private-mobile-top">
+            <h2 id="private-mobile-title" class="text-lg font-semibold">
+              SkillBase
+            </h2>
+            <button
+              class="private-mobile-trigger"
+              type="button"
+              data-menu-close
+              aria-label="Cerrar menú"
+            >
+              <X size={21} aria-hidden="true" />
+            </button>
+          </div>
+          <PrivateNavigation
+            mode="mobile"
+            {currentPath}
+            {isAdmin}
+            {isInstructor}
+          />
+          <div class="private-mobile-footer">
+            <p class="truncate text-sm font-semibold">{user.name}</p>
+            <p class="truncate text-xs text-muted-foreground">{user.email}</p>
+            <form method="post" action="/auth/logout">
+              <button
+                class="private-action"
+                type="submit"
+                aria-label="Cerrar sesión"
+                title="Cerrar sesión"
+              >
+                <LogOut size={19} aria-hidden="true" />
+              </button>
+            </form>
+          </div>
+        </aside>
+      </div>
+      <div class="private-main-scroll">
+        <main
+          id="main-content"
+          class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10"
+        >
+          <slot />
+        </main>
+      </div>
     </div>
   </div>
+  <script>
+    const shell = document.querySelector<HTMLElement>("[data-private-shell]");
+    if (shell) {
+      const toggle = shell.querySelector<HTMLButtonElement>(
+        "[data-sidebar-toggle]",
+      );
+      const sidebar = shell.querySelector<HTMLElement>(".private-sidebar");
+      const openButton =
+        shell.querySelector<HTMLButtonElement>("[data-menu-open]");
+      const drawer = shell.querySelector<HTMLElement>("[data-mobile-drawer]");
+      const closeButton = drawer?.querySelector<HTMLButtonElement>(
+        ".private-mobile-panel [data-menu-close]",
+      );
+      let keyboardFocus = false;
+      let returnFocus: HTMLElement | null = null;
+
+      const closePreview = () => {
+        delete shell.dataset.preview;
+      };
+      const setCollapsed = (collapsed: boolean) => {
+        shell.dataset.collapsed = String(collapsed);
+        closePreview();
+        toggle?.setAttribute("aria-expanded", String(!collapsed));
+        toggle?.setAttribute(
+          "aria-label",
+          collapsed ? "Expandir barra lateral" : "Contraer barra lateral",
+        );
+        toggle?.setAttribute(
+          "title",
+          collapsed ? "Expandir barra lateral" : "Contraer barra lateral",
+        );
+        try {
+          localStorage.setItem("private-sidebar-collapsed", String(collapsed));
+        } catch {
+          /* Storage may be unavailable. */
+        }
+      };
+      try {
+        if (localStorage.getItem("private-sidebar-collapsed") === "true")
+          setCollapsed(true);
+      } catch {
+        /* Keep the default expanded state. */
+      }
+      toggle?.addEventListener("click", () =>
+        setCollapsed(shell.dataset.collapsed !== "true"),
+      );
+      sidebar?.addEventListener("pointerenter", (event) => {
+        if (event.pointerType === "mouse" && shell.dataset.collapsed === "true")
+          shell.dataset.preview = "true";
+      });
+      sidebar?.addEventListener("pointerleave", () => {
+        if (!keyboardFocus) closePreview();
+      });
+      sidebar?.addEventListener("focusin", () => {
+        if (keyboardFocus && shell.dataset.collapsed === "true")
+          shell.dataset.preview = "true";
+      });
+      sidebar?.addEventListener("focusout", (event) => {
+        if (!sidebar.contains(event.relatedTarget as Node | null)) {
+          keyboardFocus = false;
+          closePreview();
+        }
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Tab") keyboardFocus = true;
+        if (event.key === "Escape") {
+          if (drawer && !drawer.hidden) closeDrawer();
+          else if (shell.dataset.preview === "true") {
+            closePreview();
+            keyboardFocus = false;
+            toggle?.focus();
+          }
+        }
+      });
+      sidebar?.addEventListener("pointerdown", () => {
+        keyboardFocus = false;
+      });
+
+      const closeDrawer = () => {
+        if (!drawer || drawer.hidden) return;
+        drawer.hidden = true;
+        openButton?.setAttribute("aria-expanded", "false");
+        document.body.classList.remove("private-drawer-open");
+        returnFocus?.focus();
+      };
+      openButton?.addEventListener("click", () => {
+        if (!drawer) return;
+        returnFocus = openButton;
+        drawer.hidden = false;
+        openButton.setAttribute("aria-expanded", "true");
+        document.body.classList.add("private-drawer-open");
+        closeButton?.focus();
+      });
+      drawer
+        ?.querySelectorAll<HTMLElement>("[data-menu-close]")
+        .forEach((button) => button.addEventListener("click", closeDrawer));
+      drawer?.addEventListener("keydown", (event) => {
+        if (event.key !== "Tab") return;
+        const focusable = Array.from(
+          drawer.querySelectorAll<HTMLElement>(
+            "a, button:not([disabled]), summary",
+          ),
+        );
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      });
+    }
+  </script>
 </BaseLayout>

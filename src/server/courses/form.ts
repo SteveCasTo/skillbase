@@ -5,7 +5,10 @@ export function courseInputFromFormData(formData: FormData): CourseInput {
     "name",
     "description",
     "level",
-    "totalHours",
+    "courseTypeId",
+    "contentMarkdown",
+    "instructorName",
+    "artwork",
     "schedule",
     "conditions",
     "startsAt",
@@ -13,8 +16,6 @@ export function courseInputFromFormData(formData: FormData): CourseInput {
     "registrationStartAt",
     "registrationEndAt",
     "minimumGrade",
-    "studentAmount",
-    "externalAmount",
     "revision",
   ] as const;
   return Object.fromEntries(

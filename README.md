@@ -124,25 +124,45 @@ Los detalles y responsabilidades de cada tecnología se documentan en `docs/ARCH
 
 ## INICIO RÁPIDO
 
-Requisitos: Bun `1.4.2` y Docker con el daemon activo.
+Requisitos: Git, Bun `1.4.2`, Node.js `24.x` y Docker con el daemon activo. En un equipo nuevo, clonar la rama `development`, instalar las dependencias y preparar `.env` antes del setup:
 
 ```sh
+git clone -b development <URL_DEL_REPOSITORIO>
+cd SkillBase
 bun install --frozen-lockfile
+bun -e "await Bun.write('.env', Bun.file('.env.example'))"
+```
+
+En `.env`, sustituir los valores `replace-with-*` de Google OAuth por credenciales propias y establecer `DEV_INITIAL_ADMIN_EMAIL` con el correo de Google que accederá a `/app`. Registrar `http://127.0.0.1:54321/auth/v1/callback` como URI de redirección autorizado en Google. La clave pública local de Supabase se conoce **después** de iniciar los servicios:
+
+```sh
 bun run setup
+bun run supabase:status
+```
+
+Copiar la clave **Publishable** de `supabase:status` a `PUBLIC_SUPABASE_PUBLISHABLE_KEY` en `.env` (nunca la clave Secret). Luego:
+
+```sh
 bun run dev
 ```
 
-La aplicación queda disponible en `http://127.0.0.1:4321`. `setup` sincroniza Astro, instala Chromium, inicia los servicios locales mínimos de Supabase y reinicia la base.
+La aplicación queda disponible en `http://127.0.0.1:4321`. `setup` sincroniza Astro, instala Chromium, inicia Supabase local, **reinicia la base local** y aplica migraciones y formatos iniciales (20 h y 30 h). No ejecutarlo para conservar datos de una instalación anterior. Para llenar la landing y el catálogo con cursos ficticios sin borrar los existentes:
+
+```sh
+bun run db:seed:demo
+```
+
+El comando funciona únicamente contra Supabase local, crea una vez sus cursos de ejemplo y se puede repetir. El acceso al dashboard requiere iniciar sesión con la cuenta Google del correo preaprovisionado. Más detalles en `docs/DEVELOPMENT.md` y `docs/AUTHENTICATION.md`.
 
 Para trabajo diario, después del setup inicial:
 
 ```sh
 bun run supabase:start
-bun run db:reset
+bun run db:migrate
 bun run dev
 ```
 
-Usar `.env.example` como referencia. No se requieren entidades ni seeds de negocio durante Foundation.
+Usar `.env.example` como referencia; `.env` contiene credenciales locales y no se versiona.
 
 ## ENTORNOS
 
@@ -157,8 +177,7 @@ Usar `.env.example` como referencia. No se requieren entidades ni seeds de negoc
 
 ### Testing
 
-- Entorno aislado.
-- Base reiniciable.
+- Cada ejecución de integración/E2E crea un Supabase temporal aislado y no accede a la base local de desarrollo.
 - Fixtures o seeds de prueba controlados.
 - Tests unitarios.
 - Tests de integración.
@@ -166,6 +185,8 @@ Usar `.env.example` como referencia. No se requieren entidades ni seeds de negoc
 - Lint.
 - Typecheck.
 - Build de producción.
+
+Comandos, lifecycle de los stacks temporales y limpieza opcional de fixtures heredados: `docs/TESTING.md`.
 
 ### Producción
 

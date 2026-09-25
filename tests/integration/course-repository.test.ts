@@ -1,361 +1,349 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { eq, sql } from "drizzle-orm";
-
-import { validateCourseData } from "@/domain/courses/validation";
 import { createDatabase } from "@/server/db/client";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
-import { auditEvents, coursePrices, courses, users } from "@/server/db/schema";
+import { DrizzleFormatRepository } from "@/server/db/repositories/format-repository";
+import {
+  auditEvents,
+  courseTypeRevisions,
+  courses,
+  users,
+} from "@/server/db/schema";
+import { validateCourseData } from "@/domain/courses/validation";
 import { COURSE_FIXTURES } from "../fixtures/courses";
+import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
-const database = createDatabase(
-  process.env.DATABASE_URL ??
-    "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
-);
+const connection = getTestSupabaseEnvironment().databaseUrl;
+const database = createDatabase(connection);
 const repository = new DrizzleCourseRepository(database.db);
-let actorId = "";
-const input = validateCourseData(COURSE_FIXTURES.publishedOpenRegistration);
-
-async function rejectedValue(promise: Promise<unknown>): Promise<unknown> {
+const formats = new DrizzleFormatRepository(database.db);
+let actorId: string;
+let formatId: string;
+const input = () =>
+  validateCourseData({
+    ...COURSE_FIXTURES.publishedOpenRegistration,
+    courseTypeId: formatId,
+  });
+const failure = async (promise: Promise<unknown>) => {
   try {
     await promise;
     return null;
   } catch (error) {
     return error;
   }
-}
+};
 
-async function clearCourseFixtures() {
+async function clear() {
   await database.db
     .delete(auditEvents)
-    .where(eq(auditEvents.entityType, "COURSE"));
-  await database.db.delete(coursePrices);
-  await database.db.delete(courses);
+    .where(sql`${auditEvents.entityType} in ('COURSE', 'COURSE_TYPE')`);
+  await database.db.execute(
+    sql`truncate courses, course_type_revisions, course_types`,
+  );
   await database.db
     .delete(users)
     .where(eq(users.email, "course.actor@repository.test"));
 }
-
 afterAll(async () => {
-  await clearCourseFixtures();
+  await clear();
   await database.close();
 });
 beforeEach(async () => {
-  await clearCourseFixtures();
+  await clear();
   const [actor] = await database.db
     .insert(users)
     .values({ email: "course.actor@repository.test", name: "Course Actor" })
     .returning();
-  if (!actor) throw new Error("Actor fixture missing");
+  if (!actor) throw new Error("Missing actor");
   actorId = actor.id;
+  formatId = (
+    await formats.create(
+      "30 horas",
+      { totalHours: 30, studentAmount: "120.00", externalAmount: "150.00" },
+      actorId,
+    )
+  ).id;
 });
 
-describe("course repository", () => {
-  test("creates prices and audit atomically, generates unique immutable slugs", async () => {
-    const first = await repository.create(input, actorId);
-    const second = await repository.create(input, actorId);
-    expect(first.slug).toBe("course-repository-test");
-    expect(second.slug).toBe("course-repository-test-2");
-    expect(first.prices).toHaveLength(2);
-    const updated = await repository.update(
-      first.id,
+describe("course format persistence", () => {
+  test("revisions are immutable; drafts follow latest while published and archived stay pinned", async () => {
+    const draft = await repository.create(input(), actorId);
+    const published = await repository.create(
+      { ...input(), name: "Published" },
+      actorId,
+    );
+    await repository.transition(published.id, "PUBLISHED", actorId);
+    const archived = await repository.create(
+      { ...input(), name: "Archived" },
+      actorId,
+    );
+    await repository.transition(archived.id, "ARCHIVED", actorId);
+    const revision = await formats.revise(
+      formatId,
+      { totalHours: 35, studentAmount: "130.00", externalAmount: "155.00" },
+      actorId,
+    );
+    expect(revision.revisionNumber).toBe(2);
+    expect((await repository.getAdmin(draft.id))?.totalHours).toBe(35);
+    expect((await repository.getAdmin(published.id))?.totalHours).toBe(30);
+    expect((await repository.getAdmin(archived.id))?.prices[0]?.amount).toBe(
+      "120.00",
+    );
+    expect(
+      await failure(
+        database.db
+          .update(courseTypeRevisions)
+          .set({ totalHours: 100 })
+          .where(eq(courseTypeRevisions.id, revision.revisionId)),
+      ),
+    ).toBeInstanceOf(Error);
+    expect(
+      await failure(
+        database.db
+          .delete(courseTypeRevisions)
+          .where(eq(courseTypeRevisions.id, revision.revisionId)),
+      ),
+    ).toBeInstanceOf(Error);
+    expect(
+      await failure(
+        repository.update(draft.id, input(), actorId, draft.updatedAt),
+      ),
+    ).toMatchObject({ code: "STALE_COURSE" });
+    const withdrawn = await repository.transition(
+      published.id,
+      "DRAFT",
+      actorId,
+    );
+    expect(withdrawn.totalHours).toBe(35);
+  });
+
+  test("rejects inactive formats for new and draft assignments without changing historical courses", async () => {
+    const course = await repository.create(input(), actorId);
+    await repository.transition(course.id, "PUBLISHED", actorId);
+    await formats.setActive(formatId, false, actorId);
+    expect(await failure(repository.create(input(), actorId))).toMatchObject({
+      code: "FORMAT_INACTIVE",
+    });
+    const draft = await repository.create(
       {
-        ...input,
-        name: "Renamed",
-        prices: input.prices.map((price) =>
-          price.participantType === "STUDENT"
-            ? { ...price, amount: "125.00" }
-            : price,
-        ),
+        ...input(),
+        courseTypeId: (
+          await formats.create(
+            "Otro",
+            {
+              totalHours: 20,
+              studentAmount: "80.00",
+              externalAmount: "100.00",
+            },
+            actorId,
+          )
+        ).id,
       },
+      actorId,
+    );
+    const otherType = draft.courseTypeId;
+    await formats.setActive(otherType, false, actorId);
+    expect(
+      await failure(repository.transition(draft.id, "PUBLISHED", actorId)),
+    ).toMatchObject({ code: "FORMAT_INACTIVE" });
+    expect((await repository.getPublic(course.slug))?.totalHours).toBe(30);
+    expect((await formats.list())[0]?.active).toBe(false);
+  });
+
+  test("serializes featured selection and enforces published-only singleton", async () => {
+    const first = await repository.create(input(), actorId);
+    const second = await repository.create(
+      { ...input(), name: "Second" },
+      actorId,
+    );
+    expect(
+      await failure(repository.setFeatured(first.id, actorId)),
+    ).toMatchObject({ code: "INVALID_TRANSITION" });
+    await repository.transition(first.id, "PUBLISHED", actorId);
+    await repository.transition(second.id, "PUBLISHED", actorId);
+    await Promise.all([
+      repository.setFeatured(first.id, actorId),
+      repository.setFeatured(second.id, actorId),
+    ]);
+    expect(
+      (await repository.listPublic()).filter((course) => course.featured),
+    ).toHaveLength(1);
+    expect((await repository.listPublic())[0]?.featured).toBe(true);
+    const selected = (await repository.listAdmin()).find(
+      (course) => course.featured,
+    );
+    if (!selected) throw new Error("Missing featured course");
+    await repository.transition(selected.id, "DRAFT", actorId);
+    expect(
+      (await repository.listPublic()).filter((course) => course.featured),
+    ).toHaveLength(0);
+  });
+
+  test("public projection stays allowlisted and slug/UTC/audit invariants survive", async () => {
+    const first = await repository.create(
+      { ...input(), contentMarkdown: "**Texto**", instructorName: "Ana" },
+      actorId,
+    );
+    const second = await repository.create(input(), actorId);
+    expect(second.slug).toBe(`${first.slug}-2`);
+    expect(first.startsAt.toISOString()).toBe("2027-03-01T22:00:00.000Z");
+    const changed = await repository.update(
+      first.id,
+      { ...input(), description: "Edited" },
       actorId,
       first.updatedAt,
     );
-    expect(updated.slug).toBe(first.slug);
+    expect(changed.slug).toBe(first.slug);
+    expect(
+      await failure(
+        repository.update(first.id, input(), actorId, first.updatedAt),
+      ),
+    ).toMatchObject({ code: "STALE_COURSE" });
+    expect(await repository.getPublic(first.slug)).toBeNull();
+    await repository.transition(first.id, "PUBLISHED", actorId);
+    const dto = await repository.getPublic(first.slug);
+    expect(dto).toMatchObject({
+      prices: [{ amount: "120.00" }, { amount: "150.00" }],
+      totalHours: 30,
+    });
+    for (const field of [
+      "id",
+      "status",
+      "minimumGrade",
+      "updatedAt",
+      "courseTypeRevisionId",
+    ])
+      expect(dto).not.toHaveProperty(field);
     expect(
       (
         await database.db
           .select()
           .from(auditEvents)
           .where(eq(auditEvents.entityId, first.id))
-      ).map(({ action }) => action),
-    ).toEqual(["COURSE_CREATED", "COURSE_UPDATED", "COURSE_PRICES_UPDATED"]);
+      ).map((row) => row.action),
+    ).toEqual(["COURSE_CREATED", "COURSE_UPDATED", "COURSE_PUBLISHED"]);
   });
 
-  test("publishes, withdraws, archives and filters public DTOs", async () => {
-    const draft = await repository.create(input, actorId);
-    expect(await repository.listPublic()).toEqual([]);
-    const published = await repository.transition(
-      draft.id,
-      "PUBLISHED",
-      actorId,
-    );
-    await repository.update(
-      draft.id,
-      { ...input, description: "Published content can be edited safely." },
-      actorId,
-      published.updatedAt,
-    );
-    const publicCourse = await repository.getPublic(
-      draft.slug,
-      new Date("2027-01-15T00:00:00Z"),
-    );
-    expect(publicCourse).toMatchObject({
-      slug: draft.slug,
-      description: "Published content can be edited safely.",
-      registrationAvailability: "OPEN",
-    });
-    expect(publicCourse).not.toHaveProperty("id");
-    expect(publicCourse).not.toHaveProperty("status");
-    expect(publicCourse).not.toHaveProperty("minimumGrade");
-    expect(publicCourse).not.toHaveProperty("createdAt");
-    await repository.transition(draft.id, "DRAFT", actorId);
-    expect(await repository.getPublic(draft.slug)).toBeNull();
-    await repository.transition(draft.id, "ARCHIVED", actorId);
-    expect(await repository.listPublic()).toEqual([]);
+  test("DB checks, RLS and grants protect format and featured tables", async () => {
+    const course = await repository.create(input(), actorId);
     expect(
-      await rejectedValue(
-        repository.update(draft.id, input, actorId, draft.updatedAt),
-      ),
-    ).toMatchObject({ code: "COURSE_ARCHIVED" });
-  });
-
-  test("rolls back course and prices when audit actor is invalid", async () => {
-    expect(
-      await rejectedValue(
-        repository.create(input, "00000000-0000-4000-8000-000000000099"),
+      await failure(
+        database.db
+          .update(courseTypeRevisions)
+          .set({ studentAmount: "-1.00" })
+          .where(eq(courseTypeRevisions.courseTypeId, formatId)),
       ),
     ).toBeInstanceOf(Error);
-    expect(await database.db.select().from(courses)).toHaveLength(0);
-    expect(await database.db.select().from(coursePrices)).toHaveLength(0);
-  });
-
-  test("enforces checks, indexed foreign keys, RLS and least privilege", async () => {
     expect(
-      await rejectedValue(
+      await failure(
         database.db
-          .insert(courses)
-          .values({
-            name: input.name,
-            slug: "invalid slug",
-            description: input.description,
-            level: input.level,
-            totalHours: input.totalHours,
-            schedule: input.schedule,
-            conditions: input.conditions,
-            startsAt: input.startsAt,
-            endsAt: input.endsAt,
-            registrationStartAt: input.registrationStartAt,
-            registrationEndAt: input.registrationEndAt,
-            minimumGrade: input.minimumGrade,
-          })
-          .execute(),
+          .update(courses)
+          .set({ featured: true })
+          .where(eq(courses.id, course.id)),
       ),
     ).toBeInstanceOf(Error);
-    const valid = await repository.create(input, actorId);
-    const invalidWrites: ReadonlyArray<() => Promise<unknown>> = [
-      () =>
-        database.db
-          .update(courses)
-          .set({ totalHours: 0 })
-          .where(eq(courses.id, valid.id))
-          .execute(),
-      () =>
-        database.db
-          .update(courses)
-          .set({ minimumGrade: 101 })
-          .where(eq(courses.id, valid.id))
-          .execute(),
-      () =>
-        database.db
-          .update(courses)
-          .set({ endsAt: input.startsAt })
-          .where(eq(courses.id, valid.id))
-          .execute(),
-      () =>
-        database.db
-          .update(courses)
-          .set({ registrationEndAt: null })
-          .where(eq(courses.id, valid.id))
-          .execute(),
-      () =>
-        database.db
-          .insert(coursePrices)
-          .values({
-            courseId: valid.id,
-            participantType: "STUDENT",
-            amount: "1.00",
-            currency: "BOB",
-          })
-          .execute(),
-      () =>
-        database.db
-          .insert(coursePrices)
-          .values({
-            courseId: "00000000-0000-4000-8000-000000000099",
-            participantType: "STUDENT",
-            amount: "1.00",
-            currency: "BOB",
-          })
-          .execute(),
-      () =>
-        database.db
-          .update(coursePrices)
-          .set({ amount: "-0.01" })
-          .where(eq(coursePrices.courseId, valid.id))
-          .execute(),
-      () =>
-        database.db
-          .update(coursePrices)
-          .set({ currency: "USD" })
-          .where(eq(coursePrices.courseId, valid.id))
-          .execute(),
-    ];
-    for (const write of invalidWrites)
-      expect(await rejectedValue(write())).toBeInstanceOf(Error);
-    const indexes = await database.db.execute<{ indexname: string }>(
-      sql`select indexname from pg_indexes where schemaname = 'public' and indexname in ('course_prices_course_id_idx', 'audit_events_actor_id_idx', 'courses_status_idx', 'courses_slug_unique')`,
-    );
-    expect(indexes).toHaveLength(4);
-    const rls = await database.db.execute<{
+    const rows = await database.db.execute<{
       relname: string;
       relrowsecurity: boolean;
     }>(
-      sql`select relname, relrowsecurity from pg_class where relkind = 'r' and relnamespace = 'public'::regnamespace and relname in ('courses', 'course_prices', 'audit_events') order by relname`,
+      sql`select relname, relrowsecurity from pg_class where relname in ('course_types','course_type_revisions') and relnamespace = 'public'::regnamespace`,
     );
-    expect(rls).toHaveLength(3);
-    expect(rls.every(({ relrowsecurity }) => relrowsecurity)).toBe(true);
-    for (const table of ["courses", "course_prices", "audit_events"])
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.relrowsecurity)).toBe(true);
+    for (const name of ["course_types", "course_type_revisions"])
       for (const role of ["anon", "authenticated", "service_role"])
         expect(
           (
             await database.db.execute<{ allowed: boolean }>(
-              sql`select has_table_privilege(${role}, ${`public.${table}`}, 'select,insert,update,delete') as allowed`,
+              sql`select has_table_privilege(${role}, ${`public.${name}`}, 'select,insert,update,delete') allowed`,
             )
           )[0]?.allowed,
         ).toBe(false);
   });
 
-  test("persists Bolivia civil datetimes as UTC and returns them without displacement", async () => {
-    const created = await repository.create(input, actorId);
-    expect(created.startsAt.toISOString()).toBe("2027-03-01T22:00:00.000Z");
-    expect(created.registrationStartAt?.toISOString()).toBe(
-      "2027-01-01T16:00:00.000Z",
-    );
-    const reloaded = await repository.getAdmin(created.id);
-    expect(reloaded?.startsAt.toISOString()).toBe("2027-03-01T22:00:00.000Z");
-  });
-
-  test("serializes overlapping slug bases under concurrent creation", async () => {
-    const firstDatabase = createDatabase(
-      process.env.DATABASE_URL ??
-        "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
-    );
-    const secondDatabase = createDatabase(
-      process.env.DATABASE_URL ??
-        "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
-    );
-    try {
-      const [first, second] = await Promise.all([
-        new DrizzleCourseRepository(firstDatabase.db).create(
-          { ...input, name: "Foo" },
-          actorId,
-        ),
-        new DrizzleCourseRepository(secondDatabase.db).create(
-          { ...input, name: "Foo 2" },
-          actorId,
-        ),
-      ]);
-      expect([first.slug, second.slug].sort()).toEqual(["foo", "foo-2"]);
-    } finally {
-      await firstDatabase.close();
-      await secondDatabase.close();
-    }
-  });
-
-  test("rejects publication unless exactly both required BOB prices exist", async () => {
-    const draft = await repository.create(input, actorId);
-    await database.db
-      .delete(coursePrices)
-      .where(
-        sql`${coursePrices.courseId} = ${draft.id} and ${coursePrices.participantType} = 'EXTERNAL'`,
-      );
+  test("format creation rolls back on invalid audit actor", async () => {
+    const before = await formats.list();
     expect(
-      await rejectedValue(
-        repository.transition(draft.id, "PUBLISHED", actorId),
-      ),
-    ).toMatchObject({ code: "COURSE_PRICES_INCOMPLETE" });
-    expect((await repository.getAdmin(draft.id))?.status).toBe("DRAFT");
-    expect(
-      await database.db
-        .select()
-        .from(auditEvents)
-        .where(eq(auditEvents.entityId, draft.id)),
-    ).toHaveLength(1);
-  });
-
-  test("uses optimistic revisions and never overwrites a stale edit", async () => {
-    const original = await repository.create(input, actorId);
-    const first = await repository.update(
-      original.id,
-      { ...input, description: "First accepted edit" },
-      actorId,
-      original.updatedAt,
-    );
-    expect(
-      await rejectedValue(
-        repository.update(
-          original.id,
-          { ...input, description: "Stale overwrite" },
-          actorId,
-          original.updatedAt,
+      await failure(
+        formats.create(
+          "No audit actor",
+          { totalHours: 10, studentAmount: "1.00", externalAmount: "2.00" },
+          "00000000-0000-4000-8000-000000000099",
         ),
       ),
-    ).toMatchObject({ code: "STALE_COURSE" });
-    expect((await repository.getAdmin(original.id))?.description).toBe(
-      "First accepted edit",
-    );
-    expect(first.updatedAt.getTime()).toBeGreaterThan(
-      original.updatedAt.getTime(),
-    );
+    ).toBeInstanceOf(Error);
+    expect(await formats.list()).toEqual(before);
   });
 
-  test("audits only real field and exact price changes", async () => {
-    const original = await repository.create(input, actorId);
-    const unchanged = await repository.update(
-      original.id,
-      input,
+  test("deleting an unused format removes its revisions and records an audit", async () => {
+    await formats.revise(
+      formatId,
+      { totalHours: 35, studentAmount: "130.00", externalAmount: "155.00" },
       actorId,
-      original.updatedAt,
     );
-    expect(unchanged.updatedAt).toEqual(original.updatedAt);
-    expect(
-      await database.db
-        .select()
-        .from(auditEvents)
-        .where(eq(auditEvents.entityId, original.id)),
-    ).toHaveLength(1);
-
-    await repository.update(
-      original.id,
-      {
-        ...input,
-        prices: input.prices.map((price) =>
-          price.participantType === "STUDENT"
-            ? { ...price, amount: "121.00" }
-            : price,
-        ),
-      },
-      actorId,
-      original.updatedAt,
-    );
-    const events = await database.db
+    const revisions = await database.db
       .select()
-      .from(auditEvents)
-      .where(eq(auditEvents.entityId, original.id));
-    expect(events.map(({ action }) => action)).toEqual([
-      "COURSE_CREATED",
-      "COURSE_PRICES_UPDATED",
-    ]);
-    expect(events[1]?.metadata).toEqual({ participantTypes: "STUDENT" });
+      .from(courseTypeRevisions)
+      .where(eq(courseTypeRevisions.courseTypeId, formatId));
+    const format = await formats.get(formatId);
+    if (!format) throw new Error("Missing format");
+
+    await formats.delete(
+      formatId,
+      format.revisionId,
+      format.updatedAt,
+      actorId,
+    );
+
+    expect(await formats.get(formatId)).toBeNull();
+    expect(
+      await database.db
+        .select()
+        .from(courseTypeRevisions)
+        .where(eq(courseTypeRevisions.courseTypeId, formatId)),
+    ).toHaveLength(0);
+    expect(revisions).toHaveLength(2);
+    expect(
+      await database.db
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.entityId, formatId)),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "COURSE_TYPE_DELETED",
+          actorId,
+          entityType: "COURSE_TYPE",
+        }),
+      ]),
+    );
+  });
+
+  test("assigned formats cannot be deleted but can be deactivated", async () => {
+    await repository.create(input(), actorId);
+    const format = await formats.get(formatId);
+    if (!format) throw new Error("Missing format");
+
+    expect(
+      await failure(
+        formats.delete(formatId, format.revisionId, format.updatedAt, actorId),
+      ),
+    ).toMatchObject({ code: "INVALID_TRANSITION" });
+    expect(await formats.get(formatId)).toMatchObject({
+      id: formatId,
+      used: true,
+    });
+
+    const deactivated = await formats.setActive(formatId, false, actorId);
+    expect(deactivated).toMatchObject({
+      id: formatId,
+      active: false,
+      used: true,
+    });
+    expect(await formats.get(formatId)).toMatchObject({
+      id: formatId,
+      active: false,
+      used: true,
+    });
   });
 });

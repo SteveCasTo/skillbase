@@ -2,6 +2,7 @@
 .agents
 .opencode
 .vercel
+.tmp-*
 dist
 drizzle/meta
 docs/DESIGN.md

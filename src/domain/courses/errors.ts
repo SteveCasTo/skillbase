@@ -5,7 +5,9 @@ export type CourseErrorCode =
   | "COURSE_ARCHIVED"
   | "COURSE_PRICES_INCOMPLETE"
   | "STALE_COURSE"
-  | "SLUG_CONFLICT";
+  | "SLUG_CONFLICT"
+  | "FORMAT_NOT_FOUND"
+  | "FORMAT_INACTIVE";
 
 export class CourseDomainError extends Error {
   constructor(

@@ -1,5 +1,8 @@
 ---
 import { createCourse } from "@/application/courses/manage-courses";
+import { listFormats } from "@/application/courses/manage-formats";
+import type { CourseFormat } from "@/domain/courses/formats";
+import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import CourseForm from "@/components/courses/CourseForm.astro";
 import { CourseDomainError } from "@/domain/courses/errors";
 import type { CourseInput } from "@/domain/courses/validation";
@@ -15,34 +18,65 @@ import {
 import { getDatabase } from "@/server/db/client";
 import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
+import { DrizzleFormatRepository } from "@/server/db/repositories/format-repository";
 import { getPublicAuthEnvironment } from "@/server/environment";
 
 const user = requireInternalUser(Astro.locals);
+const jsonRequested =
+  Astro.request.headers.get("accept") === "application/json";
+const json = (body: object, status: number) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "private, no-store",
+    },
+  });
+void json; // Astro's frontmatter checker omits references inside returned responses.
 let values: CourseInput = {
   minimumGrade: "70",
   level: "",
-  studentAmount: "",
-  externalAmount: "",
+  courseTypeId: "",
 };
 let errors: Readonly<Record<string, string>> = {};
 let pageError: string | null = null;
+let formats: readonly CourseFormat[] = [];
+try {
+  formats = await listFormats(new DrizzleFormatRepository(getDatabase()), user);
+} catch (error) {
+  Astro.response.status = COURSE_INFRASTRUCTURE_STATUS;
+  pageError = "No se pudieron cargar los formatos. Inténtalo nuevamente.";
+  if (error instanceof CourseInfrastructureError)
+    logCourseInfrastructureError(error, { actorId: user.id });
+}
 
-if (Astro.request.method === "POST") {
+if (Astro.request.method === "POST" && !pageError) {
   if (
     !requestHasExpectedOrigin(Astro.request, getPublicAuthEnvironment().siteUrl)
   ) {
     Astro.response.status = 403;
     pageError =
       "La solicitud no tiene un origen válido. Recarga la página e inténtalo de nuevo.";
+    if (jsonRequested) return json({ error: pageError }, 403);
   } else {
     values = courseInputFromFormData(await Astro.request.formData());
     try {
-      await createCourse(
+      // The image is only accepted by the dedicated bounded upload endpoint,
+      // after a real course exists. Never accept a client-supplied artwork key here.
+      values = { ...values, artwork: "" };
+      const created = await createCourse(
         new DrizzleCourseRepository(getDatabase()),
         user,
         values,
       );
-      return Astro.redirect("/app/cursos?success=created", 303);
+      if (jsonRequested)
+        return json(
+          { id: created.id, revision: created.updatedAt.toISOString() },
+          201,
+        );
+      const destination = `/app/cursos/${created.id}/editar?success=created`;
+      void destination; // Astro's frontmatter checker omits references inside a returned redirect.
+      return Astro.redirect(destination, 303);
     } catch (error) {
       if (error instanceof CourseDomainError) {
         Astro.response.status = courseDomainStatus(error);
@@ -56,6 +90,11 @@ if (Astro.request.method === "POST") {
         Astro.response.status = COURSE_INFRASTRUCTURE_STATUS;
         pageError = "No se pudo crear el curso. Inténtalo nuevamente.";
       }
+      if (jsonRequested)
+        return json(
+          { error: pageError, fieldErrors: errors },
+          Astro.response.status,
+        );
     }
   }
 }
@@ -63,18 +102,12 @@ if (Astro.request.method === "POST") {
 
 <PrivateLayout title="Nuevo curso">
   <header>
-    <a
-      href="/app/cursos"
-      class="text-sm font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground"
-    >
-      ← Volver a cursos
-    </a>
+    <CourseBreadcrumbs current="Nuevo curso" />
     <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
       Crear curso
     </h1>
-    <p class="mt-3 max-w-2xl leading-7 text-muted-foreground">
-      El curso se guardará como borrador. Su slug se genera una vez desde el
-      nombre y después permanece estable.
+    <p class="mt-3 text-muted-foreground">
+      Puedes elegir y recortar una foto ahora, o añadirla más adelante.
     </p>
   </header>
   {pageError && (
@@ -85,7 +118,28 @@ if (Astro.request.method === "POST") {
       {pageError}
     </p>
   )}
+  {!pageError && formats.length === 0 && (
+    <p
+      role="status"
+      class="mt-7 rounded-lg border bg-secondary px-4 py-3 text-sm text-secondary-foreground"
+    >
+      Antes de crear un curso,{" "}
+      <a
+        href="/app/formatos"
+        class="font-semibold underline underline-offset-4"
+      >
+        crea un formato
+      </a>{" "}
+      con duración y precios.
+    </p>
+  )}
   <div class="mt-8">
-    <CourseForm values={values} errors={errors} submitLabel="Crear borrador" />
+    <CourseForm
+      values={values}
+      errors={errors}
+      formats={formats}
+      disabled={Boolean(pageError) || formats.length === 0}
+      submitLabel="Crear borrador"
+    />
   </div>
 </PrivateLayout>

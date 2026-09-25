@@ -2,10 +2,9 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { sql } from "drizzle-orm";
 
 import { createDatabase } from "@/server/db/client";
+import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
-const connectionString =
-  process.env.DATABASE_URL ??
-  "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const connectionString = getTestSupabaseEnvironment().databaseUrl;
 const database = createDatabase(connectionString);
 
 afterAll(async () => database.close());

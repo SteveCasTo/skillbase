@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { createClient } from "@supabase/supabase-js";
 
-import { getLocalSupabaseEnvironment } from "../../scripts/supabase-local-env";
+import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
 describe("local Supabase Auth configuration", () => {
   test("rejects public password signup while allowing Admin API fixtures", async () => {
-    const environment = getLocalSupabaseEnvironment();
+    const environment = getTestSupabaseEnvironment();
     const publicClient = createClient(
       environment.apiUrl,
       environment.publishableKey,

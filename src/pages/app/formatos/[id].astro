@@ -1,0 +1,458 @@
+---
+import { Check, Pencil, X } from "lucide-react";
+import {
+  deleteFormat,
+  getFormat,
+  renameFormat,
+  reviseFormat,
+  setFormatActive,
+} from "@/application/courses/manage-formats";
+import type { CourseFormat } from "@/domain/courses/formats";
+import { CourseDomainError } from "@/domain/courses/errors";
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import { requireInternalUser } from "@/server/auth/context";
+import { requestHasExpectedOrigin } from "@/server/auth/redirects";
+import {
+  logCourseInfrastructureError,
+  courseDomainStatus,
+} from "@/server/courses/errors";
+import { getDatabase } from "@/server/db/client";
+import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
+import { DrizzleFormatRepository } from "@/server/db/repositories/format-repository";
+import { getPublicAuthEnvironment } from "@/server/environment";
+
+const user = requireInternalUser(Astro.locals);
+const id = Astro.params.id ?? "";
+const validId = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id);
+const repository = new DrizzleFormatRepository(getDatabase());
+let format: CourseFormat | null = null;
+let pageError: string | null = null;
+let errors: Readonly<Record<string, string>> = {};
+let editing = "";
+let attemptedValue = "";
+let loadError = false;
+if (!validId) Astro.response.status = 404;
+else {
+  try {
+    format = await getFormat(repository, user, id);
+    if (!format) Astro.response.status = 404;
+  } catch (error) {
+    Astro.response.status = 500;
+    loadError = true;
+    if (error instanceof CourseInfrastructureError)
+      logCourseInfrastructureError(error, { actorId: user.id });
+  }
+}
+const text = (data: FormData, key: string) =>
+  typeof data.get(key) === "string" ? String(data.get(key)) : "";
+if (format && Astro.request.method === "POST") {
+  if (
+    !requestHasExpectedOrigin(Astro.request, getPublicAuthEnvironment().siteUrl)
+  ) {
+    Astro.response.status = 403;
+    pageError =
+      "La solicitud no tiene un origen válido. Recarga la página e inténtalo de nuevo.";
+  } else {
+    const data = await Astro.request.formData();
+    const intent = text(data, "intent");
+    editing = text(data, "field");
+    attemptedValue = text(data, "value");
+    const revisionId = text(data, "revisionId");
+    const updatedAt = text(data, "updatedAt");
+    try {
+      if (intent === "rename" && editing === "name") {
+        await renameFormat(
+          repository,
+          user,
+          id,
+          attemptedValue,
+          revisionId,
+          updatedAt,
+        );
+      } else if (
+        intent === "revise" &&
+        ["totalHours", "studentAmount", "externalAmount"].includes(editing)
+      ) {
+        await reviseFormat(
+          repository,
+          user,
+          id,
+          {
+            totalHours:
+              editing === "totalHours"
+                ? attemptedValue
+                : String(format.totalHours),
+            studentAmount:
+              editing === "studentAmount"
+                ? attemptedValue
+                : format.studentAmount,
+            externalAmount:
+              editing === "externalAmount"
+                ? attemptedValue
+                : format.externalAmount,
+          },
+          revisionId,
+          updatedAt,
+        );
+      } else if (intent === "activate" || intent === "deactivate") {
+        await setFormatActive(
+          repository,
+          user,
+          id,
+          intent === "activate",
+          revisionId,
+          updatedAt,
+        );
+      } else if (intent === "delete") {
+        await deleteFormat(repository, user, id, revisionId, updatedAt);
+        return Astro.redirect("/app/formatos?success=deleted", 303);
+      } else {
+        Astro.response.status = 400;
+        pageError = "La acción solicitada no es válida.";
+      }
+      if (!pageError)
+        return Astro.redirect(`/app/formatos/${id}?success=${intent}`, 303);
+    } catch (error) {
+      if (error instanceof CourseDomainError) {
+        Astro.response.status =
+          error.code === "FORMAT_NOT_FOUND" ? 404 : courseDomainStatus(error);
+        errors = error.fieldErrors;
+        pageError = error.message;
+      } else {
+        Astro.response.status = 500;
+        pageError = "No se pudo guardar el cambio. Inténtalo nuevamente.";
+        if (error instanceof CourseInfrastructureError)
+          logCourseInfrastructureError(error, { actorId: user.id });
+      }
+    }
+  }
+}
+const fields = format
+  ? [
+      {
+        key: "name",
+        label: "Nombre",
+        value: format.name,
+        intent: "rename",
+        pattern: undefined,
+        mode: undefined,
+      },
+      {
+        key: "totalHours",
+        label: "Duración total",
+        value: String(format.totalHours),
+        intent: "revise",
+        pattern: "[1-9][0-9]*",
+        mode: "numeric" as const,
+        suffix: "horas",
+      },
+      {
+        key: "studentAmount",
+        label: "Precio estudiante",
+        value: format.studentAmount,
+        intent: "revise",
+        pattern: "(?:0|[1-9][0-9]{0,9})(?:\\.[0-9]{1,2})?",
+        mode: "decimal" as const,
+        suffix: "BOB",
+      },
+      {
+        key: "externalAmount",
+        label: "Precio externo",
+        value: format.externalAmount,
+        intent: "revise",
+        pattern: "(?:0|[1-9][0-9]{0,9})(?:\\.[0-9]{1,2})?",
+        mode: "decimal" as const,
+        suffix: "BOB",
+      },
+    ]
+  : [];
+const success: Record<string, string> = {
+  rename: "Nombre actualizado.",
+  revise: "Nueva revisión guardada. Los borradores usan los valores vigentes.",
+  activate: "Formato activado.",
+  deactivate: "Formato desactivado.",
+};
+const successKey = Astro.url.searchParams.get("success");
+---
+
+<PrivateLayout title={format ? format.name : "Formato"}>
+  <nav aria-label="Ruta de navegación" class="text-sm text-muted-foreground">
+    <ol class="flex flex-wrap items-center gap-2">
+      <li>
+        <a href="/app" class="hover:underline">
+          Resumen
+        </a>
+      </li>
+      <li aria-hidden="true">/</li>
+      <li>
+        <a href="/app/cursos" class="hover:underline">
+          Cursos
+        </a>
+      </li>
+      <li aria-hidden="true">/</li>
+      <li>
+        <a href="/app/formatos" class="hover:underline">
+          Formatos
+        </a>
+      </li>
+      <li aria-hidden="true">/</li>
+      <li aria-current="page" class="font-medium text-foreground">
+        {format?.name ?? "Detalle"}
+      </li>
+    </ol>
+  </nav>
+  {loadError ? (
+    <p role="alert" class="mt-8 text-destructive">
+      No se pudo cargar el formato. Inténtalo nuevamente.
+    </p>
+  ) : !format ? (
+    <section class="mt-8">
+      <h1 class="text-3xl font-semibold">Formato no encontrado</h1>
+      <a href="/app/formatos" class="mt-4 inline-block underline">
+        Ver formatos
+      </a>
+    </section>
+  ) : (
+    <>
+      <header class="mt-5">
+        <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">
+          {format.name}
+        </h1>
+        <p class="mt-3 text-sm text-muted-foreground">
+          {format.active ? "Activo" : "Inactivo"} · Revisión vigente{" "}
+          {format.revisionNumber} ·{" "}
+          {format.used ? "Usado en cursos" : "Sin cursos asociados"}
+        </p>
+        <p class="mt-2 text-sm leading-6 text-muted-foreground">
+          Cada cambio de duración o precio crea una nueva revisión. Los
+          borradores adoptan los nuevos valores; los publicados y archivados
+          conservan los anteriores.
+        </p>
+      </header>
+      {successKey && success[successKey] && (
+        <noscript>
+          <p
+            role="status"
+            class="mt-6 rounded-lg border bg-secondary p-4 text-sm"
+          >
+            {success[successKey]}
+          </p>
+        </noscript>
+      )}
+      {pageError && (
+        <p
+          role="alert"
+          class="mt-6 rounded-lg border border-destructive/40 p-4 text-sm text-destructive"
+        >
+          {pageError}
+        </p>
+      )}
+      <div class="mt-8 grid gap-8 xl:grid-cols-2 xl:items-start">
+        <section
+          aria-labelledby="values-title"
+          class="rounded-xl border bg-card p-5 sm:p-7"
+        >
+          <h2 id="values-title" class="text-xl font-semibold">
+            Datos del formato
+          </h2>
+          <dl class="mt-5 divide-y">
+            {fields.map((field) => (
+              <div class="py-4 first:pt-0 last:pb-0">
+                <dt class="text-sm text-muted-foreground">{field.label}</dt>
+                <dd class="mt-1">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <span class="break-words font-semibold tabular-nums">
+                      {field.value} {field.suffix ?? ""}
+                    </span>
+                    {(format.active || field.key === "name") && (
+                      <details
+                        open={editing === field.key && Boolean(pageError)}
+                        class="group min-w-0 flex-1 open:basis-full"
+                      >
+                        <summary class="ml-auto flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-lg border px-3 text-sm font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+                          <Pencil size={16} aria-hidden="true" /> Editar{" "}
+                          {field.label.toLowerCase()}
+                        </summary>
+                        <form
+                          method="post"
+                          aria-label={`Editar ${field.label.toLowerCase()}`}
+                          class="mt-3 flex flex-wrap items-end gap-2"
+                        >
+                          <input
+                            type="hidden"
+                            name="intent"
+                            value={field.intent}
+                          />
+                          <input type="hidden" name="field" value={field.key} />
+                          <input
+                            type="hidden"
+                            name="revisionId"
+                            value={format.revisionId}
+                          />
+                          <input
+                            type="hidden"
+                            name="updatedAt"
+                            value={format.updatedAt}
+                          />
+                          <div class="min-w-0 flex-1">
+                            <label
+                              for={`edit-${field.key}`}
+                              class="text-sm font-medium"
+                            >
+                              {field.key === "totalHours" ? "Nueva" : "Nuevo"}{" "}
+                              {field.label.toLowerCase()}
+                            </label>
+                            <input
+                              id={`edit-${field.key}`}
+                              name="value"
+                              type="text"
+                              required
+                              pattern={field.pattern}
+                              inputmode={field.mode}
+                              value={
+                                editing === field.key && pageError
+                                  ? attemptedValue
+                                  : field.value
+                              }
+                              aria-invalid={Boolean(errors[field.key])}
+                              aria-describedby={
+                                errors[field.key]
+                                  ? `error-${field.key}`
+                                  : undefined
+                              }
+                              class="mt-1 min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+                            />
+                            {errors[field.key] && editing === field.key && (
+                              <p
+                                id={`error-${field.key}`}
+                                class="mt-1 text-sm text-destructive"
+                              >
+                                {errors[field.key]}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="submit"
+                            aria-label={`Guardar ${field.label.toLowerCase()}`}
+                            title="Guardar"
+                            class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground"
+                          >
+                            <Check size={18} aria-hidden="true" />
+                          </button>
+                          <a
+                            href={`/app/formatos/${id}`}
+                            aria-label={`Cancelar edición de ${field.label.toLowerCase()}`}
+                            title="Cancelar"
+                            class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border"
+                          >
+                            <X size={18} aria-hidden="true" />
+                          </a>
+                        </form>
+                      </details>
+                    )}
+                  </div>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+        <section
+          aria-label="Estado y eliminación"
+          class="rounded-xl border bg-card p-5 sm:p-7"
+        >
+          <h2 class="text-xl font-semibold">Disponibilidad</h2>
+          <p class="mt-2 text-sm leading-6 text-muted-foreground">
+            {format.active
+              ? "Desactivar impide elegir este formato en nuevos cursos sin alterar los cursos existentes."
+              : "Activar permite elegirlo de nuevo en los cursos."}
+          </p>
+          <form method="post" class="mt-4">
+            <input type="hidden" name="revisionId" value={format.revisionId} />
+            <input type="hidden" name="updatedAt" value={format.updatedAt} />
+            <input
+              type="hidden"
+              name="intent"
+              value={format.active ? "deactivate" : "activate"}
+            />
+            <button
+              type="submit"
+              class="min-h-11 rounded-lg border px-4 text-sm font-semibold hover:bg-secondary"
+            >
+              {format.active ? "Desactivar formato" : "Activar formato"}
+            </button>
+          </form>
+          {format.used ? (
+            <p class="mt-5 text-sm text-muted-foreground">
+              Este formato ya está asociado a cursos y no puede eliminarse.
+              Puedes desactivarlo.
+            </p>
+          ) : (
+            <details class="mt-6 border-t pt-4">
+              <summary class="min-h-11 cursor-pointer py-3 font-semibold text-destructive">
+                Eliminar formato
+              </summary>
+              <p class="mt-2 text-sm">
+                Esta acción elimina el formato y todas sus revisiones sin uso.
+                No se puede deshacer.
+              </p>
+              <form method="post" class="mt-4">
+                <input
+                  type="hidden"
+                  name="revisionId"
+                  value={format.revisionId}
+                />
+                <input
+                  type="hidden"
+                  name="updatedAt"
+                  value={format.updatedAt}
+                />
+                <input type="hidden" name="intent" value="delete" />
+                <button
+                  type="submit"
+                  class="min-h-11 rounded-lg border border-destructive px-4 text-sm font-semibold text-destructive"
+                >
+                  Sí, eliminar formato
+                </button>{" "}
+                <a
+                  href={`/app/formatos/${id}`}
+                  class="inline-flex min-h-11 items-center px-4 text-sm font-medium"
+                >
+                  Cancelar
+                </a>
+              </form>
+            </details>
+          )}
+        </section>
+      </div>
+    </>
+  )}
+  <script>
+    import { sileo } from "sileo";
+
+    const success = new URLSearchParams(window.location.search).get("success");
+    const messages: Record<string, string> = {
+      rename: "Nombre actualizado.",
+      revise:
+        "Nueva revisión guardada. Los borradores usan los valores vigentes.",
+      activate: "Formato activado.",
+      deactivate: "Formato desactivado.",
+    };
+    const message = success ? messages[success] : undefined;
+    if (message) {
+      window.addEventListener(
+        "load",
+        () => {
+          sileo.success({ title: message, duration: 6000 });
+          const url = new URL(window.location.href);
+          url.searchParams.delete("success");
+          window.history.replaceState(
+            window.history.state,
+            "",
+            `${url.pathname}${url.search}${url.hash}`,
+          );
+        },
+        { once: true },
+      );
+    }
+  </script>
+</PrivateLayout>

@@ -51,7 +51,7 @@ El administrador debe poder publicar y retirar un curso.
 
 Los cursos publicados deben aparecer automáticamente en el catálogo público.
 
-La implementación HTTP de este requisito queda pendiente para Fase 2B. Fase 2A ya ofrece la proyección y las lecturas de repositorio únicamente para cursos `PUBLISHED`, pero todavía no expone rutas públicas de catálogo o detalle.
+Está implementado mediante catálogo y detalle públicos SSR. Solo aparecen cursos `PUBLISHED`; los no públicos no se distinguen de slugs inexistentes en detalle.
 
 ### RF-CUR-005
 
@@ -66,27 +66,30 @@ Los niveles iniciales son:
 - El curso nace como `DRAFT`, puede publicarse, retirarse de `PUBLISHED` a `DRAFT` y archivarse sin borrado físico. `ARCHIVED` es terminal en esta fase.
 - El slug se deriva del nombre al crear, es único y permanece inmutable aunque cambie el nombre.
 - Un curso publicado puede editar su información pública y precios; cada cambio queda auditado.
-- Nombre, descripción, nivel, duración entera positiva, horario informativo, condiciones, fechas públicas, nota mínima y precios `STUDENT`/`EXTERNAL` son obligatorios.
+- Nombre, descripción, nivel, formato, horario informativo, condiciones, fechas públicas y nota mínima son obligatorios. El formato aporta duración positiva y precios `STUDENT`/`EXTERNAL` en `BOB`.
 - La nota mínima admite enteros de 0 a 100. No se configura aún asistencia mínima ni se calculan resultados académicos.
 - La ventana de preinscripción es opcional como conjunto: apertura y cierre deben estar ambos ausentes o ambos presentes, con apertura anterior al cierre. Su disponibilidad es derivada.
 - Los campos `datetime-local` se interpretan como tiempo civil de Bolivia (`America/La_Paz`, UTC-04 sin DST), validan exactamente `YYYY-MM-DDTHH:mm` y conservan la misma hora visible después de persistir y reeditar.
 - Una edición debe incluir la revisión observada del curso. Si otra operación cambió el agregado, el guardado obsoleto se rechaza sin sobrescribir y permite revisar/reintentar.
 - Todo monto se expresa como decimal de dos posiciones en moneda `BOB`; no se usan valores de punto flotante.
 - Solo un usuario interno activo con rol `ADMIN` puede crear, modificar o cambiar el estado de un curso.
-- La publicación exige exactamente un precio `STUDENT` y uno `EXTERNAL`, ambos en `BOB`, comprobados dentro de la misma transacción bloqueada.
-- El contrato público devuelve exclusivamente cursos `PUBLISHED` y no expone identificadores, estado, nota mínima ni timestamps administrativos. En Fase 2A es un DTO/repositorio sin rutas HTTP; el catálogo y detalle públicos pertenecen a Fase 2B.
+- La publicación exige un formato activo/revisión válida con exactamente los precios `STUDENT` y `EXTERNAL` aplicables, ambos en `BOB`.
+- El contrato público devuelve exclusivamente cursos `PUBLISHED` y no expone identificadores, estado, nota mínima ni timestamps administrativos; catálogo y detalle están implementados por SSR.
+- El campo `schedule` sigue siendo texto informativo. El formulario ofrece un constructor de horario por días/horas, pero no persiste calendario estructurado ni reemplaza la futura planificación de sesiones.
+- El contenido opcional Markdown se presenta sin HTML crudo y se filtran protocolos de enlaces no permitidos. Instructor se almacena como texto provisional, no como asignación de identidad.
+- Se puede seleccionar como destacado, con máximo uno entre cursos publicados; si no se designa uno, landing y catálogo usan fallback determinista.
 
-### Decisión aprobada pendiente de implementación
+### Reglas implementadas de formatos e imágenes
 
-La implementación actual de Fase 2A conserva duración (`totalHours`) y precios `STUDENT`/`EXTERNAL` directamente en cada curso. Estas reglas describen el modelo objetivo aceptado y requieren una refactorización antes de cerrar Fase 2B:
-
-- Administración debe poder gestionar Tipos de curso o formatos de curso, cada uno con duración y precios `STUDENT`/`EXTERNAL` en `BOB`.
-- Un curso debe seleccionar exactamente un tipo y no puede sobrescribir sus horas ni precios.
-- Editar un tipo crea una revisión inmutable. Los cursos `DRAFT` o no publicados deben adoptar la revisión vigente; los cursos `PUBLISHED` y `ARCHIVED` deben conservar exactamente la revisión utilizada.
-- Los tipos pueden activarse o desactivarse. Desactivar un tipo no elimina revisiones ni modifica cursos históricos.
-- Un curso puede tener una fotografía propia opcional únicamente si está autorizada. Si no la tiene, la presentación usa un fallback gráfico de Cota Activa, nunca un icono genérico ni fotografía ficticia.
-
-La decisión de persistencia y su relación con ADR-015 se registra en ADR-016; no se considera implementada mientras el repositorio siga usando los campos directos actuales.
+- Administración puede crear y activar/desactivar formatos tarifarios, cada uno con duración y valores `STUDENT`/`EXTERNAL` en `BOB`.
+- Las revisiones del formato son inmutables. Un curso referencia una única revisión; cambios de formato desplazan cursos `DRAFT` a la vigente y preservan la revisión de cursos `PUBLISHED` y `ARCHIVED`.
+- La administración permite crear formatos en una página dedicada y abrir el detalle desde su tarjeta. Nombre, duración y cada precio se guardan como cambios individuales; una escritura con revisión obsoleta se rechaza para evitar sobrescribir datos concurrentes.
+- Un formato asociado a uno o más cursos no se puede eliminar; debe desactivarse para impedir nuevas selecciones y conservar las referencias históricas. Solo un formato todavía no usado puede eliminarse.
+- La migración asigna a cursos existentes formatos/revisiones construidos con sus valores históricos exactos.
+- Los formatos de 20 h (80/100 Bs) y 30 h (120/150 Bs) los crea el seed local como defaults editables de desarrollo, no como precios universales.
+- El upload de artwork opcional se limita a administradores autorizados, y al faltar imagen se conserva fallback gráfico Cota Activa.
+- Con JavaScript, el administrador puede seleccionar y recortar artwork en el alta. Al crear se persiste primero el borrador, luego se sube WebP mediante el endpoint autorizado y se asocia con una edición que usa revisión optimista. Si falla la carga, el borrador permanece y se ofrece reintentar o abrir su edición. Sin JavaScript se puede crear sin foto y añadirla después desde edición.
+- El descuento del 50 % para auxiliares no está implementado: no existe elegibilidad validada ni tercer precio; permanece para fases de inscripción/descuentos posteriores.
 
 ## PREINSCRIPCIÓN
 
@@ -185,13 +188,13 @@ Valores iniciales conocidos:
 
 Estos valores no deben hardcodearse como reglas universales.
 
-En el modelo objetivo deben formar parte de una revisión de Tipo de curso, no de valores independientes editables por curso. Hasta completar la refactorización, Fase 2A los mantiene directamente en cada curso.
+Estos importes se usan como valores iniciales de ejemplo en el seed de desarrollo y no deben hardcodearse como reglas universales. En el modelo implementado forman parte de revisiones de formatos, no de valores editables directamente en cada curso.
 
 ## DESCUENTOS
 
 ### RN-DIS-001
 
-Auxiliares elegibles pueden recibir 50 % de descuento.
+La regla conocida plantea un descuento del 50 % para auxiliares que resulten elegibles; la elegibilidad y la aplicación todavía no están implementadas.
 
 Casos iniciales mencionados:
 
@@ -200,7 +203,7 @@ Casos iniciales mencionados:
 - mantenimiento;
 - laboratorio de desarrollo.
 
-La lista definitiva debe mantenerse configurable.
+La lista definitiva debe mantenerse configurable y confirmarse antes de implementar elegibilidad. No se publica un tercer precio ni se promete el descuento en el catálogo actual.
 
 ### RN-DIS-002
 

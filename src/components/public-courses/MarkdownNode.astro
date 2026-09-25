@@ -1,0 +1,99 @@
+---
+import type { MarkdownNode as Node } from "./course-markdown";
+import MarkdownNode from "./MarkdownNode.astro";
+
+interface Props {
+  node: Node;
+}
+
+const { node } = Astro.props;
+const children = node.children ?? [];
+---
+
+{node.type === "text" && node.value}
+{node.type === "break" && <br />}
+{node.type === "code" && <code>{node.value}</code>}
+{node.type === "strong" && (
+  <strong>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </strong>
+)}
+{node.type === "emphasis" && (
+  <em>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </em>
+)}
+{node.type === "link" && (
+  <a href={node.href}>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </a>
+)}
+{node.type === "paragraph" && (
+  <p>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </p>
+)}
+{node.type === "heading" && node.level === 1 && (
+  <h3>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </h3>
+)}
+{node.type === "heading" && node.level === 2 && (
+  <h3>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </h3>
+)}
+{node.type === "heading" && node.level === 3 && (
+  <h4>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </h4>
+)}
+{node.type === "heading" && node.level === 4 && (
+  <h5>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </h5>
+)}
+{node.type === "heading" && node.level && node.level >= 5 && (
+  <h6>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </h6>
+)}
+{node.type === "unordered-list" && (
+  <ul>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </ul>
+)}
+{node.type === "ordered-list" && (
+  <ol>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </ol>
+)}
+{node.type === "list-item" && (
+  <li>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </li>
+)}
