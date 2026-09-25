@@ -31,9 +31,45 @@ test("collapsed rail expands on hover without shifting main and persists across 
   await page.goto("/app");
   const shell = page.locator("[data-private-shell]");
   const sidebar = page.locator(".private-sidebar");
+  const collapseButton = page.getByRole("button", {
+    name: "Contraer barra lateral",
+  });
+  const logoutButton = sidebar.locator(
+    ".private-sidebar-footer .private-sidebar-actions form button",
+  );
+  const collapseBox = await collapseButton.boundingBox();
+  const logoutBox = await logoutButton.boundingBox();
+  expect(collapseBox).not.toBeNull();
+  expect(logoutBox).not.toBeNull();
+  expect(Math.abs(collapseBox!.y - logoutBox!.y)).toBeLessThan(2);
+  await expect(collapseButton).toHaveText("");
+  await expect(logoutButton).toHaveText("");
+  expect(
+    await shell.evaluate(
+      (element) => getComputedStyle(element).transitionDuration,
+    ),
+  ).toContain("0.35s");
   await expect(sidebar.getByText("Espacio de trabajo")).toHaveCount(0);
-  await page.getByRole("button", { name: "Contraer barra lateral" }).click();
+  await collapseButton.click();
   await expect(shell).toHaveAttribute("data-collapsed", "true");
+  await page.waitForFunction(() =>
+    [
+      document.querySelector("[data-private-shell]"),
+      document.querySelector(".private-sidebar-panel"),
+    ].every(
+      (element) =>
+        !element ||
+        element
+          .getAnimations()
+          .every((animation) => animation.playState !== "running"),
+    ),
+  );
+  await expect(logoutButton).toBeHidden();
+  expect(
+    await logoutButton.evaluate(
+      (element) => element !== document.activeElement,
+    ),
+  ).toBe(true);
   await expect(sidebar.getByText("Expandir menú")).toHaveCount(0);
   const brand = await sidebar.locator(".private-brand").boundingBox();
   const firstLink = await sidebar
@@ -50,8 +86,10 @@ test("collapsed rail expands on hover without shifting main and persists across 
   ).toHaveCount(0);
   const main = page.locator(".private-main-scroll");
   const railWidth = (await main.boundingBox())?.width;
+  await main.hover();
   await page.locator(".private-brand-mark").hover();
   await expect(shell).toHaveAttribute("data-preview", "true");
+  await expect(logoutButton).toBeVisible();
   expect((await main.boundingBox())?.width).toBe(railWidth);
   await page.locator(".private-main-scroll").hover();
   await expect(shell).not.toHaveAttribute("data-preview", "true");
@@ -76,6 +114,7 @@ test("collapsed rail expands on hover without shifting main and persists across 
   await expect(
     page.getByRole("button", { name: "Expandir barra lateral" }),
   ).toBeVisible();
+  await expect(logoutButton).toBeHidden();
 });
 
 test("keyboard focus previews rail, Escape closes it; instructor sees no admin links", async ({
@@ -92,8 +131,14 @@ test("keyboard focus previews rail, Escape closes it; instructor sees no admin l
   await page.locator(".private-main-scroll").hover();
   await page.keyboard.press("Shift+Tab");
   await expect(shell).toHaveAttribute("data-preview", "true");
+  await expect(
+    page.getByRole("button", { name: "Cerrar sesión" }),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(shell).not.toHaveAttribute("data-preview", "true");
+  await expect(
+    page.getByRole("button", { name: "Cerrar sesión" }),
+  ).toBeHidden();
   await expect(
     page.getByRole("button", { name: "Expandir barra lateral" }),
   ).toBeFocused();
@@ -127,6 +172,7 @@ test("desktop content scrolls independently of the sidebar and reduced motion re
       .evaluate((element) => element.scrollTop),
   ).toBe(0);
   await page.getByRole("button", { name: "Contraer barra lateral" }).click();
+  await scroller.hover();
   await page.locator(".private-brand-mark").hover();
   await expect(page.locator("[data-private-shell]")).toHaveAttribute(
     "data-preview",
@@ -137,4 +183,9 @@ test("desktop content scrolls independently of the sidebar and reduced motion re
       .locator(".private-sidebar-panel")
       .evaluate((element) => getComputedStyle(element).animationName),
   ).toBe("none");
+  expect(
+    await page
+      .locator(".private-sidebar-panel")
+      .evaluate((element) => getComputedStyle(element).transitionDuration),
+  ).toBe("0s");
 });

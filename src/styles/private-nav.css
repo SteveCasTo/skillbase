@@ -166,6 +166,30 @@
   padding: 0.5rem;
   border-top: 1px solid var(--sidebar-border);
 }
+.private-sidebar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+}
+.private-sidebar-actions > form {
+  min-width: 0;
+  flex: 1;
+}
+.private-sidebar-actions > .private-action {
+  width: auto;
+  flex: none;
+}
+.private-sidebar-actions > form .private-action {
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+.private-sidebar-actions .private-action {
+  width: 2.5rem;
+  min-width: 2.5rem;
+  justify-content: center;
+  padding-inline: 0;
+}
 .private-account {
   display: flex;
   align-items: center;
@@ -177,7 +201,7 @@
 }
 .private-collapse {
   justify-content: center;
-  margin-top: 0.125rem;
+  margin-top: 0;
 }
 .private-collapsed-icon {
   display: none;
@@ -187,9 +211,13 @@
   padding: 1rem 1.25rem;
 }
 .private-mobile-footer form {
-  margin-top: 0.75rem;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
 }
 .private-mobile-footer .private-action {
+  width: 2.75rem;
+  justify-content: center;
   padding-inline: 0;
 }
 .private-shell :is(a, button, summary):focus-visible {
@@ -204,6 +232,7 @@
     height: 100svh;
     min-height: 0;
     overflow: hidden;
+    transition: grid-template-columns 350ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .private-shell[data-collapsed="true"] {
     grid-template-columns: var(--private-rail) minmax(0, 1fr);
@@ -225,6 +254,9 @@
     border-right: 1px solid var(--sidebar-border);
     background: var(--sidebar);
     color: var(--sidebar-foreground);
+    transition:
+      width 350ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 180ms ease-out;
   }
   .private-shell[data-collapsed="true"] .private-sidebar-panel {
     width: var(--private-rail);
@@ -233,15 +265,6 @@
     .private-sidebar-panel {
     width: var(--private-wide);
     box-shadow: var(--shadow-xl);
-    animation: private-reveal 180ms ease-out both;
-  }
-  @keyframes private-reveal {
-    from {
-      clip-path: inset(0 calc(100% - var(--private-rail)) 0 0);
-    }
-    to {
-      clip-path: inset(0 0 0 0);
-    }
   }
   .private-shell[data-collapsed="true"]:not([data-preview="true"])
     .private-label {
@@ -276,6 +299,11 @@
     justify-content: center;
     padding-inline: 0;
   }
+  .private-shell[data-collapsed="true"]:not([data-preview="true"])
+    .private-sidebar-actions
+    > form {
+    display: none;
+  }
   .private-shell[data-collapsed="true"] .private-expanded-icon {
     display: none;
   }
@@ -300,8 +328,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .private-shell {
+    transition: none !important;
+  }
   .private-shell .private-sidebar-panel {
     animation: none !important;
+    transition: none !important;
   }
   .private-chevron {
     transition: none;

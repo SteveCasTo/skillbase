@@ -50,36 +50,37 @@ const currentPath = Astro.url.pathname;
               <p class="truncate text-xs text-muted-foreground">{user.email}</p>
             </div>
           </div>
-          <form method="post" action="/auth/logout">
+          <div class="private-sidebar-actions">
             <button
-              class="private-action"
-              type="submit"
-              title="Cerrar sesión"
-              aria-label="Cerrar sesión"
+              class="private-action private-collapse"
+              type="button"
+              data-sidebar-toggle
+              aria-label="Contraer barra lateral"
+              aria-expanded="true"
+              title="Contraer barra lateral"
             >
-              <LogOut size={19} aria-hidden="true" />
-              <span class="private-label">Cerrar sesión</span>
+              <PanelLeftClose
+                className="private-expanded-icon"
+                size={19}
+                aria-hidden="true"
+              />
+              <PanelLeftOpen
+                className="private-collapsed-icon"
+                size={19}
+                aria-hidden="true"
+              />
             </button>
-          </form>
-          <button
-            class="private-action private-collapse"
-            type="button"
-            data-sidebar-toggle
-            aria-label="Contraer barra lateral"
-            aria-expanded="true"
-            title="Contraer barra lateral"
-          >
-            <PanelLeftClose
-              className="private-expanded-icon"
-              size={19}
-              aria-hidden="true"
-            />
-            <PanelLeftOpen
-              className="private-collapsed-icon"
-              size={19}
-              aria-hidden="true"
-            />
-          </button>
+            <form method="post" action="/auth/logout">
+              <button
+                class="private-action"
+                type="submit"
+                title="Cerrar sesión"
+                aria-label="Cerrar sesión"
+              >
+                <LogOut size={19} aria-hidden="true" />
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </aside>
@@ -133,8 +134,13 @@ const currentPath = Astro.url.pathname;
             <p class="truncate text-sm font-semibold">{user.name}</p>
             <p class="truncate text-xs text-muted-foreground">{user.email}</p>
             <form method="post" action="/auth/logout">
-              <button class="private-action" type="submit">
-                <LogOut size={19} aria-hidden="true" /> Cerrar sesión
+              <button
+                class="private-action"
+                type="submit"
+                aria-label="Cerrar sesión"
+                title="Cerrar sesión"
+              >
+                <LogOut size={19} aria-hidden="true" />
               </button>
             </form>
           </div>
@@ -143,7 +149,7 @@ const currentPath = Astro.url.pathname;
       <div class="private-main-scroll">
         <main
           id="main-content"
-          class="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10"
+          class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10"
         >
           <slot />
         </main>
