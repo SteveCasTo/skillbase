@@ -44,17 +44,19 @@ async function simpleWebp(blob: Blob): Promise<Blob> {
 }
 
 interface Props {
-  courseId: string;
+  courseId?: string;
   /** Server-generated key already saved for this course, not an arbitrary URL. */
   currentArtwork?: string | null;
   /** Called only when the upload succeeds; persist the returned key via the admin save use case. */
   onUploaded?: (key: string) => void;
+  onPrepared?: (file: File | null) => void;
 }
 
 export default function CourseImageEditor({
   courseId,
   currentArtwork,
   onUploaded,
+  onPrepared,
 }: Props) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -64,9 +66,17 @@ export default function CourseImageEditor({
   const [saved, setSaved] = useState(currentArtwork ?? "");
   const [uploaded, setUploaded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [prepared, setPrepared] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const notifyPrepared = (file: File | null) => {
+    onPrepared?.(file);
+    if (!courseId)
+      window.dispatchEvent(
+        new CustomEvent("course-artwork-prepared", { detail: file }),
+      );
+  };
 
   useEffect(() => {
     if (!image) return;
@@ -120,6 +130,12 @@ export default function CourseImageEditor({
 
   async function choose(file?: File) {
     if (!file) return;
+    if (!courseId)
+      window.dispatchEvent(
+        new CustomEvent("course-artwork-selection", { detail: true }),
+      );
+    notifyPrepared(null);
+    setPrepared(false);
     setError(null);
     if (
       !/\.(png|jpe?g|webp)$/i.test(file.name) ||
@@ -150,8 +166,19 @@ export default function CourseImageEditor({
     photo.src = url;
   }
 
+  function removeSelection() {
+    setImage(null);
+    setPrepared(false);
+    setError(null);
+    if (input.current) input.current.value = "";
+    notifyPrepared(null);
+    window.dispatchEvent(
+      new CustomEvent("course-artwork-selection", { detail: false }),
+    );
+  }
+
   async function save() {
-    if (!preview || busy) return;
+    if (!courseId || !preview || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -203,6 +230,31 @@ export default function CourseImageEditor({
     }
   }
 
+  async function prepare() {
+    if (!preview || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const blob = await fetch(preview)
+        .then((response) => response.blob())
+        .then(simpleWebp);
+      if (blob.size > 4 * 1024 * 1024)
+        throw new Error("La foto recortada no puede superar 4 MB.");
+      notifyPrepared(new File([blob], "foto.webp", { type: "image/webp" }));
+      setPrepared(true);
+    } catch (caught) {
+      notifyPrepared(null);
+      setPrepared(false);
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "No se pudo preparar la foto.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section
       className="bg-card rounded-xl border p-5 shadow-xs sm:p-7"
@@ -212,8 +264,9 @@ export default function CourseImageEditor({
         Foto del curso (opcional)
       </h2>
       <p className="text-muted-foreground mt-2 text-sm">
-        Usa solo una fotografía propia o autorizada. Ajusta el encuadre antes de
-        subirla. La imagen se mostrará públicamente al publicar el curso.
+        {courseId
+          ? "Usa una foto propia o autorizada. Recórtala y guarda los cambios tras subirla."
+          : "Usa una foto propia o autorizada. Recórtala antes de crear el borrador; se cargará al guardarlo."}
       </p>
       <input
         ref={input}
@@ -248,6 +301,16 @@ export default function CourseImageEditor({
           Seleccionar foto
         </Button>
       </div>
+      {!courseId && (image || error) && (
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-3"
+          onClick={removeSelection}
+        >
+          Quitar foto
+        </Button>
+      )}
       {preview && image && (
         <div className="mt-5 space-y-4">
           <p className="text-sm font-medium">Vista previa del recorte</p>
@@ -265,7 +328,11 @@ export default function CourseImageEditor({
                 max="2"
                 step="0.05"
                 value={zoom}
-                onChange={(event) => setZoom(Number(event.target.value))}
+                onChange={(event) => {
+                  setZoom(Number(event.target.value));
+                  setPrepared(false);
+                  notifyPrepared(null);
+                }}
               />
             </label>
             <label className="grid gap-2 text-sm">
@@ -275,7 +342,11 @@ export default function CourseImageEditor({
                 min="0"
                 max="100"
                 value={focusX}
-                onChange={(event) => setFocusX(Number(event.target.value))}
+                onChange={(event) => {
+                  setFocusX(Number(event.target.value));
+                  setPrepared(false);
+                  notifyPrepared(null);
+                }}
               />
             </label>
             <label className="grid gap-2 text-sm">
@@ -285,13 +356,32 @@ export default function CourseImageEditor({
                 min="0"
                 max="100"
                 value={focusY}
-                onChange={(event) => setFocusY(Number(event.target.value))}
+                onChange={(event) => {
+                  setFocusY(Number(event.target.value));
+                  setPrepared(false);
+                  notifyPrepared(null);
+                }}
               />
             </label>
           </div>
-          <Button type="button" disabled={busy} onClick={() => void save()}>
-            {busy ? "Subiendo foto…" : "Subir foto recortada"}
+          <Button
+            type="button"
+            disabled={busy}
+            onClick={() => void (courseId ? save() : prepare())}
+          >
+            {busy
+              ? "Preparando foto…"
+              : courseId
+                ? "Subir foto recortada"
+                : "Usar este recorte"}
           </Button>
+          {!courseId && (
+            <p role="status" className="text-muted-foreground text-sm">
+              {prepared
+                ? "Foto lista para cargarse al crear el borrador."
+                : "Confirma el recorte antes de crear el borrador."}
+            </p>
+          )}
         </div>
       )}
       {error && (

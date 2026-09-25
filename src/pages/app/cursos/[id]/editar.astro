@@ -75,10 +75,13 @@ const valuesFromCourse = (item: AdminCourseDto): CourseInput => ({
   registrationEndAt: dateInput(item.registrationEndAt),
   minimumGrade: String(item.minimumGrade),
 });
+// Keep the persisted snapshot even when a failed POST re-renders attempted values.
+const baseline = course ? valuesFromCourse(course) : undefined;
 let values: CourseInput = course ? valuesFromCourse(course) : {};
 let errors: Readonly<Record<string, string>> = {};
 let pageError: string | null = null;
 const successMessages = {
+  created: "Borrador creado. Ya puedes añadir una foto.",
   updated: "Cambios guardados correctamente.",
   published: "Curso publicado.",
   withdrawn: "Curso retirado y devuelto a borrador.",
@@ -199,21 +202,20 @@ const statusLabel = {
           <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
             Editar curso
           </h1>
-          <p class="mt-2 font-mono text-xs text-muted-foreground">
-            /{course.slug}
-          </p>
         </div>
         <span class="w-fit rounded-full bg-secondary px-3 py-1.5 text-sm font-semibold text-secondary-foreground">
           {statusLabel[course.status]}
         </span>
       </header>
       {successMessage && (
-        <p
-          role="status"
-          class="mt-7 rounded-lg border bg-secondary px-4 py-3 text-sm text-secondary-foreground"
-        >
-          {successMessage}
-        </p>
+        <noscript>
+          <p
+            role="status"
+            class="mt-7 rounded-lg border bg-secondary px-4 py-3 text-sm text-secondary-foreground"
+          >
+            {successMessage}
+          </p>
+        </noscript>
       )}
       {pageError && (
         <p
@@ -233,6 +235,7 @@ const statusLabel = {
           intent="update"
           revision={course.updatedAt.toISOString()}
           courseId={course.id}
+          {baseline}
         />
       </div>
       {course.status !== "ARCHIVED" && (
@@ -240,17 +243,17 @@ const statusLabel = {
           <h2 id="editorial-title" class="text-xl font-semibold">
             Estado editorial
           </h2>
-          <p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Publicar hace visible el curso mediante el contrato público. Retirar
-            lo devuelve a borrador. Archivar es definitivo en esta fase.
+          <p class="mt-2 text-sm leading-6 text-muted-foreground">
+            Publica para mostrar el curso, retíralo para volver a borrador o
+            archívalo definitivamente.
           </p>
-          <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <div class="mt-5 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-start">
             {course.status === "PUBLISHED" && !course.featured && (
-              <form method="post" class="mutation-form self-start">
+              <form method="post" class="mutation-form">
                 <input type="hidden" name="intent" value="feature" />
                 <button
                   type="submit"
-                  class="min-h-11 rounded-lg border px-4 text-sm font-semibold hover:bg-secondary"
+                  class="inline-flex min-h-11 items-center justify-center rounded-lg border px-4 text-sm font-semibold hover:bg-secondary"
                 >
                   Destacar en la cartelera
                 </button>
@@ -263,16 +266,16 @@ const statusLabel = {
             )}
             {course.status === "DRAFT" && (
               <details class="rounded-lg border bg-card p-3">
-                <summary class="min-h-11 cursor-pointer px-2 py-3 text-sm font-semibold">
+                <summary class="flex min-h-11 cursor-pointer items-center px-2 text-sm font-semibold">
                   Publicar curso
                 </summary>
                 <form method="post" class="mutation-form mt-2">
                   <input type="hidden" name="intent" value="publish" />
-                  <p class="mb-3 max-w-sm text-sm text-muted-foreground">
-                    El contenido y los precios pasarán a lectura pública.
+                  <p class="mb-3 text-sm text-muted-foreground">
+                    El curso y sus precios serán visibles para todos.
                   </p>
                   <button
-                    class="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+                    class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
                     type="submit"
                   >
                     Confirmar publicación
@@ -282,17 +285,16 @@ const statusLabel = {
             )}
             {course.status === "PUBLISHED" && (
               <details class="rounded-lg border bg-card p-3">
-                <summary class="min-h-11 cursor-pointer px-2 py-3 text-sm font-semibold">
+                <summary class="flex min-h-11 cursor-pointer items-center px-2 text-sm font-semibold">
                   Retirar publicación
                 </summary>
                 <form method="post" class="mutation-form mt-2">
                   <input type="hidden" name="intent" value="withdraw" />
-                  <p class="mb-3 max-w-sm text-sm text-muted-foreground">
-                    El curso dejará de estar disponible públicamente y volverá a
-                    borrador.
+                  <p class="mb-3 text-sm text-muted-foreground">
+                    El curso dejará de ser público y volverá a borrador.
                   </p>
                   <button
-                    class="min-h-11 rounded-lg border px-4 text-sm font-semibold"
+                    class="inline-flex min-h-11 items-center justify-center rounded-lg border px-4 text-sm font-semibold"
                     type="submit"
                   >
                     Confirmar retiro
@@ -301,16 +303,16 @@ const statusLabel = {
               </details>
             )}
             <details class="rounded-lg border border-destructive/30 bg-card p-3">
-              <summary class="min-h-11 cursor-pointer px-2 py-3 text-sm font-semibold text-destructive">
+              <summary class="flex min-h-11 cursor-pointer items-center px-2 text-sm font-semibold text-destructive">
                 Archivar curso
               </summary>
               <form method="post" class="mutation-form mt-2">
                 <input type="hidden" name="intent" value="archive" />
-                <p class="mb-3 max-w-sm text-sm text-muted-foreground">
-                  No podrás editar ni reactivar este curso en la Fase 2A.
+                <p class="mb-3 text-sm text-muted-foreground">
+                  No podrás editar ni reactivar este curso.
                 </p>
                 <button
-                  class="min-h-11 rounded-lg bg-destructive px-4 text-sm font-semibold text-destructive-foreground"
+                  class="inline-flex min-h-11 items-center justify-center rounded-lg bg-destructive px-4 text-sm font-semibold text-destructive-foreground"
                   type="submit"
                 >
                   Confirmar archivo
@@ -321,6 +323,26 @@ const statusLabel = {
         </section>
       )}
       <script>
+        import { sileo } from "sileo";
+        const success = new URLSearchParams(window.location.search).get(
+          "success",
+        );
+        const messages: Record<string, string> = {
+          created: "Borrador creado. Ya puedes añadir una foto.",
+          updated: "Cambios guardados correctamente.",
+          published: "Curso publicado.",
+          withdrawn: "Curso retirado y devuelto a borrador.",
+          archived: "Curso archivado.",
+          featured: "Curso seleccionado como destacado.",
+        };
+        const message = success ? messages[success] : undefined;
+        if (message) {
+          window.addEventListener(
+            "load",
+            () => sileo.success({ title: message, duration: 6000 }),
+            { once: true },
+          );
+        }
         document
           .querySelectorAll<HTMLFormElement>(".mutation-form")
           .forEach((form) => {

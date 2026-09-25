@@ -19,13 +19,17 @@ test("published course is public end-to-end and withdrawal removes every public 
 
   try {
     await page.goto("/app/formatos");
+    await page.getByRole("link", { name: "Nuevo formato" }).click();
     const createFormat = page.getByRole("form", { name: "Crear formato" });
     await createFormat.getByLabel("Nombre").fill(formatName);
     await createFormat.getByLabel("Duración total (horas)").fill("20");
     await createFormat.getByLabel("Precio estudiante (BOB)").fill("80");
     await createFormat.getByLabel("Precio externo (BOB)").fill("100.50");
     await createFormat.getByRole("button", { name: "Crear formato" }).click();
-    await expect(page).toHaveURL(/success=create/);
+    await expect(page).toHaveURL(/\/app\/formatos$/);
+    await expect(page.locator("[data-sileo-toast]")).toContainText(
+      "Formato creado",
+    );
 
     await page.goto("/app/cursos/nuevo");
     await page.getByLabel("Nombre").fill(courseName);
@@ -40,22 +44,29 @@ test("published course is public end-to-end and withdrawal removes every public 
       .fill(
         "## Temario público\n- **Unidad segura**\n\n[Enlace inseguro](javascript:alert(1))\n<script>alert(2)</script>",
       );
-    await page.getByLabel("Horario informativo").fill("Lunes, 18:30–20:30");
+    await page.getByRole("checkbox", { name: "Lunes" }).click();
+    await page.getByLabel("Desde", { exact: true }).fill("18:30");
+    await page.getByLabel("Hasta", { exact: true }).fill("20:30");
     await page.getByLabel("Condiciones").fill("Inscripción sujeta a cupo.");
-    await page.getByLabel("Inicio del curso").fill("2027-03-01T18:30");
-    await page.getByLabel("Finalización del curso").fill("2027-04-01T20:30");
-    await page
-      .getByLabel("Apertura de preinscripción")
-      .fill("2027-01-01T08:00");
-    await page.getByLabel("Cierre de preinscripción").fill("2027-02-20T18:00");
+    for (const [label, date, time] of [
+      ["Inicio del curso", "01/03/2027", "18:30"],
+      ["Finalización del curso", "01/04/2027", "20:30"],
+      ["Apertura de preinscripción", "01/01/2027", "08:00"],
+      ["Cierre de preinscripción", "20/02/2027", "18:00"],
+    ] as const) {
+      await page.getByLabel(label, { exact: true }).fill(date);
+      await page
+        .getByRole("textbox", {
+          name: `Hora de ${label.toLowerCase()}`,
+          exact: true,
+        })
+        .fill(time);
+    }
     await page.getByLabel("Nota mínima (0–100)").fill("70");
     await page.getByRole("button", { name: "Crear borrador" }).click();
-    await expect(page).toHaveURL(/\/app\/cursos\?success=created$/);
-    await page
-      .getByRole("article")
-      .filter({ hasText: courseName })
-      .getByRole("link", { name: "Revisar y editar" })
-      .click();
+    await expect(page).toHaveURL(
+      /\/app\/cursos\/[^/]+\/editar\?success=created$/,
+    );
     courseId = new URL(page.url()).pathname.split("/").at(-2);
     expect(courseId).toMatch(/^[0-9a-f-]{36}$/i);
 
@@ -173,7 +184,9 @@ test("published course is public end-to-end and withdrawal removes every public 
     await page.goto(`/app/cursos/${courseId}/editar`);
     await page.getByText("Retirar publicación", { exact: true }).click();
     await page.getByRole("button", { name: "Confirmar retiro" }).click();
-    await expect(page.getByRole("status")).toContainText("devuelto a borrador");
+    await expect(page.locator("[data-sileo-toast]")).toContainText(
+      "devuelto a borrador",
+    );
     await context.clearCookies();
 
     await page.goto("/cursos");
@@ -195,7 +208,9 @@ test("published course is public end-to-end and withdrawal removes every public 
     await page.goto(`/app/cursos/${courseId}/editar`);
     await page.getByText("Archivar curso", { exact: true }).click();
     await page.getByRole("button", { name: "Confirmar archivo" }).click();
-    await expect(page.getByRole("status")).toContainText("Curso archivado");
+    await expect(page.locator("[data-sileo-toast]")).toContainText(
+      "Curso archivado",
+    );
   } finally {
     if (artworkKey) {
       const environment = getTestSupabaseEnvironment();

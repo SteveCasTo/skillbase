@@ -60,6 +60,8 @@ export default function CourseSelect({
         <Select.Portal>
           <Select.Content
             position="popper"
+            sideOffset={4}
+            collisionPadding={8}
             className="bg-popover text-popover-foreground z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-auto rounded-lg border p-1 shadow-md"
           >
             <Select.Viewport>

@@ -1,7 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarDays } from "lucide-react";
+import { es } from "react-day-picker/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { TimePicker, validTime } from "@/components/ui/time-picker";
 import {
   Popover,
   PopoverContent,
@@ -17,34 +20,21 @@ interface Props {
   error?: string;
 }
 
-const dateTimePattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
-const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-
-function parseDateTime(value: string): Date | undefined {
-  const match = dateTimePattern.exec(value);
+function parseDate(value: string): Date | undefined {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
   if (!match) return undefined;
-  const [, year, month, day, hour, minute] = match;
   const date = new Date(0);
-  date.setFullYear(Number(year), Number(month) - 1, Number(day));
-  date.setHours(Number(hour), Number(minute), 0, 0);
-  return date.getFullYear() === Number(year) &&
-    date.getMonth() === Number(month) - 1 &&
-    date.getDate() === Number(day) &&
-    date.getHours() === Number(hour) &&
-    date.getMinutes() === Number(minute)
+  date.setFullYear(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+  date.setHours(12, 0, 0, 0);
+  return date.getFullYear() === Number(match[3]) &&
+    date.getMonth() + 1 === Number(match[2]) &&
+    date.getDate() === Number(match[1])
     ? date
     : undefined;
 }
 
-function formatDate(date: Date): string {
-  return `${date.getFullYear().toString().padStart(4, "0")}-${(date.getMonth() + 1).toString().padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}`;
-}
-
-function validationMessage(value: string): string {
-  if (!value) return "";
-  if (!dateTimePattern.test(value))
-    return "Ingresa la fecha y hora como AAAA-MM-DDTHH:mm.";
-  return parseDateTime(value) ? "" : "Ingresa una fecha y hora válidas.";
+function localDate(date: Date) {
+  return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
 }
 
 export default function CourseDateTimePicker({
@@ -55,71 +45,80 @@ export default function CourseDateTimePicker({
   disabled = false,
   error,
 }: Props) {
-  const [dateTime, setDateTime] = useState(value);
-  const [message, setMessage] = useState(validationMessage(value));
-  const [timeDraft, setTimeDraft] = useState(
-    dateTimePattern.exec(value)?.slice(4, 6).join(":") ?? "",
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  const [date, setDate] = useState(
+    match ? `${match[3]}/${match[2]}/${match[1]}` : "",
   );
-  const dateTimeInput = useRef<HTMLInputElement>(null);
-  const selectedDate = parseDateTime(dateTime);
-  const dateTimeParts = dateTimePattern.exec(dateTime);
-  const inputId = `${name}-input`;
-  const errorId = `${name}-error`;
+  const [time, setTime] = useState(match ? `${match[4]}:${match[5]}` : "");
+  const [open, setOpen] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
+  const dateField = useRef<HTMLInputElement>(null);
+  const selected = parseDate(date);
+  const problem =
+    date && !selected
+      ? "Ingresa una fecha válida (DD/MM/AAAA)."
+      : time && !validTime(time)
+        ? "Ingresa una hora válida (HH:mm)."
+        : "";
+  const combined =
+    selected && validTime(time)
+      ? `${selected.getFullYear().toString().padStart(4, "0")}-${String(selected.getMonth() + 1).padStart(2, "0")}-${String(selected.getDate()).padStart(2, "0")}T${time}`
+      : "";
+  const fieldError = problem || error;
+  const missing = required && !date && !time;
 
-  function update(value: string) {
-    setDateTime(value);
-    const problem = validationMessage(value);
-    setMessage(problem);
-    dateTimeInput.current?.setCustomValidity(problem);
+  useEffect(() => {
+    dateField.current?.setCustomValidity(
+      problem ||
+        ((date || time) && !combined
+          ? "Selecciona una fecha y hora válidas."
+          : ""),
+    );
+  }, [problem, date, time, combined]);
+
+  useEffect(() => {
+    field.current?.dispatchEvent(
+      new Event("course-form-change", { bubbles: true }),
+    );
+  }, [combined]);
+
+  function validate() {
+    const message =
+      problem ||
+      ((required && !combined) || ((date || time) && !combined)
+        ? "Selecciona una fecha y hora válidas."
+        : "");
+    dateField.current?.setCustomValidity(message);
   }
-
-  function chooseDate(date: Date | undefined) {
-    if (!date) return;
-    const time = timePattern.test(timeDraft) ? timeDraft : "09:00";
-    setTimeDraft(time);
-    update(`${formatDate(date)}T${time}`);
-  }
-
-  const fieldError = message || error;
 
   return (
     <div
       className="flex min-w-0 flex-col gap-2"
       data-invalid={Boolean(fieldError)}
     >
-      <label
-        id={`${name}-label`}
-        htmlFor={inputId}
-        className="text-sm font-medium"
-      >
+      <label htmlFor={`${name}-date`} className="text-sm font-medium">
         {label}
       </label>
-      <div className="flex min-w-0 gap-2">
-        <input
-          ref={dateTimeInput}
-          id={inputId}
-          className="bg-background focus-visible:ring-ring min-h-11 min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
-          name={name}
+      <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+        <Input
+          ref={dateField}
+          id={`${name}-date`}
           type="text"
-          inputMode="text"
-          placeholder="AAAA-MM-DDTHH:mm"
-          value={dateTime}
-          required={required}
+          inputMode="numeric"
+          placeholder="DD/MM/AAAA"
+          value={date}
           disabled={disabled}
+          required={required}
           aria-invalid={Boolean(fieldError)}
-          aria-describedby={fieldError ? errorId : `${name}-hint`}
+          aria-describedby={fieldError ? `${name}-error` : undefined}
+          className="h-11 min-w-0 flex-1 px-1 text-center text-xs tabular-nums sm:px-2 sm:text-sm"
           onChange={(event) => {
-            const nextValue = event.currentTarget.value;
-            const parsed = dateTimePattern.exec(nextValue);
-            setTimeDraft(parsed ? `${parsed[4]}:${parsed[5]}` : "");
-            update(nextValue);
+            setDate(event.target.value);
+            event.target.setCustomValidity("");
           }}
-          onBlur={(event) => {
-            event.currentTarget.setCustomValidity(validationMessage(dateTime));
-            setMessage(validationMessage(dateTime));
-          }}
+          onBlur={validate}
         />
-        <Popover>
+        <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button
               type="button"
@@ -127,8 +126,7 @@ export default function CourseDateTimePicker({
               size="icon"
               className="size-11 shrink-0"
               id={`${name}-calendar`}
-              aria-label="Elegir fecha"
-              aria-describedby={`${name}-label`}
+              aria-label={`Elegir fecha de ${label.toLowerCase()}`}
               disabled={disabled}
             >
               <CalendarDays aria-hidden="true" />
@@ -140,45 +138,49 @@ export default function CourseDateTimePicker({
           >
             <Calendar
               mode="single"
-              selected={selectedDate}
-              onSelect={chooseDate}
+              locale={es}
+              selected={selected}
+              onSelect={(next) => {
+                if (next) {
+                  setDate(localDate(next));
+                  dateField.current?.setCustomValidity("");
+                  setOpen(false);
+                }
+              }}
               autoFocus
               className="mx-auto [--cell-size:2.5rem]"
             />
           </PopoverContent>
         </Popover>
-      </div>
-      <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        <span id={`${name}-hint`}>Hora local de Bolivia (HH:mm).</span>
-        <label htmlFor={`${name}-time`}>Hora</label>
-        <input
+        <TimePicker
           id={`${name}-time`}
-          type="text"
-          inputMode="numeric"
-          placeholder="18:30"
-          pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]"
-          aria-label="Hora"
-          className="bg-background text-foreground focus-visible:ring-ring min-h-9 w-24 rounded-md border px-2 text-sm outline-none focus-visible:ring-2 disabled:opacity-60"
-          value={timeDraft}
+          label={`Hora de ${label.toLowerCase()}`}
+          value={time}
           disabled={disabled}
-          onChange={(event) => {
-            const time = event.currentTarget.value;
-            if (!/^\d{0,2}(?::\d{0,2})?$/.test(time)) return;
-            setTimeDraft(time);
-            const date = dateTimeParts?.slice(1, 4);
-            if (date) update(`${date[0]}-${date[1]}-${date[2]}T${time}`);
+          invalid={Boolean(fieldError)}
+          onChange={(next) => {
+            setTime(next);
+            dateField.current?.setCustomValidity("");
           }}
         />
       </div>
+      <input
+        ref={field}
+        type="hidden"
+        name={name}
+        value={combined}
+        disabled={disabled}
+      />
       {fieldError && (
         <span
-          id={errorId}
+          id={`${name}-error`}
+          role="alert"
           className="text-destructive text-sm"
-          role={error ? undefined : "alert"}
         >
           {fieldError}
         </span>
       )}
+      {missing && <span className="sr-only">Fecha y hora obligatorias</span>}
     </div>
   );
 }

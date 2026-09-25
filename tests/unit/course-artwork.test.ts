@@ -83,6 +83,10 @@ describe("course artwork", () => {
       new File([valid], "crop.webp", { type: "image/png" }),
       new File([new Uint8Array(30)], "crop.webp", { type: "image/webp" }),
       new File([sampleWebp(200, 100)], "crop.webp", { type: "image/webp" }),
+      new File([sampleWebp(5000, 750)], "crop.webp", { type: "image/webp" }),
+      new File([new Uint8Array(4 * 1024 * 1024 + 1)], "crop.webp", {
+        type: "image/webp",
+      }),
     ];
     const animated = sampleWebp();
     animated.set([86, 80, 56, 56], 12); // VP8X
