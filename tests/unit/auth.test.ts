@@ -97,13 +97,39 @@ describe("private route policies and caching", () => {
       "/app",
       "/app/asistencia",
       "/app/cursos",
+      "/app/cursos/imagen",
       "/app/cursos/nuevo",
+      "/app/formatos",
+      "/app/formatos/nuevo",
     ]);
     expect(getPrivateRoutePolicy("/app")).toEqual({ access: "ACTIVE_USER" });
     expect(getPrivateRoutePolicy("/app/cursos")).toEqual({
       access: "ROLES",
       roles: ["ADMIN"],
     });
+    expect(getPrivateRoutePolicy("/app/cursos/imagen")).toEqual({
+      access: "ROLES",
+      roles: ["ADMIN"],
+    });
+    expect(getPrivateRoutePolicy("/app/formatos")).toEqual({
+      access: "ROLES",
+      roles: ["ADMIN"],
+    });
+    expect(getPrivateRoutePolicy("/app/formatos/nuevo")).toEqual({
+      access: "ROLES",
+      roles: ["ADMIN"],
+    });
+    expect(
+      getPrivateRoutePolicy(
+        "/app/formatos/10000000-0000-4000-8000-000000000001",
+      ),
+    ).toEqual({ access: "ROLES", roles: ["ADMIN"] });
+    expect(getPrivateRoutePolicy("/app/formatos/not-an-id")).toBeNull();
+    expect(
+      getPrivateRoutePolicy(
+        "/app/formatos/10000000-0000-4000-8000-000000000001/otra",
+      ),
+    ).toBeNull();
     expect(getPrivateRoutePolicy("/app/asistencia/")).toEqual({
       access: "ROLES",
       roles: ["INSTRUCTOR"],

@@ -1,0 +1,177 @@
+---
+import CourseShell from "@/components/public-courses/CourseShell.astro";
+import {
+  availabilityLabels,
+  levelLabels,
+} from "@/components/landing/course-presentation";
+import {
+  civilDate,
+  registrationWindow,
+  type DisplayCourse,
+} from "@/components/public-courses/course-details";
+import { parseCourseMarkdown } from "@/components/public-courses/course-markdown";
+import MarkdownNode from "@/components/public-courses/MarkdownNode.astro";
+import { getDatabase } from "@/server/db/client";
+import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
+import { publicArtworkUrl } from "@/server/courses/artwork";
+
+const slug = Astro.params.slug;
+let course: DisplayCourse | null = null;
+let loadError = false;
+try {
+  course = slug
+    ? await new DrizzleCourseRepository(getDatabase()).getPublic(slug)
+    : null;
+} catch {
+  loadError = true;
+  Astro.response.status = 503;
+}
+if (!loadError && !course) Astro.response.status = 404;
+const title = course
+  ? `${course.name} | Formación continua · UMSS`
+  : loadError
+    ? "Consulta no disponible | Formación continua"
+    : "Curso no encontrado | Formación continua";
+const artworkUrl = publicArtworkUrl(
+  course?.artwork,
+  import.meta.env.PUBLIC_SUPABASE_URL,
+);
+---
+
+<CourseShell
+  {title}
+  description={
+    course?.description ??
+    "Consulta los cursos publicados de formación continua de Informática y Sistemas, FCyT · UMSS."
+  }
+  noindex={!course}
+>
+  <div class="detail-wrap">
+    <a class="back-link" href="/cursos">
+      ← Volver a todos los cursos
+    </a>
+    {course ? (
+      <>
+        <header class="detail-hero">
+          <div class="detail-heading">
+            <p class="course-status">
+              {availabilityLabels[course.registrationAvailability]}
+            </p>
+            <h1>{course.name}</h1>
+            <p class="detail-description">{course.description}</p>
+          </div>
+          {artworkUrl ? (
+            <div class="detail-art has-photo" aria-hidden="true">
+              <img
+                src={artworkUrl}
+                alt=""
+                width="1200"
+                height="750"
+                decoding="async"
+              />
+            </div>
+          ) : (
+            <div class="detail-art" aria-hidden="true">
+              <span>
+                {course.name.trim().slice(0, 1).toLocaleUpperCase("es-BO")}
+              </span>
+              <small>Cota Activa / Formación continua</small>
+            </div>
+          )}
+        </header>
+        <div class="detail-body">
+          <div class="detail-main">
+            {course.contentMarkdown?.trim() && (
+              <section aria-labelledby="content-title" class="detail-section">
+                <h2 id="content-title">Sobre el curso</h2>
+                <div class="course-markdown">
+                  {parseCourseMarkdown(course.contentMarkdown).map((node) => (
+                    <MarkdownNode node={node} />
+                  ))}
+                </div>
+              </section>
+            )}
+            <section aria-labelledby="schedule-title" class="detail-section">
+              <h2 id="schedule-title">Horario</h2>
+              <p class="content-paragraph">{course.schedule}</p>
+              <p class="detail-note">
+                Horario informativo; el calendario definitivo se confirmará al
+                organizar los grupos.
+              </p>
+            </section>
+            <section aria-labelledby="conditions-title" class="detail-section">
+              <h2 id="conditions-title">Condiciones</h2>
+              <p class="content-paragraph">{course.conditions}</p>
+            </section>
+          </div>
+          <aside class="detail-aside" aria-label="Información del curso">
+            <dl>
+              <div>
+                <dt>Inicio</dt>
+                <dd>{civilDate(course.startsAt)}</dd>
+              </div>
+              <div>
+                <dt>Finalización</dt>
+                <dd>{civilDate(course.endsAt)}</dd>
+              </div>
+              <div>
+                <dt>Nivel</dt>
+                <dd>{levelLabels[course.level]}</dd>
+              </div>
+              <div>
+                <dt>Duración</dt>
+                <dd>{course.totalHours} horas</dd>
+              </div>
+              {course.instructorName?.trim() && (
+                <div>
+                  <dt>Instructor</dt>
+                  <dd>{course.instructorName}</dd>
+                </div>
+              )}
+              {registrationWindow(course) && (
+                <div>
+                  <dt>Ventana de preinscripción</dt>
+                  <dd>{registrationWindow(course)}</dd>
+                </div>
+              )}
+            </dl>
+            <section aria-labelledby="prices-title" class="prices">
+              <h2 id="prices-title">Precios</h2>
+              <dl>
+                {course.prices.map((price) => (
+                  <div>
+                    <dt>
+                      {price.participantType === "STUDENT"
+                        ? "Estudiantes"
+                        : "Personas externas"}
+                    </dt>
+                    <dd>Bs {price.amount}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p>Importes en bolivianos (BOB).</p>
+            </section>
+          </aside>
+        </div>
+      </>
+    ) : (
+      <section
+        class="catalog-state detail-state"
+        aria-labelledby="detail-state-title"
+        role={loadError ? "alert" : undefined}
+      >
+        <h1 id="detail-state-title">
+          {loadError
+            ? "No pudimos consultar el curso."
+            : "Curso no encontrado."}
+        </h1>
+        <p>
+          {loadError
+            ? "La consulta no está disponible en este momento. Intenta de nuevo más tarde."
+            : "Este curso no está disponible en la cartelera pública. Consulta la oferta vigente."}
+        </p>
+        <a href="/cursos">Ver todos los cursos</a>
+      </section>
+    )}
+  </div>
+</CourseShell>

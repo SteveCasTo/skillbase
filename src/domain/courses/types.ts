@@ -16,10 +16,10 @@ export interface CoursePrice {
 }
 
 export interface CourseData {
+  readonly courseTypeId: string;
   readonly name: string;
   readonly description: string;
   readonly level: CourseLevel;
-  readonly totalHours: number;
   readonly schedule: string;
   readonly conditions: string;
   readonly startsAt: Date;
@@ -27,10 +27,16 @@ export interface CourseData {
   readonly registrationStartAt: Date | null;
   readonly registrationEndAt: Date | null;
   readonly minimumGrade: number;
-  readonly prices: readonly CoursePrice[];
+  readonly contentMarkdown: string | null;
+  readonly instructorName: string | null;
+  readonly artwork: string | null;
 }
 
 export interface Course extends CourseData {
+  readonly courseTypeRevisionId: string;
+  readonly totalHours: number;
+  readonly prices: readonly CoursePrice[];
+  readonly featured: boolean;
   readonly id: string;
   readonly slug: string;
   readonly status: CourseStatus;
@@ -46,6 +52,10 @@ export interface PublicCourseDto {
   readonly slug: string;
   readonly name: string;
   readonly description: string;
+  readonly contentMarkdown?: string | null;
+  readonly instructorName?: string | null;
+  readonly artwork?: string | null;
+  readonly featured?: boolean;
   readonly level: CourseLevel;
   readonly totalHours: number;
   readonly schedule: string;

@@ -18,6 +18,7 @@ export interface CourseRepository {
     next: CourseStatus,
     actorId: string,
   ): Promise<AdminCourseDto>;
+  setFeatured(id: string, actorId: string): Promise<AdminCourseDto>;
   listAdmin(): Promise<readonly AdminCourseDto[]>;
   getAdmin(id: string): Promise<AdminCourseDto | null>;
   listPublic(now?: Date): Promise<readonly PublicCourseDto[]>;

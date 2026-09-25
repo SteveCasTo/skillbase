@@ -348,7 +348,7 @@ Ejemplos:
 - revocación;
 - cambios de rol.
 
-## MÓDULO COURSES EN FASE 2A
+## MÓDULO COURSES EN FASE 2
 
 El flujo implementado conserva los límites del monolito modular:
 
@@ -360,9 +360,15 @@ páginas Astro SSR
 → Drizzle/PostgreSQL
 ```
 
-Las páginas administrativas hacen render server-side y usan POST tradicional para evitar una isla React innecesaria. Cada escritura vuelve a verificar origen y autorización `ADMIN`; el middleware registra de forma explícita el listado, alta y edición dinámica con UUID válido, y mantiene el comportamiento fail-closed para cualquier otra ruta `/app`.
+Las páginas administrativas hacen render server-side y usan POST tradicional para evitar una isla React innecesaria. Cada escritura vuelve a verificar origen y autorización `ADMIN`; el middleware registra de forma explícita las rutas de cursos y formatos y mantiene el comportamiento fail-closed para cualquier otra ruta `/app`. El constructor/recortador de imágenes es una isla React acotada a la interacción que la necesita.
 
-`DrizzleCourseRepository` agrupa curso, dos precios requeridos y auditoría en una misma transacción. El contrato administrativo incluye campos operativos; el contrato público independiente se construye solo desde filas `PUBLISHED`, omite estado, nota mínima, IDs y timestamps administrativos, y deriva disponibilidad de la ventana en tiempo de lectura. En Fase 2A ese contrato se limita a DTOs y lecturas del repositorio: todavía no existen rutas HTTP de catálogo o detalle.
+`DrizzleCourseRepository` agrupa curso y auditoría en transacción; los términos comerciales se resuelven desde la revisión inmutable de formato referenciada por el curso. `DrizzleFormatRepository` crea y revisa formatos, conserva auditoría, mueve cursos `DRAFT` a la revisión vigente y deja intactas revisiones de cursos publicados/archivados. La migración versionada reconstruye formatos a partir de las tuplas históricas de duración y precios y elimina los campos/tablas directos al completar la migración.
+
+El contrato administrativo incluye campos operativos; el contrato público independiente se construye solo desde filas `PUBLISHED`, omite estado, nota mínima, IDs y timestamps administrativos, y deriva disponibilidad de la ventana en tiempo de lectura. `/` y `/cursos` cargan catálogo SSR en cada solicitud; `/cursos/[slug]` consulta detalle publicado y responde 404 para no-publicados e inexistentes. La landing elige el destacado único si existe y usa un fallback determinista si no.
+
+El contenido Markdown del curso se interpreta mediante un parser de nodos permitidos y se renderiza sin insertar HTML arbitrario; destinos de enlaces pasan por allowlist. El horario se conserva como texto legado: un constructor de días/horas ayuda a producirlo, pero no crea un calendario estructurado ni sesiones operativas. Instructor es texto, no una relación de identidad.
+
+El editor de artwork produce una imagen WebP recortada y la envía a un endpoint SSR. El endpoint exige origen esperado, sesión/usuario activo y rol `ADMIN`, limita tamaño, comprueba MIME/extensión y dimensiones/contenedor WebP y sube con credencial service-role solo en servidor al bucket público `course-artwork`. Las filas guardan una key de formato canónico vinculada al curso, no una URL proporcionada por el cliente; la URL pública se genera desde el host Supabase configurado. El bucket se verifica/crea con política pública de lectura y escritura solo server-side mediante privilegio privilegiado.
 
 Los formularios `datetime-local` representan exclusivamente tiempo civil de `America/La_Paz`. La conversión pura de dominio aplica UTC-04 —Bolivia no utiliza horario de verano— tanto al persistir instantes UTC como al volver a editar, sin depender del timezone del proceso. La edición envía `updatedAt` como revisión optimista y el repositorio rechaza escrituras obsoletas. La asignación de slugs se serializa con un advisory lock transaccional global y estable para evitar colisiones incluso entre bases solapadas como `foo` y `foo-2`.
 

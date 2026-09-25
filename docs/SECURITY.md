@@ -91,9 +91,7 @@ Certificado final:
 
 No aceptar formatos arbitrarios.
 
-Si posteriormente se aceptan imágenes:
-
-- definir explícitamente tipos permitidos.
+El flujo actual acepta fotografía de curso mediante un editor que exporta WebP; ver las restricciones de upload y el bucket público específico en «Artwork de cursos» más abajo. Esto no habilita otros tipos de archivo.
 
 ## STORAGE
 
@@ -102,6 +100,15 @@ Separar buckets o políticas según sensibilidad.
 No exponer buckets privados mediante URL pública permanente.
 
 Utilizar URLs firmadas cuando corresponda.
+
+### Artwork de cursos
+
+- El bucket `course-artwork` es público solo para lectura porque sus objetos se destinan a cursos publicados; no contiene documentos personales.
+- El endpoint de aplicación realiza la carga usando `SUPABASE_SERVICE_ROLE_KEY` exclusivamente server-side. Storage no concede upload directo al navegador y no se entrega esa credencial en props, respuestas ni bundle.
+- Se exige origen esperado, usuario interno activo y rol `ADMIN`. El curso debe existir y no estar archivado.
+- El request multipart está limitado; se valida `image/webp`, extensión `.webp`, bytes reales, dimensiones y contenedor WebP estático simple. Se rechazan formatos animados/extendidos. El editor convierte PNG/JPEG/WebP al WebP canónico recortado.
+- Las keys son generadas por servidor bajo `courses/{courseId}/{uuid}.webp`; al guardar se comprueba que la key pertenezca al curso y que el objeto exista en el bucket. Solo keys canónicas generan URLs públicas, desde el origen Supabase configurado.
+- La configuración del bucket (público, solo `image/webp`, 4 MiB) se comprueba/crea al usar el servicio; esto no equivale a despliegue cloud verificado.
 
 ## DATOS PERSONALES
 
@@ -180,18 +187,20 @@ Usar schemas compartibles cuando tenga sentido.
 
 Normalizar datos antes de persistir.
 
-### Cursos de Fase 2A
+### Cursos y formatos de Fase 2
 
 - Las rutas administrativas de cursos están enumeradas por política; la edición dinámica solo acepta el patrón con UUID y cualquier ruta privada desconocida falla cerrada.
 - Cada POST de creación, edición, publicación, retiro o archivo exige origen exacto, usuario interno `ACTIVE` y rol `ADMIN`, incluso después del guard del middleware.
 - El cliente no puede enviar un estado editorial arbitrario: cada intención invoca un caso de uso y una transición cerrada.
 - El slug se normaliza y asigna en servidor bajo bloqueo transaccional; nunca se acepta durante edición.
 - La asignación usa un namespace global estable de advisory lock para que nombres concurrentes con bases solapadas no compitan por el mismo slug.
-- Curso, precios y evento de auditoría se escriben en una sola transacción. No existe endpoint `DELETE`.
+- Curso y evento de auditoría se escriben transaccionalmente; el formato/revisión se referencia desde el curso. Las revisiones son inmutables y su modificación/eliminación se bloquea en DB mediante un trigger con `search_path` fijado. No existe endpoint `DELETE` de cursos.
 - Las ediciones usan `updatedAt` como revisión optimista y fallan con conflicto antes de sobrescribir cambios más recientes.
 - Los fallos de infraestructura responden `500` con texto público genérico y emiten únicamente contexto estructurado sanitizado en servidor; no se registran SQL, causas, secretos ni payloads de formulario.
-- Los DTO públicos se proyectan de forma explícita y solo consultan `PUBLISHED`; no reutilizan el DTO administrativo. En Fase 2A este contrato todavía no se expone mediante rutas HTTP públicas.
-- `courses`, `course_prices` y `audit_events` mantienen RLS sin políticas y revocación explícita de todos los privilegios de tabla a `anon`, `authenticated` y `service_role`. El browser no recibe credenciales de base ni service role.
+- Los DTO públicos se proyectan de forma explícita y solo consultan `PUBLISHED`; no reutilizan el DTO administrativo. Landing, catálogo y detalle son SSR.
+- El destacado singleton se limita a cursos publicados mediante constraint/index DB y lógica de aplicación.
+- El contenido Markdown no se inserta como HTML; el parser crea únicamente nodos soportados y filtra esquemas/destinos de enlaces.
+- `courses`, `course_types`, `course_type_revisions` y `audit_events` mantienen RLS sin políticas Data API y revocación de privilegios a roles de cliente. El browser no recibe credenciales de base ni service role.
 - Las respuestas bajo `/app` siguen usando `Cache-Control: private, no-store`.
 
 ## CSRF / XSS / HTML

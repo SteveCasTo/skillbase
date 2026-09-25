@@ -6,10 +6,9 @@ import { completeOAuthCallback } from "@/application/auth/complete-oauth-callbac
 import { createDatabase } from "@/server/db/client";
 import { DrizzleAuthUserRepository } from "@/server/db/repositories/auth-user-repository";
 import { roles, userRoles, users } from "@/server/db/schema";
+import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
-const connectionString =
-  process.env.DATABASE_URL ??
-  "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const connectionString = getTestSupabaseEnvironment().databaseUrl;
 const database = createDatabase(connectionString);
 const repository = new DrizzleAuthUserRepository(database.db);
 const testDomain = "%@repository.test";

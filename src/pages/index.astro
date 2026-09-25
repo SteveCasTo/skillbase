@@ -43,6 +43,7 @@ if (showDesignPreview) {
 }
 
 const featuredCourse =
+  courses.find((course) => "featured" in course && course.featured === true) ??
   courses.find(
     ({ registrationAvailability }) => registrationAvailability === "OPEN",
   ) ??

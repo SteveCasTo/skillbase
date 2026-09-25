@@ -1,32 +1,117 @@
 ---
 import type { CourseInput } from "@/domain/courses/validation";
+import type { CourseFormat } from "@/domain/courses/formats";
+import CourseSelect from "./CourseSelect";
+import CourseImageEditor from "./CourseImageEditor";
+import CourseDateTimePicker from "./CourseDateTimePicker";
+import CourseSchedulePicker from "./CourseSchedulePicker";
+import CourseMarkdownEditor from "./CourseMarkdownEditor";
 
 interface Props {
   values: CourseInput;
+  formats: readonly CourseFormat[];
   errors?: Readonly<Record<string, string>>;
   disabled?: boolean;
   submitLabel: string;
   intent?: "update";
   revision?: string;
+  courseId?: string;
+  /** Persisted course values, distinct from the attempted values after a failed POST. */
+  baseline?: CourseInput | undefined;
 }
 
 const {
   values,
+  formats,
   errors = {},
   disabled = false,
   submitLabel,
   intent,
   revision,
+  courseId,
+  baseline,
 } = Astro.props;
 const control =
   "mt-2 min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";
 const area = `${control} min-h-28 resize-y`;
 const errorId = (name: string) => (errors[name] ? `${name}-error` : undefined);
+const trackedFields = [
+  "name",
+  "description",
+  "level",
+  "courseTypeId",
+  "instructorName",
+  "contentMarkdown",
+  "schedule",
+  "conditions",
+  "startsAt",
+  "endsAt",
+  "registrationStartAt",
+  "registrationEndAt",
+  "minimumGrade",
+  "artwork",
+] as const;
+const initialValues = Object.fromEntries(
+  trackedFields.map((name) => [name, baseline?.[name] ?? ""]),
+);
 ---
 
-<form method="post" class="course-form flex flex-col gap-8" novalidate>
+<form
+  method="post"
+  class="course-form flex flex-col gap-8"
+  data-course-id={courseId}
+  data-baseline={baseline ? JSON.stringify(initialValues) : undefined}
+  novalidate
+>
   {intent && <input type="hidden" name="intent" value={intent} />}
   {revision && <input type="hidden" name="revision" value={revision} />}
+  <input type="hidden" name="artwork" value={values.artwork ?? ""} />
+  {courseId && !disabled && (
+    <CourseImageEditor
+      client:only="react"
+      courseId={courseId}
+      currentArtwork={values.artwork ?? null}
+    />
+  )}
+  {!courseId && !disabled && <CourseImageEditor client:only="react" />}
+  {!courseId && (
+    <p
+      class="artwork-create-error hidden text-sm text-destructive"
+      role="alert"
+      aria-live="assertive"
+    ></p>
+  )}
+  {!courseId && (
+    <div
+      class="draft-recovery hidden rounded-lg border bg-secondary p-4 text-sm"
+      role="status"
+      aria-live="polite"
+    >
+      <p>
+        El borrador ya se creó, pero la foto no quedó guardada. Puedes
+        reintentar o abrir el borrador para subirla desde allí.
+      </p>
+      <div class="mt-3 flex flex-wrap gap-3">
+        <button
+          type="button"
+          class="retry-artwork min-h-11 rounded-lg border px-4 font-medium"
+        >
+          Reintentar foto
+        </button>
+        <a
+          class="draft-link inline-flex min-h-11 items-center rounded-lg border px-4 font-medium"
+          href="/app/cursos"
+        >
+          Abrir borrador
+        </a>
+      </div>
+    </div>
+  )}
+  {errors.artwork && (
+    <p id="artwork-error" role="alert" class="text-sm text-destructive">
+      {errors.artwork}
+    </p>
+  )}
   <fieldset disabled={disabled} class="flex flex-col gap-8 disabled:opacity-70">
     <section
       class="rounded-xl border bg-card p-5 shadow-xs sm:p-7"
@@ -35,9 +120,6 @@ const errorId = (name: string) => (errors[name] ? `${name}-error` : undefined);
       <h2 id="general-title" class="text-xl font-semibold">
         Información general
       </h2>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Estos datos serán públicos cuando el curso esté publicado.
-      </p>
       <div class="mt-6 grid gap-5 sm:grid-cols-2">
         <label class="sm:col-span-2">
           {" "}
@@ -45,6 +127,7 @@ const errorId = (name: string) => (errors[name] ? `${name}-error` : undefined);
           <input
             class={control}
             name="name"
+            data-course-input="text"
             value={values.name ?? ""}
             required
             aria-invalid={Boolean(errors.name)}
@@ -62,6 +145,7 @@ const errorId = (name: string) => (errors[name] ? `${name}-error` : undefined);
           <textarea
             class={area}
             name="description"
+            data-course-input="multiline"
             required
             aria-invalid={Boolean(errors.description)}
             aria-describedby={errorId("description")}
@@ -75,84 +159,152 @@ const errorId = (name: string) => (errors[name] ? `${name}-error` : undefined);
             </span>
           )}
         </label>
-        <label>
-          <span class="text-sm font-medium">Nivel</span>
-          <select
-            class={control}
-            name="level"
-            required
-            aria-invalid={Boolean(errors.level)}
-            aria-describedby={errorId("level")}
-          >
-            <option value="">Selecciona un nivel</option>
-            <option value="BASIC" selected={values.level === "BASIC"}>
-              Básico
-            </option>
-            <option
-              value="INTERMEDIATE"
-              selected={values.level === "INTERMEDIATE"}
+        <CourseSelect
+          client:only="react"
+          name="level"
+          label="Nivel"
+          value={values.level ?? ""}
+          error={errors.level ?? ""}
+          disabled={disabled}
+          placeholder="Selecciona un nivel"
+          options={[
+            { value: "BASIC", label: "Básico" },
+            { value: "INTERMEDIATE", label: "Medio" },
+            { value: "ADVANCED", label: "Avanzado" },
+          ]}
+        />
+        <CourseSelect
+          client:only="react"
+          name="courseTypeId"
+          label="Formato de curso"
+          value={values.courseTypeId ?? ""}
+          error={errors.courseTypeId ?? ""}
+          disabled={disabled || formats.length === 0}
+          placeholder="Selecciona un formato"
+          options={formats
+            .filter(
+              (format) => format.active || format.id === values.courseTypeId,
+            )
+            .map((format) => ({
+              value: format.id,
+              label: `${format.name} · ${format.totalHours} h · ${format.studentAmount} / ${format.externalAmount} BOB`,
+              disabled: !format.active,
+            }))}
+        />
+        <noscript>
+          <label class="text-sm font-medium">
+            Nivel
+            <select class={control} name="level" required disabled={disabled}>
+              <option value="">Selecciona un nivel</option>
+              {[
+                { value: "BASIC", label: "Básico" },
+                { value: "INTERMEDIATE", label: "Medio" },
+                { value: "ADVANCED", label: "Avanzado" },
+              ].map((option) => (
+                <option
+                  value={option.value}
+                  selected={values.level === option.value}
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label class="text-sm font-medium">
+            Formato de curso
+            <select
+              class={control}
+              name="courseTypeId"
+              required
+              disabled={disabled || formats.length === 0}
             >
-              Medio
-            </option>
-            <option value="ADVANCED" selected={values.level === "ADVANCED"}>
-              Avanzado
-            </option>
-          </select>
-          {errors.level && (
-            <span id="level-error" class="mt-1 block text-sm text-destructive">
-              {errors.level}
-            </span>
-          )}
-        </label>
-        <label>
-          <span class="text-sm font-medium">Duración total (horas)</span>
-          <input
-            class={control}
-            name="totalHours"
-            type="number"
-            min="1"
-            step="1"
-            value={values.totalHours ?? ""}
-            required
-            aria-invalid={Boolean(errors.totalHours)}
-            aria-describedby={errorId("totalHours")}
-          />
-          {errors.totalHours && (
-            <span
-              id="totalHours-error"
-              class="mt-1 block text-sm text-destructive"
-            >
-              {errors.totalHours}
-            </span>
-          )}
-        </label>
+              <option value="">Selecciona un formato</option>
+              {formats
+                .filter(
+                  (format) =>
+                    format.active || format.id === values.courseTypeId,
+                )
+                .map((format) => (
+                  <option
+                    value={format.id}
+                    selected={values.courseTypeId === format.id}
+                    disabled={!format.active}
+                  >
+                    {format.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </noscript>
         <label class="sm:col-span-2">
-          <span class="text-sm font-medium">Horario informativo</span>
+          <span class="text-sm font-medium">Instructor (opcional)</span>
           <input
             class={control}
-            name="schedule"
-            value={values.schedule ?? ""}
-            required
-            aria-invalid={Boolean(errors.schedule)}
-            aria-describedby={errorId("schedule")}
+            name="instructorName"
+            data-course-input="text"
+            value={values.instructorName ?? ""}
+            aria-invalid={Boolean(errors.instructorName)}
+            aria-describedby={errorId("instructorName")}
           />
-          <span class="mt-1 block text-xs text-muted-foreground">
-            Ejemplo: lunes y miércoles, 18:30–20:30.
-          </span>
-          {errors.schedule && (
-            <span
-              id="schedule-error"
-              class="mt-1 block text-sm text-destructive"
-            >
-              {errors.schedule}
+          {errors.instructorName && (
+            <span id="instructorName-error" class="text-sm text-destructive">
+              {errors.instructorName}
             </span>
           )}
         </label>
+        <div class="min-w-0 sm:col-span-2">
+          <label for="contentMarkdown" class="text-sm font-medium">
+            Contenido del curso (Markdown, opcional)
+          </label>
+          <CourseMarkdownEditor
+            client:only="react"
+            value={values.contentMarkdown ?? ""}
+            error={errors.contentMarkdown ?? ""}
+            disabled={disabled}
+            describedBy="contentMarkdown-help"
+          />
+          <noscript>
+            <textarea
+              class={area}
+              id="contentMarkdown"
+              name="contentMarkdown"
+              data-course-input="multiline"
+              rows="9"
+              disabled={disabled}
+            >{values.contentMarkdown ?? ""}</textarea>
+          </noscript>
+          <span class="mt-1 block text-xs text-muted-foreground">
+            <span id="contentMarkdown-help">
+              Usa encabezados con ## y listas con -; el texto se publicará junto
+              al curso.
+            </span>
+          </span>
+        </div>
+        <CourseSchedulePicker
+          client:only="react"
+          value={values.schedule ?? ""}
+          error={errors.schedule ?? ""}
+          disabled={disabled}
+        />
+        <noscript>
+          <label class="sm:col-span-2">
+            Horario informativo
+            <input
+              class={control}
+              name="schedule"
+              data-course-input="text"
+              value={values.schedule ?? ""}
+              required
+              disabled={disabled}
+            />
+          </label>
+        </noscript>
         <label class="sm:col-span-2">
           <span class="text-sm font-medium">Condiciones</span>
           <textarea
             class={area}
             name="conditions"
+            data-course-input="multiline"
             required
             aria-invalid={Boolean(errors.conditions)}
             aria-describedby={errorId("conditions")}
@@ -170,45 +322,52 @@ const errorId = (name: string) => (errors[name] ? `${name}-error` : undefined);
     </section>
 
     <section
-      class="rounded-xl border bg-card p-5 shadow-xs sm:p-7"
+      class="rounded-xl border bg-card p-4 shadow-xs sm:p-7"
       aria-labelledby="dates-title"
     >
       <h2 id="dates-title" class="text-xl font-semibold">
         Fechas y preinscripción
       </h2>
-      <p class="mt-1 text-sm text-muted-foreground">
-        El calendario es provisional. La ventana de preinscripción puede quedar
-        sin configurar. Todas las horas se interpretan en America/La_Paz
-        (Bolivia).
-      </p>
-      <div class="mt-6 grid gap-5 sm:grid-cols-2">
+      <div class="mt-6 grid gap-5 lg:grid-cols-2">
         {[
           { name: "startsAt", label: "Inicio del curso" },
           { name: "endsAt", label: "Finalización del curso" },
           { name: "registrationStartAt", label: "Apertura de preinscripción" },
           { name: "registrationEndAt", label: "Cierre de preinscripción" },
         ].map(({ name, label }) => (
-          <label>
-            <span class="text-sm font-medium">{label}</span>
-            <input
-              class={control}
-              name={name}
-              type="datetime-local"
-              value={values[name] ?? ""}
-              required={name === "startsAt" || name === "endsAt"}
-              aria-invalid={Boolean(errors[name])}
-              aria-describedby={errorId(name)}
-            />
-            {errors[name] && (
-              <span
-                id={`${name}-error`}
-                class="mt-1 block text-sm text-destructive"
-              >
-                {errors[name]}
-              </span>
-            )}
-          </label>
+          <CourseDateTimePicker
+            client:only="react"
+            name={name}
+            data-course-input="text"
+            label={label}
+            value={values[name] ?? ""}
+            required={name === "startsAt" || name === "endsAt"}
+            disabled={disabled}
+            error={errors[name] ?? ""}
+          />
         ))}
+        <noscript>
+          {[
+            { name: "startsAt", label: "Inicio del curso" },
+            { name: "endsAt", label: "Finalización del curso" },
+            {
+              name: "registrationStartAt",
+              label: "Apertura de preinscripción",
+            },
+            { name: "registrationEndAt", label: "Cierre de preinscripción" },
+          ].map(({ name, label }) => (
+            <label class="text-sm font-medium">
+              {label} (AAAA-MM-DDTHH:mm)
+              <input
+                class={control}
+                name={name}
+                value={values[name] ?? ""}
+                required={name === "startsAt" || name === "endsAt"}
+                disabled={disabled}
+              />
+            </label>
+          ))}
+        </noscript>
       </div>
     </section>
 
@@ -217,46 +376,17 @@ const errorId = (name: string) => (errors[name] ? `${name}-error` : undefined);
       aria-labelledby="prices-title"
     >
       <h2 id="prices-title" class="text-xl font-semibold">
-        Precios y aprobación
+        Aprobación
       </h2>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Todos los montos se registran en bolivianos (BOB).
-      </p>
       <div class="mt-6 grid gap-5 sm:grid-cols-3">
-        {[
-          { name: "studentAmount", label: "Precio estudiante" },
-          { name: "externalAmount", label: "Precio externo" },
-        ].map(({ name, label }) => (
-          <label>
-            <span class="text-sm font-medium">{label} (BOB)</span>
-            <input
-              class={control}
-              name={name}
-              inputmode="decimal"
-              value={values[name] ?? ""}
-              required
-              aria-invalid={Boolean(errors[name])}
-              aria-describedby={errorId(name)}
-            />
-            {errors[name] && (
-              <span
-                id={`${name}-error`}
-                class="mt-1 block text-sm text-destructive"
-              >
-                {errors[name]}
-              </span>
-            )}
-          </label>
-        ))}
         <label>
           <span class="text-sm font-medium">Nota mínima (0–100)</span>
           <input
             class={control}
             name="minimumGrade"
-            type="number"
-            min="0"
-            max="100"
-            step="1"
+            type="text"
+            inputmode="numeric"
+            data-course-input="grade"
             value={values.minimumGrade ?? ""}
             required
             aria-invalid={Boolean(errors.minimumGrade)}
@@ -293,9 +423,220 @@ const errorId = (name: string) => (errors[name] ? `${name}-error` : undefined);
 </form>
 
 <script>
+  import { createCourseWithArtwork } from "./createCourseWithArtwork";
+  import {
+    acceptsCourseInput,
+    draftFieldsReady,
+    requiredCourseFields,
+    type CourseInputKind,
+  } from "./course-input-filter";
+  let preparedImage: File | null = null;
+  let imageSelected = false;
+  window.addEventListener("course-artwork-selection", (event) => {
+    imageSelected = (event as CustomEvent<boolean>).detail;
+  });
+  window.addEventListener("course-artwork-prepared", (event) => {
+    preparedImage = (event as CustomEvent<File | null>).detail;
+  });
+  window.addEventListener("course-artwork-uploaded", (event) => {
+    const detail = (event as CustomEvent<{ courseId: string; key: string }>)
+      .detail;
+    const form = document.querySelector<HTMLFormElement>(
+      `.course-form[data-course-id="${detail.courseId}"]`,
+    );
+    const artwork = form?.querySelector<HTMLInputElement>(
+      'input[name="artwork"]',
+    );
+    if (artwork) {
+      artwork.value = detail.key;
+      artwork.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
   document.querySelectorAll<HTMLFormElement>(".course-form").forEach((form) => {
-    form.addEventListener("submit", () => {
-      const button = form.querySelector<HTMLButtonElement>(".submit-button");
+    const button = form.querySelector<HTMLButtonElement>(".submit-button");
+    // Capture edits before React's delegated change handlers see them. Invalid
+    // paste/drop/IME commits are reverted as a whole, never sanitized into a
+    // different value that might inadvertently be submitted.
+    const admitted = new WeakMap<
+      HTMLInputElement | HTMLTextAreaElement,
+      string
+    >();
+    const filtered = (target: EventTarget | null) => {
+      if (!(
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement
+      ))
+        return null;
+      const kind = target.dataset.courseInput as CourseInputKind | undefined;
+      return kind ? { target, kind } : null;
+    };
+    form.addEventListener("beforeinput", (event) => {
+      const input = event as InputEvent;
+      const field = filtered(event.target);
+      if (
+        !field ||
+        input.isComposing ||
+        !input.cancelable ||
+        input.inputType.startsWith("delete")
+      )
+        return;
+      const { target, kind } = field;
+      const inserted =
+        input.data ?? input.dataTransfer?.getData("text/plain") ?? "";
+      if (!inserted) return;
+      const candidate =
+        target.value.slice(0, target.selectionStart ?? target.value.length) +
+        inserted +
+        target.value.slice(target.selectionEnd ?? target.value.length);
+      if (!acceptsCourseInput(kind, candidate)) event.preventDefault();
+    });
+    form.addEventListener(
+      "input",
+      (event) => {
+        const field = filtered(event.target);
+        if (!field || (event as InputEvent).isComposing) return;
+        const { target, kind } = field;
+        if (acceptsCourseInput(kind, target.value))
+          admitted.set(target, target.value);
+        else target.value = admitted.get(target) ?? target.defaultValue;
+      },
+      true,
+    );
+    form.addEventListener("compositionstart", (event) => {
+      const field = filtered(event.target);
+      if (field && acceptsCourseInput(field.kind, field.target.value))
+        admitted.set(field.target, field.target.value);
+    });
+    form.addEventListener("compositionend", (event) => {
+      const field = filtered(event.target);
+      if (!field) return;
+      if (!acceptsCourseInput(field.kind, field.target.value)) {
+        field.target.value =
+          admitted.get(field.target) ?? field.target.defaultValue;
+        field.target.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    const baseline: Record<string, string> | null = form.dataset.baseline
+      ? JSON.parse(form.dataset.baseline)
+      : null;
+    if (button && !button.disabled) {
+      // The SSR button stays usable without JavaScript. Once JS runs, wait for
+      // all form-associated islands before comparing against persisted values.
+      button.disabled = true;
+      let ready = false;
+      const fields = baseline ? Object.keys(baseline) : [];
+      const sync = () => {
+        const current = new FormData(form);
+        if (
+          !ready &&
+          !(
+            baseline
+              ? fields
+              : [
+                  ...requiredCourseFields,
+                  "registrationStartAt",
+                  "registrationEndAt",
+                ]
+          ).every((name) => current.has(name))
+        )
+          return;
+        ready = true;
+        const changed = baseline
+          ? !fields.every((name) => {
+              const values = current.getAll(name);
+              return (
+                values.length === 1 &&
+                values[0] === (baseline[name] ?? "").replace(/\r\n?/g, "\n")
+              );
+            })
+          : false;
+        const values = Object.fromEntries(
+          [...current.entries()].filter(
+            (entry): entry is [string, string] => typeof entry[1] === "string",
+          ),
+        );
+        const valid = form.checkValidity() && draftFieldsReady(values);
+        button.disabled = baseline ? !changed || !valid : !valid;
+      };
+      // FormData reads the controls' current values directly, including hidden
+      // fields updated by React islands, so reconcile each change immediately.
+      form.addEventListener("input", sync);
+      form.addEventListener("change", sync);
+      form.addEventListener("course-form-change", sync);
+      const observer = new MutationObserver(() => {
+        sync();
+      });
+      observer.observe(form, { childList: true, subtree: true });
+      sync();
+      // Reconcile after all islands hydrate, even if their first form controls
+      // appeared before their final values were committed.
+      window.addEventListener(
+        "load",
+        () => {
+          sync();
+          observer.disconnect();
+        },
+        { once: true },
+      );
+      window.addEventListener("pageshow", sync);
+    }
+    form.addEventListener("submit", (event) => {
+      if (!form.reportValidity()) {
+        event.preventDefault();
+        return;
+      }
+      if (!form.dataset.courseId && imageSelected) {
+        event.preventDefault();
+        const error = form.querySelector<HTMLElement>(".artwork-create-error");
+        const recovery = form.querySelector<HTMLElement>(".draft-recovery");
+        const retry = form.querySelector<HTMLButtonElement>(".retry-artwork");
+        const link = form.querySelector<HTMLAnchorElement>(".draft-link");
+        if (!error || !recovery || !retry || !link) return;
+        if (!preparedImage) {
+          error.textContent =
+            "Confirma el recorte con “Usar este recorte” antes de crear el borrador.";
+          error.classList.remove("hidden");
+          error.scrollIntoView({ block: "center" });
+          return;
+        }
+        const fields = new FormData(form);
+        const image = preparedImage;
+        if (button) {
+          button.disabled = true;
+          button.querySelector(".submit-label")?.classList.add("hidden");
+          button.querySelector(".submit-pending")?.classList.remove("hidden");
+        }
+        error.classList.add("hidden");
+        let draftExists = false;
+        const showError = (caught: unknown) => {
+          error.textContent =
+            caught instanceof Error
+              ? caught.message
+              : "No se pudo guardar. Inténtalo nuevamente.";
+          error.classList.remove("hidden");
+          error.scrollIntoView({ block: "center" });
+          if (draftExists) recovery.classList.remove("hidden");
+          if (!draftExists && button) {
+            button.disabled = false;
+            button.querySelector(".submit-label")?.classList.remove("hidden");
+            button.querySelector(".submit-pending")?.classList.add("hidden");
+          }
+        };
+        void createCourseWithArtwork(fields, image, (url, attach) => {
+          draftExists = true;
+          link.href = url;
+          retry.onclick = () => {
+            retry.disabled = true;
+            error.classList.add("hidden");
+            void attach()
+              .catch(showError)
+              .finally(() => {
+                retry.disabled = false;
+              });
+          };
+        }).catch(showError);
+        return;
+      }
       if (!button) return;
       button.disabled = true;
       button.querySelector(".submit-label")?.classList.add("hidden");

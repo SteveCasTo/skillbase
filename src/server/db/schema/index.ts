@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  boolean,
   decimal,
   index,
   integer,
@@ -98,6 +99,66 @@ export const userRoles = pgTable(
   ],
 );
 
+export const courseTypes = pgTable(
+  "course_types",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull().unique(),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      "course_types_name_not_blank_check",
+      sql`length(btrim(${table.name})) > 0`,
+    ),
+  ],
+);
+
+export const courseTypeRevisions = pgTable(
+  "course_type_revisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    courseTypeId: uuid("course_type_id")
+      .notNull()
+      .references(() => courseTypes.id, { onDelete: "restrict" }),
+    revisionNumber: integer("revision_number").notNull(),
+    totalHours: integer("total_hours").notNull(),
+    studentAmount: decimal("student_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    externalAmount: decimal("external_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("course_type_revisions_type_number_unique").on(
+      table.courseTypeId,
+      table.revisionNumber,
+    ),
+    index("course_type_revisions_type_idx").on(table.courseTypeId),
+    check("course_type_revisions_hours_check", sql`${table.totalHours} > 0`),
+    check(
+      "course_type_revisions_prices_check",
+      sql`${table.studentAmount} >= 0 and ${table.externalAmount} >= 0`,
+    ),
+    check(
+      "course_type_revisions_number_check",
+      sql`${table.revisionNumber} > 0`,
+    ),
+  ],
+);
+
 export const courses = pgTable(
   "courses",
   {
@@ -106,7 +167,13 @@ export const courses = pgTable(
     slug: text("slug").notNull(),
     description: text("description").notNull(),
     level: courseLevel("level").notNull(),
-    totalHours: integer("total_hours").notNull(),
+    courseTypeRevisionId: uuid("course_type_revision_id")
+      .notNull()
+      .references(() => courseTypeRevisions.id, { onDelete: "restrict" }),
+    contentMarkdown: text("content_markdown"),
+    instructorName: text("instructor_name"),
+    artwork: text("artwork"),
+    featured: boolean("featured").notNull().default(false),
     schedule: text("schedule").notNull(),
     conditions: text("conditions").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
@@ -130,6 +197,14 @@ export const courses = pgTable(
     uniqueIndex("courses_slug_unique").on(table.slug),
     index("courses_status_idx").on(table.status),
     index("courses_status_created_at_idx").on(table.status, table.createdAt),
+    index("courses_course_type_revision_idx").on(table.courseTypeRevisionId),
+    uniqueIndex("courses_one_published_featured_unique")
+      .on(table.featured)
+      .where(sql`${table.status} = 'PUBLISHED' and ${table.featured} = true`),
+    check(
+      "courses_featured_published_check",
+      sql`not ${table.featured} or ${table.status} = 'PUBLISHED'`,
+    ),
     check(
       "courses_name_not_blank_check",
       sql`length(btrim(${table.name})) > 0`,
@@ -150,7 +225,6 @@ export const courses = pgTable(
       "courses_slug_format_check",
       sql`${table.slug} ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'`,
     ),
-    check("courses_total_hours_check", sql`${table.totalHours} > 0`),
     check(
       "courses_minimum_grade_check",
       sql`${table.minimumGrade} between 0 and 100`,
@@ -160,34 +234,6 @@ export const courses = pgTable(
       "courses_registration_window_check",
       sql`(${table.registrationStartAt} is null and ${table.registrationEndAt} is null) or (${table.registrationStartAt} is not null and ${table.registrationEndAt} is not null and ${table.registrationStartAt} < ${table.registrationEndAt})`,
     ),
-  ],
-);
-
-export const coursePrices = pgTable(
-  "course_prices",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    courseId: uuid("course_id")
-      .notNull()
-      .references(() => courses.id, { onDelete: "restrict" }),
-    participantType: participantType("participant_type").notNull(),
-    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
-    currency: text("currency").notNull().default("BOB"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    uniqueIndex("course_prices_course_participant_unique").on(
-      table.courseId,
-      table.participantType,
-    ),
-    index("course_prices_course_id_idx").on(table.courseId),
-    check("course_prices_amount_check", sql`${table.amount} >= 0`),
-    check("course_prices_currency_check", sql`${table.currency} = 'BOB'`),
   ],
 );
 
