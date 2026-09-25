@@ -108,7 +108,12 @@ test("published course is public end-to-end and withdrawal removes every public 
       new RegExp(`^courses/${courseId}/[0-9a-f-]+\\.webp$`, "i"),
     );
     await page.getByRole("button", { name: "Guardar cambios" }).click();
-    await expect(page).toHaveURL(/success=updated/);
+    await expect(page.locator("[data-sileo-toast]")).toContainText(
+      "Cambios guardados",
+    );
+    await expect(
+      page.getByRole("button", { name: "Guardar cambios" }),
+    ).toBeDisabled();
 
     await page.getByText("Publicar curso", { exact: true }).click();
     await page.getByRole("button", { name: "Confirmar publicación" }).click();

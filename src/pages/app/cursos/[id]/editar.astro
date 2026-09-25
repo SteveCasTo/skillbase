@@ -38,6 +38,9 @@ import {
 
 const user = requireInternalUser(Astro.locals);
 const id = Astro.params.id ?? "";
+const wantsJson = Astro.request.headers
+  .get("accept")
+  ?.includes("application/json");
 const repository = new DrizzleCourseRepository(getDatabase());
 let course: AdminCourseDto | null = null;
 let loadError = false;
@@ -118,6 +121,14 @@ if (course && Astro.request.method === "POST") {
         if (artwork && artwork !== (course.artwork ?? ""))
           await verifyArtworkForCourse(id, artwork, artworkStorage());
         course = await updateCourse(repository, user, id, values);
+        if (wantsJson)
+          return new Response(
+            JSON.stringify({
+              revision: course.updatedAt.toISOString(),
+              name: course.name,
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          );
         return Astro.redirect(`/app/cursos/${id}/editar?success=updated`, 303);
       } else if (intent === "publish") {
         course = await publishCourse(repository, user, id);
@@ -162,6 +173,11 @@ if (course && Astro.request.method === "POST") {
     }
   }
 }
+if (wantsJson && Astro.request.method === "POST")
+  return new Response(JSON.stringify({ message: pageError, errors }), {
+    status: Astro.response.status,
+    headers: { "Content-Type": "application/json" },
+  });
 const statusLabel = {
   DRAFT: "Borrador",
   PUBLISHED: "Publicado",
@@ -225,6 +241,12 @@ const statusLabel = {
           {pageError}
         </p>
       )}
+      <p
+        data-save-error
+        role="alert"
+        hidden
+        class="mt-7 rounded-lg border border-destructive/40 bg-card px-4 py-3 text-sm text-destructive"
+      ></p>
       <div class="mt-8">
         <CourseForm
           values={values}
