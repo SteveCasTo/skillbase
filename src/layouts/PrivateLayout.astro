@@ -169,6 +169,9 @@ const currentPath = Astro.url.pathname;
       const closeButton = drawer?.querySelector<HTMLButtonElement>(
         ".private-mobile-panel [data-menu-close]",
       );
+      const mobilePanel = drawer?.querySelector<HTMLElement>(
+        ".private-mobile-panel",
+      );
       let keyboardFocus = false;
       let returnFocus: HTMLElement | null = null;
 
@@ -234,24 +237,41 @@ const currentPath = Astro.url.pathname;
         keyboardFocus = false;
       });
 
-      const closeDrawer = () => {
-        if (!drawer || drawer.hidden) return;
-        drawer.hidden = true;
+      const closeDrawer = (restoreFocus = true) => {
+        if (!drawer || drawer.hidden || drawer.dataset.state !== "open") return;
+        drawer.dataset.state = "closed";
+        drawer.inert = true;
         openButton?.setAttribute("aria-expanded", "false");
         document.body.classList.remove("private-drawer-open");
-        returnFocus?.focus();
+        if (restoreFocus) returnFocus?.focus();
+        const animations = mobilePanel?.getAnimations() ?? [];
+        void Promise.allSettled(
+          animations.map((animation) => animation.finished),
+        ).then(() => {
+          if (drawer.dataset.state === "closed") drawer.hidden = true;
+        });
       };
       openButton?.addEventListener("click", () => {
         if (!drawer) return;
         returnFocus = openButton;
         drawer.hidden = false;
+        drawer.inert = false;
+        mobilePanel?.getBoundingClientRect();
+        drawer.dataset.state = "open";
         openButton.setAttribute("aria-expanded", "true");
         document.body.classList.add("private-drawer-open");
         closeButton?.focus();
       });
       drawer
         ?.querySelectorAll<HTMLElement>("[data-menu-close]")
-        .forEach((button) => button.addEventListener("click", closeDrawer));
+        .forEach((button) =>
+          button.addEventListener("click", () => closeDrawer()),
+        );
+      window
+        .matchMedia("(min-width: 1024px)")
+        .addEventListener("change", (event) => {
+          if (event.matches) closeDrawer(false);
+        });
       drawer?.addEventListener("keydown", (event) => {
         if (event.key !== "Tab") return;
         const focusable = Array.from(
