@@ -3,6 +3,7 @@ import {
   applyMarkdownAction,
   type MarkdownAction,
 } from "./course-markdown-actions";
+import { nextCourseInput } from "./course-input-filter";
 
 interface Props {
   value: string;
@@ -100,11 +101,16 @@ export default function CourseMarkdownEditor({
         name="contentMarkdown"
         rows={9}
         value={markdown}
+        data-course-input="multiline"
         disabled={disabled}
         aria-invalid={Boolean(error)}
         aria-describedby={descriptionIds || undefined}
         placeholder={"## Contenido\n- Tema 1\n- Tema 2"}
-        onChange={(event) => setMarkdown(event.currentTarget.value)}
+        onChange={(event) =>
+          setMarkdown(
+            nextCourseInput("multiline", markdown, event.currentTarget.value),
+          )
+        }
         className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-44 w-full min-w-0 resize-y rounded-b-lg border px-3 py-2 font-mono text-sm shadow-xs outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
       />
       {error && (

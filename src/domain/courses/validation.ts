@@ -15,6 +15,22 @@ function requiredText(
   return value;
 }
 
+function validateTextControls(
+  input: CourseInput,
+  key: string,
+  multiline: boolean,
+  errors: Record<string, string>,
+): void {
+  // Text entry rejects control characters; multiline fields retain newline and tab.
+  const pattern = multiline
+    ? // eslint-disable-next-line no-control-regex
+      /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u
+    : // eslint-disable-next-line no-control-regex
+      /[\u0000-\u001f\u007f]/u;
+  if (pattern.test(input[key] ?? ""))
+    errors[key] = "El campo contiene caracteres no permitidos.";
+}
+
 function dateValue(
   input: CourseInput,
   key: string,
@@ -77,6 +93,12 @@ export function validateCourseData(input: CourseInput): CourseData {
     "Las condiciones",
     errors,
   );
+  validateTextControls(input, "name", false, errors);
+  validateTextControls(input, "description", true, errors);
+  validateTextControls(input, "schedule", false, errors);
+  validateTextControls(input, "conditions", true, errors);
+  validateTextControls(input, "instructorName", false, errors);
+  validateTextControls(input, "contentMarkdown", true, errors);
   const levelRaw = input.level ?? "";
   if (!COURSE_LEVELS.some((level) => level === levelRaw))
     errors.level = "Selecciona un nivel válido.";
@@ -86,7 +108,7 @@ export function validateCourseData(input: CourseInput): CourseData {
   const minimumGradeRaw = input.minimumGrade?.trim() ?? "";
   const minimumGrade = Number(minimumGradeRaw);
   if (
-    !minimumGradeRaw ||
+    !/^\d+$/.test(minimumGradeRaw) ||
     !Number.isInteger(minimumGrade) ||
     minimumGrade < 0 ||
     minimumGrade > 100

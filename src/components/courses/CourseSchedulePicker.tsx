@@ -3,6 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { TimePicker, validTime } from "@/components/ui/time-picker";
 import { Button } from "@/components/ui/button";
+import { nextCourseInput } from "./course-input-filter";
 
 const days = [
   "Lunes",
@@ -129,11 +130,14 @@ export default function CourseSchedulePicker({
             id="course-schedule"
             aria-label="Horario informativo"
             value={text}
+            data-course-input="text"
             required
             disabled={disabled}
             aria-invalid={Boolean(error)}
             aria-describedby={error ? "schedule-error" : undefined}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) =>
+              setText(nextCourseInput("text", text, event.target.value))
+            }
           />
         )}
         <Button

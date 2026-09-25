@@ -10,11 +10,13 @@ async function fillCourseFields(page: Page, formatName: string): Promise<void> {
     .getByLabel("Descripción")
     .fill("Contenido determinista para validar el flujo administrativo.");
   await page.getByRole("combobox", { name: "Nivel" }).click();
-  const levelMenu = await page.getByRole("listbox").boundingBox();
-  const viewportHeight = await page.evaluate(() => window.innerHeight);
-  expect(levelMenu).not.toBeNull();
-  expect(levelMenu!.y).toBeGreaterThanOrEqual(0);
-  expect(levelMenu!.y + levelMenu!.height).toBeLessThanOrEqual(viewportHeight);
+  await expect
+    .poll(async () => {
+      const box = await page.getByRole("listbox").boundingBox();
+      const height = await page.evaluate(() => window.innerHeight);
+      return Boolean(box && box.y >= 0 && box.y + box.height <= height);
+    })
+    .toBe(true);
   await page.getByRole("option", { name: "Medio" }).click();
   await page.getByRole("combobox", { name: "Formato de curso" }).click();
   await page.getByRole("option", { name: new RegExp(formatName) }).click();
@@ -97,10 +99,23 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   await page
     .getByLabel("Finalización del curso", { exact: true })
     .fill("01/02/2027");
-  await page.getByRole("button", { name: "Crear borrador" }).click();
-  await expect(
-    page.getByRole("alert").filter({ hasText: /obligatori|revisa/i }),
-  ).toBeVisible();
+  const create = page.getByRole("button", { name: "Crear borrador" });
+  await expect(create).toBeDisabled();
+  const invalidForm = await page
+    .locator("form.course-form")
+    .evaluate((form) =>
+      Object.fromEntries(new FormData(form as HTMLFormElement).entries()),
+    );
+  const invalidResponse = await page.request.post("/app/cursos/nuevo", {
+    form: invalidForm,
+    headers: {
+      Accept: "application/json",
+      Origin: new URL(page.url()).origin,
+    },
+  });
+  expect(invalidResponse.status()).toBe(422);
+  const invalidBody = await invalidResponse.json();
+  expect(invalidBody.fieldErrors).toHaveProperty("endsAt");
   await expect(page.getByLabel("Nombre")).toHaveValue(/Curso con foto/);
   await expect(page.getByText("Foto lista para cargarse")).toBeVisible();
   await page
@@ -172,19 +187,60 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     "Formato creado",
   );
   await page.goto("/app/cursos/nuevo");
+  const create = page.getByRole("button", { name: "Crear borrador" });
+  await expect(create).toBeDisabled();
   await page.getByLabel("Nombre").fill("Curso E2E conservación");
-  await page.getByRole("button", { name: "Crear borrador" }).click();
+  await expect(create).toBeDisabled();
   await expect(page).toHaveURL(/\/app\/cursos\/nuevo$/);
   await expect(page.getByLabel("Nombre")).toHaveValue("Curso E2E conservación");
 
   await fillCourseFields(page, formatName);
+  await expect(create).toBeEnabled();
+  await page.getByLabel("Instructor (opcional)").fill("Docente temporal");
+  await expect(create).toBeEnabled();
+  await page.getByLabel("Instructor (opcional)").clear();
+  await page.getByLabel("Condiciones").clear();
+  await expect(create).toBeDisabled();
+  await page.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
+  await expect(create).toBeEnabled();
+  const grade = page.getByLabel("Nota mínima (0–100)");
+  await grade.focus();
+  await page.keyboard.press("End");
+  await page.keyboard.type("e");
+  await expect(grade).toHaveValue("70");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.evaluate(() => navigator.clipboard.writeText("9x"));
+  await grade.press("ControlOrMeta+A");
+  await grade.press("ControlOrMeta+V");
+  await expect(grade).toHaveValue("70");
   const startDate = page.getByLabel("Inicio del curso", { exact: true });
+  await startDate.focus();
+  await page.keyboard.press("End");
+  await page.keyboard.type("x");
+  await expect(startDate).toHaveValue("01/03/2027");
+  await page.evaluate(() => navigator.clipboard.writeText("bad/date"));
+  await startDate.press("ControlOrMeta+A");
+  await startDate.press("ControlOrMeta+V");
+  await expect(startDate).toHaveValue("01/03/2027");
+  const startTime = page.getByRole("textbox", {
+    name: "Hora de inicio del curso",
+  });
+  await startTime.focus();
+  await page.keyboard.press("End");
+  await page.keyboard.type("q");
+  await expect(startTime).toHaveValue("18:30");
+  await page.evaluate(() => navigator.clipboard.writeText("29:99"));
+  await startTime.press("ControlOrMeta+A");
+  await startTime.press("ControlOrMeta+V");
+  await expect(startTime).toHaveValue("18:30");
   await startDate.fill("30/02/2027");
+  await expect(create).toBeDisabled();
   await expect(startDate).toHaveValue("30/02/2027");
   await expect(
     page.getByText("Ingresa una fecha válida (DD/MM/AAAA).", { exact: true }),
   ).toBeVisible();
   await startDate.fill("01/03/2027");
+  await expect(create).toBeEnabled();
   const calendarTrigger = page.locator("#startsAt-calendar");
   await calendarTrigger.click();
   await expect(page.getByRole("grid")).toBeVisible();
@@ -207,6 +263,35 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   );
   const save = page.getByRole("button", { name: "Guardar cambios" });
   await expect(save).toBeDisabled();
+  await page.getByLabel("Nombre").fill("Curso temporalmente inválido");
+  await page.getByLabel("Nombre").clear();
+  await expect(save).toBeDisabled();
+  await page.getByLabel("Nombre").fill("Curso E2E conservación");
+  await expect(save).toBeDisabled();
+  const gradeInput = page.getByLabel("Nota mínima (0–100)");
+  await page.getByLabel("Nombre").fill("Curso temporalmente inválido");
+  await gradeInput.evaluate((input) => {
+    (input as HTMLInputElement).value = "101";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(save).toBeDisabled();
+  await gradeInput.evaluate((input) => {
+    (input as HTMLInputElement).value = "70";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  const courseStart = page.locator('input[name="startsAt"]');
+  await courseStart.evaluate((input) => {
+    (input as HTMLInputElement).value = "2027-02-30T18:30";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(save).toBeDisabled();
+  await courseStart.evaluate((input) => {
+    (input as HTMLInputElement).value = "2027-03-01T18:30";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(save).toBeEnabled();
+  await page.getByLabel("Nombre").fill("Curso E2E conservación");
+  await expect(save).toBeDisabled();
   await page.locator('input[name="artwork"]').evaluate((input) => {
     (input as HTMLInputElement).value = "artwork/temporary.webp";
     input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -217,6 +302,29 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await expect(save).toBeDisabled();
+  await page.getByLabel("Descripción").fill("Texto conservado tras rechazo.");
+  await page.locator('input[name="revision"]').evaluate((input) => {
+    (input as HTMLInputElement).value = "invalid-revision";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(save).toBeEnabled();
+  const failedUpdate = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().includes("/app/cursos/") &&
+      response.url().includes("/editar"),
+  );
+  await save.click();
+  expect((await failedUpdate).status()).toBe(422);
+  await expect(page.getByLabel("Descripción")).toHaveValue(
+    "Texto conservado tras rechazo.",
+  );
+  await expect(page.getByRole("alert").first()).toContainText(
+    "La revisión del curso no es válida.",
+  );
+  await page
+    .getByLabel("Descripción")
+    .fill("Contenido determinista para validar el flujo administrativo.");
   await page.getByLabel("Nombre").fill("Curso E2E editado");
   await expect(save).toBeEnabled();
   await page.getByLabel("Nombre").fill("Curso E2E conservación");

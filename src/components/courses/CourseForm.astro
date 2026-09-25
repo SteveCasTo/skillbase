@@ -127,6 +127,7 @@ const initialValues = Object.fromEntries(
           <input
             class={control}
             name="name"
+            data-course-input="text"
             value={values.name ?? ""}
             required
             aria-invalid={Boolean(errors.name)}
@@ -144,6 +145,7 @@ const initialValues = Object.fromEntries(
           <textarea
             class={area}
             name="description"
+            data-course-input="multiline"
             required
             aria-invalid={Boolean(errors.description)}
             aria-describedby={errorId("description")}
@@ -189,11 +191,57 @@ const initialValues = Object.fromEntries(
               disabled: !format.active,
             }))}
         />
+        <noscript>
+          <label class="text-sm font-medium">
+            Nivel
+            <select class={control} name="level" required disabled={disabled}>
+              <option value="">Selecciona un nivel</option>
+              {[
+                { value: "BASIC", label: "Básico" },
+                { value: "INTERMEDIATE", label: "Medio" },
+                { value: "ADVANCED", label: "Avanzado" },
+              ].map((option) => (
+                <option
+                  value={option.value}
+                  selected={values.level === option.value}
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label class="text-sm font-medium">
+            Formato de curso
+            <select
+              class={control}
+              name="courseTypeId"
+              required
+              disabled={disabled || formats.length === 0}
+            >
+              <option value="">Selecciona un formato</option>
+              {formats
+                .filter(
+                  (format) =>
+                    format.active || format.id === values.courseTypeId,
+                )
+                .map((format) => (
+                  <option
+                    value={format.id}
+                    selected={values.courseTypeId === format.id}
+                    disabled={!format.active}
+                  >
+                    {format.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </noscript>
         <label class="sm:col-span-2">
           <span class="text-sm font-medium">Instructor (opcional)</span>
           <input
             class={control}
             name="instructorName"
+            data-course-input="text"
             value={values.instructorName ?? ""}
             aria-invalid={Boolean(errors.instructorName)}
             aria-describedby={errorId("instructorName")}
@@ -209,7 +257,7 @@ const initialValues = Object.fromEntries(
             Contenido del curso (Markdown, opcional)
           </label>
           <CourseMarkdownEditor
-            client:load
+            client:only="react"
             value={values.contentMarkdown ?? ""}
             error={errors.contentMarkdown ?? ""}
             disabled={disabled}
@@ -220,6 +268,7 @@ const initialValues = Object.fromEntries(
               class={area}
               id="contentMarkdown"
               name="contentMarkdown"
+              data-course-input="multiline"
               rows="9"
               disabled={disabled}
             >{values.contentMarkdown ?? ""}</textarea>
@@ -243,6 +292,7 @@ const initialValues = Object.fromEntries(
             <input
               class={control}
               name="schedule"
+              data-course-input="text"
               value={values.schedule ?? ""}
               required
               disabled={disabled}
@@ -254,6 +304,7 @@ const initialValues = Object.fromEntries(
           <textarea
             class={area}
             name="conditions"
+            data-course-input="multiline"
             required
             aria-invalid={Boolean(errors.conditions)}
             aria-describedby={errorId("conditions")}
@@ -285,8 +336,9 @@ const initialValues = Object.fromEntries(
           { name: "registrationEndAt", label: "Cierre de preinscripción" },
         ].map(({ name, label }) => (
           <CourseDateTimePicker
-            client:load
+            client:only="react"
             name={name}
+            data-course-input="text"
             label={label}
             value={values[name] ?? ""}
             required={name === "startsAt" || name === "endsAt"}
@@ -332,10 +384,9 @@ const initialValues = Object.fromEntries(
           <input
             class={control}
             name="minimumGrade"
-            type="number"
-            min="0"
-            max="100"
-            step="1"
+            type="text"
+            inputmode="numeric"
+            data-course-input="grade"
             value={values.minimumGrade ?? ""}
             required
             aria-invalid={Boolean(errors.minimumGrade)}
@@ -373,6 +424,12 @@ const initialValues = Object.fromEntries(
 
 <script>
   import { createCourseWithArtwork } from "./createCourseWithArtwork";
+  import {
+    acceptsCourseInput,
+    draftFieldsReady,
+    requiredCourseFields,
+    type CourseInputKind,
+  } from "./course-input-filter";
   let preparedImage: File | null = null;
   let imageSelected = false;
   window.addEventListener("course-artwork-selection", (event) => {
@@ -397,26 +454,109 @@ const initialValues = Object.fromEntries(
   });
   document.querySelectorAll<HTMLFormElement>(".course-form").forEach((form) => {
     const button = form.querySelector<HTMLButtonElement>(".submit-button");
+    // Capture edits before React's delegated change handlers see them. Invalid
+    // paste/drop/IME commits are reverted as a whole, never sanitized into a
+    // different value that might inadvertently be submitted.
+    const admitted = new WeakMap<
+      HTMLInputElement | HTMLTextAreaElement,
+      string
+    >();
+    const filtered = (target: EventTarget | null) => {
+      if (!(
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement
+      ))
+        return null;
+      const kind = target.dataset.courseInput as CourseInputKind | undefined;
+      return kind ? { target, kind } : null;
+    };
+    form.addEventListener("beforeinput", (event) => {
+      const input = event as InputEvent;
+      const field = filtered(event.target);
+      if (
+        !field ||
+        input.isComposing ||
+        !input.cancelable ||
+        input.inputType.startsWith("delete")
+      )
+        return;
+      const { target, kind } = field;
+      const inserted =
+        input.data ?? input.dataTransfer?.getData("text/plain") ?? "";
+      if (!inserted) return;
+      const candidate =
+        target.value.slice(0, target.selectionStart ?? target.value.length) +
+        inserted +
+        target.value.slice(target.selectionEnd ?? target.value.length);
+      if (!acceptsCourseInput(kind, candidate)) event.preventDefault();
+    });
+    form.addEventListener(
+      "input",
+      (event) => {
+        const field = filtered(event.target);
+        if (!field || (event as InputEvent).isComposing) return;
+        const { target, kind } = field;
+        if (acceptsCourseInput(kind, target.value))
+          admitted.set(target, target.value);
+        else target.value = admitted.get(target) ?? target.defaultValue;
+      },
+      true,
+    );
+    form.addEventListener("compositionstart", (event) => {
+      const field = filtered(event.target);
+      if (field && acceptsCourseInput(field.kind, field.target.value))
+        admitted.set(field.target, field.target.value);
+    });
+    form.addEventListener("compositionend", (event) => {
+      const field = filtered(event.target);
+      if (!field) return;
+      if (!acceptsCourseInput(field.kind, field.target.value)) {
+        field.target.value =
+          admitted.get(field.target) ?? field.target.defaultValue;
+        field.target.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
     const baseline: Record<string, string> | null = form.dataset.baseline
       ? JSON.parse(form.dataset.baseline)
       : null;
-    if (baseline && button && !button.disabled) {
+    if (button && !button.disabled) {
       // The SSR button stays usable without JavaScript. Once JS runs, wait for
       // all form-associated islands before comparing against persisted values.
       button.disabled = true;
       let ready = false;
-      const fields = Object.keys(baseline);
+      const fields = baseline ? Object.keys(baseline) : [];
       const sync = () => {
         const current = new FormData(form);
-        if (!ready && !fields.every((name) => current.has(name))) return;
+        if (
+          !ready &&
+          !(
+            baseline
+              ? fields
+              : [
+                  ...requiredCourseFields,
+                  "registrationStartAt",
+                  "registrationEndAt",
+                ]
+          ).every((name) => current.has(name))
+        )
+          return;
         ready = true;
-        button.disabled = fields.every((name) => {
-          const values = current.getAll(name);
-          return (
-            values.length === 1 &&
-            values[0] === (baseline[name] ?? "").replace(/\r\n?/g, "\n")
-          );
-        });
+        const changed = baseline
+          ? !fields.every((name) => {
+              const values = current.getAll(name);
+              return (
+                values.length === 1 &&
+                values[0] === (baseline[name] ?? "").replace(/\r\n?/g, "\n")
+              );
+            })
+          : false;
+        const values = Object.fromEntries(
+          [...current.entries()].filter(
+            (entry): entry is [string, string] => typeof entry[1] === "string",
+          ),
+        );
+        const valid = form.checkValidity() && draftFieldsReady(values);
+        button.disabled = baseline ? !changed || !valid : !valid;
       };
       // FormData reads the controls' current values directly, including hidden
       // fields updated by React islands, so reconcile each change immediately.

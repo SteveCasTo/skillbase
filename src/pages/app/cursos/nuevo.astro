@@ -138,7 +138,10 @@ if (Astro.request.method === "POST" && !pageError) {
       values={values}
       errors={errors}
       formats={formats}
-      disabled={Boolean(pageError) || formats.length === 0}
+      disabled={
+        Astro.response.status === COURSE_INFRASTRUCTURE_STATUS ||
+        formats.length === 0
+      }
       submitLabel="Crear borrador"
     />
   </div>

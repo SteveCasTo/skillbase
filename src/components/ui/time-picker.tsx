@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Clock3, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { nextCourseInput } from "@/components/courses/course-input-filter";
 import {
   Popover,
   PopoverContent,
@@ -49,9 +50,12 @@ export function TimePicker({
         aria-label={label}
         aria-invalid={invalid}
         value={value}
+        data-course-input="time"
         disabled={disabled}
         className="h-11 w-[4.5rem] px-1 text-center text-xs tabular-nums sm:w-24 sm:px-2 sm:text-sm"
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) =>
+          onChange(nextCourseInput("time", value, event.target.value))
+        }
       />
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
