@@ -42,6 +42,25 @@ test("collapsed rail expands on hover without shifting main and persists across 
   expect(collapseBox).not.toBeNull();
   expect(logoutBox).not.toBeNull();
   expect(Math.abs(collapseBox!.y - logoutBox!.y)).toBeLessThan(2);
+  expect(logoutBox!.x).toBeGreaterThan(collapseBox!.x);
+  expect(
+    await logoutButton.locator("svg").evaluate((icon) => {
+      const iconBox = icon.getBoundingClientRect();
+      const buttonBox = icon.parentElement!.getBoundingClientRect();
+      return Math.abs(
+        iconBox.x + iconBox.width / 2 - (buttonBox.x + buttonBox.width / 2),
+      );
+    }),
+  ).toBeLessThan(2);
+  const footerBox = await sidebar
+    .locator(".private-sidebar-footer")
+    .boundingBox();
+  expect(footerBox).not.toBeNull();
+  const logoutRight = logoutBox!.x + logoutBox!.width;
+  const footerRight = footerBox!.x + footerBox!.width;
+  expect(logoutRight).toBeLessThanOrEqual(footerRight);
+  expect(logoutRight).toBeGreaterThanOrEqual(footerBox!.x);
+  expect(footerRight - logoutRight).toBeLessThanOrEqual(24);
   await expect(collapseButton).toHaveText("");
   await expect(logoutButton).toHaveText("");
   expect(
@@ -65,6 +84,7 @@ test("collapsed rail expands on hover without shifting main and persists across 
     ),
   );
   await expect(logoutButton).toBeHidden();
+  await logoutButton.evaluate((element) => (element as HTMLElement).focus());
   expect(
     await logoutButton.evaluate(
       (element) => element !== document.activeElement,
@@ -93,6 +113,13 @@ test("collapsed rail expands on hover without shifting main and persists across 
   expect((await main.boundingBox())?.width).toBe(railWidth);
   await page.locator(".private-main-scroll").hover();
   await expect(shell).not.toHaveAttribute("data-preview", "true");
+  await expect(logoutButton).toBeHidden();
+  await logoutButton.evaluate((element) => (element as HTMLElement).focus());
+  expect(
+    await logoutButton.evaluate(
+      (element) => element !== document.activeElement,
+    ),
+  ).toBe(true);
   await page.locator(".private-brand-mark").hover();
   await page
     .getByRole("navigation", { name: "Navegación privada" })
@@ -115,6 +142,23 @@ test("collapsed rail expands on hover without shifting main and persists across 
     page.getByRole("button", { name: "Expandir barra lateral" }),
   ).toBeVisible();
   await expect(logoutButton).toBeHidden();
+});
+
+test("courses page has a single create-course action", async ({
+  context,
+  page,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app/cursos");
+
+  const header = page.locator("main header");
+  await expect(
+    header.getByRole("link", { name: "Nuevo curso" }),
+  ).toHaveAttribute("href", "/app/cursos/nuevo");
+  await expect(header.getByRole("link")).toHaveCount(1);
+  await expect(
+    header.getByRole("link", { name: "Gestionar formatos" }),
+  ).toHaveCount(0);
 });
 
 test("keyboard focus previews rail, Escape closes it; instructor sees no admin links", async ({
