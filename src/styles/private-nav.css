@@ -173,15 +173,15 @@
   gap: 0.25rem;
 }
 .private-sidebar-actions > form {
-  min-width: 0;
-  flex: 1;
+  width: 2.5rem;
+  flex: none;
 }
 .private-sidebar-actions > .private-action {
   width: auto;
   flex: none;
 }
 .private-sidebar-actions > form .private-action {
-  justify-content: flex-end;
+  justify-content: center;
   white-space: nowrap;
 }
 .private-sidebar-actions .private-action {
@@ -223,6 +223,15 @@
 .private-shell :is(a, button, summary):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+html:has(.private-shell) [data-sileo-viewport] {
+  --sileo-state-success: var(--primary);
+  --sileo-state-loading: var(--muted-foreground);
+  --sileo-state-error: var(--destructive);
+  --sileo-state-warning: var(--accent);
+  --sileo-state-info: var(--secondary-foreground);
+  --sileo-state-action: var(--primary);
 }
 
 @media (min-width: 1024px) {
