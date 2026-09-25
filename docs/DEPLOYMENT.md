@@ -150,6 +150,8 @@ El job `integration-e2e` instala Chromium y ejecuta los runners aislados. `test:
 
 El proyecto cloud Supabase `SkillBase` (`fvzxqlezdrlzykyoevub`) y el proyecto Vercel `stevecasto-projects/skillbase` están enlazados. El dominio de producción es `https://skillbase-alpha.vercel.app`; `skillbase.vercel.app` no está disponible porque pertenece a otra cuenta.
 
+Por petición explícita se cargaron manualmente en producción los dos formatos de ejemplo de 20 y 30 horas (80/100 y 120/150 BOB) y los cinco cursos sintéticos de `seed-demo`, todos en estado `DRAFT` y sin destacado. El formato local adicional `Promedio` no se cargó. Esta carga puntual no forma parte de las migraciones ni del despliegue automático; los ejemplos no constituyen oferta académica aprobada y solo pueden mostrarse públicamente mediante publicación administrativa posterior.
+
 El job `deploy` se ejecuta únicamente en pushes a `master`, y su condición requiere éxito explícito de `quality` e `integration-e2e`. Aplica migraciones Drizzle y despliega el output preconstruido con Vercel CLI. La integración Git automática de Vercel está desconectada para impedir despliegues paralelos que omitan estos gates.
 
 Los placeholders públicos de build están limitados a `quality`; los runners de integración inyectan sus propios endpoints/keys temporales. `deploy` descarga su entorno de producción desde Vercel para evitar que valores locales sobrescriban URLs, claves públicas o conexiones del build final.
@@ -163,6 +165,8 @@ El environment GitHub `production` restringe despliegues a ramas protegidas y co
 - `VERCEL_TOKEN`: GitHub Environment secret;
 - `VERCEL_ORG_ID`: GitHub Environment variable;
 - `VERCEL_PROJECT_ID`: GitHub Environment variable.
+
+La subida de artwork requiere además una clave privada de Supabase en Vercel Production (`SUPABASE_SERVICE_ROLE_KEY`, valor de una clave moderna `sb_secret_...`). Sin ella, el endpoint de imagen responde 500. El bucket `course-artwork` se prepara/valida server-side con acceso público de lectura, solo WebP y límite de 4 MiB. La variable se configuró y se redeplegó el mismo artefacto de producción después de detectar su ausencia; la clave no debe registrarse ni entregarse al cliente.
 
 Vercel usa el preset Astro, Bun con lockfile congelado y Node.js 24. El proyecto usa el adapter oficial con salida server-side. No se generan previews automáticos ni se entregan credenciales de producción a ramas de feature.
 
