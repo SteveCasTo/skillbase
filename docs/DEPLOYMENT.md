@@ -14,7 +14,7 @@ Integración del desarrollo.
 
 Producción.
 
-Cuando se habilite producción, un push válido a `master` deberá terminar en despliegue automático solamente si todos los gates pasan. Durante Foundation, `master` ejecuta únicamente validaciones.
+Un push a `master` ejecuta los gates y, si todos pasan, aplica migraciones y despliega a producción. Los pull requests a `master` ejecutan los gates, pero no despliegan.
 
 ## GITHUB ACTIONS
 
@@ -37,30 +37,11 @@ Según estructura final:
 
 ## JOBS
 
-Separar jobs cuando reduzca tiempo sin duplicar infraestructura pesada innecesariamente.
+El workflow tiene tres jobs:
 
-Ejemplo conceptual:
-
-```text
-static-checks
-├── lint
-├── format
-└── typecheck
-
-unit
-└── unit tests
-
-integration
-└── Supabase local + integration tests
-
-e2e
-└── Supabase local + Playwright
-
-build
-└── production build
-```
-
-El workflow final puede optimizar dependencias entre jobs.
+- `quality`: instalación congelada, `bun run check` (lint, formato y typecheck), unit tests y build; no necesita Docker.
+- `integration-e2e`: instala Chromium y ejecuta los comandos `bun run test:integration` y `bun run test:e2e`. Cada runner crea y limpia su propio proyecto Supabase temporal con puertos dedicados; no se comparte ni se prepara un stack de desarrollo.
+- `deploy`: solo para push a `master`, depende de que `quality` e `integration-e2e` terminen correctamente. Aplica migraciones y despliega el output de producción con Vercel.
 
 ## DOCKER EN CI
 
@@ -74,33 +55,32 @@ Principios:
 - usar cache con cuidado;
 - evitar imágenes custom grandes salvo necesidad real.
 
-Supabase local debe levantarse únicamente en jobs que lo necesiten.
+Docker se utiliza en `integration-e2e` porque ambos runners arrancan stacks Supabase aislados. No ejecutar `supabase start`, `db:reset` ni `supabase stop` por separado en CI: los runners son responsables del ciclo de vida y sus errores de CLI no imprimen la salida que podría revelar keys. La instalación de Playwright descarga únicamente Chromium y sus dependencias del sistema.
 
 ## MASTER PIPELINE OBJETIVO
 
 ```text
 push master
-→ install
-→ static checks
-→ tests
-→ production build
-→ [cuando producción esté enlazada] verify migrations
-→ [cuando producción esté enlazada] apply pending migrations
-→ [cuando producción esté enlazada] Vercel deploy
+→ quality (install, static checks, unit tests, build)
+→ integration-e2e (isolated Supabase integration and E2E tests)
+→ apply Drizzle migrations
+→ pull Vercel production configuration
+→ Vercel production build and deploy
 ```
 
-No desplegar si falla cualquier gate obligatorio.
+El job de despliegue está condicionado explícitamente al evento push en `master` y al éxito de ambos jobs de gates. Cualquier fallo o job no exitoso bloquea el despliegue. Los pull requests nunca reciben el job de despliegue.
 
 ## MIGRACIONES
 
 Las migraciones viven versionadas en Git.
 
-CI debe:
+El job actual ejecuta `bunx drizzle-kit migrate` con `MIGRATION_DATABASE_URL` y detiene el despliegue si falla. Drizzle consulta el historial y aplica las migraciones versionadas que estén pendientes; no hay un paso separado de previsualización/verificación.
 
-1. conectarse al proyecto Supabase de producción usando secrets;
-2. verificar migraciones pendientes;
-3. aplicar únicamente migraciones versionadas;
-4. detener el deploy si falla la migración.
+En el workflow actual:
+
+1. `MIGRATION_DATABASE_URL` conecta al proyecto Supabase de producción desde un GitHub Environment secret;
+2. Drizzle compara el historial y aplica migraciones versionadas pendientes;
+3. el fallo de migración termina el job antes de cualquier paso Vercel.
 
 Después de tener datos productivos:
 
@@ -164,15 +144,15 @@ Agregar herramientas externas únicamente cuando exista beneficio claro.
 - push a `master`;
 - pull request cuyo destino sea `master`.
 
-El job `quality` instala con lockfile y ejecuta checks estáticos, unit tests y build sin levantar Docker.
+El job `quality` instala con lockfile y ejecuta checks estáticos, unit tests y build sin levantar Docker. Sus valores públicos de Supabase y base de datos son placeholders de build, no credenciales.
 
-El job `integration-e2e` levanta una sola instancia mínima de Supabase, aplica migraciones, ejecuta integration tests y E2E con Chromium, y detiene Supabase incluso ante fallos.
+El job `integration-e2e` instala Chromium y ejecuta los runners aislados. `test:integration` y `test:e2e` crean cada uno su propio stack temporal, asignan puertos/credenciales temporales, aplican migraciones Drizzle y limpian el proyecto al terminar. El runner inyecta placeholders locales para las variables de proveedor Google requeridas por la configuración Supabase; no usa OAuth real. No se inyectan credenciales del stack de desarrollo ni se ejecuta `db:reset`. La salida de error de comandos Supabase se retiene para evitar que keys locales aparezcan en los logs.
 
 El proyecto cloud Supabase `SkillBase` (`fvzxqlezdrlzykyoevub`) y el proyecto Vercel `stevecasto-projects/skillbase` están enlazados. El dominio de producción es `https://skillbase-alpha.vercel.app`; `skillbase.vercel.app` no está disponible porque pertenece a otra cuenta.
 
-El job `deploy` se ejecuta únicamente en pushes a `master`, depende de `quality` e `integration-e2e`, aplica migraciones Drizzle y despliega el output preconstruido con Vercel CLI. La integración Git automática de Vercel está desconectada para impedir despliegues paralelos que omitan estos gates.
+El job `deploy` se ejecuta únicamente en pushes a `master`, y su condición requiere éxito explícito de `quality` e `integration-e2e`. Aplica migraciones Drizzle y despliega el output preconstruido con Vercel CLI. La integración Git automática de Vercel está desconectada para impedir despliegues paralelos que omitan estos gates.
 
-Las variables de Supabase local están limitadas a los jobs de calidad e integración. `deploy` descarga su entorno de producción desde Vercel para evitar que valores locales sobrescriban URLs, claves públicas o conexiones del build final.
+Los placeholders públicos de build están limitados a `quality`; los runners de integración inyectan sus propios endpoints/keys temporales. `deploy` descarga su entorno de producción desde Vercel para evitar que valores locales sobrescriban URLs, claves públicas o conexiones del build final.
 
 Las variables públicas se incorporan durante el build desde la configuración descargada. `DATABASE_URL` se lee desde `process.env` en runtime, porque Vercel no revela valores sensibles al construir output prebuilt y los inyecta únicamente en la función desplegada.
 
