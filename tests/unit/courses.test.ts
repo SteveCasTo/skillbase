@@ -84,6 +84,39 @@ describe("course domain", () => {
     expect(
       validateCourseData({ ...validInput, minimumGrade: "0" }).minimumGrade,
     ).toBe(0);
+    for (const minimumGrade of ["1e2", "0x64", "+70", "70.0", "-1"])
+      expect(() =>
+        validateCourseData({ ...validInput, minimumGrade }),
+      ).toThrow();
+  });
+
+  test("rejects text control characters while allowing multiline formatting", () => {
+    for (const [field, value] of [
+      ["name", "Curso\u0001"],
+      ["instructorName", "Docente\u007f"],
+      ["description", "Texto\u0000"],
+      ["conditions", "Texto\u000b"],
+      ["contentMarkdown", "Texto\u001f"],
+      ["schedule", "Lunes\n18:00"],
+    ] as const) {
+      try {
+        validateCourseData({ ...validInput, [field]: value });
+        throw new Error(`Expected ${field} control-character rejection`);
+      } catch (error) {
+        expect(error).toMatchObject({
+          code: "VALIDATION_FAILED",
+          fieldErrors: { [field]: expect.any(String) },
+        });
+      }
+    }
+    expect(
+      validateCourseData({
+        ...validInput,
+        description: "Texto\ncon\ttab",
+        conditions: "Condición\ncon detalle\t",
+        contentMarkdown: "## Tema\n- Unidad\tuno",
+      }).description,
+    ).toBe("Texto\ncon\ttab");
   });
 
   test("rejects invalid dates, partial registration windows, grade, duration and money", () => {

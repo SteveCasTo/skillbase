@@ -5,6 +5,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimePicker, validTime } from "@/components/ui/time-picker";
+import { nextCourseInput } from "./course-input-filter";
 import {
   Popover,
   PopoverContent,
@@ -47,7 +48,7 @@ export default function CourseDateTimePicker({
 }: Props) {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
   const [date, setDate] = useState(
-    match ? `${match[3]}/${match[2]}/${match[1]}` : "",
+    match ? `${match[3]}/${match[2]}/${match[1]}` : value,
   );
   const [time, setTime] = useState(match ? `${match[4]}:${match[5]}` : "");
   const [open, setOpen] = useState(false);
@@ -63,7 +64,9 @@ export default function CourseDateTimePicker({
   const combined =
     selected && validTime(time)
       ? `${selected.getFullYear().toString().padStart(4, "0")}-${String(selected.getMonth() + 1).padStart(2, "0")}-${String(selected.getDate()).padStart(2, "0")}T${time}`
-      : "";
+      : !match && date === value && !time
+        ? value
+        : "";
   const fieldError = problem || error;
   const missing = required && !date && !time;
 
@@ -107,13 +110,14 @@ export default function CourseDateTimePicker({
           inputMode="numeric"
           placeholder="DD/MM/AAAA"
           value={date}
+          data-course-input="date"
           disabled={disabled}
           required={required}
           aria-invalid={Boolean(fieldError)}
           aria-describedby={fieldError ? `${name}-error` : undefined}
           className="h-11 min-w-0 flex-1 px-1 text-center text-xs tabular-nums sm:px-2 sm:text-sm"
           onChange={(event) => {
-            setDate(event.target.value);
+            setDate(nextCourseInput("date", date, event.target.value));
             event.target.setCustomValidity("");
           }}
           onBlur={validate}
