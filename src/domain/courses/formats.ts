@@ -17,8 +17,20 @@ export interface CourseFormat extends FormatValues {
   readonly updatedAt: string;
 }
 
+const hasControlCharacters = (value: string) =>
+  Array.from(value).some(
+    (character) =>
+      character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+  );
+
 export function validateFormatName(input: string): string {
   const name = input.trim();
+  if (hasControlCharacters(input))
+    throw new CourseDomainError(
+      "VALIDATION_FAILED",
+      "Revisa los campos indicados.",
+      { name: "El nombre no puede contener caracteres de control." },
+    );
   if (!name)
     throw new CourseDomainError(
       "VALIDATION_FAILED",
@@ -38,7 +50,9 @@ export function validateFormat(
 ) {
   const errors: Record<string, string> = {};
   const name = nameInput.trim();
-  if (!name) errors.name = "El nombre es obligatorio.";
+  if (hasControlCharacters(nameInput))
+    errors.name = "El nombre no puede contener caracteres de control.";
+  else if (!name) errors.name = "El nombre es obligatorio.";
   const totalHours = Number(hoursInput);
   if (
     !/^\d+$/.test(hoursInput) ||

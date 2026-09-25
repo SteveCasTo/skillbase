@@ -134,7 +134,7 @@ const fields = format
         label: "Nombre",
         value: format.name,
         intent: "rename",
-        pattern: undefined,
+        pattern: ".*\\S.*",
         mode: undefined,
       },
       {
@@ -259,98 +259,109 @@ const successKey = Astro.url.searchParams.get("success");
             {fields.map((field) => (
               <div class="py-4 first:pt-0 last:pb-0">
                 <dt class="text-sm text-muted-foreground">{field.label}</dt>
-                <dd class="mt-1">
-                  <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="break-words font-semibold tabular-nums">
-                      {field.value} {field.suffix ?? ""}
-                    </span>
-                    {(format.active || field.key === "name") && (
-                      <details
-                        open={editing === field.key && Boolean(pageError)}
-                        class="group min-w-0 flex-1 open:basis-full"
+                <dd class="mt-1 flex min-h-11 min-w-0 items-center gap-2">
+                  <span class="min-w-0 flex-1 break-words font-semibold tabular-nums [&:has(+details[open])]:hidden">
+                    {field.value} {field.suffix ?? ""}
+                  </span>
+                  {(format.active || field.key === "name") && (
+                    <details
+                      open={editing === field.key && Boolean(pageError)}
+                      class="group ml-auto shrink-0 open:min-w-0 open:flex-1"
+                    >
+                      <summary
+                        aria-label={`Editar ${field.label.toLowerCase()}`}
+                        title={`Editar ${field.label.toLowerCase()}`}
+                        class="flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center rounded-lg border hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring group-open:hidden [&::-webkit-details-marker]:hidden"
                       >
-                        <summary class="ml-auto flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-lg border px-3 text-sm font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
-                          <Pencil size={16} aria-hidden="true" /> Editar{" "}
-                          {field.label.toLowerCase()}
-                        </summary>
-                        <form
-                          method="post"
-                          aria-label={`Editar ${field.label.toLowerCase()}`}
-                          class="mt-3 flex flex-wrap items-end gap-2"
-                        >
+                        <Pencil size={18} aria-hidden="true" />
+                      </summary>
+                      <form
+                        method="post"
+                        aria-label={`Editar ${field.label.toLowerCase()}`}
+                        class="flex min-w-0 items-center gap-1.5 sm:gap-2"
+                      >
+                        <input
+                          type="hidden"
+                          name="intent"
+                          value={field.intent}
+                        />
+                        <input type="hidden" name="field" value={field.key} />
+                        <input
+                          type="hidden"
+                          name="revisionId"
+                          value={format.revisionId}
+                        />
+                        <input
+                          type="hidden"
+                          name="updatedAt"
+                          value={format.updatedAt}
+                        />
+                        <div class="min-w-0 flex-1">
+                          <label for={`edit-${field.key}`} class="sr-only">
+                            {field.key === "totalHours" ? "Nueva" : "Nuevo"}{" "}
+                            {field.label.toLowerCase()}
+                          </label>
                           <input
-                            type="hidden"
-                            name="intent"
-                            value={field.intent}
+                            id={`edit-${field.key}`}
+                            name="value"
+                            type="text"
+                            required
+                            pattern={field.pattern}
+                            inputmode={field.mode}
+                            value={
+                              editing === field.key && pageError
+                                ? attemptedValue
+                                : field.value
+                            }
+                            data-persisted-value={field.value}
+                            aria-invalid={Boolean(errors[field.key])}
+                            aria-describedby={
+                              errors[field.key]
+                                ? `error-${field.key}`
+                                : undefined
+                            }
+                            data-format-filter={field.key}
+                            class="min-h-11 w-full min-w-0 rounded-lg border bg-background px-2 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring sm:px-3"
                           />
-                          <input type="hidden" name="field" value={field.key} />
-                          <input
-                            type="hidden"
-                            name="revisionId"
-                            value={format.revisionId}
-                          />
-                          <input
-                            type="hidden"
-                            name="updatedAt"
-                            value={format.updatedAt}
-                          />
-                          <div class="min-w-0 flex-1">
-                            <label
-                              for={`edit-${field.key}`}
-                              class="text-sm font-medium"
+                          {errors[field.key] && editing === field.key && (
+                            <p
+                              id={`error-${field.key}`}
+                              class="mt-1 text-sm text-destructive"
                             >
-                              {field.key === "totalHours" ? "Nueva" : "Nuevo"}{" "}
-                              {field.label.toLowerCase()}
-                            </label>
-                            <input
-                              id={`edit-${field.key}`}
-                              name="value"
-                              type="text"
-                              required
-                              pattern={field.pattern}
-                              inputmode={field.mode}
-                              value={
-                                editing === field.key && pageError
-                                  ? attemptedValue
-                                  : field.value
-                              }
-                              aria-invalid={Boolean(errors[field.key])}
-                              aria-describedby={
-                                errors[field.key]
-                                  ? `error-${field.key}`
-                                  : undefined
-                              }
-                              class="mt-1 min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
-                            />
-                            {errors[field.key] && editing === field.key && (
-                              <p
-                                id={`error-${field.key}`}
-                                class="mt-1 text-sm text-destructive"
-                              >
-                                {errors[field.key]}
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            type="submit"
-                            aria-label={`Guardar ${field.label.toLowerCase()}`}
-                            title="Guardar"
-                            class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground"
-                          >
-                            <Check size={18} aria-hidden="true" />
-                          </button>
-                          <a
-                            href={`/app/formatos/${id}`}
-                            aria-label={`Cancelar edición de ${field.label.toLowerCase()}`}
-                            title="Cancelar"
-                            class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border"
-                          >
-                            <X size={18} aria-hidden="true" />
-                          </a>
-                        </form>
-                      </details>
-                    )}
-                  </div>
+                              {errors[field.key]}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="submit"
+                          aria-label={`Guardar ${field.label.toLowerCase()}`}
+                          title="Guardar"
+                          class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                        >
+                          <Check size={18} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          data-cancel-edit
+                          hidden
+                          aria-label={`Cancelar edición de ${field.label.toLowerCase()}`}
+                          title="Cancelar"
+                          class="min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border focus-visible:outline-2 focus-visible:outline-ring"
+                        >
+                          <X size={18} aria-hidden="true" />
+                        </button>
+                        <a
+                          href={`/app/formatos/${id}`}
+                          aria-label={`Cancelar edición de ${field.label.toLowerCase()}`}
+                          title="Cancelar"
+                          class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border focus-visible:outline-2 focus-visible:outline-ring"
+                          data-cancel-fallback
+                        >
+                          <X size={18} aria-hidden="true" />
+                        </a>
+                      </form>
+                    </details>
+                  )}
                 </dd>
               </div>
             ))}
@@ -387,40 +398,57 @@ const successKey = Astro.url.searchParams.get("success");
               Puedes desactivarlo.
             </p>
           ) : (
-            <details class="mt-6 border-t pt-4">
-              <summary class="min-h-11 cursor-pointer py-3 font-semibold text-destructive">
+            <div class="mt-6 border-t pt-4">
+              <button
+                type="button"
+                data-delete-toggle
+                aria-expanded="true"
+                aria-controls="delete-confirmation"
+                class="min-h-11 rounded-lg border border-destructive px-4 font-semibold text-destructive focus-visible:outline-2 focus-visible:outline-ring"
+              >
                 Eliminar formato
-              </summary>
-              <p class="mt-2 text-sm">
-                Esta acción elimina el formato y todas sus revisiones sin uso.
-                No se puede deshacer.
-              </p>
-              <form method="post" class="mt-4">
-                <input
-                  type="hidden"
-                  name="revisionId"
-                  value={format.revisionId}
-                />
-                <input
-                  type="hidden"
-                  name="updatedAt"
-                  value={format.updatedAt}
-                />
-                <input type="hidden" name="intent" value="delete" />
-                <button
-                  type="submit"
-                  class="min-h-11 rounded-lg border border-destructive px-4 text-sm font-semibold text-destructive"
-                >
-                  Sí, eliminar formato
-                </button>{" "}
-                <a
-                  href={`/app/formatos/${id}`}
-                  class="inline-flex min-h-11 items-center px-4 text-sm font-medium"
-                >
-                  Cancelar
-                </a>
-              </form>
-            </details>
+              </button>
+              <div id="delete-confirmation">
+                <p class="mt-2 text-sm">
+                  Esta acción elimina el formato y todas sus revisiones sin uso.
+                  No se puede deshacer.
+                </p>
+                <form method="post" class="mt-4">
+                  <input
+                    type="hidden"
+                    name="revisionId"
+                    value={format.revisionId}
+                  />
+                  <input
+                    type="hidden"
+                    name="updatedAt"
+                    value={format.updatedAt}
+                  />
+                  <input type="hidden" name="intent" value="delete" />
+                  <button
+                    type="submit"
+                    class="min-h-11 rounded-lg border border-destructive px-4 text-sm font-semibold text-destructive"
+                  >
+                    Sí, eliminar formato
+                  </button>{" "}
+                  <button
+                    type="button"
+                    data-delete-cancel
+                    hidden
+                    class="min-h-11 rounded-lg border px-4 text-sm font-medium"
+                  >
+                    Cancelar
+                  </button>
+                  <a
+                    href={`/app/formatos/${id}`}
+                    class="inline-flex min-h-11 items-center px-4 text-sm font-medium"
+                    data-delete-fallback
+                  >
+                    Cancelar
+                  </a>
+                </form>
+              </div>
+            </div>
           )}
         </section>
       </div>
@@ -428,6 +456,109 @@ const successKey = Astro.url.searchParams.get("success");
   )}
   <script>
     import { sileo } from "sileo";
+
+    // Keep the HTML forms authoritative: filtering only assists input, never replaces server validation.
+    const allowed = (kind: string, value: string) => {
+      if (kind === "name")
+        return !Array.from(value).some(
+          (character) =>
+            character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+        );
+      if (kind === "totalHours")
+        return (
+          value === "" ||
+          (/^(?:0|[1-9]\d{0,9})$/.test(value) && Number(value) <= 2147483647)
+        );
+      return value === "" || /^(?:0|[1-9]\d{0,9})(?:\.\d{0,2})?$/.test(value);
+    };
+    document
+      .querySelectorAll<HTMLInputElement>("[data-format-filter]")
+      .forEach((input) => {
+        let previous = input.value;
+        const valid = (value: string) =>
+          allowed(input.dataset.formatFilter ?? "", value);
+        const insert = (text: string) =>
+          valid(
+            input.value.slice(0, input.selectionStart ?? input.value.length) +
+              text +
+              input.value.slice(input.selectionEnd ?? input.value.length),
+          );
+        input.addEventListener("beforeinput", (event) => {
+          if (!event.isComposing && event.data && !insert(event.data))
+            event.preventDefault();
+        });
+        input.addEventListener("paste", (event) => {
+          if (!insert(event.clipboardData?.getData("text") ?? ""))
+            event.preventDefault();
+        });
+        input.addEventListener("drop", (event) => {
+          if (!insert(event.dataTransfer?.getData("text") ?? ""))
+            event.preventDefault();
+        });
+        input.addEventListener("input", () => {
+          if (valid(input.value)) previous = input.value;
+          else input.value = previous;
+        });
+        input.addEventListener("compositionend", () => {
+          if (valid(input.value)) previous = input.value;
+          else input.value = previous;
+        });
+      });
+    document
+      .querySelectorAll<HTMLDetailsElement>("dd details")
+      .forEach((details) => {
+        const cancel =
+          details.querySelector<HTMLButtonElement>("[data-cancel-edit]");
+        const fallback = details.querySelector<HTMLAnchorElement>(
+          "[data-cancel-fallback]",
+        );
+        if (!cancel || !fallback) return;
+        cancel.hidden = false;
+        cancel.classList.add("inline-flex");
+        fallback.hidden = true;
+        const input = details.querySelector<HTMLInputElement>(
+          'input[name="value"]',
+        );
+        details.addEventListener("toggle", () => {
+          if (details.open) input?.focus();
+        });
+        cancel.addEventListener("click", () => {
+          if (input)
+            input.value = input.dataset.persistedValue ?? input.defaultValue;
+          details.open = false;
+          details.querySelector<HTMLElement>("summary")?.focus();
+        });
+      });
+    const deleteToggle = document.querySelector<HTMLButtonElement>(
+      "[data-delete-toggle]",
+    );
+    const deletePanel = document.querySelector<HTMLElement>(
+      "#delete-confirmation",
+    );
+    const deleteCancel = document.querySelector<HTMLButtonElement>(
+      "[data-delete-cancel]",
+    );
+    const deleteFallback = document.querySelector<HTMLAnchorElement>(
+      "[data-delete-fallback]",
+    );
+    if (deleteToggle && deletePanel && deleteCancel && deleteFallback) {
+      deleteToggle.hidden = false;
+      deletePanel.hidden = true;
+      deleteToggle.setAttribute("aria-expanded", "false");
+      deleteCancel.hidden = false;
+      deleteFallback.hidden = true;
+      const show = (open: boolean) => {
+        deletePanel.hidden = !open;
+        deleteToggle.setAttribute("aria-expanded", String(open));
+        if (open)
+          deletePanel
+            .querySelector<HTMLButtonElement>('button[type="submit"]')
+            ?.focus();
+        else deleteToggle.focus();
+      };
+      deleteToggle.addEventListener("click", () => show(true));
+      deleteCancel.addEventListener("click", () => show(false));
+    }
 
     const success = new URLSearchParams(window.location.search).get("success");
     const messages: Record<string, string> = {
