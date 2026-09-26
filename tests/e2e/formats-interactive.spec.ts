@@ -188,9 +188,138 @@ test("inline editing swaps icons in the same row, filters input and cancels with
   await expect(
     page.getByRole("button", { name: "Sí, eliminar formato" }),
   ).toBeHidden();
-  await deleteButton.click();
-  await expect(deleteButton).toHaveAttribute("aria-expanded", "true");
+  await deleteButton.focus();
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "¿Eliminar formato?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("No se puede deshacer");
   await page.getByRole("button", { name: "Cancelar", exact: true }).click();
   await expect(deleteButton).toBeFocused();
+  await expect(dialog).toBeHidden();
+  await deleteButton.click();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(deleteButton).toBeFocused();
   await expect(page).toHaveURL(new RegExp(`${path}$`));
+
+  const revisionId = await page
+    .locator('input[name="revisionId"]')
+    .first()
+    .inputValue();
+  const updatedAt = await page
+    .locator('input[name="updatedAt"]')
+    .first()
+    .inputValue();
+  const conflict = await page.request.post(path, {
+    headers: { Origin: "http://127.0.0.1:4321" },
+    form: {
+      intent: "rename",
+      field: "name",
+      value: `${name} actualizado`,
+      revisionId,
+      updatedAt,
+    },
+    maxRedirects: 0,
+  });
+  expect(conflict.status()).toBe(303);
+  await deleteButton.click();
+  await dialog.getByRole("button", { name: "Sí, eliminar formato" }).click();
+  await expect(page.locator("[data-action-error]")).toContainText(
+    "Recarga y revisa",
+  );
+  await expect(page).toHaveURL(new RegExp(`${path}$`));
+  await page.reload();
+  await page.evaluate(() => {
+    (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
+  });
+  await page
+    .getByRole("button", { name: "Eliminar formato", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "¿Eliminar formato?" })
+    .getByRole("button", { name: "Sí, eliminar formato" })
+    .click();
+  await expect(page).toHaveURL(/\/app\/formatos$/);
+  await expect(
+    page.getByRole("heading", { name: "Formatos de curso" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: new RegExp(name) })).toHaveCount(
+    0,
+  );
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { navigationMarker?: boolean }).navigationMarker,
+    ),
+  ).toBe(true);
+});
+
+test("used formats toggle availability in place and disable editors while inactive", async ({
+  page,
+  context,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app/formatos/nuevo");
+  const name = `Formato en uso ${Date.now()}`;
+  await page.getByLabel("Nombre").fill(name);
+  await page.getByLabel("Duración total (horas)").fill("24");
+  await page.getByLabel("Precio estudiante (BOB)").fill("80");
+  await page.getByLabel("Precio externo (BOB)").fill("100");
+  await page.getByRole("button", { name: "Crear formato" }).click();
+  await page.getByRole("link", { name: new RegExp(name) }).click();
+  const path = new URL(page.url()).pathname;
+  const id = path.split("/").at(-1)!;
+  const created = await page.request.post("/app/cursos/nuevo", {
+    headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
+    form: {
+      name: `Curso formato en uso ${Date.now()}`,
+      description: "Curso para probar el estado del formato asociado.",
+      level: "INTERMEDIATE",
+      courseTypeId: id,
+      schedule: "Lunes 18:30–20:30",
+      conditions: "Sujeto a cupo.",
+      startsAt: "2027-03-01T18:30",
+      endsAt: "2027-04-01T20:30",
+      minimumGrade: "70",
+    },
+  });
+  expect(created.status()).toBe(201);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Eliminar formato" }),
+  ).toHaveCount(0);
+  await page.evaluate(() => {
+    (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
+  });
+  await page.getByRole("button", { name: "Desactivar formato" }).click();
+  const dialog = page.getByRole("dialog", { name: "¿Desactivar formato?" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Sí, desactivar formato" }).click();
+  await expect(page.locator("[data-format-status]")).toHaveText("Inactivo");
+  await expect(
+    page.getByRole("button", { name: "Activar formato" }),
+  ).toBeVisible();
+  await expect(
+    page.locator('summary[aria-label="Editar nombre"]'),
+  ).toBeHidden();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { navigationMarker?: boolean }).navigationMarker,
+    ),
+  ).toBe(true);
+  await page.getByRole("button", { name: "Activar formato" }).click();
+  await expect(page.locator("[data-format-status]")).toHaveText("Activo");
+  await expect(
+    page.locator('summary[aria-label="Editar nombre"]'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Desactivar formato" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { navigationMarker?: boolean }).navigationMarker,
+    ),
+  ).toBe(true);
 });

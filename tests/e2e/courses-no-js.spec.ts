@@ -104,7 +104,7 @@ test("new courses preserve values and can be corrected after server validation w
   await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
 });
 
-test("formats can be created, edited, deactivated and deleted without JavaScript", async ({
+test("unused formats can be created, edited and deleted without JavaScript", async ({
   page,
   context,
 }) => {
@@ -147,13 +147,38 @@ test("formats can be created, edited, deactivated and deleted without JavaScript
   await hours.getByRole("button", { name: "Guardar duración total" }).click();
   await expect(page).toHaveURL(/success=revise/);
   await expect(page.getByText("30 horas")).toBeVisible();
-  await page.getByRole("button", { name: "Desactivar formato" }).click();
-  await expect(page.getByText(/Inactivo · Revisión/)).toBeVisible();
-  await page.getByRole("button", { name: "Activar formato" }).click();
-  await expect(page.getByText(/Activo · Revisión/)).toBeVisible();
+  await expect(page.locator("[data-format-status]")).toHaveText("Activo");
+  const path = new URL(page.url()).pathname;
+  const deactivated = await page.request.post(path, {
+    headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
+    form: {
+      intent: "deactivate",
+      revisionId: await page
+        .locator('input[name="revisionId"]')
+        .first()
+        .inputValue(),
+      updatedAt: await page
+        .locator('input[name="updatedAt"]')
+        .first()
+        .inputValue(),
+    },
+  });
+  expect(deactivated.status()).toBe(200);
+  await page.reload();
+  await expect(page.locator("[data-format-status]")).toHaveText("Inactivo");
   await expect(
-    page.getByRole("button", { name: "Eliminar formato", exact: true }),
-  ).toBeVisible();
+    page.locator('summary[aria-label="Editar nombre"]'),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Activar formato" }),
+  ).toHaveCount(0);
+  await page.locator("[data-action-fallback] summary").click();
+  await page
+    .locator("[data-action-fallback]")
+    .getByRole("link", { name: "Cancelar" })
+    .click();
+  await expect(page).toHaveURL(path);
+  await page.locator("[data-action-fallback] summary").click();
   await expect(
     page.getByRole("button", { name: "Sí, eliminar formato" }),
   ).toBeVisible();
@@ -162,6 +187,53 @@ test("formats can be created, edited, deactivated and deleted without JavaScript
   await expect(page.getByRole("link", { name: new RegExp(name) })).toHaveCount(
     0,
   );
+});
+
+test("used formats require confirmation to deactivate without JavaScript", async ({
+  page,
+  context,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app/formatos/nuevo");
+  const name = `Formato usado sin JS ${Date.now()}`;
+  await page.getByLabel("Nombre").fill(name);
+  await page.getByLabel("Duración total (horas)").fill("20");
+  await page.getByLabel("Precio estudiante (BOB)").fill("80");
+  await page.getByLabel("Precio externo (BOB)").fill("100");
+  await page.getByRole("button", { name: "Crear formato" }).click();
+  await page.getByRole("link", { name: new RegExp(name) }).click();
+  const path = new URL(page.url()).pathname;
+  const course = await page.request.post("/app/cursos/nuevo", {
+    headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
+    form: {
+      name: `Curso sin JS ${Date.now()}`,
+      description: "Curso asociado para comprobar la confirmación.",
+      level: "INTERMEDIATE",
+      courseTypeId: path.split("/").at(-1)!,
+      schedule: "Lunes a viernes 16:00–17:30",
+      conditions: "Sujeto a cupo.",
+      startsAt: "2027-03-01T16:00",
+      endsAt: "2027-04-01T17:30",
+      minimumGrade: "70",
+    },
+  });
+  expect(course.status()).toBe(201);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Eliminar formato" }),
+  ).toHaveCount(0);
+  await page.locator("[data-action-fallback] summary").click();
+  await expect(
+    page.getByRole("button", { name: "Sí, desactivar formato" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Cancelar" }).click();
+  await expect(page.locator("[data-format-status]")).toHaveText("Activo");
+  await page.locator("[data-action-fallback] summary").click();
+  await page.getByRole("button", { name: "Sí, desactivar formato" }).click();
+  await expect(page.locator("[data-format-status]")).toHaveText("Inactivo");
+  await page.getByRole("button", { name: "Activar formato" }).click();
+  await expect(page.locator("[data-format-status]")).toHaveText("Activo");
+  await expect(page).toHaveURL(/success=activate/);
 });
 
 test("format mutations reject stale revisions, invalid origins and non-admin users", async ({
