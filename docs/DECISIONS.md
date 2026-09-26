@@ -386,3 +386,30 @@ Fase 2A almacena `totalHours` y los precios `STUDENT`/`EXTERNAL` directamente po
 - La cartelera agrupa afiches en tríos, convierte cuatro remanentes en dos pares y deja un remanente único en una fila completa; desktop varía proporciones, tablet equilibra dos columnas y mobile usa una columna uniforme. Cada pieza es un enlace de tarjeta completa.
 
 Los formatos de desarrollo seeded (20 horas: Bs 80/100; 30 horas: Bs 120/150) son valores iniciales editables de entorno local, no una tarifa universal ni un precio para auxiliares.
+
+---
+
+## ADR-017 — MUTACIONES ADMINISTRATIVAS SIN RECARGA
+
+**Fecha:** 2026-09-26
+
+**Estado:** Accepted — aplicación progresiva
+
+### Contexto
+
+Las recargas completas tras guardar, eliminar o cambiar un estado interrumpen el trabajo en formularios, la posición de lectura y los controles interactivos. El contrato SSR de las páginas administrativas ya ofrece POST HTML y validación de servidor.
+
+### Decisión
+
+Con JavaScript, toda mutación administrativa (incluidas altas, ediciones, cambios de estado y eliminaciones) debe confirmar en la interfaz y actualizar el contenido pertinente sin recargar el documento. Los POST con `Accept: application/json` reutilizan el mismo caso de uso, autorización, comprobación de origen, validación y control de concurrencia que el formulario HTML. Errores persistentes y revisiones optimistas se reflejan en la vista. Para acciones irreversibles o de alto impacto se pide confirmación accesible; las operaciones no se ejecutan al cerrar el diálogo. Sin JavaScript se conserva POST/redirect y una confirmación HTML utilizable.
+
+### Alternativas
+
+- Recargar la página después de cada operación.
+- Mantener una implementación de reglas distinta en el cliente.
+
+### Consecuencias
+
+- La interfaz debe sincronizar los datos y tokens devueltos por el servidor y ofrecer recuperación si la sesión caduca o falla una solicitud.
+- Los tests cubren resultados del servidor, continuidad de la página, foco y el fallback sin JavaScript por flujo; las mutaciones que aún hacen redirect con JavaScript se migran por fases.
+- Esta decisión reemplaza la exigencia de Post/Redirect/Get para **todo** éxito mutable en ADR-015: PRG permanece para el fallback HTML.
