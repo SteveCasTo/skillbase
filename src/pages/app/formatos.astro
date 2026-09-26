@@ -1,5 +1,5 @@
 ---
-import { Plus } from "lucide-react";
+import { Layers3, Plus } from "lucide-react";
 import { listFormats } from "@/application/courses/manage-formats";
 import type { CourseFormat } from "@/domain/courses/formats";
 import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
@@ -63,14 +63,24 @@ const success = Astro.url.searchParams.get("success");
       No se pudieron cargar los formatos. Inténtalo nuevamente.
     </p>
   ) : formats.length === 0 ? (
-    <section class="mt-8 rounded-xl border border-dashed bg-card p-7">
-      <h2 class="text-lg font-semibold">Aún no hay formatos</h2>
-      <p class="mt-2 text-muted-foreground">
+    <section
+      class="mt-9 rounded-xl border border-dashed bg-card p-7 text-center sm:p-10"
+      aria-labelledby="formats-empty-title"
+    >
+      <Layers3
+        className="mx-auto text-muted-foreground"
+        size={34}
+        aria-hidden="true"
+      />
+      <h2 id="formats-empty-title" class="mt-4 text-lg font-semibold">
+        Aún no hay formatos
+      </h2>
+      <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
         Crea el primero para asignar duración y precios a los cursos.
       </p>
       <a
         href="/app/formatos/nuevo"
-        class="mt-4 inline-flex min-h-11 items-center font-semibold underline underline-offset-4"
+        class="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg border px-4 text-sm font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         Crear primer formato
       </a>

@@ -191,6 +191,7 @@ Normalizar datos antes de persistir.
 
 - Las rutas administrativas de cursos están enumeradas por política; la edición dinámica solo acepta el patrón con UUID y cualquier ruta privada desconocida falla cerrada.
 - Cada POST de creación, edición, publicación, retiro o archivo exige origen exacto, usuario interno `ACTIVE` y rol `ADMIN`, incluso después del guard del middleware.
+- Los POST de edición con `Accept: application/json` pasan por la misma autorización, validación y revisión optimista que los formularios HTML. Las respuestas de error JSON contienen solo mensajes de dominio y campos, sin detalles de infraestructura ni credenciales.
 - El cliente no puede enviar un estado editorial arbitrario: cada intención invoca un caso de uso y una transición cerrada.
 - El slug se normaliza y asigna en servidor bajo bloqueo transaccional; nunca se acepta durante edición.
 - La asignación usa un namespace global estable de advisory lock para que nombres concurrentes con bases solapadas no compitan por el mismo slug.
