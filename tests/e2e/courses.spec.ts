@@ -145,8 +145,36 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   expect(page.url()).toContain(draftUrl!);
   const key = await page.locator('input[name="artwork"]').inputValue();
   expect(key).toMatch(/^courses\/[0-9a-f-]+\/[0-9a-f-]+\.webp$/);
+  await expect(
+    page.getByRole("img", { name: "Foto actual del curso" }),
+  ).toBeVisible();
+  const editorBox = await page
+    .locator("[data-course-image-editor]")
+    .boundingBox();
+  const nameBox = await page.getByLabel("Nombre").boundingBox();
+  expect(editorBox).not.toBeNull();
+  expect(nameBox).not.toBeNull();
+  expect(editorBox!.x).toBeLessThan(nameBox!.x);
   await page.reload();
   await expect(page.locator('input[name="artwork"]')).toHaveValue(key);
+  await expect(
+    page.getByRole("img", { name: "Foto actual del curso" }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileEditorBox = await page
+    .locator("[data-course-image-editor]")
+    .boundingBox();
+  const mobileNameBox = await page.getByLabel("Nombre").boundingBox();
+  expect(mobileEditorBox).not.toBeNull();
+  expect(mobileNameBox).not.toBeNull();
+  expect(mobileEditorBox!.y).toBeLessThan(mobileNameBox!.y);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
   const env = getTestSupabaseEnvironment();
   const storage = createClient(env.apiUrl, env.serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
