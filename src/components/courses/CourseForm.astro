@@ -6,6 +6,7 @@ import CourseImageEditor from "./CourseImageEditor";
 import CourseDateTimePicker from "./CourseDateTimePicker";
 import CourseSchedulePicker from "./CourseSchedulePicker";
 import CourseMarkdownEditor from "./CourseMarkdownEditor";
+import { publicArtworkUrl } from "@/server/courses/artwork";
 
 interface Props {
   values: CourseInput;
@@ -54,6 +55,13 @@ const trackedFields = [
 const initialValues = Object.fromEntries(
   trackedFields.map((name) => [name, baseline?.[name] ?? ""]),
 );
+const displayedArtwork = courseId
+  ? (baseline?.artwork ?? values.artwork)
+  : values.artwork;
+const currentArtworkUrl = publicArtworkUrl(
+  displayedArtwork,
+  import.meta.env.PUBLIC_SUPABASE_URL,
+);
 ---
 
 <form
@@ -66,14 +74,6 @@ const initialValues = Object.fromEntries(
   {intent && <input type="hidden" name="intent" value={intent} />}
   {revision && <input type="hidden" name="revision" value={revision} />}
   <input type="hidden" name="artwork" value={values.artwork ?? ""} />
-  {courseId && !disabled && (
-    <CourseImageEditor
-      client:only="react"
-      courseId={courseId}
-      currentArtwork={values.artwork ?? null}
-    />
-  )}
-  {!courseId && !disabled && <CourseImageEditor client:only="react" />}
   {!courseId && (
     <p
       class="artwork-create-error hidden text-sm text-destructive"
@@ -120,45 +120,57 @@ const initialValues = Object.fromEntries(
       <h2 id="general-title" class="text-xl font-semibold">
         Información general
       </h2>
-      <div class="mt-6 grid gap-5 sm:grid-cols-2">
-        <label class="sm:col-span-2">
-          {" "}
-          <span class="text-sm font-medium">Nombre</span>
-          <input
-            class={control}
-            name="name"
-            data-course-input="text"
-            value={values.name ?? ""}
-            required
-            aria-invalid={Boolean(errors.name)}
-            aria-describedby={errorId("name")}
+      <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.4fr)] lg:items-start">
+        {!disabled && (
+          <CourseImageEditor
+            client:only="react"
+            {...(courseId ? { courseId } : {})}
+            currentArtwork={displayedArtwork ?? null}
+            currentArtworkUrl={currentArtworkUrl}
           />
-          {errors.name && (
-            <span id="name-error" class="mt-1 block text-sm text-destructive">
-              {errors.name}
-            </span>
-          )}
-        </label>
-        <label class="sm:col-span-2">
-          {" "}
-          <span class="text-sm font-medium">Descripción</span>
-          <textarea
-            class={area}
-            name="description"
-            data-course-input="multiline"
-            required
-            aria-invalid={Boolean(errors.description)}
-            aria-describedby={errorId("description")}
-          >{values.description ?? ""}</textarea>
-          {errors.description && (
-            <span
-              id="description-error"
-              class="mt-1 block text-sm text-destructive"
-            >
-              {errors.description}
-            </span>
-          )}
-        </label>
+        )}
+        <div class="grid min-w-0 gap-5">
+          <label>
+            {" "}
+            <span class="text-sm font-medium">Nombre</span>
+            <input
+              class={control}
+              name="name"
+              data-course-input="text"
+              value={values.name ?? ""}
+              required
+              aria-invalid={Boolean(errors.name)}
+              aria-describedby={errorId("name")}
+            />
+            {errors.name && (
+              <span id="name-error" class="mt-1 block text-sm text-destructive">
+                {errors.name}
+              </span>
+            )}
+          </label>
+          <label>
+            {" "}
+            <span class="text-sm font-medium">Descripción</span>
+            <textarea
+              class={area}
+              name="description"
+              data-course-input="multiline"
+              required
+              aria-invalid={Boolean(errors.description)}
+              aria-describedby={errorId("description")}
+            >{values.description ?? ""}</textarea>
+            {errors.description && (
+              <span
+                id="description-error"
+                class="mt-1 block text-sm text-destructive"
+              >
+                {errors.description}
+              </span>
+            )}
+          </label>
+        </div>
+      </div>
+      <div class="mt-5 grid gap-5 sm:grid-cols-2">
         <CourseSelect
           client:only="react"
           name="level"

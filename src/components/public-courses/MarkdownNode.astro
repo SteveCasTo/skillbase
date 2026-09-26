@@ -13,6 +13,10 @@ const children = node.children ?? [];
 {node.type === "text" && node.value}
 {node.type === "break" && <br />}
 {node.type === "code" && <code>{node.value}</code>}
+{node.type === "code-block" && <pre>
+    <code>{node.value}</code>
+  </pre>}
+{node.type === "separator" && <hr />}
 {node.type === "strong" && (
   <strong>
     {children.map((child) => (
@@ -42,39 +46,53 @@ const children = node.children ?? [];
   </p>
 )}
 {node.type === "heading" && node.level === 1 && (
-  <h3>
+  <h2>
     {children.map((child) => (
       <MarkdownNode node={child} />
     ))}
-  </h3>
+  </h2>
 )}
 {node.type === "heading" && node.level === 2 && (
+  <h2>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </h2>
+)}
+{node.type === "heading" && node.level === 3 && (
   <h3>
     {children.map((child) => (
       <MarkdownNode node={child} />
     ))}
   </h3>
 )}
-{node.type === "heading" && node.level === 3 && (
+{node.type === "heading" && node.level === 4 && (
   <h4>
     {children.map((child) => (
       <MarkdownNode node={child} />
     ))}
   </h4>
 )}
-{node.type === "heading" && node.level === 4 && (
+{node.type === "heading" && node.level === 5 && (
   <h5>
     {children.map((child) => (
       <MarkdownNode node={child} />
     ))}
   </h5>
 )}
-{node.type === "heading" && node.level && node.level >= 5 && (
+{node.type === "heading" && node.level === 6 && (
   <h6>
     {children.map((child) => (
       <MarkdownNode node={child} />
     ))}
   </h6>
+)}
+{node.type === "blockquote" && (
+  <blockquote>
+    {children.map((child) => (
+      <MarkdownNode node={child} />
+    ))}
+  </blockquote>
 )}
 {node.type === "unordered-list" && (
   <ul>

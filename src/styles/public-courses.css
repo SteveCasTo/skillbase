@@ -389,12 +389,12 @@ html.dark:has(.public-courses) {
     overflow-wrap: anywhere;
     line-height: 1.8;
   }
-  .course-markdown :where(h3, h4, h5, h6) {
+  .course-markdown :where(h2, h3, h4, h5, h6) {
     margin: 1.75rem 0 0.75rem;
     font-family: Alef, sans-serif;
     line-height: 1.3;
   }
-  .course-markdown :where(h3, h4) {
+  .course-markdown :where(h2, h3, h4) {
     font-size: 1.35rem;
   }
   .course-markdown :where(h5, h6) {
@@ -402,8 +402,32 @@ html.dark:has(.public-courses) {
   }
   .course-markdown p,
   .course-markdown ul,
-  .course-markdown ol {
+  .course-markdown ol,
+  .course-markdown blockquote,
+  .course-markdown pre,
+  .course-markdown hr {
     margin: 0 0 1rem;
+  }
+  .course-markdown blockquote {
+    padding-inline-start: 1rem;
+    border-inline-start: 2px solid var(--blue);
+    color: var(--soft);
+  }
+  .course-markdown pre {
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 1rem;
+    border-radius: 8px;
+    background: var(--field);
+    line-height: 1.5;
+  }
+  .course-markdown pre code {
+    padding: 0;
+    background: transparent;
+  }
+  .course-markdown hr {
+    border: 0;
+    border-top: 1px solid var(--border);
   }
   .course-markdown :where(ul, ol) {
     padding-inline-start: 1.5rem;
