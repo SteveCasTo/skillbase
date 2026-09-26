@@ -17,12 +17,16 @@ const actions: {
   label: string;
   mark: string;
 }[] = [
-  { action: "heading", label: "Encabezado", mark: "H" },
+  { action: "heading-2", label: "Encabezado nivel 2", mark: "H2" },
+  { action: "heading-3", label: "Encabezado nivel 3", mark: "H3" },
   { action: "bold", label: "Negrita", mark: "B" },
   { action: "italic", label: "Cursiva", mark: "I" },
   { action: "code", label: "Código en línea", mark: "`" },
+  { action: "code-block", label: "Bloque de código", mark: "```" },
   { action: "ordered-list", label: "Lista numerada", mark: "1." },
   { action: "unordered-list", label: "Lista con viñetas", mark: "•" },
+  { action: "blockquote", label: "Cita", mark: ">" },
+  { action: "separator", label: "Separador horizontal", mark: "—" },
   { action: "link", label: "Enlace", mark: "↗" },
 ];
 
@@ -78,7 +82,7 @@ export default function CourseMarkdownEditor({
       >
         {actions.map(({ action, label, mark }, index) => (
           <span key={action} className="inline-flex items-center gap-1">
-            {index > 0 && (index === 1 || index === 4 || index === 6) && (
+            {index > 0 && (index === 2 || index === 6 || index === 9) && (
               <span aria-hidden="true" className="bg-border mx-1 h-5 w-px" />
             )}
             <button

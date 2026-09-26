@@ -42,7 +42,7 @@ test("published course is public end-to-end and withdrawal removes every public 
     await page
       .getByLabel("Contenido del curso (Markdown, opcional)")
       .fill(
-        "## Temario público\n- **Unidad segura**\n\n[Enlace inseguro](javascript:alert(1))\n<script>alert(2)</script>",
+        "## Temario público\n- **Unidad segura**\n\n> Nota del curso\n\n```ts\nconst ejemplo = 1;\n```\n\n---\n\n[Guía válida](https://example.com/guia)\n[Enlace inseguro](javascript:alert(1))\n<script>alert(2)</script>",
       );
     await page.getByRole("checkbox", { name: "Lunes" }).click();
     await page.getByLabel("Desde", { exact: true }).fill("18:30");
@@ -165,7 +165,7 @@ test("published course is public end-to-end and withdrawal removes every public 
       page.getByText("Docente público E2E", { exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Temario público" }),
+      page.getByRole("heading", { level: 2, name: "Temario público" }),
     ).toBeVisible();
     await expect(
       page.getByText("Unidad segura", { exact: true }),
@@ -173,6 +173,16 @@ test("published course is public end-to-end and withdrawal removes every public 
     await expect(page.locator(".course-markdown strong")).toHaveText(
       "Unidad segura",
     );
+    await expect(page.locator(".course-markdown blockquote")).toHaveText(
+      "Nota del curso",
+    );
+    await expect(page.locator(".course-markdown pre code")).toContainText(
+      "const ejemplo = 1;",
+    );
+    await expect(page.locator(".course-markdown hr")).toHaveCount(1);
+    await expect(
+      page.getByRole("link", { name: "Guía válida" }),
+    ).toHaveAttribute("href", "https://example.com/guia");
     await expect(
       page.locator("script").filter({ hasText: "alert(2)" }),
     ).toHaveCount(0);
