@@ -138,8 +138,24 @@ test("inline editing swaps icons in the same row, filters input and cancels with
   await edit.click();
   await expect(input).toHaveValue("80.00");
   await input.fill("90.25");
+  await page.evaluate(() => {
+    (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
+  });
   await form.getByRole("button", { name: "Guardar precio estudiante" }).click();
   await expect(page.getByText("90.25 BOB")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { navigationMarker?: boolean }).navigationMarker,
+    ),
+  ).toBe(true);
+  await expect(page.locator('input[name="revisionId"]').first()).toHaveValue(
+    /.+/,
+  );
+  await edit.click();
+  await input.fill("95.00");
+  await form.getByRole("button", { name: "Guardar precio estudiante" }).click();
+  await expect(page.getByText("95.00 BOB")).toBeVisible();
   const stale = await page.request.post(path, {
     headers: { Origin: "http://127.0.0.1:4321" },
     form: {

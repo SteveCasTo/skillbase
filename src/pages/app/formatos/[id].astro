@@ -25,6 +25,9 @@ const user = requireInternalUser(Astro.locals);
 const id = Astro.params.id ?? "";
 const validId = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id);
 const repository = new DrizzleFormatRepository(getDatabase());
+const wantsJson = Astro.request.headers
+  .get("accept")
+  ?.includes("application/json");
 let format: CourseFormat | null = null;
 let pageError: string | null = null;
 let errors: Readonly<Record<string, string>> = {};
@@ -110,6 +113,14 @@ if (format && Astro.request.method === "POST") {
         Astro.response.status = 400;
         pageError = "La acción solicitada no es válida.";
       }
+      if (!pageError && wantsJson && intent !== "delete") {
+        return new Response(
+          JSON.stringify({ format: await getFormat(repository, user, id) }),
+          {
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
       if (!pageError)
         return Astro.redirect(`/app/formatos/${id}?success=${intent}`, 303);
     } catch (error) {
@@ -127,6 +138,11 @@ if (format && Astro.request.method === "POST") {
     }
   }
 }
+if (wantsJson && Astro.request.method === "POST")
+  return new Response(JSON.stringify({ message: pageError, errors }), {
+    status: Astro.response.status,
+    headers: { "Content-Type": "application/json" },
+  });
 const fields = format
   ? [
       {
@@ -260,7 +276,10 @@ const successKey = Astro.url.searchParams.get("success");
               <div class="py-4 first:pt-0 last:pb-0">
                 <dt class="text-sm text-muted-foreground">{field.label}</dt>
                 <dd class="mt-1 flex min-h-11 min-w-0 items-center gap-2">
-                  <span class="min-w-0 flex-1 break-words font-semibold tabular-nums [&:has(+details[open])]:hidden">
+                  <span
+                    data-format-value={field.key}
+                    class="min-w-0 flex-1 break-words font-semibold tabular-nums [&:has(+details[open])]:hidden"
+                  >
                     {field.value} {field.suffix ?? ""}
                   </span>
                   {(format.active || field.key === "name") && (
@@ -527,6 +546,121 @@ const successKey = Astro.url.searchParams.get("success");
             input.value = input.dataset.persistedValue ?? input.defaultValue;
           details.open = false;
           details.querySelector<HTMLElement>("summary")?.focus();
+        });
+        const form = details.querySelector<HTMLFormElement>("form");
+        form?.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const field = form.querySelector<HTMLInputElement>(
+            'input[name="field"]',
+          )?.value;
+          const submit = form.querySelector<HTMLButtonElement>(
+            'button[type="submit"]',
+          );
+          if (!field || !input || !submit || !form.reportValidity()) return;
+          submit.disabled = true;
+          submit.setAttribute("aria-busy", "true");
+          form.querySelector<HTMLElement>(`#error-${field}`)?.remove();
+          input.removeAttribute("aria-invalid");
+          input.removeAttribute("aria-describedby");
+          void (async () => {
+            try {
+              const response = await fetch(window.location.pathname, {
+                method: "POST",
+                headers: { Accept: "application/json" },
+                body: new FormData(form),
+              });
+              if (response.redirected) {
+                window.location.assign(response.url);
+                return;
+              }
+              const result = (await response.json()) as {
+                format?: {
+                  name: string;
+                  active: boolean;
+                  used: boolean;
+                  totalHours: number;
+                  studentAmount: string;
+                  externalAmount: string;
+                  revisionNumber: number;
+                  revisionId: string;
+                  updatedAt: string;
+                };
+                message?: string;
+                errors?: Record<string, string>;
+              };
+              if (!response.ok || !result.format) {
+                const message =
+                  result.errors?.[field] ??
+                  result.message ??
+                  "No se pudo guardar el cambio. Inténtalo nuevamente.";
+                const error = document.createElement("p");
+                error.id = `error-${field}`;
+                error.className = "mt-1 text-sm text-destructive";
+                error.textContent = message;
+                input.parentElement?.append(error);
+                input.setAttribute("aria-invalid", "true");
+                input.setAttribute("aria-describedby", error.id);
+                return;
+              }
+              const current = result.format;
+              document
+                .querySelectorAll<HTMLInputElement>('input[name="revisionId"]')
+                .forEach((control) => (control.value = current.revisionId));
+              document
+                .querySelectorAll<HTMLInputElement>('input[name="updatedAt"]')
+                .forEach((control) => (control.value = current.updatedAt));
+              for (const key of [
+                "name",
+                "totalHours",
+                "studentAmount",
+                "externalAmount",
+              ] as const) {
+                const value = String(current[key]);
+                const label = document.querySelector<HTMLElement>(
+                  `[data-format-value="${key}"]`,
+                );
+                if (label)
+                  label.textContent = `${value}${key === "totalHours" ? " horas" : key.endsWith("Amount") ? " BOB" : ""}`;
+                const control = document.querySelector<HTMLInputElement>(
+                  `#edit-${key}`,
+                );
+                if (control) {
+                  control.value = value;
+                  control.dataset.persistedValue = value;
+                }
+              }
+              document.querySelector("main h1")!.textContent = current.name;
+              document.querySelector<HTMLElement>(
+                'nav[aria-label="Ruta de navegación"] [aria-current="page"]',
+              )!.textContent = current.name;
+              const summary =
+                document.querySelector<HTMLElement>("header.mt-5 p");
+              if (summary)
+                summary.textContent = `${current.active ? "Activo" : "Inactivo"} · Revisión vigente ${current.revisionNumber} · ${current.used ? "Usado en cursos" : "Sin cursos asociados"}`;
+              document.title = `${current.name} | SkillBase`;
+              details.open = false;
+              details.querySelector<HTMLElement>("summary")?.focus();
+              sileo.success({
+                title:
+                  field === "name"
+                    ? "Nombre actualizado."
+                    : "Nueva revisión guardada. Los borradores usan los valores vigentes.",
+                duration: 6000,
+              });
+            } catch {
+              const error = document.createElement("p");
+              error.id = `error-${field}`;
+              error.className = "mt-1 text-sm text-destructive";
+              error.textContent =
+                "No se pudo guardar el cambio. Inténtalo nuevamente.";
+              input.parentElement?.append(error);
+              input.setAttribute("aria-invalid", "true");
+              input.setAttribute("aria-describedby", error.id);
+            } finally {
+              submit.disabled = false;
+              submit.removeAttribute("aria-busy");
+            }
+          })();
         });
       });
     const deleteToggle = document.querySelector<HTMLButtonElement>(

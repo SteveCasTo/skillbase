@@ -516,9 +516,10 @@ const initialValues = Object.fromEntries(
         field.target.dispatchEvent(new Event("input", { bubbles: true }));
       }
     });
-    const baseline: Record<string, string> | null = form.dataset.baseline
+    let baseline: Record<string, string> | null = form.dataset.baseline
       ? JSON.parse(form.dataset.baseline)
       : null;
+    let saving = false;
     if (button && !button.disabled) {
       // The SSR button stays usable without JavaScript. Once JS runs, wait for
       // all form-associated islands before comparing against persisted values.
@@ -546,7 +547,7 @@ const initialValues = Object.fromEntries(
               const values = current.getAll(name);
               return (
                 values.length === 1 &&
-                values[0] === (baseline[name] ?? "").replace(/\r\n?/g, "\n")
+                values[0] === (baseline?.[name] ?? "").replace(/\r\n?/g, "\n")
               );
             })
           : false;
@@ -556,7 +557,7 @@ const initialValues = Object.fromEntries(
           ),
         );
         const valid = form.checkValidity() && draftFieldsReady(values);
-        button.disabled = baseline ? !changed || !valid : !valid;
+        button.disabled = saving || (baseline ? !changed || !valid : !valid);
       };
       // FormData reads the controls' current values directly, including hidden
       // fields updated by React islands, so reconcile each change immediately.
@@ -635,6 +636,106 @@ const initialValues = Object.fromEntries(
               });
           };
         }).catch(showError);
+        return;
+      }
+      if (form.dataset.courseId) {
+        event.preventDefault();
+        if (!button || saving) return;
+        saving = true;
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+        button.querySelector(".submit-label")?.classList.add("hidden");
+        button.querySelector(".submit-pending")?.classList.remove("hidden");
+        const error = document.querySelector<HTMLElement>("[data-save-error]");
+        if (error) error.hidden = true;
+        form
+          .querySelectorAll<HTMLElement>("[data-async-field-error]")
+          .forEach((item) => item.remove());
+        form
+          .querySelectorAll<HTMLElement>('[aria-invalid="true"]')
+          .forEach((item) => item.removeAttribute("aria-invalid"));
+        void (async () => {
+          try {
+            const response = await fetch(window.location.pathname, {
+              method: "POST",
+              headers: { Accept: "application/json" },
+              body: new FormData(form),
+            });
+            if (response.redirected) {
+              window.location.assign(response.url);
+              return;
+            }
+            const result = (await response.json()) as {
+              revision?: string;
+              name?: string;
+              message?: string;
+              errors?: Record<string, string>;
+            };
+            if (!response.ok || !result.revision) {
+              if (error) {
+                error.textContent =
+                  result.message ??
+                  "No se pudieron guardar los cambios. Inténtalo nuevamente.";
+                error.hidden = false;
+              }
+              for (const [name, message] of Object.entries(
+                result.errors ?? {},
+              )) {
+                const control = Array.from(form.elements).find(
+                  (element) =>
+                    element instanceof HTMLElement &&
+                    element.getAttribute("name") === name,
+                );
+                if (!(control instanceof HTMLElement)) continue;
+                const hint = document.createElement("p");
+                hint.dataset.asyncFieldError = name;
+                hint.className = "mt-1 text-sm text-destructive";
+                hint.textContent = message;
+                const wrapper =
+                  control.closest("label") ?? control.parentElement;
+                wrapper?.append(hint);
+                control.setAttribute("aria-invalid", "true");
+              }
+              error?.scrollIntoView({ block: "center" });
+              return;
+            }
+            form.querySelector<HTMLInputElement>(
+              'input[name="revision"]',
+            )!.value = result.revision;
+            baseline = Object.fromEntries(
+              [...new FormData(form)].filter(
+                (entry): entry is [string, string] =>
+                  typeof entry[1] === "string" && entry[0] in (baseline ?? {}),
+              ),
+            );
+            form.dataset.baseline = JSON.stringify(baseline);
+            form.dispatchEvent(new Event("course-form-change"));
+            const breadcrumb = document.querySelector<HTMLElement>(
+              'nav[aria-label="Ruta de navegación"] [aria-current="page"]',
+            );
+            if (breadcrumb && result.name) breadcrumb.textContent = result.name;
+            if (result.name)
+              document.title = `Editar ${result.name} | SkillBase`;
+            const { sileo } = await import("sileo");
+            sileo.success({
+              title: "Cambios guardados correctamente.",
+              duration: 6000,
+            });
+          } catch {
+            if (error) {
+              error.textContent =
+                "No se pudieron guardar los cambios. Inténtalo nuevamente.";
+              error.hidden = false;
+              error.scrollIntoView({ block: "center" });
+            }
+          } finally {
+            saving = false;
+            button.querySelector(".submit-label")?.classList.remove("hidden");
+            button.querySelector(".submit-pending")?.classList.add("hidden");
+            button.removeAttribute("aria-busy");
+            form.dispatchEvent(new Event("course-form-change"));
+          }
+        })();
         return;
       }
       if (!button) return;

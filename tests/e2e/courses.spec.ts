@@ -303,6 +303,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   });
   await expect(save).toBeDisabled();
   await page.getByLabel("Descripción").fill("Texto conservado tras rechazo.");
+  const persistedRevision = await page
+    .locator('input[name="revision"]')
+    .inputValue();
   await page.locator('input[name="revision"]').evaluate((input) => {
     (input as HTMLInputElement).value = "invalid-revision";
     input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -322,6 +325,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(page.getByRole("alert").first()).toContainText(
     "La revisión del curso no es válida.",
   );
+  await page.locator('input[name="revision"]').evaluate((input, revision) => {
+    (input as HTMLInputElement).value = revision;
+  }, persistedRevision);
   await page
     .getByLabel("Descripción")
     .fill("Contenido determinista para validar el flujo administrativo.");
@@ -415,10 +421,21 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await page
     .getByLabel("Descripción")
     .fill("Contenido actualizado antes de publicar.");
-  await expectPostRedirect(page, () =>
-    page.getByRole("button", { name: "Guardar cambios" }).click(),
+  const editUrl = page.url();
+  await page.evaluate(() => {
+    (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
+  });
+  await page.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(page.locator("[data-sileo-toast]")).toContainText(
+    "Cambios guardados",
   );
-  await expect(page).toHaveURL(/\?success=updated$/);
+  expect(page.url()).toBe(editUrl);
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { navigationMarker?: boolean }).navigationMarker,
+    ),
+  ).toBe(true);
   await expect(page.getByLabel("Horario informativo")).toHaveValue(
     "Horario especial acordado con el grupo",
   );

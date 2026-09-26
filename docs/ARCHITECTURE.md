@@ -360,7 +360,7 @@ páginas Astro SSR
 → Drizzle/PostgreSQL
 ```
 
-Las páginas administrativas hacen render server-side y usan POST tradicional para evitar una isla React innecesaria. Cada escritura vuelve a verificar origen y autorización `ADMIN`; el middleware registra de forma explícita las rutas de cursos y formatos y mantiene el comportamiento fail-closed para cualquier otra ruta `/app`. El constructor/recortador de imágenes es una isla React acotada a la interacción que la necesita.
+Las páginas administrativas hacen render server-side y usan POST tradicional como base sin JavaScript. La edición de campos de formato y el guardado del formulario de curso utilizan `fetch` con respuestas JSON cuando hay JavaScript: conservan el formulario, actualizan el token de revisión optimista y muestran errores sin navegar. El servidor reutiliza los mismos casos de uso, validación y autorización que para POST HTML. Cada escritura vuelve a verificar origen y autorización `ADMIN`; el middleware registra de forma explícita las rutas de cursos y formatos y mantiene el comportamiento fail-closed para cualquier otra ruta `/app`. El constructor/recortador de imágenes es una isla React acotada a la interacción que la necesita.
 
 `DrizzleCourseRepository` agrupa curso y auditoría en transacción; los términos comerciales se resuelven desde la revisión inmutable de formato referenciada por el curso. `DrizzleFormatRepository` crea y revisa formatos, conserva auditoría, mueve cursos `DRAFT` a la revisión vigente y deja intactas revisiones de cursos publicados/archivados. La migración versionada reconstruye formatos a partir de las tuplas históricas de duración y precios y elimina los campos/tablas directos al completar la migración.
 

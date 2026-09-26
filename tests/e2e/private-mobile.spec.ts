@@ -46,4 +46,51 @@ test("mobile drawer closes with Escape and restores keyboard focus", async ({
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("[data-mobile-drawer]")).toBeHidden();
+});
+
+test("mobile menu slides in and out, with logout on the left", async ({
+  context,
+  page,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app");
+  const trigger = page.getByRole("button", { name: "Abrir menú" });
+  const drawer = page.locator("[data-mobile-drawer]");
+  const panel = page.locator(".private-mobile-panel");
+  await trigger.click();
+  await expect(drawer).toHaveAttribute("data-state", "open");
+  expect(
+    await panel.evaluate(
+      (element) => getComputedStyle(element).transitionDuration,
+    ),
+  ).toBe("0.3s");
+
+  const footer = page.locator(".private-mobile-footer");
+  const logout = footer.getByRole("button", { name: "Cerrar sesión" });
+  const footerBox = await footer.boundingBox();
+  const logoutBox = await logout.boundingBox();
+  expect(footerBox).not.toBeNull();
+  expect(logoutBox).not.toBeNull();
+  expect(logoutBox!.x).toBeLessThan(footerBox!.x + footerBox!.width / 2);
+
+  await page.getByRole("button", { name: "Cerrar menú" }).click();
+  await expect(drawer).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await expect(panel).toBeVisible();
+});
+
+test("mobile drawer respects reduced motion", async ({ context, page }) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/app");
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  expect(
+    await page
+      .locator(".private-mobile-panel")
+      .evaluate((element) => getComputedStyle(element).transitionDuration),
+  ).toBe("0s");
+  await page.getByRole("button", { name: "Cerrar menú" }).click();
+  await expect(page.locator("[data-mobile-drawer]")).toBeHidden();
 });
