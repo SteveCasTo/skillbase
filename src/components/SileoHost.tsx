@@ -25,5 +25,11 @@ export function SileoHost() {
     };
   }, []);
 
-  return <Toaster position="top-right" theme={theme} />;
+  return (
+    <Toaster
+      position="top-right"
+      theme={theme}
+      options={{ fill: "var(--card)" }}
+    />
+  );
 }

@@ -248,6 +248,22 @@ html:has(.private-shell) [data-sileo-viewport] {
   --sileo-state-info: var(--secondary-foreground);
   --sileo-state-action: var(--primary);
 }
+html:has(.private-shell) [data-sileo-viewport] [data-sileo-title] {
+  color: var(--card-foreground);
+}
+html:has(.private-shell) [data-sileo-viewport] [data-sileo-description] {
+  color: var(--muted-foreground);
+}
+html:has(.private-shell) [data-sileo-viewport] [data-sileo-svg] {
+  filter: drop-shadow(
+    0 4px 12px color-mix(in oklch, var(--foreground) 12%, transparent)
+  );
+}
+html:has(.private-shell)
+  [data-sileo-viewport]
+  :is([data-sileo-pill], [data-sileo-body]) {
+  fill: var(--card);
+}
 
 @media (min-width: 1024px) {
   .private-shell {
