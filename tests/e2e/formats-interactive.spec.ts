@@ -286,6 +286,7 @@ test("used formats toggle availability in place and disable editors while inacti
   await page.getByLabel("Precio externo (BOB)").fill("100");
   await page.getByRole("button", { name: "Crear formato" }).click();
   await page.getByRole("link", { name: new RegExp(name) }).click();
+  await expect(page).toHaveURL(/\/app\/formatos\/[0-9a-f-]+$/);
   const path = new URL(page.url()).pathname;
   const id = path.split("/").at(-1)!;
   const created = await page.request.post("/app/cursos/nuevo", {
@@ -303,7 +304,7 @@ test("used formats toggle availability in place and disable editors while inacti
       minimumGrade: "70",
     },
   });
-  expect(created.status()).toBe(201);
+  expect(created.status(), await created.text()).toBe(201);
   await page.reload();
   await expect(
     page.getByRole("button", { name: "Eliminar formato" }),

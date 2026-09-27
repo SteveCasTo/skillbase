@@ -61,8 +61,9 @@ test("published course is public end-to-end and withdrawal removes every public 
     }
     await page.getByLabel("Nota mínima (0–100)").fill("70");
     await page.getByRole("button", { name: "Crear borrador" }).click();
-    await expect(page).toHaveURL(
-      /\/app\/cursos\/[^/]+\/editar\?success=created$/,
+    await expect(page).toHaveURL(/\/app\/cursos\/[^/]+\/editar$/);
+    await expect(page.locator("[data-sileo-toast]")).toContainText(
+      "Borrador creado",
     );
     courseId = new URL(page.url()).pathname.split("/").at(-2);
     expect(courseId).toMatch(/^[0-9a-f-]{36}$/i);
@@ -112,9 +113,12 @@ test("published course is public end-to-end and withdrawal removes every public 
       page.getByRole("button", { name: "Guardar cambios" }),
     ).toBeDisabled();
 
-    await page.getByText("Publicar curso", { exact: true }).click();
+    await page.getByRole("button", { name: "Publicar curso" }).click();
     await page.getByRole("button", { name: "Confirmar publicación" }).click();
-    await expect(page).toHaveURL(/success=published/);
+    await expect(page.locator("[data-sileo-toast]")).toContainText(
+      "Curso publicado",
+    );
+    await expect(page).toHaveURL(/\/app\/cursos\/[^/]+\/editar$/);
     await page
       .getByRole("button", { name: "Destacar en la cartelera" })
       .click();
@@ -194,7 +198,7 @@ test("published course is public end-to-end and withdrawal removes every public 
     // The upload really reached public Storage; remove it even when later assertions fail.
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     await page.goto(`/app/cursos/${courseId}/editar`);
-    await page.getByText("Retirar publicación", { exact: true }).click();
+    await page.getByRole("button", { name: "Retirar publicación" }).click();
     await page.getByRole("button", { name: "Confirmar retiro" }).click();
     await expect(page.locator("[data-sileo-toast]")).toContainText(
       "devuelto a borrador",
@@ -218,7 +222,7 @@ test("published course is public end-to-end and withdrawal removes every public 
 
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     await page.goto(`/app/cursos/${courseId}/editar`);
-    await page.getByText("Archivar curso", { exact: true }).click();
+    await page.getByRole("button", { name: "Archivar curso" }).click();
     await page.getByRole("button", { name: "Confirmar archivo" }).click();
     await expect(page.locator("[data-sileo-toast]")).toContainText(
       "Curso archivado",

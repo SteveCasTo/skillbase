@@ -435,7 +435,7 @@ const successKey = Astro.url.searchParams.get("success");
                   <details
                     hidden={!format.active}
                     open={editing === field.key && Boolean(pageError)}
-                    class="group ml-auto shrink-0 open:min-w-0 open:flex-1"
+                    class="group ml-auto shrink-0 [&:not([open])>form]:hidden open:min-w-0 open:flex-1"
                   >
                     <summary
                       aria-label={`Editar ${field.label.toLowerCase()}`}
@@ -536,352 +536,325 @@ const successKey = Astro.url.searchParams.get("success");
     </>
   )}
   <script>
+    import { navigate } from "astro:transitions/client";
     import { sileo } from "sileo";
-
-    type FormatResult = {
-      name: string;
-      active: boolean;
-      used: boolean;
-      totalHours: number;
-      sessionMinutes: number | null;
-      studentAmount: string;
-      externalAmount: string;
-      revisionId: string;
-      updatedAt: string;
-    };
-    type MutationResult = {
-      format?: FormatResult;
-      deleted?: boolean;
-      message?: string;
-      errors?: Record<string, string>;
-    };
-    const mutation = async (form: HTMLFormElement, field?: string) => {
-      const response = await fetch(window.location.pathname, {
-        method: "POST",
-        headers: { Accept: "application/json" },
-        body: new FormData(form),
-      });
-      if (
-        response.redirected ||
-        !response.headers.get("content-type")?.includes("application/json")
-      )
-        throw new Error(
-          "La sesión cambió. Recarga la página e inténtalo de nuevo.",
-        );
-      const result = (await response.json()) as MutationResult;
-      if (!response.ok)
-        throw new Error(
-          (field && result.errors?.[field]) ||
-            result.message ||
-            "No se pudo guardar el cambio. Inténtalo nuevamente.",
-        );
-      return result;
-    };
-    const renderFormat = (current: FormatResult) => {
-      document
-        .querySelectorAll<HTMLInputElement>('input[name="revisionId"]')
-        .forEach((control) => (control.value = current.revisionId));
-      document
-        .querySelectorAll<HTMLInputElement>('input[name="updatedAt"]')
-        .forEach((control) => (control.value = current.updatedAt));
-      for (const key of [
-        "name",
-        "totalHours",
-        "sessionMinutes",
-        "studentAmount",
-        "externalAmount",
-      ] as const) {
-        const value = String(current[key]);
-        const label = document.querySelector<HTMLElement>(
-          `[data-format-value="${key}"]`,
-        );
-        if (label)
-          label.textContent = `${current[key] === null ? "Sin definir" : value}${key === "totalHours" ? " horas" : key === "sessionMinutes" && current[key] !== null ? " minutos" : key.endsWith("Amount") ? " BOB" : ""}`;
-        const control = document.querySelector<HTMLInputElement>(
-          `#edit-${key}`,
-        );
-        if (control) {
-          control.value = value;
-          control.dataset.persistedValue = value;
+    document.addEventListener("astro:page-load", () => {
+      type FormatResult = {
+        name: string;
+        active: boolean;
+        used: boolean;
+        totalHours: number;
+        sessionMinutes: number | null;
+        studentAmount: string;
+        externalAmount: string;
+        revisionId: string;
+        updatedAt: string;
+      };
+      type MutationResult = {
+        format?: FormatResult;
+        deleted?: boolean;
+        message?: string;
+        errors?: Record<string, string>;
+      };
+      const mutation = async (form: HTMLFormElement, field?: string) => {
+        const response = await fetch(window.location.pathname, {
+          method: "POST",
+          headers: { Accept: "application/json" },
+          body: new FormData(form),
+        });
+        if (
+          response.redirected ||
+          !response.headers.get("content-type")?.includes("application/json")
+        )
+          throw new Error(
+            "La sesión cambió. Recarga la página e inténtalo de nuevo.",
+          );
+        const result = (await response.json()) as MutationResult;
+        if (!response.ok)
+          throw new Error(
+            (field && result.errors?.[field]) ||
+              result.message ||
+              "No se pudo guardar el cambio. Inténtalo nuevamente.",
+          );
+        return result;
+      };
+      const renderFormat = (current: FormatResult) => {
+        document
+          .querySelectorAll<HTMLInputElement>('input[name="revisionId"]')
+          .forEach((control) => (control.value = current.revisionId));
+        document
+          .querySelectorAll<HTMLInputElement>('input[name="updatedAt"]')
+          .forEach((control) => (control.value = current.updatedAt));
+        for (const key of [
+          "name",
+          "totalHours",
+          "sessionMinutes",
+          "studentAmount",
+          "externalAmount",
+        ] as const) {
+          const value = String(current[key]);
+          const label = document.querySelector<HTMLElement>(
+            `[data-format-value="${key}"]`,
+          );
+          if (label)
+            label.textContent = `${current[key] === null ? "Sin definir" : value}${key === "totalHours" ? " horas" : key === "sessionMinutes" && current[key] !== null ? " minutos" : key.endsWith("Amount") ? " BOB" : ""}`;
+          const control = document.querySelector<HTMLInputElement>(
+            `#edit-${key}`,
+          );
+          if (control) {
+            control.value = value;
+            control.dataset.persistedValue = value;
+          }
         }
-      }
-      document.querySelector("main h1")!.textContent = current.name;
-      document.querySelector<HTMLElement>(
-        'nav[aria-label="Ruta de navegación"] [aria-current="page"]',
-      )!.textContent = current.name;
-      document.querySelector<HTMLElement>("[data-format-status]")!.textContent =
-        current.active ? "Activo" : "Inactivo";
+        document.querySelector("main h1")!.textContent = current.name;
+        document.querySelector<HTMLElement>(
+          'nav[aria-label="Ruta de navegación"] [aria-current="page"]',
+        )!.textContent = current.name;
+        document.querySelector<HTMLElement>(
+          "[data-format-status]",
+        )!.textContent = current.active ? "Activo" : "Inactivo";
+        document
+          .querySelectorAll<HTMLDetailsElement>("dd details")
+          .forEach((details) => {
+            details.open = false;
+            details.hidden = !current.active;
+          });
+        const action = document.querySelector<HTMLElement>(
+          "[data-format-action]",
+        );
+        const actionForm =
+          action?.querySelector<HTMLFormElement>("[data-action-form]");
+        const trigger = action?.querySelector<HTMLButtonElement>(
+          "[data-action-trigger]",
+        );
+        const fallback = action?.querySelector<HTMLDetailsElement>(
+          "[data-action-fallback]",
+        );
+        if (actionForm) actionForm.hidden = current.active;
+        if (trigger) trigger.hidden = !current.active;
+        if (fallback) fallback.hidden = true;
+        document.title = `${current.name} | SkillBase`;
+      };
+
+      // Keep the HTML forms authoritative: filtering only assists input, never replaces server validation.
+      const allowed = (kind: string, value: string) => {
+        if (kind === "name")
+          return !Array.from(value).some(
+            (character) =>
+              character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+          );
+        if (kind === "sessionMinutes")
+          return (
+            value === "" || (/^\d{1,3}$/.test(value) && Number(value) <= 480)
+          );
+        if (kind === "totalHours")
+          return (
+            value === "" ||
+            (/^(?:0|[1-9]\d{0,9})$/.test(value) && Number(value) <= 2147483647)
+          );
+        return value === "" || /^(?:0|[1-9]\d{0,9})(?:\.\d{0,2})?$/.test(value);
+      };
+      document
+        .querySelectorAll<HTMLInputElement>("[data-format-filter]")
+        .forEach((input) => {
+          let previous = input.value;
+          const valid = (value: string) =>
+            allowed(input.dataset.formatFilter ?? "", value);
+          const insert = (text: string) =>
+            valid(
+              input.value.slice(0, input.selectionStart ?? input.value.length) +
+                text +
+                input.value.slice(input.selectionEnd ?? input.value.length),
+            );
+          input.addEventListener("beforeinput", (event) => {
+            if (!event.isComposing && event.data && !insert(event.data))
+              event.preventDefault();
+          });
+          input.addEventListener("paste", (event) => {
+            if (!insert(event.clipboardData?.getData("text") ?? ""))
+              event.preventDefault();
+          });
+          input.addEventListener("drop", (event) => {
+            if (!insert(event.dataTransfer?.getData("text") ?? ""))
+              event.preventDefault();
+          });
+          input.addEventListener("input", () => {
+            if (valid(input.value)) previous = input.value;
+            else input.value = previous;
+          });
+          input.addEventListener("compositionend", () => {
+            if (valid(input.value)) previous = input.value;
+            else input.value = previous;
+          });
+        });
       document
         .querySelectorAll<HTMLDetailsElement>("dd details")
         .forEach((details) => {
-          details.open = false;
-          details.hidden = !current.active;
-        });
-      const action = document.querySelector<HTMLElement>(
-        "[data-format-action]",
-      );
-      const actionForm =
-        action?.querySelector<HTMLFormElement>("[data-action-form]");
-      const trigger = action?.querySelector<HTMLButtonElement>(
-        "[data-action-trigger]",
-      );
-      const fallback = action?.querySelector<HTMLDetailsElement>(
-        "[data-action-fallback]",
-      );
-      if (actionForm) actionForm.hidden = current.active;
-      if (trigger) trigger.hidden = !current.active;
-      if (fallback) fallback.hidden = true;
-      document.title = `${current.name} | SkillBase`;
-    };
-
-    // Keep the HTML forms authoritative: filtering only assists input, never replaces server validation.
-    const allowed = (kind: string, value: string) => {
-      if (kind === "name")
-        return !Array.from(value).some(
-          (character) =>
-            character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
-        );
-      if (kind === "sessionMinutes")
-        return (
-          value === "" || (/^\d{1,3}$/.test(value) && Number(value) <= 480)
-        );
-      if (kind === "totalHours")
-        return (
-          value === "" ||
-          (/^(?:0|[1-9]\d{0,9})$/.test(value) && Number(value) <= 2147483647)
-        );
-      return value === "" || /^(?:0|[1-9]\d{0,9})(?:\.\d{0,2})?$/.test(value);
-    };
-    document
-      .querySelectorAll<HTMLInputElement>("[data-format-filter]")
-      .forEach((input) => {
-        let previous = input.value;
-        const valid = (value: string) =>
-          allowed(input.dataset.formatFilter ?? "", value);
-        const insert = (text: string) =>
-          valid(
-            input.value.slice(0, input.selectionStart ?? input.value.length) +
-              text +
-              input.value.slice(input.selectionEnd ?? input.value.length),
+          const cancel =
+            details.querySelector<HTMLButtonElement>("[data-cancel-edit]");
+          const fallback = details.querySelector<HTMLAnchorElement>(
+            "[data-cancel-fallback]",
           );
-        input.addEventListener("beforeinput", (event) => {
-          if (!event.isComposing && event.data && !insert(event.data))
-            event.preventDefault();
-        });
-        input.addEventListener("paste", (event) => {
-          if (!insert(event.clipboardData?.getData("text") ?? ""))
-            event.preventDefault();
-        });
-        input.addEventListener("drop", (event) => {
-          if (!insert(event.dataTransfer?.getData("text") ?? ""))
-            event.preventDefault();
-        });
-        input.addEventListener("input", () => {
-          if (valid(input.value)) previous = input.value;
-          else input.value = previous;
-        });
-        input.addEventListener("compositionend", () => {
-          if (valid(input.value)) previous = input.value;
-          else input.value = previous;
-        });
-      });
-    document
-      .querySelectorAll<HTMLDetailsElement>("dd details")
-      .forEach((details) => {
-        const cancel =
-          details.querySelector<HTMLButtonElement>("[data-cancel-edit]");
-        const fallback = details.querySelector<HTMLAnchorElement>(
-          "[data-cancel-fallback]",
-        );
-        if (!cancel || !fallback) return;
-        cancel.hidden = false;
-        cancel.classList.add("inline-flex");
-        fallback.hidden = true;
-        const input = details.querySelector<HTMLInputElement>(
-          'input[name="value"]',
-        );
-        details.addEventListener("toggle", () => {
-          if (details.open) input?.focus();
-        });
-        cancel.addEventListener("click", () => {
-          if (input)
-            input.value = input.dataset.persistedValue ?? input.defaultValue;
-          details.open = false;
-          details.querySelector<HTMLElement>("summary")?.focus();
-        });
-        const form = details.querySelector<HTMLFormElement>("form");
-        form?.addEventListener("submit", (event) => {
-          event.preventDefault();
-          const field = form.querySelector<HTMLInputElement>(
-            'input[name="field"]',
-          )?.value;
-          const submit = form.querySelector<HTMLButtonElement>(
-            'button[type="submit"]',
+          if (!cancel || !fallback) return;
+          cancel.hidden = false;
+          cancel.classList.add("inline-flex");
+          fallback.hidden = true;
+          const input = details.querySelector<HTMLInputElement>(
+            'input[name="value"]',
           );
-          if (!field || !input || !submit || !form.reportValidity()) return;
-          submit.disabled = true;
-          submit.setAttribute("aria-busy", "true");
-          form.querySelector<HTMLElement>(`#error-${field}`)?.remove();
-          input.removeAttribute("aria-invalid");
-          input.removeAttribute("aria-describedby");
-          void (async () => {
-            try {
-              const result = await mutation(form, field);
-              if (!result.format) {
-                const message =
-                  "No se pudo guardar el cambio. Inténtalo nuevamente.";
+          details.addEventListener("toggle", () => {
+            if (details.open) input?.focus();
+          });
+          cancel.addEventListener("click", () => {
+            if (input)
+              input.value = input.dataset.persistedValue ?? input.defaultValue;
+            details.open = false;
+            details.querySelector<HTMLElement>("summary")?.focus();
+          });
+          const form = details.querySelector<HTMLFormElement>("form");
+          form?.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const field = form.querySelector<HTMLInputElement>(
+              'input[name="field"]',
+            )?.value;
+            const submit = form.querySelector<HTMLButtonElement>(
+              'button[type="submit"]',
+            );
+            if (!field || !input || !submit || !form.reportValidity()) return;
+            submit.disabled = true;
+            submit.setAttribute("aria-busy", "true");
+            form.querySelector<HTMLElement>(`#error-${field}`)?.remove();
+            input.removeAttribute("aria-invalid");
+            input.removeAttribute("aria-describedby");
+            void (async () => {
+              try {
+                const result = await mutation(form, field);
+                if (!result.format) {
+                  const message =
+                    "No se pudo guardar el cambio. Inténtalo nuevamente.";
+                  const error = document.createElement("p");
+                  error.id = `error-${field}`;
+                  error.className = "mt-1 text-sm text-destructive";
+                  error.textContent = message;
+                  input.parentElement?.append(error);
+                  input.setAttribute("aria-invalid", "true");
+                  input.setAttribute("aria-describedby", error.id);
+                  return;
+                }
+                renderFormat(result.format);
+                details.open = false;
+                details.querySelector<HTMLElement>("summary")?.focus();
+                sileo.success({
+                  title:
+                    field === "name"
+                      ? "Nombre actualizado."
+                      : "Nueva revisión guardada. Los borradores usan los valores vigentes.",
+                  duration: 6000,
+                });
+              } catch (failure) {
                 const error = document.createElement("p");
                 error.id = `error-${field}`;
                 error.className = "mt-1 text-sm text-destructive";
-                error.textContent = message;
+                error.textContent =
+                  failure instanceof Error
+                    ? failure.message
+                    : "No se pudo guardar el cambio. Inténtalo nuevamente.";
                 input.parentElement?.append(error);
                 input.setAttribute("aria-invalid", "true");
                 input.setAttribute("aria-describedby", error.id);
-                return;
+              } finally {
+                submit.disabled = false;
+                submit.removeAttribute("aria-busy");
               }
-              renderFormat(result.format);
-              details.open = false;
-              details.querySelector<HTMLElement>("summary")?.focus();
-              sileo.success({
-                title:
-                  field === "name"
-                    ? "Nombre actualizado."
-                    : "Nueva revisión guardada. Los borradores usan los valores vigentes.",
-                duration: 6000,
-              });
+            })();
+          });
+        });
+      const trigger = document.querySelector<HTMLButtonElement>(
+        "[data-action-trigger]",
+      );
+      const fallback = document.querySelector<HTMLDetailsElement>(
+        "[data-action-fallback]",
+      );
+      const dialog = document.querySelector<HTMLDialogElement>(
+        "[data-action-dialog]",
+      );
+      const error = document.querySelector<HTMLElement>("[data-action-error]");
+      const actionForm =
+        document.querySelector<HTMLFormElement>("[data-action-form]");
+      const dialogForm =
+        document.querySelector<HTMLFormElement>("[data-dialog-form]");
+      if (fallback && trigger) {
+        fallback.hidden = true;
+        trigger.hidden = Boolean(actionForm && !actionForm.hidden);
+      }
+      trigger?.addEventListener("click", () => dialog?.showModal());
+      dialog
+        ?.querySelector<HTMLButtonElement>("[data-dialog-cancel]")
+        ?.addEventListener("click", () => dialog.close());
+      dialog?.addEventListener("close", () => trigger?.focus());
+      const submitAction = (form: HTMLFormElement) => {
+        form.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const submit = form.querySelector<HTMLButtonElement>(
+            'button[type="submit"]',
+          );
+          if (!submit) return;
+          submit.disabled = true;
+          submit.setAttribute("aria-busy", "true");
+          if (error) error.hidden = true;
+          void (async () => {
+            try {
+              const result = await mutation(form);
+              if (result.deleted) {
+                dialog?.close();
+                await navigate("/app/formatos?success=deleted");
+              } else if (result.format) {
+                renderFormat(result.format);
+                dialog?.close();
+                if (form === actionForm) trigger?.focus();
+                sileo.success({
+                  title: result.format.active
+                    ? "Formato activado."
+                    : "Formato desactivado.",
+                  duration: 6000,
+                });
+              } else
+                throw new Error(
+                  "No se pudo guardar el cambio. Inténtalo nuevamente.",
+                );
             } catch (failure) {
-              const error = document.createElement("p");
-              error.id = `error-${field}`;
-              error.className = "mt-1 text-sm text-destructive";
-              error.textContent =
-                failure instanceof Error
-                  ? failure.message
-                  : "No se pudo guardar el cambio. Inténtalo nuevamente.";
-              input.parentElement?.append(error);
-              input.setAttribute("aria-invalid", "true");
-              input.setAttribute("aria-describedby", error.id);
+              if (error) {
+                error.textContent =
+                  failure instanceof Error
+                    ? failure.message
+                    : "No se pudo guardar el cambio. Inténtalo nuevamente.";
+                error.hidden = false;
+              }
+              dialog?.close();
+              error?.focus();
             } finally {
               submit.disabled = false;
               submit.removeAttribute("aria-busy");
             }
           })();
         });
-      });
-    const trigger = document.querySelector<HTMLButtonElement>(
-      "[data-action-trigger]",
-    );
-    const fallback = document.querySelector<HTMLDetailsElement>(
-      "[data-action-fallback]",
-    );
-    const dialog = document.querySelector<HTMLDialogElement>(
-      "[data-action-dialog]",
-    );
-    const error = document.querySelector<HTMLElement>("[data-action-error]");
-    const actionForm =
-      document.querySelector<HTMLFormElement>("[data-action-form]");
-    const dialogForm =
-      document.querySelector<HTMLFormElement>("[data-dialog-form]");
-    if (fallback && trigger) {
-      fallback.hidden = true;
-      trigger.hidden = Boolean(actionForm && !actionForm.hidden);
-    }
-    trigger?.addEventListener("click", () => dialog?.showModal());
-    dialog
-      ?.querySelector<HTMLButtonElement>("[data-dialog-cancel]")
-      ?.addEventListener("click", () => dialog.close());
-    dialog?.addEventListener("close", () => trigger?.focus());
-    const submitAction = (form: HTMLFormElement) => {
-      form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const submit = form.querySelector<HTMLButtonElement>(
-          'button[type="submit"]',
-        );
-        if (!submit) return;
-        submit.disabled = true;
-        submit.setAttribute("aria-busy", "true");
-        if (error) error.hidden = true;
-        void (async () => {
-          try {
-            const result = await mutation(form);
-            if (result.deleted) {
-              // Render the authorized list response in the existing shell; keep the JS runtime and sidebar intact.
-              const response = await fetch("/app/formatos", {
-                headers: { Accept: "text/html" },
-              });
-              if (!response.ok || response.redirected)
-                throw new Error(
-                  "El formato se eliminó, pero no se pudo mostrar la lista. Abre Formatos para continuar.",
-                );
-              const page = new DOMParser().parseFromString(
-                await response.text(),
-                "text/html",
-              );
-              const next = page.querySelector("main#main-content");
-              const main = document.querySelector("main#main-content");
-              if (!next || !main)
-                throw new Error(
-                  "El formato se eliminó, pero no se pudo mostrar la lista. Abre Formatos para continuar.",
-                );
-              dialog?.close();
-              main.replaceChildren(...Array.from(next.childNodes));
-              document.title = page.title;
-              window.history.replaceState(
-                window.history.state,
-                "",
-                "/app/formatos",
-              );
-              document
-                .querySelector<HTMLElement>("main h1")
-                ?.setAttribute("tabindex", "-1");
-              document.querySelector<HTMLElement>("main h1")?.focus();
-              sileo.success({ title: "Formato eliminado.", duration: 6000 });
-            } else if (result.format) {
-              renderFormat(result.format);
-              dialog?.close();
-              if (form === actionForm) trigger?.focus();
-              sileo.success({
-                title: result.format.active
-                  ? "Formato activado."
-                  : "Formato desactivado.",
-                duration: 6000,
-              });
-            } else
-              throw new Error(
-                "No se pudo guardar el cambio. Inténtalo nuevamente.",
-              );
-          } catch (failure) {
-            if (error) {
-              error.textContent =
-                failure instanceof Error
-                  ? failure.message
-                  : "No se pudo guardar el cambio. Inténtalo nuevamente.";
-              error.hidden = false;
-            }
-            dialog?.close();
-            error?.focus();
-          } finally {
-            submit.disabled = false;
-            submit.removeAttribute("aria-busy");
-          }
-        })();
-      });
-    };
-    if (actionForm) submitAction(actionForm);
-    if (dialogForm) submitAction(dialogForm);
+      };
+      if (actionForm) submitAction(actionForm);
+      if (dialogForm) submitAction(dialogForm);
 
-    const success = new URLSearchParams(window.location.search).get("success");
-    const messages: Record<string, string> = {
-      rename: "Nombre actualizado.",
-      revise:
-        "Nueva revisión guardada. Los borradores usan los valores vigentes.",
-      activate: "Formato activado.",
-      deactivate: "Formato desactivado.",
-    };
-    const message = success ? messages[success] : undefined;
-    if (message) {
-      window.addEventListener(
-        "load",
-        () => {
+      const success = new URLSearchParams(window.location.search).get(
+        "success",
+      );
+      const messages: Record<string, string> = {
+        rename: "Nombre actualizado.",
+        revise:
+          "Nueva revisión guardada. Los borradores usan los valores vigentes.",
+        activate: "Formato activado.",
+        deactivate: "Formato desactivado.",
+      };
+      const message = success ? messages[success] : undefined;
+      if (message) {
+        {
           sileo.success({ title: message, duration: 6000 });
           const url = new URL(window.location.href);
           url.searchParams.delete("success");
@@ -890,9 +863,8 @@ const successKey = Astro.url.searchParams.get("success");
             "",
             `${url.pathname}${url.search}${url.hash}`,
           );
-        },
-        { once: true },
-      );
-    }
+        }
+      }
+    });
   </script>
 </PrivateLayout>

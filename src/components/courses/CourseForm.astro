@@ -477,326 +477,400 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
 </form>
 
 <script>
-  import { createCourseWithArtwork } from "./createCourseWithArtwork";
+  import {
+    createCourseWithArtwork,
+    formError,
+    isError,
+    openCreatedCourse,
+  } from "./createCourseWithArtwork";
   import {
     acceptsCourseInput,
     draftFieldsReady,
     requiredCourseFields,
     type CourseInputKind,
   } from "./course-input-filter";
-  let preparedImage: File | null = null;
-  let imageSelected = false;
-  window.addEventListener("course-artwork-selection", (event) => {
-    imageSelected = (event as CustomEvent<boolean>).detail;
-  });
-  window.addEventListener("course-artwork-prepared", (event) => {
-    preparedImage = (event as CustomEvent<File | null>).detail;
-  });
-  window.addEventListener("course-artwork-uploaded", (event) => {
-    const detail = (event as CustomEvent<{ courseId: string; key: string }>)
-      .detail;
-    const form = document.querySelector<HTMLFormElement>(
-      `.course-form[data-course-id="${detail.courseId}"]`,
-    );
-    const artwork = form?.querySelector<HTMLInputElement>(
-      'input[name="artwork"]',
-    );
-    if (artwork) {
-      artwork.value = detail.key;
-      artwork.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-  });
-  document.querySelectorAll<HTMLFormElement>(".course-form").forEach((form) => {
-    const button = form.querySelector<HTMLButtonElement>(".submit-button");
-    // Capture edits before React's delegated change handlers see them. Invalid
-    // paste/drop/IME commits are reverted as a whole, never sanitized into a
-    // different value that might inadvertently be submitted.
-    const admitted = new WeakMap<
-      HTMLInputElement | HTMLTextAreaElement,
-      string
-    >();
-    const filtered = (target: EventTarget | null) => {
-      if (!(
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement
-      ))
-        return null;
-      const kind = target.dataset.courseInput as CourseInputKind | undefined;
-      return kind ? { target, kind } : null;
-    };
-    form.addEventListener("beforeinput", (event) => {
-      const input = event as InputEvent;
-      const field = filtered(event.target);
-      if (
-        !field ||
-        input.isComposing ||
-        !input.cancelable ||
-        input.inputType.startsWith("delete")
-      )
-        return;
-      const { target, kind } = field;
-      const inserted =
-        input.data ?? input.dataTransfer?.getData("text/plain") ?? "";
-      if (!inserted) return;
-      const candidate =
-        target.value.slice(0, target.selectionStart ?? target.value.length) +
-        inserted +
-        target.value.slice(target.selectionEnd ?? target.value.length);
-      if (!acceptsCourseInput(kind, candidate)) event.preventDefault();
+  document.addEventListener("astro:page-load", () => {
+    let preparedImage: File | null = null;
+    let imageSelected = false;
+    window.addEventListener("course-artwork-selection", (event) => {
+      imageSelected = (event as CustomEvent<boolean>).detail;
     });
-    form.addEventListener(
-      "input",
-      (event) => {
-        const field = filtered(event.target);
-        if (!field || (event as InputEvent).isComposing) return;
-        const { target, kind } = field;
-        if (acceptsCourseInput(kind, target.value))
-          admitted.set(target, target.value);
-        else target.value = admitted.get(target) ?? target.defaultValue;
-      },
-      true,
-    );
-    form.addEventListener("compositionstart", (event) => {
-      const field = filtered(event.target);
-      if (field && acceptsCourseInput(field.kind, field.target.value))
-        admitted.set(field.target, field.target.value);
+    window.addEventListener("course-artwork-prepared", (event) => {
+      preparedImage = (event as CustomEvent<File | null>).detail;
     });
-    form.addEventListener("compositionend", (event) => {
-      const field = filtered(event.target);
-      if (!field) return;
-      if (!acceptsCourseInput(field.kind, field.target.value)) {
-        field.target.value =
-          admitted.get(field.target) ?? field.target.defaultValue;
-        field.target.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-    });
-    let baseline: Record<string, string> | null = form.dataset.baseline
-      ? JSON.parse(form.dataset.baseline)
-      : null;
-    let saving = false;
-    if (button && !button.disabled) {
-      // The SSR button stays usable without JavaScript. Once JS runs, wait for
-      // all form-associated islands before comparing against persisted values.
-      button.disabled = true;
-      let ready = false;
-      const fields = baseline ? Object.keys(baseline) : [];
-      const sync = () => {
-        const current = new FormData(form);
-        if (
-          !ready &&
-          !(
-            baseline
-              ? fields
-              : [
-                  ...requiredCourseFields,
-                  "registrationStartAt",
-                  "registrationEndAt",
-                ]
-          ).every((name) => current.has(name))
-        )
-          return;
-        ready = true;
-        const changed = baseline
-          ? !fields.every((name) => {
-              const values = current.getAll(name);
-              return (
-                values.length === 1 &&
-                values[0] === (baseline?.[name] ?? "").replace(/\r\n?/g, "\n")
-              );
-            })
-          : false;
-        const values = Object.fromEntries(
-          [...current.entries()].filter(
-            (entry): entry is [string, string] => typeof entry[1] === "string",
-          ),
-        );
-        const valid =
-          form.checkValidity() && draftFieldsReady(values, !baseline);
-        button.disabled = saving || (baseline ? !changed || !valid : !valid);
-      };
-      // FormData reads the controls' current values directly, including hidden
-      // fields updated by React islands, so reconcile each change immediately.
-      form.addEventListener("input", sync);
-      form.addEventListener("change", sync);
-      form.addEventListener("course-form-change", sync);
-      const observer = new MutationObserver(() => {
-        sync();
-      });
-      observer.observe(form, { childList: true, subtree: true });
-      sync();
-      // Reconcile after all islands hydrate, even if their first form controls
-      // appeared before their final values were committed.
-      window.addEventListener(
-        "load",
-        () => {
-          sync();
-          observer.disconnect();
-        },
-        { once: true },
+    window.addEventListener("course-artwork-uploaded", (event) => {
+      const detail = (event as CustomEvent<{ courseId: string; key: string }>)
+        .detail;
+      const form = document.querySelector<HTMLFormElement>(
+        `.course-form[data-course-id="${detail.courseId}"]`,
       );
-      window.addEventListener("pageshow", sync);
-    }
-    form.addEventListener("submit", (event) => {
-      if (!form.reportValidity()) {
-        event.preventDefault();
-        return;
+      const artwork = form?.querySelector<HTMLInputElement>(
+        'input[name="artwork"]',
+      );
+      if (artwork) {
+        artwork.value = detail.key;
+        artwork.dispatchEvent(new Event("change", { bubbles: true }));
       }
-      if (!form.dataset.courseId && imageSelected) {
-        event.preventDefault();
-        const error = form.querySelector<HTMLElement>(".artwork-create-error");
-        const recovery = form.querySelector<HTMLElement>(".draft-recovery");
-        const retry = form.querySelector<HTMLButtonElement>(".retry-artwork");
-        const link = form.querySelector<HTMLAnchorElement>(".draft-link");
-        if (!error || !recovery || !retry || !link) return;
-        if (!preparedImage) {
-          error.textContent =
-            "Confirma el recorte con “Usar este recorte” antes de crear el borrador.";
-          error.classList.remove("hidden");
-          error.scrollIntoView({ block: "center" });
-          return;
+    });
+    document
+      .querySelectorAll<HTMLFormElement>(".course-form")
+      .forEach((form) => {
+        const button = form.querySelector<HTMLButtonElement>(".submit-button");
+        // Capture edits before React's delegated change handlers see them. Invalid
+        // paste/drop/IME commits are reverted as a whole, never sanitized into a
+        // different value that might inadvertently be submitted.
+        const admitted = new WeakMap<
+          HTMLInputElement | HTMLTextAreaElement,
+          string
+        >();
+        const filtered = (target: EventTarget | null) => {
+          if (!(
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement
+          ))
+            return null;
+          const kind = target.dataset.courseInput as
+            CourseInputKind | undefined;
+          return kind ? { target, kind } : null;
+        };
+        form.addEventListener("beforeinput", (event) => {
+          const input = event as InputEvent;
+          const field = filtered(event.target);
+          if (
+            !field ||
+            input.isComposing ||
+            !input.cancelable ||
+            input.inputType.startsWith("delete")
+          )
+            return;
+          const { target, kind } = field;
+          const inserted =
+            input.data ?? input.dataTransfer?.getData("text/plain") ?? "";
+          if (!inserted) return;
+          const candidate =
+            target.value.slice(
+              0,
+              target.selectionStart ?? target.value.length,
+            ) +
+            inserted +
+            target.value.slice(target.selectionEnd ?? target.value.length);
+          if (!acceptsCourseInput(kind, candidate)) event.preventDefault();
+        });
+        form.addEventListener(
+          "input",
+          (event) => {
+            const field = filtered(event.target);
+            if (!field || (event as InputEvent).isComposing) return;
+            const { target, kind } = field;
+            if (acceptsCourseInput(kind, target.value))
+              admitted.set(target, target.value);
+            else target.value = admitted.get(target) ?? target.defaultValue;
+          },
+          true,
+        );
+        form.addEventListener("compositionstart", (event) => {
+          const field = filtered(event.target);
+          if (field && acceptsCourseInput(field.kind, field.target.value))
+            admitted.set(field.target, field.target.value);
+        });
+        form.addEventListener("compositionend", (event) => {
+          const field = filtered(event.target);
+          if (!field) return;
+          if (!acceptsCourseInput(field.kind, field.target.value)) {
+            field.target.value =
+              admitted.get(field.target) ?? field.target.defaultValue;
+            field.target.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        });
+        let baseline: Record<string, string> | null = form.dataset.baseline
+          ? JSON.parse(form.dataset.baseline)
+          : null;
+        let saving = false;
+        if (button && !button.disabled) {
+          // The SSR button stays usable without JavaScript. Once JS runs, wait for
+          // all form-associated islands before comparing against persisted values.
+          button.disabled = true;
+          let ready = false;
+          const fields = baseline ? Object.keys(baseline) : [];
+          const sync = () => {
+            const current = new FormData(form);
+            if (
+              !ready &&
+              !(
+                baseline
+                  ? fields
+                  : [
+                      ...requiredCourseFields,
+                      "registrationStartAt",
+                      "registrationEndAt",
+                    ]
+              ).every((name) => current.has(name))
+            )
+              return;
+            ready = true;
+            const changed = baseline
+              ? !fields.every((name) => {
+                  const values = current.getAll(name);
+                  return (
+                    values.length === 1 &&
+                    values[0] ===
+                      (baseline?.[name] ?? "").replace(/\r\n?/g, "\n")
+                  );
+                })
+              : false;
+            const values = Object.fromEntries(
+              [...current.entries()].filter(
+                (entry): entry is [string, string] =>
+                  typeof entry[1] === "string",
+              ),
+            );
+            const valid =
+              form.checkValidity() && draftFieldsReady(values, !baseline);
+            button.disabled =
+              saving || (baseline ? !changed || !valid : !valid);
+          };
+          // FormData reads the controls' current values directly, including hidden
+          // fields updated by React islands, so reconcile each change immediately.
+          form.addEventListener("input", sync);
+          form.addEventListener("change", sync);
+          form.addEventListener("course-form-change", sync);
+          const observer = new MutationObserver(() => {
+            sync();
+          });
+          observer.observe(form, { childList: true, subtree: true });
+          sync();
+          // Reconcile after all islands hydrate, even if their first form controls
+          // appeared before their final values were committed.
+          window.addEventListener(
+            "load",
+            () => {
+              sync();
+              observer.disconnect();
+            },
+            { once: true },
+          );
+          window.addEventListener("pageshow", sync);
         }
-        const fields = new FormData(form);
-        const image = preparedImage;
-        if (button) {
+        form.addEventListener("submit", (event) => {
+          if (!form.reportValidity()) {
+            event.preventDefault();
+            return;
+          }
+          if (!form.dataset.courseId) {
+            event.preventDefault();
+            const error = form.querySelector<HTMLElement>(
+              ".artwork-create-error",
+            );
+            const recovery = form.querySelector<HTMLElement>(".draft-recovery");
+            const retry =
+              form.querySelector<HTMLButtonElement>(".retry-artwork");
+            const link = form.querySelector<HTMLAnchorElement>(".draft-link");
+            if (!error || !recovery || !retry || !link) return;
+            if (imageSelected && !preparedImage) {
+              error.textContent =
+                "Confirma el recorte con “Usar este recorte” antes de crear el borrador.";
+              error.classList.remove("hidden");
+              error.scrollIntoView({ block: "center" });
+              return;
+            }
+            const fields = new FormData(form);
+            const image = preparedImage;
+            if (button) {
+              button.disabled = true;
+              button.querySelector(".submit-label")?.classList.add("hidden");
+              button
+                .querySelector(".submit-pending")
+                ?.classList.remove("hidden");
+            }
+            error.classList.add("hidden");
+            let draftExists = false;
+            const showError = (caught: unknown) => {
+              error.textContent =
+                caught instanceof Error
+                  ? caught.message
+                  : "No se pudo guardar. Inténtalo nuevamente.";
+              error.classList.remove("hidden");
+              error.scrollIntoView({ block: "center" });
+              if (draftExists) recovery.classList.remove("hidden");
+              if (!draftExists && button) {
+                button.disabled = false;
+                button
+                  .querySelector(".submit-label")
+                  ?.classList.remove("hidden");
+                button
+                  .querySelector(".submit-pending")
+                  ?.classList.add("hidden");
+              }
+            };
+            if (!imageSelected || !image) {
+              void (async () => {
+                const response = await fetch("/app/cursos/nuevo", {
+                  method: "POST",
+                  body: fields,
+                  credentials: "same-origin",
+                  headers: { Accept: "application/json" },
+                });
+                if (
+                  response.redirected ||
+                  !response.headers
+                    .get("content-type")
+                    ?.includes("application/json")
+                )
+                  throw new Error(
+                    "La sesión cambió. Recarga la página e inténtalo de nuevo.",
+                  );
+                const result: unknown = await response.json();
+                if (
+                  !response.ok ||
+                  !result ||
+                  typeof result !== "object" ||
+                  !("id" in result) ||
+                  typeof result.id !== "string"
+                )
+                  throw new Error(
+                    isError(result)
+                      ? formError(result)
+                      : "No se pudo crear el borrador.",
+                  );
+                draftExists = true;
+                link.href = `/app/cursos/${result.id}/editar`;
+                retry.hidden = true;
+                await openCreatedCourse(result.id, "created");
+              })().catch(showError);
+              return;
+            }
+            void createCourseWithArtwork(fields, image, (url, attach) => {
+              draftExists = true;
+              link.href = url;
+              retry.onclick = () => {
+                retry.disabled = true;
+                error.classList.add("hidden");
+                void attach()
+                  .catch(showError)
+                  .finally(() => {
+                    retry.disabled = false;
+                  });
+              };
+            }).catch(showError);
+            return;
+          }
+          if (form.dataset.courseId) {
+            event.preventDefault();
+            if (!button || saving) return;
+            saving = true;
+            button.disabled = true;
+            button.setAttribute("aria-busy", "true");
+            button.querySelector(".submit-label")?.classList.add("hidden");
+            button.querySelector(".submit-pending")?.classList.remove("hidden");
+            const error =
+              document.querySelector<HTMLElement>("[data-save-error]");
+            if (error) error.hidden = true;
+            form
+              .querySelectorAll<HTMLElement>("[data-async-field-error]")
+              .forEach((item) => item.remove());
+            form
+              .querySelectorAll<HTMLElement>('[aria-invalid="true"]')
+              .forEach((item) => item.removeAttribute("aria-invalid"));
+            void (async () => {
+              try {
+                const response = await fetch(window.location.pathname, {
+                  method: "POST",
+                  headers: { Accept: "application/json" },
+                  body: new FormData(form),
+                });
+                if (
+                  response.redirected ||
+                  !response.headers
+                    .get("content-type")
+                    ?.includes("application/json")
+                )
+                  throw new Error(
+                    "La sesión cambió. Recarga la página e inténtalo de nuevo.",
+                  );
+                const result = (await response.json()) as {
+                  revision?: string;
+                  name?: string;
+                  message?: string;
+                  errors?: Record<string, string>;
+                };
+                if (!response.ok || !result.revision) {
+                  if (error) {
+                    error.textContent =
+                      result.message ??
+                      "No se pudieron guardar los cambios. Inténtalo nuevamente.";
+                    error.hidden = false;
+                  }
+                  for (const [name, message] of Object.entries(
+                    result.errors ?? {},
+                  )) {
+                    const control = Array.from(form.elements).find(
+                      (element) =>
+                        element instanceof HTMLElement &&
+                        element.getAttribute("name") === name,
+                    );
+                    if (!(control instanceof HTMLElement)) continue;
+                    const hint = document.createElement("p");
+                    hint.dataset.asyncFieldError = name;
+                    hint.className = "mt-1 text-sm text-destructive";
+                    hint.textContent = message;
+                    const wrapper =
+                      control.closest("label") ?? control.parentElement;
+                    wrapper?.append(hint);
+                    control.setAttribute("aria-invalid", "true");
+                  }
+                  error?.scrollIntoView({ block: "center" });
+                  return;
+                }
+                form.querySelector<HTMLInputElement>(
+                  'input[name="revision"]',
+                )!.value = result.revision;
+                baseline = Object.fromEntries(
+                  [...new FormData(form)].filter(
+                    (entry): entry is [string, string] =>
+                      typeof entry[1] === "string" &&
+                      entry[0] in (baseline ?? {}),
+                  ),
+                );
+                form.dataset.baseline = JSON.stringify(baseline);
+                form.dispatchEvent(new Event("course-form-change"));
+                const breadcrumb = document.querySelector<HTMLElement>(
+                  'nav[aria-label="Ruta de navegación"] [aria-current="page"]',
+                );
+                if (breadcrumb && result.name)
+                  breadcrumb.textContent = result.name;
+                if (result.name)
+                  document.title = `Editar ${result.name} | SkillBase`;
+                const { sileo } = await import("sileo");
+                sileo.success({
+                  title: "Cambios guardados correctamente.",
+                  duration: 6000,
+                });
+              } catch {
+                if (error) {
+                  error.textContent =
+                    "No se pudieron guardar los cambios. Inténtalo nuevamente.";
+                  error.hidden = false;
+                  error.scrollIntoView({ block: "center" });
+                }
+              } finally {
+                saving = false;
+                button
+                  .querySelector(".submit-label")
+                  ?.classList.remove("hidden");
+                button
+                  .querySelector(".submit-pending")
+                  ?.classList.add("hidden");
+                button.removeAttribute("aria-busy");
+                form.dispatchEvent(new Event("course-form-change"));
+              }
+            })();
+            return;
+          }
+          if (!button) return;
           button.disabled = true;
           button.querySelector(".submit-label")?.classList.add("hidden");
           button.querySelector(".submit-pending")?.classList.remove("hidden");
-        }
-        error.classList.add("hidden");
-        let draftExists = false;
-        const showError = (caught: unknown) => {
-          error.textContent =
-            caught instanceof Error
-              ? caught.message
-              : "No se pudo guardar. Inténtalo nuevamente.";
-          error.classList.remove("hidden");
-          error.scrollIntoView({ block: "center" });
-          if (draftExists) recovery.classList.remove("hidden");
-          if (!draftExists && button) {
-            button.disabled = false;
-            button.querySelector(".submit-label")?.classList.remove("hidden");
-            button.querySelector(".submit-pending")?.classList.add("hidden");
-          }
-        };
-        void createCourseWithArtwork(fields, image, (url, attach) => {
-          draftExists = true;
-          link.href = url;
-          retry.onclick = () => {
-            retry.disabled = true;
-            error.classList.add("hidden");
-            void attach()
-              .catch(showError)
-              .finally(() => {
-                retry.disabled = false;
-              });
-          };
-        }).catch(showError);
-        return;
-      }
-      if (form.dataset.courseId) {
-        event.preventDefault();
-        if (!button || saving) return;
-        saving = true;
-        button.disabled = true;
-        button.setAttribute("aria-busy", "true");
-        button.querySelector(".submit-label")?.classList.add("hidden");
-        button.querySelector(".submit-pending")?.classList.remove("hidden");
-        const error = document.querySelector<HTMLElement>("[data-save-error]");
-        if (error) error.hidden = true;
-        form
-          .querySelectorAll<HTMLElement>("[data-async-field-error]")
-          .forEach((item) => item.remove());
-        form
-          .querySelectorAll<HTMLElement>('[aria-invalid="true"]')
-          .forEach((item) => item.removeAttribute("aria-invalid"));
-        void (async () => {
-          try {
-            const response = await fetch(window.location.pathname, {
-              method: "POST",
-              headers: { Accept: "application/json" },
-              body: new FormData(form),
-            });
-            if (response.redirected) {
-              window.location.assign(response.url);
-              return;
-            }
-            const result = (await response.json()) as {
-              revision?: string;
-              name?: string;
-              message?: string;
-              errors?: Record<string, string>;
-            };
-            if (!response.ok || !result.revision) {
-              if (error) {
-                error.textContent =
-                  result.message ??
-                  "No se pudieron guardar los cambios. Inténtalo nuevamente.";
-                error.hidden = false;
-              }
-              for (const [name, message] of Object.entries(
-                result.errors ?? {},
-              )) {
-                const control = Array.from(form.elements).find(
-                  (element) =>
-                    element instanceof HTMLElement &&
-                    element.getAttribute("name") === name,
-                );
-                if (!(control instanceof HTMLElement)) continue;
-                const hint = document.createElement("p");
-                hint.dataset.asyncFieldError = name;
-                hint.className = "mt-1 text-sm text-destructive";
-                hint.textContent = message;
-                const wrapper =
-                  control.closest("label") ?? control.parentElement;
-                wrapper?.append(hint);
-                control.setAttribute("aria-invalid", "true");
-              }
-              error?.scrollIntoView({ block: "center" });
-              return;
-            }
-            form.querySelector<HTMLInputElement>(
-              'input[name="revision"]',
-            )!.value = result.revision;
-            baseline = Object.fromEntries(
-              [...new FormData(form)].filter(
-                (entry): entry is [string, string] =>
-                  typeof entry[1] === "string" && entry[0] in (baseline ?? {}),
-              ),
-            );
-            form.dataset.baseline = JSON.stringify(baseline);
-            form.dispatchEvent(new Event("course-form-change"));
-            const breadcrumb = document.querySelector<HTMLElement>(
-              'nav[aria-label="Ruta de navegación"] [aria-current="page"]',
-            );
-            if (breadcrumb && result.name) breadcrumb.textContent = result.name;
-            if (result.name)
-              document.title = `Editar ${result.name} | SkillBase`;
-            const { sileo } = await import("sileo");
-            sileo.success({
-              title: "Cambios guardados correctamente.",
-              duration: 6000,
-            });
-          } catch {
-            if (error) {
-              error.textContent =
-                "No se pudieron guardar los cambios. Inténtalo nuevamente.";
-              error.hidden = false;
-              error.scrollIntoView({ block: "center" });
-            }
-          } finally {
-            saving = false;
-            button.querySelector(".submit-label")?.classList.remove("hidden");
-            button.querySelector(".submit-pending")?.classList.add("hidden");
-            button.removeAttribute("aria-busy");
-            form.dispatchEvent(new Event("course-form-change"));
-          }
-        })();
-        return;
-      }
-      if (!button) return;
-      button.disabled = true;
-      button.querySelector(".submit-label")?.classList.add("hidden");
-      button.querySelector(".submit-pending")?.classList.remove("hidden");
-    });
+        });
+      });
   });
 </script>
