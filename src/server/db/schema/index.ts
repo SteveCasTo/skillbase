@@ -129,6 +129,8 @@ export const courseTypeRevisions = pgTable(
       .references(() => courseTypes.id, { onDelete: "restrict" }),
     revisionNumber: integer("revision_number").notNull(),
     totalHours: integer("total_hours").notNull(),
+    // NULL marks historical terms whose session duration was never recorded.
+    sessionMinutes: integer("session_minutes"),
     studentAmount: decimal("student_amount", {
       precision: 12,
       scale: 2,
@@ -148,6 +150,10 @@ export const courseTypeRevisions = pgTable(
     ),
     index("course_type_revisions_type_idx").on(table.courseTypeId),
     check("course_type_revisions_hours_check", sql`${table.totalHours} > 0`),
+    check(
+      "course_type_revisions_session_minutes_check",
+      sql`${table.sessionMinutes} between 15 and 480`,
+    ),
     check(
       "course_type_revisions_prices_check",
       sql`${table.studentAmount} >= 0 and ${table.externalAmount} >= 0`,
@@ -175,6 +181,7 @@ export const courses = pgTable(
     artwork: text("artwork"),
     featured: boolean("featured").notNull().default(false),
     schedule: text("schedule").notNull(),
+    weekdaysMask: integer("weekdays_mask"),
     conditions: text("conditions").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
@@ -230,6 +237,10 @@ export const courses = pgTable(
       sql`${table.minimumGrade} between 0 and 100`,
     ),
     check("courses_dates_check", sql`${table.startsAt} < ${table.endsAt}`),
+    check(
+      "courses_weekdays_mask_check",
+      sql`${table.weekdaysMask} between 1 and 31`,
+    ),
     check(
       "courses_registration_window_check",
       sql`(${table.registrationStartAt} is null and ${table.registrationEndAt} is null) or (${table.registrationStartAt} is not null and ${table.registrationEndAt} is not null and ${table.registrationStartAt} < ${table.registrationEndAt})`,

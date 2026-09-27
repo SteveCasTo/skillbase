@@ -3,11 +3,14 @@ import { money } from "./validation";
 
 export interface FormatValues {
   readonly totalHours: number;
+  /** Null means the legacy revision did not record session duration. */
+  readonly sessionMinutes?: number | null;
   readonly studentAmount: string;
   readonly externalAmount: string;
 }
 
 export interface CourseFormat extends FormatValues {
+  readonly sessionMinutes: number | null;
   readonly id: string;
   readonly name: string;
   readonly active: boolean;
@@ -47,6 +50,7 @@ export function validateFormat(
   hoursInput: string,
   studentInput: string,
   externalInput: string,
+  sessionInput?: string,
 ) {
   const errors: Record<string, string> = {};
   const name = nameInput.trim();
@@ -61,6 +65,17 @@ export function validateFormat(
     totalHours > 2147483647
   )
     errors.totalHours = "La duración debe ser un entero positivo.";
+  const sessionMinutes =
+    sessionInput === undefined ? null : Number(sessionInput);
+  if (
+    sessionInput !== undefined &&
+    (!/^\d+$/.test(sessionInput) ||
+      !Number.isInteger(sessionMinutes) ||
+      sessionMinutes === null ||
+      sessionMinutes < 15 ||
+      sessionMinutes > 480)
+  )
+    errors.sessionMinutes = "La sesión debe durar entre 15 y 480 minutos.";
   const studentAmount = money(
     { studentAmount: studentInput },
     "studentAmount",
@@ -77,5 +92,5 @@ export function validateFormat(
       "Revisa los campos indicados.",
       errors,
     );
-  return { name, totalHours, studentAmount, externalAmount };
+  return { name, totalHours, sessionMinutes, studentAmount, externalAmount };
 }
