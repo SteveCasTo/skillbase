@@ -10,7 +10,10 @@ export type MarkdownNode = {
     | "paragraph"
     | "unordered-list"
     | "ordered-list"
-    | "list-item";
+    | "list-item"
+    | "blockquote"
+    | "code-block"
+    | "separator";
   value?: string;
   href?: string;
   level?: number;
@@ -19,13 +22,25 @@ export type MarkdownNode = {
 
 function safeHref(href: string): string | null {
   const value = href.trim();
-  if (/^(https?:\/\/|mailto:)/i.test(value)) return value;
   if (
-    /^(?:\/|#|\?|\.)/.test(value) &&
-    !value.startsWith("//") &&
-    !value.startsWith("\\")
+    !value ||
+    value.includes("\\") ||
+    [...value].some((char) => char.charCodeAt(0) <= 0x20)
   )
-    return value;
+    return null;
+
+  if (/^(?:https?:|mailto:)/i.test(value)) {
+    try {
+      const url = new URL(value);
+      if (url.protocol === "http:" || url.protocol === "https:")
+        return url.href;
+      if (url.protocol === "mailto:" && url.pathname) return url.href;
+    } catch {
+      return null;
+    }
+  }
+
+  if (/^(?:\/|#|\?|\.)/.test(value) && !value.startsWith("//")) return value;
   return null;
 }
 
@@ -80,6 +95,24 @@ export function parseCourseMarkdown(markdown: string): MarkdownNode[] {
       continue;
     }
 
+    if (/^```/.test(line)) {
+      index++;
+      const code: string[] = [];
+      while (index < lines.length && !/^\s*```\s*$/.test(lines[index]!)) {
+        code.push(lines[index]!);
+        index++;
+      }
+      if (index < lines.length) index++;
+      blocks.push({ type: "code-block", value: code.join("\n") });
+      continue;
+    }
+
+    if (/^(?:---+|\*\*\*+|___+)$/.test(line)) {
+      blocks.push({ type: "separator" });
+      index++;
+      continue;
+    }
+
     const heading = /^(#{1,6})\s+(.+?)\s*#*$/.exec(line);
     if (heading) {
       blocks.push({
@@ -88,6 +121,19 @@ export function parseCourseMarkdown(markdown: string): MarkdownNode[] {
         children: parseInline(heading[2]!),
       });
       index++;
+      continue;
+    }
+
+    if (/^>\s?/.test(line)) {
+      const quote: string[] = [];
+      while (index < lines.length && /^\s*>/.test(lines[index]!)) {
+        quote.push(lines[index]!.replace(/^\s*>\s?/, ""));
+        index++;
+      }
+      blocks.push({
+        type: "blockquote",
+        children: parseInline(quote.join("\n")),
+      });
       continue;
     }
 
@@ -114,6 +160,9 @@ export function parseCourseMarkdown(markdown: string): MarkdownNode[] {
       index < lines.length &&
       lines[index]!.trim() &&
       !/^(#{1,6})\s+/.test(lines[index]!.trim()) &&
+      !/^\s*>/.test(lines[index]!) &&
+      !/^\s*```/.test(lines[index]!) &&
+      !/^(?:---+|\*\*\*+|___+)$/.test(lines[index]!.trim()) &&
       !/^\s*(?:[-+*]|\d+[.)])\s+/.test(lines[index]!)
     ) {
       paragraph.push(lines[index]!.trim());

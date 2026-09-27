@@ -15,11 +15,16 @@ describe("course Markdown toolbar actions", () => {
     );
   });
 
-  test("inserts heading and inline placeholders at the caret", () => {
+  test("inserts block-safe headings and inline placeholders at the caret", () => {
     expect(applyMarkdownAction("Texto", 0, 0, "heading")).toEqual({
-      value: "## TítuloTexto",
+      value: "## Título\nTexto",
       selectionStart: 3,
       selectionEnd: 9,
+    });
+    expect(applyMarkdownAction("antes después", 6, 6, "heading-4")).toEqual({
+      value: "antes \n#### Título\ndespués",
+      selectionStart: 12,
+      selectionEnd: 18,
     });
     expect(applyMarkdownAction("", 0, 0, "bold")).toEqual({
       value: "**texto**",
@@ -39,6 +44,23 @@ describe("course Markdown toolbar actions", () => {
     );
     expect(applyMarkdownAction("", 0, 0, "unordered-list").value).toBe(
       "- Elemento",
+    );
+    expect(
+      applyMarkdownAction("primero\nsegundo", 2, 5, "unordered-list").value,
+    ).toBe("- primero\nsegundo");
+  });
+
+  test("creates blockquotes, fenced code and separators", () => {
+    expect(applyMarkdownAction("uno\ndos", 0, 7, "blockquote").value).toBe(
+      "> uno\n> dos",
+    );
+    expect(applyMarkdownAction("", 0, 0, "code-block")).toMatchObject({
+      value: "```\ncódigo\n```",
+      selectionStart: 4,
+      selectionEnd: 10,
+    });
+    expect(applyMarkdownAction("antes después", 6, 6, "separator").value).toBe(
+      "antes \n---\ndespués",
     );
   });
 });

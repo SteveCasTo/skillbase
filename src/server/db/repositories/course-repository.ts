@@ -2,6 +2,8 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { CourseRepository } from "@/application/courses/course-repository";
 import { CourseDomainError } from "@/domain/courses/errors";
+import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+import { planWeekdaySchedule } from "@/domain/courses/weekday-schedule";
 import {
   assertTransition,
   normalizeSlug,
@@ -58,6 +60,7 @@ function admin(row: Row, revision: Revision, now = new Date()): AdminCourseDto {
     ...row,
     courseTypeId: revision.courseTypeId,
     totalHours: revision.totalHours,
+    sessionMinutes: revision.sessionMinutes,
     prices: prices(revision),
     registrationAvailability: registrationAvailability(
       row.registrationStartAt,
@@ -82,6 +85,7 @@ function publicDto(
     featured: row.featured,
     level: row.level,
     totalHours: revision.totalHours,
+    sessionMinutes: revision.sessionMinutes,
     prices: prices(revision),
     schedule: row.schedule,
     conditions: row.conditions,
@@ -158,6 +162,7 @@ function values(input: CourseData) {
     description: input.description,
     level: input.level,
     schedule: input.schedule,
+    weekdaysMask: input.weekdaysMask ?? null,
     conditions: input.conditions,
     startsAt: input.startsAt,
     endsAt: input.endsAt,
@@ -168,6 +173,41 @@ function values(input: CourseData) {
     instructorName: input.instructorName,
     artwork: input.artwork,
   };
+}
+
+function assertSchedule(input: CourseData, revision: Revision): void {
+  if (input.weekdaysMask == null) return; // Historical text-only schedule.
+  if (revision.sessionMinutes === null)
+    throw new CourseDomainError(
+      "VALIDATION_FAILED",
+      "El formato no tiene duración de sesión resuelta.",
+      { courseTypeId: "Configura la duración de sesión del formato." },
+    );
+  const planned = planWeekdaySchedule({
+    startsAt: instantToBoliviaCivil(input.startsAt),
+    weekdaysMask: input.weekdaysMask,
+    totalHours: revision.totalHours,
+    sessionMinutes: revision.sessionMinutes,
+  });
+  const expectedSchedule = `Lunes a viernes, ${instantToBoliviaCivil(input.startsAt).slice(11)}–${planned.endTime}`;
+  if (input.schedule !== expectedSchedule)
+    throw new CourseDomainError(
+      "VALIDATION_FAILED",
+      "El horario no coincide con el plan.",
+      { schedule: "Usa el horario calculado." },
+    );
+  if (input.endsAt.getTime() !== planned.endsAt.getTime())
+    throw new CourseDomainError(
+      "VALIDATION_FAILED",
+      "La fecha de finalización no coincide con el horario.",
+      { endsAt: "Usa la finalización calculada." },
+    );
+  if (input.registrationEndAt && input.registrationEndAt >= input.startsAt)
+    throw new CourseDomainError(
+      "VALIDATION_FAILED",
+      "La preinscripción debe cerrar antes de iniciar clases.",
+      { registrationEndAt: "El cierre debe ser anterior al inicio de clases." },
+    );
 }
 
 function changed(
@@ -197,6 +237,7 @@ export class DrizzleCourseRepository implements CourseRepository {
       this.db.transaction(async (tx) => {
         await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
         const revision = await currentRevision(tx, input.courseTypeId);
+        assertSchedule(input, revision);
         const baseSlug = normalizeSlug(input.name);
         await tx.execute(sql`select pg_advisory_xact_lock(20260915, 1)`);
         const matching = await tx
@@ -261,6 +302,17 @@ export class DrizzleCourseRepository implements CourseRepository {
             "El curso cambió desde que abriste esta página.",
           );
         const existing = revisionFor(previous, await revisions(tx, [previous]));
+        const [group] = await tx
+          .select({ id: schema.groups.id })
+          .from(schema.groups)
+          .where(eq(schema.groups.courseId, id))
+          .limit(1);
+        if (group && existing.courseTypeId !== input.courseTypeId)
+          throw new CourseDomainError(
+            "VALIDATION_FAILED",
+            "Un curso con grupos no puede cambiar de formato.",
+            { courseTypeId: "Los grupos conservan el formato del curso." },
+          );
         // Published content is editable, but its commercial terms remain pinned until withdrawn.
         if (
           previous.status === "PUBLISHED" &&
@@ -271,10 +323,34 @@ export class DrizzleCourseRepository implements CourseRepository {
             "Retira el curso antes de cambiar su formato.",
           );
         const revision =
-          previous.status === "PUBLISHED"
+          previous.status === "PUBLISHED" || group
             ? existing
             : await currentRevision(tx, input.courseTypeId);
+        if (input.weekdaysMask === null && previous.weekdaysMask !== null)
+          throw new CourseDomainError(
+            "VALIDATION_FAILED",
+            "El horario debe planificarse de lunes a viernes.",
+            { weekdays: "Usa el horario calculado." },
+          );
+        assertSchedule(input, revision);
         const fields = changed(previous, input, revision.id);
+        if (
+          group &&
+          fields.some((field) =>
+            [
+              "startsAt",
+              "endsAt",
+              "weekdaysMask",
+              "schedule",
+              "courseTypeRevisionId",
+            ].includes(field),
+          )
+        )
+          throw new CourseDomainError(
+            "VALIDATION_FAILED",
+            "Un curso con grupos no puede cambiar sus fechas ni su horario.",
+            { startsAt: "El calendario ya está asignado a grupos." },
+          );
         if (!fields.length) return admin(previous, revision);
         const [row] = await tx
           .update(schema.courses)
@@ -328,11 +404,33 @@ export class DrizzleCourseRepository implements CourseRepository {
         assertTransition(previous.status, next);
         const existing = revisionFor(previous, await revisions(tx, [previous]));
         // Withdrawal is allowed even when the format was deactivated; publishing is not.
+        const [group] = await tx
+          .select({ id: schema.groups.id })
+          .from(schema.groups)
+          .where(eq(schema.groups.courseId, id))
+          .limit(1);
+        if (next === "PUBLISHED" && group) {
+          const [type] = await tx
+            .select({ active: schema.courseTypes.active })
+            .from(schema.courseTypes)
+            .where(eq(schema.courseTypes.id, existing.courseTypeId))
+            .for("update");
+          if (!type?.active)
+            throw new CourseDomainError(
+              "FORMAT_INACTIVE",
+              "El formato está desactivado.",
+              { courseTypeId: "Activa el formato antes de publicar." },
+            );
+        }
         const revision =
           next === "DRAFT"
-            ? await currentRevision(tx, existing.courseTypeId, false)
+            ? group
+              ? existing
+              : await currentRevision(tx, existing.courseTypeId, false)
             : next === "PUBLISHED"
-              ? await currentRevision(tx, existing.courseTypeId)
+              ? group
+                ? existing
+                : await currentRevision(tx, existing.courseTypeId)
               : existing;
         const [row] = await tx
           .update(schema.courses)
@@ -386,7 +484,7 @@ export class DrizzleCourseRepository implements CourseRepository {
           .update(schema.courses)
           .set({
             featured: false,
-            updatedAt: sql`greatest(now(), ${schema.courses.updatedAt} + interval '1 millisecond')`,
+            updatedAt: sql`date_trunc('milliseconds', greatest(now(), ${schema.courses.updatedAt}) + interval '1 millisecond')`,
           })
           .where(eq(schema.courses.featured, true));
         const [row] = await tx

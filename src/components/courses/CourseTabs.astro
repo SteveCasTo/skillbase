@@ -1,0 +1,33 @@
+---
+interface Props {
+  id: string;
+  active: "course" | "groups";
+}
+
+const { id, active } = Astro.props;
+const tabs = [
+  { key: "course", label: "Datos del curso", href: `/app/cursos/${id}/editar` },
+  { key: "groups", label: "Grupos", href: `/app/cursos/${id}/grupos` },
+] as const;
+---
+
+<nav aria-label="Secciones del curso" class="mt-7 border-b">
+  <ul class="flex gap-2 sm:gap-6">
+    {tabs.map((tab) => (
+      <li>
+        <a
+          href={tab.href}
+          aria-current={active === tab.key ? "page" : undefined}
+          class:list={[
+            "inline-flex min-h-11 items-center border-b-2 px-2 text-sm font-semibold focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:px-3",
+            active === tab.key
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground",
+          ]}
+        >
+          {tab.label}
+        </a>
+      </li>
+    ))}
+  </ul>
+</nav>

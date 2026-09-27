@@ -1,6 +1,7 @@
 import { CourseDomainError } from "./errors";
 import { boliviaCivilToInstant } from "./bolivia-time";
 import { COURSE_LEVELS, type CourseData, type CourseLevel } from "./types";
+import { weekdayMask } from "./weekday-schedule";
 
 export type CourseInput = Readonly<Record<string, string | undefined>>;
 
@@ -87,6 +88,16 @@ export function validateCourseData(input: CourseInput): CourseData {
     errors,
   );
   const schedule = requiredText(input, "schedule", "El horario", errors);
+  let weekdaysMask: number | null = null;
+  if (input.weekdays !== undefined) {
+    try {
+      weekdaysMask = weekdayMask(input.weekdays.split(",").map(Number));
+    } catch {
+      errors.weekdays = "Selecciona días de lunes a viernes sin repetir.";
+    }
+  }
+  if (weekdaysMask !== null && weekdaysMask !== 31)
+    errors.weekdays = "Las clases deben ser de lunes a viernes.";
   const conditions = requiredText(
     input,
     "conditions",
@@ -136,6 +147,14 @@ export function validateCourseData(input: CourseInput): CourseData {
   ) {
     errors.registrationEndAt = "El cierre debe ser posterior a la apertura.";
   }
+  if (
+    !errors.startsAt &&
+    !errors.registrationEndAt &&
+    registrationEndAt &&
+    registrationEndAt >= startsAt
+  )
+    errors.registrationEndAt =
+      "El cierre debe ser anterior al inicio de clases.";
   if (Object.keys(errors).length > 0)
     throw new CourseDomainError(
       "VALIDATION_FAILED",
@@ -151,6 +170,7 @@ export function validateCourseData(input: CourseInput): CourseData {
     instructorName: input.instructorName?.trim() || null,
     artwork: input.artwork?.trim() || null,
     schedule,
+    weekdaysMask,
     conditions,
     startsAt,
     endsAt,

@@ -31,12 +31,14 @@ const email = process.env.DEV_INITIAL_ADMIN_EMAIL?.trim();
       {
         name: "Formato 20 horas",
         totalHours: 20,
+        sessionMinutes: 90,
         studentAmount: "80.00",
         externalAmount: "100.00",
       },
       {
         name: "Formato 30 horas",
         totalHours: 30,
+        sessionMinutes: 150,
         studentAmount: "120.00",
         externalAmount: "150.00",
       },
@@ -57,6 +59,7 @@ const email = process.env.DEV_INITIAL_ADMIN_EMAIL?.trim();
           courseTypeId: type.id,
           revisionNumber: 1,
           totalHours: format.totalHours,
+          sessionMinutes: format.sessionMinutes,
           studentAmount: format.studentAmount,
           externalAmount: format.externalAmount,
         });

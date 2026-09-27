@@ -3,6 +3,8 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { FormatRepository } from "@/application/courses/format-repository";
 import type { CourseFormat, FormatValues } from "@/domain/courses/formats";
 import { CourseDomainError } from "@/domain/courses/errors";
+import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+import { planWeekdaySchedule } from "@/domain/courses/weekday-schedule";
 import * as schema from "@/server/db/schema";
 import { CourseInfrastructureError } from "./course-infrastructure-error";
 
@@ -62,6 +64,7 @@ async function latest(
     revisionId: revision.id,
     revisionNumber: revision.revisionNumber,
     totalHours: revision.totalHours,
+    sessionMinutes: revision.sessionMinutes,
     studentAmount: revision.studentAmount,
     externalAmount: revision.externalAmount,
     used: usage?.used ?? false,
@@ -239,10 +242,19 @@ export class DrizzleFormatRepository implements FormatRepository {
             "Activa el formato antes de editarlo.",
           );
         const previous = await latest(tx, type);
+        // Existing clients editing only price/hours must not erase resolved duration.
+        values = {
+          ...values,
+          sessionMinutes:
+            values.sessionMinutes === undefined
+              ? previous.sessionMinutes
+              : values.sessionMinutes,
+        };
         if (revisionId !== undefined || updatedAt !== undefined)
           assertFresh(previous, revisionId, updatedAt);
         if (
           previous.totalHours === values.totalHours &&
+          previous.sessionMinutes === (values.sessionMinutes ?? null) &&
           previous.studentAmount === values.studentAmount &&
           previous.externalAmount === values.externalAmount
         )
@@ -256,15 +268,43 @@ export class DrizzleFormatRepository implements FormatRepository {
           })
           .returning();
         if (!revision) throw new Error("Format revision insert failed");
+        const structuredDrafts = await tx
+          .select()
+          .from(schema.courses)
+          .where(
+            sql`${schema.courses.status} = 'DRAFT' and ${schema.courses.weekdaysMask} is not null and ${schema.courses.courseTypeRevisionId} in (select id from course_type_revisions where course_type_id = ${id}) and not exists (select 1 from groups where course_id = ${schema.courses.id})`,
+          );
+        if (structuredDrafts.length && revision.sessionMinutes === null)
+          throw new CourseDomainError(
+            "VALIDATION_FAILED",
+            "No se puede quitar la duración de sesión de un formato con cursos planificados.",
+          );
+        for (const draft of structuredDrafts) {
+          if (draft.weekdaysMask === null || revision.sessionMinutes === null)
+            continue;
+          const planned = planWeekdaySchedule({
+            startsAt: instantToBoliviaCivil(draft.startsAt),
+            weekdaysMask: draft.weekdaysMask,
+            totalHours: revision.totalHours,
+            sessionMinutes: revision.sessionMinutes,
+          });
+          await tx
+            .update(schema.courses)
+            .set({
+              endsAt: planned.endsAt,
+              schedule: `Lunes a viernes, ${instantToBoliviaCivil(draft.startsAt).slice(11)}–${planned.endTime}`,
+            })
+            .where(eq(schema.courses.id, draft.id));
+        }
         // Drafts follow the current revision; preserve optimistic editing by bumping their version.
         await tx
           .update(schema.courses)
           .set({
             courseTypeRevisionId: revision.id,
-            updatedAt: sql`greatest(now(), ${schema.courses.updatedAt} + interval '1 millisecond')`,
+            updatedAt: sql`date_trunc('milliseconds', greatest(now(), ${schema.courses.updatedAt}) + interval '1 millisecond')`,
           })
           .where(
-            sql`${schema.courses.status} = 'DRAFT' and ${schema.courses.courseTypeRevisionId} in (select id from course_type_revisions where course_type_id = ${id})`,
+            sql`${schema.courses.status} = 'DRAFT' and ${schema.courses.courseTypeRevisionId} in (select id from course_type_revisions where course_type_id = ${id}) and not exists (select 1 from groups where course_id = ${schema.courses.id})`,
           );
         await tx
           .update(schema.courseTypes)

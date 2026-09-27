@@ -16,6 +16,7 @@ test("new courses preserve values and can be corrected after server validation w
   const format = page.getByRole("form", { name: "Crear formato" });
   await format.getByLabel("Nombre").fill(formatName);
   await format.getByLabel("Duración total (horas)").fill("24");
+  await format.getByLabel("Duración de sesión (minutos)").fill("90");
   await format.getByLabel("Precio estudiante (BOB)").fill("80");
   await format.getByLabel("Precio externo (BOB)").fill("100");
   await format.getByRole("button", { name: "Crear formato" }).click();
@@ -42,14 +43,16 @@ test("new courses preserve values and can be corrected after server validation w
   await course
     .getByLabel("Formato de curso")
     .selectOption({ label: formatName });
-  await course.getByLabel("Horario informativo").fill("Lunes 18:30–20:30");
+  await course
+    .getByLabel(/Horario calculado/)
+    .fill("Lunes a viernes, 18:30–20:00");
   await course.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
   await course
     .getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)", { exact: true })
     .fill("2027-03-01T18:30");
   await course
     .getByLabel("Finalización del curso (AAAA-MM-DDTHH:mm)", { exact: true })
-    .fill("2027-04-01T20:30");
+    .fill("2027-03-22T20:00");
   expect(
     await course.evaluate((form: HTMLFormElement, names: string[]) => {
       const data = new FormData(form);
@@ -83,8 +86,8 @@ test("new courses preserve values and can be corrected after server validation w
   await expect(course.getByLabel("Formato de curso")).toHaveValue(
     selectedFormat,
   );
-  await expect(course.getByLabel("Horario informativo")).toHaveValue(
-    "Lunes 18:30–20:30",
+  await expect(course.getByLabel(/Horario calculado/)).toHaveValue(
+    "Lunes a viernes, 18:30–20:00",
   );
   await expect(
     course.getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)", { exact: true }),
@@ -93,7 +96,7 @@ test("new courses preserve values and can be corrected after server validation w
     course.getByLabel("Finalización del curso (AAAA-MM-DDTHH:mm)", {
       exact: true,
     }),
-  ).toHaveValue("2027-04-01T20:30");
+  ).toHaveValue("2027-03-22T20:00");
   await expect(course.getByLabel("Nota mínima (0–100)")).toHaveValue("101");
 
   await course.getByLabel("Nota mínima (0–100)").fill("70");
@@ -102,9 +105,27 @@ test("new courses preserve values and can be corrected after server validation w
     /\/app\/cursos\/[0-9a-f-]+\/editar\?success=created/,
   );
   await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
+  await page.locator('[data-confirm-fallback="publish"] summary').click();
+  await expect(
+    page.getByRole("button", { name: "Confirmar publicación" }),
+  ).toBeVisible();
+  await page.locator('[data-confirm-fallback="publish"] summary').click();
+  await expect(
+    page.getByRole("button", { name: "Confirmar publicación" }),
+  ).not.toBeVisible();
+  await page.locator('[data-confirm-fallback="publish"] summary').click();
+  await page.getByRole("button", { name: "Confirmar publicación" }).click();
+  await expect(page).toHaveURL(/success=published/);
+  await page.locator('[data-confirm-fallback="withdraw"] summary').click();
+  await page.getByRole("button", { name: "Confirmar retiro" }).click();
+  await expect(page).toHaveURL(/success=withdrawn/);
+  await page.locator('[data-confirm-fallback="archive"] summary').click();
+  await page.getByRole("button", { name: "Confirmar archivo" }).click();
+  await expect(page).toHaveURL(/success=archived/);
+  await expect(page.getByLabel("Nombre")).toBeDisabled();
 });
 
-test("formats can be created, edited, deactivated and deleted without JavaScript", async ({
+test("unused formats can be created, edited and deleted without JavaScript", async ({
   page,
   context,
 }) => {
@@ -115,6 +136,7 @@ test("formats can be created, edited, deactivated and deleted without JavaScript
   const create = page.getByRole("form", { name: "Crear formato" });
   await create.getByLabel("Nombre").fill(name);
   await create.getByLabel("Duración total (horas)").fill("24");
+  await create.getByLabel("Duración de sesión (minutos)").fill("90");
   await create.getByLabel("Precio estudiante (BOB)").fill("invalid");
   await create.getByLabel("Precio externo (BOB)").fill("100");
   await create.getByRole("button", { name: "Crear formato" }).click();
@@ -147,13 +169,38 @@ test("formats can be created, edited, deactivated and deleted without JavaScript
   await hours.getByRole("button", { name: "Guardar duración total" }).click();
   await expect(page).toHaveURL(/success=revise/);
   await expect(page.getByText("30 horas")).toBeVisible();
-  await page.getByRole("button", { name: "Desactivar formato" }).click();
-  await expect(page.getByText(/Inactivo · Revisión/)).toBeVisible();
-  await page.getByRole("button", { name: "Activar formato" }).click();
-  await expect(page.getByText(/Activo · Revisión/)).toBeVisible();
+  await expect(page.locator("[data-format-status]")).toHaveText("Activo");
+  const path = new URL(page.url()).pathname;
+  const deactivated = await page.request.post(path, {
+    headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
+    form: {
+      intent: "deactivate",
+      revisionId: await page
+        .locator('input[name="revisionId"]')
+        .first()
+        .inputValue(),
+      updatedAt: await page
+        .locator('input[name="updatedAt"]')
+        .first()
+        .inputValue(),
+    },
+  });
+  expect(deactivated.status()).toBe(200);
+  await page.reload();
+  await expect(page.locator("[data-format-status]")).toHaveText("Inactivo");
   await expect(
-    page.getByRole("button", { name: "Eliminar formato", exact: true }),
-  ).toBeVisible();
+    page.locator('summary[aria-label="Editar nombre"]'),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Activar formato" }),
+  ).toHaveCount(0);
+  await page.locator("[data-action-fallback] summary").click();
+  await page
+    .locator("[data-action-fallback]")
+    .getByRole("link", { name: "Cancelar" })
+    .click();
+  await expect(page).toHaveURL(path);
+  await page.locator("[data-action-fallback] summary").click();
   await expect(
     page.getByRole("button", { name: "Sí, eliminar formato" }),
   ).toBeVisible();
@@ -162,6 +209,55 @@ test("formats can be created, edited, deactivated and deleted without JavaScript
   await expect(page.getByRole("link", { name: new RegExp(name) })).toHaveCount(
     0,
   );
+});
+
+test("used formats require confirmation to deactivate without JavaScript", async ({
+  page,
+  context,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app/formatos/nuevo");
+  const name = `Formato usado sin JS ${Date.now()}`;
+  await page.getByLabel("Nombre").fill(name);
+  await page.getByLabel("Duración total (horas)").fill("20");
+  await page.getByLabel("Duración de sesión (minutos)").fill("90");
+  await page.getByLabel("Precio estudiante (BOB)").fill("80");
+  await page.getByLabel("Precio externo (BOB)").fill("100");
+  await page.getByRole("button", { name: "Crear formato" }).click();
+  await page.getByRole("link", { name: new RegExp(name) }).click();
+  const path = new URL(page.url()).pathname;
+  const course = await page.request.post("/app/cursos/nuevo", {
+    headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
+    form: {
+      name: `Curso sin JS ${Date.now()}`,
+      description: "Curso asociado para comprobar la confirmación.",
+      level: "INTERMEDIATE",
+      courseTypeId: path.split("/").at(-1)!,
+      schedule: "Lunes a viernes, 16:00–17:30",
+      conditions: "Sujeto a cupo.",
+      startsAt: "2027-03-01T16:00",
+      endsAt: "2027-03-17T17:30",
+      weekdays: "1,2,3,4,5",
+      minimumGrade: "70",
+    },
+  });
+  expect(course.status()).toBe(201);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Eliminar formato" }),
+  ).toHaveCount(0);
+  await page.locator("[data-action-fallback] summary").click();
+  await expect(
+    page.getByRole("button", { name: "Sí, desactivar formato" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Cancelar" }).click();
+  await expect(page.locator("[data-format-status]")).toHaveText("Activo");
+  await page.locator("[data-action-fallback] summary").click();
+  await page.getByRole("button", { name: "Sí, desactivar formato" }).click();
+  await expect(page.locator("[data-format-status]")).toHaveText("Inactivo");
+  await page.getByRole("button", { name: "Activar formato" }).click();
+  await expect(page.locator("[data-format-status]")).toHaveText("Activo");
+  await expect(page).toHaveURL(/success=activate/);
 });
 
 test("format mutations reject stale revisions, invalid origins and non-admin users", async ({
@@ -173,6 +269,7 @@ test("format mutations reject stale revisions, invalid origins and non-admin use
   const name = `Formato concurrencia ${Date.now()}`;
   await page.getByLabel("Nombre").fill(name);
   await page.getByLabel("Duración total (horas)").fill("20");
+  await page.getByLabel("Duración de sesión (minutos)").fill("90");
   await page.getByLabel("Precio estudiante (BOB)").fill("80");
   await page.getByLabel("Precio externo (BOB)").fill("100");
   await page.getByRole("button", { name: "Crear formato" }).click();

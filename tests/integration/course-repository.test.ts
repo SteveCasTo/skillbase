@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { eq, sql } from "drizzle-orm";
 import { createDatabase } from "@/server/db/client";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
@@ -6,10 +7,15 @@ import { DrizzleFormatRepository } from "@/server/db/repositories/format-reposit
 import {
   auditEvents,
   courseTypeRevisions,
+  courseTypes,
   courses,
   users,
 } from "@/server/db/schema";
 import { validateCourseData } from "@/domain/courses/validation";
+import {
+  planWeekdaySchedule,
+  weekdayMask,
+} from "@/domain/courses/weekday-schedule";
 import { COURSE_FIXTURES } from "../fixtures/courses";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
@@ -38,7 +44,7 @@ async function clear() {
     .delete(auditEvents)
     .where(sql`${auditEvents.entityType} in ('COURSE', 'COURSE_TYPE')`);
   await database.db.execute(
-    sql`truncate courses, course_type_revisions, course_types`,
+    sql`truncate groups, courses, course_type_revisions, course_types`,
   );
   await database.db
     .delete(users)
@@ -59,13 +65,270 @@ beforeEach(async () => {
   formatId = (
     await formats.create(
       "30 horas",
-      { totalHours: 30, studentAmount: "120.00", externalAmount: "150.00" },
+      {
+        totalHours: 30,
+        sessionMinutes: 150,
+        studentAmount: "120.00",
+        externalAmount: "150.00",
+      },
       actorId,
     )
   ).id;
 });
 
 describe("course format persistence", () => {
+  test("keeps historical text-only courses editable when their format gains session minutes", async () => {
+    const legacy = await formats.create(
+      "Legacy",
+      { totalHours: 20, studentAmount: "80.00", externalAmount: "100.00" },
+      actorId,
+    );
+    const oldInput = {
+      ...COURSE_FIXTURES.draftWithoutRegistration,
+      weekdays: undefined,
+    };
+    const created = await repository.create(
+      validateCourseData({ ...oldInput, courseTypeId: legacy.id }),
+      actorId,
+    );
+    await formats.revise(
+      legacy.id,
+      {
+        totalHours: 20,
+        sessionMinutes: 90,
+        studentAmount: "80.00",
+        externalAmount: "100.00",
+      },
+      actorId,
+    );
+    const latest = await repository.getAdmin(created.id);
+    expect(latest?.weekdaysMask).toBeNull();
+    expect(latest?.sessionMinutes).toBe(90);
+    expect(
+      await repository.update(
+        created.id,
+        validateCourseData({
+          ...oldInput,
+          courseTypeId: legacy.id,
+          description: "Edited legacy",
+        }),
+        actorId,
+        latest!.updatedAt,
+      ),
+    ).toMatchObject({
+      description: "Edited legacy",
+      schedule: oldInput.schedule,
+    });
+  });
+  test("versioned migration backfills only exact seed terms, preserving ambiguous legacy revisions", async () => {
+    const migration = readFileSync(
+      new URL("../../drizzle/0006_icy_unus.sql", import.meta.url),
+      "utf8",
+    );
+    const update = migration
+      .split("--> statement-breakpoint")
+      .find((statement) =>
+        statement.trimStart().startsWith("UPDATE course_type_revisions"),
+      );
+    if (!update) throw new Error("Missing migration backfill");
+    await database.db
+      .transaction(async (tx) => {
+        const [sample, ambiguous, sample30] = await tx
+          .insert(courseTypes)
+          .values([
+            { name: "Formato 20 horas" },
+            { name: "Legacy 20h" },
+            { name: "Formato 30 horas" },
+          ])
+          .returning();
+        if (!sample || !ambiguous || !sample30)
+          throw new Error("Missing legacy types");
+        const rows = await tx
+          .insert(courseTypeRevisions)
+          .values([
+            {
+              courseTypeId: sample.id,
+              revisionNumber: 1,
+              totalHours: 20,
+              studentAmount: "80.00",
+              externalAmount: "100.00",
+            },
+            {
+              courseTypeId: ambiguous.id,
+              revisionNumber: 1,
+              totalHours: 20,
+              studentAmount: "80.00",
+              externalAmount: "100.00",
+            },
+            {
+              courseTypeId: sample.id,
+              revisionNumber: 2,
+              totalHours: 30,
+              studentAmount: "120.00",
+              externalAmount: "150.00",
+            },
+            {
+              courseTypeId: sample30.id,
+              revisionNumber: 1,
+              totalHours: 30,
+              studentAmount: "120.00",
+              externalAmount: "150.00",
+            },
+          ])
+          .returning();
+        await tx.execute(
+          sql`ALTER TABLE course_type_revisions DISABLE TRIGGER course_type_revisions_immutable`,
+        );
+        await tx.execute(sql.raw(update));
+        await tx.execute(
+          sql`ALTER TABLE course_type_revisions ENABLE TRIGGER course_type_revisions_immutable`,
+        );
+        const result = await tx.select().from(courseTypeRevisions);
+        expect(result.find((r) => r.id === rows[0]?.id)?.sessionMinutes).toBe(
+          90,
+        );
+        expect(
+          result.find((r) => r.id === rows[1]?.id)?.sessionMinutes,
+        ).toBeNull();
+        expect(
+          result.find((r) => r.id === rows[2]?.id)?.sessionMinutes,
+        ).toBeNull();
+        expect(result.find((r) => r.id === rows[3]?.id)?.sessionMinutes).toBe(
+          150,
+        );
+        tx.rollback();
+      })
+      .catch((error: unknown) => {
+        // Drizzle rollback rejects with its own rollback marker.
+        if (!(error instanceof Error) || error.message !== "Rollback")
+          throw error;
+      });
+  });
+  test("persists resolved session minutes per immutable revision and checks structured schedules", async () => {
+    const format = await formats.revise(
+      formatId,
+      {
+        totalHours: 20,
+        sessionMinutes: 90,
+        studentAmount: "80.00",
+        externalAmount: "100.00",
+      },
+      actorId,
+    );
+    const plan = planWeekdaySchedule({
+      startsAt: "2027-03-01T18:00",
+      weekdaysMask: weekdayMask([1, 2, 3, 4, 5]),
+      totalHours: 20,
+      sessionMinutes: 90,
+    });
+    const data = validateCourseData({
+      ...COURSE_FIXTURES.publishedOpenRegistration,
+      courseTypeId: formatId,
+      weekdays: "1,2,3,4,5",
+      schedule: "Lunes a viernes, 18:00–19:30",
+      startsAt: "2027-03-01T18:00",
+      endsAt: "2027-03-17T19:30",
+    });
+    const course = await repository.create(data, actorId);
+    expect(course.weekdaysMask).toBe(31);
+    expect(course.sessionMinutes).toBe(90);
+    expect(course.endsAt).toEqual(plan.endsAt);
+    expect(
+      await failure(
+        repository.create(
+          { ...data, name: "Wrong schedule", schedule: "Viernes, 18:00–19:30" },
+          actorId,
+        ),
+      ),
+    ).toMatchObject({
+      code: "VALIDATION_FAILED",
+      fieldErrors: { schedule: "Usa el horario calculado." },
+    });
+    await repository.transition(course.id, "PUBLISHED", actorId);
+    await formats.revise(
+      formatId,
+      {
+        totalHours: 30,
+        sessionMinutes: 150,
+        studentAmount: "120.00",
+        externalAmount: "150.00",
+      },
+      actorId,
+    );
+    expect((await repository.getAdmin(course.id))?.sessionMinutes).toBe(90);
+    expect((await repository.getPublic(course.slug))?.sessionMinutes).toBe(90);
+    expect(
+      await failure(
+        repository.create(
+          {
+            ...data,
+            name: "Wrong end",
+            endsAt: new Date("2027-04-01T23:30:00Z"),
+          },
+          actorId,
+        ),
+      ),
+    ).toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(
+      await failure(
+        repository.create(
+          { ...data, name: "Wrong window", registrationEndAt: data.startsAt },
+          actorId,
+        ),
+      ),
+    ).toMatchObject({ code: "VALIDATION_FAILED" });
+    const [stored] = await database.db
+      .select()
+      .from(courseTypeRevisions)
+      .where(eq(courseTypeRevisions.id, format.revisionId));
+    expect(stored?.sessionMinutes).toBe(90);
+  });
+
+  test("format revision replans structured drafts but not published courses", async () => {
+    await formats.revise(
+      formatId,
+      {
+        totalHours: 20,
+        sessionMinutes: 90,
+        studentAmount: "80.00",
+        externalAmount: "100.00",
+      },
+      actorId,
+    );
+    const data = validateCourseData({
+      ...COURSE_FIXTURES.publishedOpenRegistration,
+      courseTypeId: formatId,
+      weekdays: "1,2,3,4,5",
+      schedule: "Lunes a viernes, 18:00–19:30",
+      startsAt: "2027-03-01T18:00",
+      endsAt: "2027-03-17T19:30",
+    });
+    const draft = await repository.create(data, actorId);
+    const next = await formats.revise(
+      formatId,
+      {
+        totalHours: 30,
+        sessionMinutes: 150,
+        studentAmount: "120.00",
+        externalAmount: "150.00",
+      },
+      actorId,
+    );
+    expect(next.sessionMinutes).toBe(150);
+    const planned = planWeekdaySchedule({
+      startsAt: "2027-03-01T18:00",
+      weekdaysMask: 31,
+      totalHours: 30,
+      sessionMinutes: 150,
+    });
+    expect((await repository.getAdmin(draft.id))?.endsAt).toEqual(
+      planned.endsAt,
+    );
+    expect((await repository.getAdmin(draft.id))?.schedule).toBe(
+      "Lunes a viernes, 18:00–20:30",
+    );
+    expect((await repository.getAdmin(draft.id))?.sessionMinutes).toBe(150);
+  });
   test("revisions are immutable; drafts follow latest while published and archived stay pinned", async () => {
     const draft = await repository.create(input(), actorId);
     const published = await repository.create(
@@ -127,11 +390,19 @@ describe("course format persistence", () => {
     const draft = await repository.create(
       {
         ...input(),
+        schedule: "Lunes a viernes, 18:00–19:30",
+        endsAt: planWeekdaySchedule({
+          startsAt: "2027-03-01T18:00",
+          weekdaysMask: 31,
+          totalHours: 20,
+          sessionMinutes: 90,
+        }).endsAt,
         courseTypeId: (
           await formats.create(
             "Otro",
             {
               totalHours: 20,
+              sessionMinutes: 90,
               studentAmount: "80.00",
               externalAmount: "100.00",
             },
