@@ -6,6 +6,7 @@ import "@fontsource/montserrat/700.css";
 import "@/styles/globals.css";
 
 import { SileoHost } from "@/components/SileoHost";
+import { ClientRouter } from "astro:transitions";
 
 interface Props {
   title: string;
@@ -13,6 +14,7 @@ interface Props {
   showToasts?: boolean;
   noindex?: boolean;
   allowSystemTheme?: boolean;
+  clientRouter?: boolean;
 }
 
 const {
@@ -21,6 +23,7 @@ const {
   showToasts = true,
   noindex = false,
   allowSystemTheme = true,
+  clientRouter = false,
 } = Astro.props;
 ---
 
@@ -44,6 +47,7 @@ const {
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>{title}</title>
+    {clientRouter && <ClientRouter fallback="swap" />}
     <script is:inline define:vars={{ allowSystemTheme }}>
       (() => {
         const saved = localStorage.getItem("theme");

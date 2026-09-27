@@ -248,6 +248,12 @@ html:has(.private-shell) [data-sileo-viewport] {
   --sileo-state-info: var(--secondary-foreground);
   --sileo-state-action: var(--primary);
 }
+@media (max-width: 380px) {
+  html:has(.private-shell) [data-sileo-viewport] [data-sileo-toast] {
+    max-width: calc(100vw - 2rem);
+    overflow: hidden;
+  }
+}
 html:has(.private-shell) [data-sileo-viewport] [data-sileo-title] {
   color: var(--card-foreground);
 }
