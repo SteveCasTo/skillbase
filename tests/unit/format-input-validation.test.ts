@@ -23,4 +23,16 @@ describe("format name validation", () => {
     expect(validateFormat(name, "24", "80", "100").name).toBe(name);
     expect(validateFormatName(name)).toBe(name);
   });
+  test("validates explicit session duration and distinguishes unresolved legacy", () => {
+    expect(
+      validateFormat("Sample", "20", "80", "100", "90").sessionMinutes,
+    ).toBe(90);
+    expect(
+      validateFormat("Legacy", "20", "80", "100").sessionMinutes,
+    ).toBeNull();
+    for (const minutes of ["", "0", "14", "481", "90.5", "Infinity"])
+      expect(() =>
+        validateFormat("Sample", "20", "80", "100", minutes),
+      ).toThrow();
+  });
 });

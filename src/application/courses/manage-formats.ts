@@ -3,6 +3,7 @@ import type { FormatRepository } from "./format-repository";
 import { AuthorizationError } from "@/domain/auth/errors";
 import type { InternalUser } from "@/domain/auth/types";
 import { validateFormat, validateFormatName } from "@/domain/courses/formats";
+import { CourseDomainError } from "@/domain/courses/errors";
 
 function requireAdmin(user: InternalUser) {
   if (user.status !== "ACTIVE")
@@ -67,14 +68,22 @@ export async function createFormat(
     totalHours: string;
     studentAmount: string;
     externalAmount: string;
+    sessionMinutes?: string;
   },
 ) {
   requireAdmin(user);
+  if (input.sessionMinutes === undefined)
+    throw new CourseDomainError(
+      "VALIDATION_FAILED",
+      "Revisa los campos indicados.",
+      { sessionMinutes: "La duración de sesión es obligatoria." },
+    );
   const { name, ...values } = validateFormat(
     input.name,
     input.totalHours,
     input.studentAmount,
     input.externalAmount,
+    input.sessionMinutes,
   );
   return repository.create(name, values, user.id);
 }
@@ -83,20 +92,32 @@ export async function reviseFormat(
   repository: FormatRepository,
   user: InternalUser,
   id: string,
-  input: { totalHours: string; studentAmount: string; externalAmount: string },
+  input: {
+    totalHours: string;
+    studentAmount: string;
+    externalAmount: string;
+    sessionMinutes?: string;
+  },
   revisionId?: string,
   updatedAt?: string,
 ) {
   requireAdmin(user);
-  const { totalHours, studentAmount, externalAmount } = validateFormat(
-    "existing",
-    input.totalHours,
-    input.studentAmount,
-    input.externalAmount,
-  );
+  const { totalHours, sessionMinutes, studentAmount, externalAmount } =
+    validateFormat(
+      "existing",
+      input.totalHours,
+      input.studentAmount,
+      input.externalAmount,
+      input.sessionMinutes,
+    );
   return repository.revise(
     id,
-    { totalHours, studentAmount, externalAmount },
+    {
+      totalHours,
+      ...(input.sessionMinutes === undefined ? {} : { sessionMinutes }),
+      studentAmount,
+      externalAmount,
+    },
     user.id,
     revisionId,
     updatedAt,

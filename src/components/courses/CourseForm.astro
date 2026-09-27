@@ -5,6 +5,7 @@ import CourseSelect from "./CourseSelect";
 import CourseImageEditor from "./CourseImageEditor";
 import CourseDateTimePicker from "./CourseDateTimePicker";
 import CourseSchedulePicker from "./CourseSchedulePicker";
+import CourseWeekdayPlanner from "./CourseWeekdayPlanner";
 import CourseMarkdownEditor from "./CourseMarkdownEditor";
 import { publicArtworkUrl } from "@/server/courses/artwork";
 
@@ -19,6 +20,8 @@ interface Props {
   courseId?: string;
   /** Persisted course values, distinct from the attempted values after a failed POST. */
   baseline?: CourseInput | undefined;
+  pinnedFormat?:
+    { totalHours: number; sessionMinutes: number | null } | undefined;
 }
 
 const {
@@ -31,6 +34,7 @@ const {
   revision,
   courseId,
   baseline,
+  pinnedFormat,
 } = Astro.props;
 const control =
   "mt-2 min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";
@@ -62,6 +66,7 @@ const currentArtworkUrl = publicArtworkUrl(
   displayedArtwork,
   import.meta.env.PUBLIC_SUPABASE_URL,
 );
+const legacy = Boolean(courseId && !baseline?.weekdays);
 ---
 
 <form
@@ -200,7 +205,8 @@ const currentArtworkUrl = publicArtworkUrl(
             .map((format) => ({
               value: format.id,
               label: `${format.name} · ${format.totalHours} h · ${format.studentAmount} / ${format.externalAmount} BOB`,
-              disabled: !format.active,
+              disabled:
+                !format.active || (!courseId && format.sessionMinutes === null),
             }))}
         />
         <noscript>
@@ -240,7 +246,10 @@ const currentArtworkUrl = publicArtworkUrl(
                   <option
                     value={format.id}
                     selected={values.courseTypeId === format.id}
-                    disabled={!format.active}
+                    disabled={
+                      !format.active ||
+                      (!courseId && format.sessionMinutes === null)
+                    }
                   >
                     {format.name}
                   </option>
@@ -292,15 +301,19 @@ const currentArtworkUrl = publicArtworkUrl(
             </span>
           </span>
         </div>
-        <CourseSchedulePicker
-          client:only="react"
-          value={values.schedule ?? ""}
-          error={errors.schedule ?? ""}
-          disabled={disabled}
-        />
+        {legacy && (
+          <CourseSchedulePicker
+            client:only="react"
+            value={values.schedule ?? ""}
+            error={errors.schedule ?? ""}
+            disabled={disabled}
+          />
+        )}
         <noscript>
           <label class="sm:col-span-2">
-            Horario informativo
+            {legacy
+              ? "Horario informativo legado"
+              : "Horario calculado (lunes a viernes, HH:mm–HH:mm)"}
             <input
               class={control}
               name="schedule"
@@ -310,6 +323,7 @@ const currentArtworkUrl = publicArtworkUrl(
               disabled={disabled}
             />
           </label>
+          {!legacy && <input type="hidden" name="weekdays" value="1,2,3,4,5" />}
         </noscript>
         <label class="sm:col-span-2">
           <span class="text-sm font-medium">Condiciones</span>
@@ -341,19 +355,47 @@ const currentArtworkUrl = publicArtworkUrl(
         Fechas y preinscripción
       </h2>
       <div class="mt-6 grid gap-5 lg:grid-cols-2">
+        {legacy ? (
+          [
+            { name: "startsAt", label: "Inicio del curso" },
+            { name: "endsAt", label: "Finalización del curso" },
+          ].map(({ name, label }) => (
+            <CourseDateTimePicker
+              client:only="react"
+              name={name}
+              data-course-input="text"
+              label={label}
+              value={values[name] ?? ""}
+              required={name === "startsAt" || name === "endsAt"}
+              disabled={disabled}
+              error={errors[name] ?? ""}
+            />
+          ))
+        ) : (
+          <CourseWeekdayPlanner
+            client:only="react"
+            newCourse={!courseId}
+            formats={formats.map((format) =>
+              format.id === values.courseTypeId && pinnedFormat
+                ? { ...format, ...pinnedFormat }
+                : format,
+            )}
+            startsAt={values.startsAt ?? ""}
+            endsAt={values.endsAt ?? ""}
+            error={errors.startsAt ?? errors.endsAt ?? errors.weekdays ?? ""}
+            disabled={disabled}
+          />
+        )}
         {[
-          { name: "startsAt", label: "Inicio del curso" },
-          { name: "endsAt", label: "Finalización del curso" },
           { name: "registrationStartAt", label: "Apertura de preinscripción" },
           { name: "registrationEndAt", label: "Cierre de preinscripción" },
         ].map(({ name, label }) => (
           <CourseDateTimePicker
             client:only="react"
             name={name}
-            data-course-input="text"
             label={label}
             value={values[name] ?? ""}
-            required={name === "startsAt" || name === "endsAt"}
+            required={false}
             disabled={disabled}
             error={errors[name] ?? ""}
           />
@@ -568,7 +610,8 @@ const currentArtworkUrl = publicArtworkUrl(
             (entry): entry is [string, string] => typeof entry[1] === "string",
           ),
         );
-        const valid = form.checkValidity() && draftFieldsReady(values);
+        const valid =
+          form.checkValidity() && draftFieldsReady(values, !baseline);
         button.disabled = saving || (baseline ? !changed || !valid : !valid);
       };
       // FormData reads the controls' current values directly, including hidden

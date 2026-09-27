@@ -23,6 +23,7 @@ test("published course is public end-to-end and withdrawal removes every public 
     const createFormat = page.getByRole("form", { name: "Crear formato" });
     await createFormat.getByLabel("Nombre").fill(formatName);
     await createFormat.getByLabel("Duración total (horas)").fill("20");
+    await createFormat.getByLabel("Duración de sesión (minutos)").fill("90");
     await createFormat.getByLabel("Precio estudiante (BOB)").fill("80");
     await createFormat.getByLabel("Precio externo (BOB)").fill("100.50");
     await createFormat.getByRole("button", { name: "Crear formato" }).click();
@@ -44,13 +45,9 @@ test("published course is public end-to-end and withdrawal removes every public 
       .fill(
         "## Temario público\n- **Unidad segura**\n\n> Nota del curso\n\n```ts\nconst ejemplo = 1;\n```\n\n---\n\n[Guía válida](https://example.com/guia)\n[Enlace inseguro](javascript:alert(1))\n<script>alert(2)</script>",
       );
-    await page.getByRole("checkbox", { name: "Lunes" }).click();
-    await page.getByLabel("Desde", { exact: true }).fill("18:30");
-    await page.getByLabel("Hasta", { exact: true }).fill("20:30");
     await page.getByLabel("Condiciones").fill("Inscripción sujeta a cupo.");
     for (const [label, date, time] of [
-      ["Inicio del curso", "01/03/2027", "18:30"],
-      ["Finalización del curso", "01/04/2027", "20:30"],
+      ["Inicio de clases (Bolivia)", "01/03/2027", "18:30"],
       ["Apertura de preinscripción", "01/01/2027", "08:00"],
       ["Cierre de preinscripción", "20/02/2027", "18:00"],
     ] as const) {
@@ -100,9 +97,9 @@ test("published course is public end-to-end and withdrawal removes every public 
       page.getByRole("img", { name: "Vista previa del encuadre del curso" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Subir foto recortada" }).click();
-    await expect(page.getByRole("status")).toContainText(
-      "aún no está guardada",
-    );
+    await expect(
+      page.getByRole("status").filter({ hasText: "Foto cargada" }),
+    ).toContainText("aún no está guardada");
     artworkKey = await page.locator('input[name="artwork"]').inputValue();
     expect(artworkKey).toMatch(
       new RegExp(`^courses/${courseId}/[0-9a-f-]+\\.webp$`, "i"),
@@ -160,7 +157,7 @@ test("published course is public end-to-end and withdrawal removes every public 
     ).toContainText(/1.*marzo.*2027/i);
     await expect(
       page.locator("dt").filter({ hasText: "Finalización" }).locator("+ dd"),
-    ).toContainText(/1.*abril.*2027/i);
+    ).toContainText(/17.*marzo.*2027/i);
     await expect(
       page.getByText("Docente público E2E", { exact: true }),
     ).toBeVisible();

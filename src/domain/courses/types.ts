@@ -21,6 +21,7 @@ export interface CourseData {
   readonly description: string;
   readonly level: CourseLevel;
   readonly schedule: string;
+  readonly weekdaysMask?: number | null;
   readonly conditions: string;
   readonly startsAt: Date;
   readonly endsAt: Date;
@@ -35,6 +36,7 @@ export interface CourseData {
 export interface Course extends CourseData {
   readonly courseTypeRevisionId: string;
   readonly totalHours: number;
+  readonly sessionMinutes: number | null;
   readonly prices: readonly CoursePrice[];
   readonly featured: boolean;
   readonly id: string;
@@ -58,6 +60,7 @@ export interface PublicCourseDto {
   readonly featured?: boolean;
   readonly level: CourseLevel;
   readonly totalHours: number;
+  readonly sessionMinutes?: number | null;
   readonly schedule: string;
   readonly conditions: string;
   readonly startsAt: Date;

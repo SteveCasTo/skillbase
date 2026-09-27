@@ -39,7 +39,22 @@ export async function createCourse(
   input: CourseInput,
 ) {
   requireAdmin(user);
-  return repository.create(validateCourseData(input), user.id);
+  const data = validateCourseData(input);
+  if (data.weekdaysMask !== 31)
+    throw new CourseDomainError(
+      "VALIDATION_FAILED",
+      "Elige un horario de lunes a viernes.",
+      {
+        weekdays: "Las clases deben ser de lunes a viernes.",
+      },
+    );
+  if (data.weekdaysMask != null && data.startsAt.getTime() < Date.now())
+    throw new CourseDomainError(
+      "VALIDATION_FAILED",
+      "El inicio de un curso nuevo debe ser futuro.",
+      { startsAt: "Selecciona una fecha futura." },
+    );
+  return repository.create(data, user.id);
 }
 
 export async function updateCourse(

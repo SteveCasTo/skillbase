@@ -13,6 +13,7 @@ test("create form filters edits and enables submit only for valid required value
   const submit = form.getByRole("button", { name: "Crear formato" });
   const name = form.getByLabel("Nombre");
   const hours = form.getByLabel("Duración total (horas)");
+  const session = form.getByLabel("Duración de sesión (minutos)");
   const student = form.getByLabel("Precio estudiante (BOB)");
   const external = form.getByLabel("Precio externo (BOB)");
   await expect(submit).toBeDisabled();
@@ -24,6 +25,7 @@ test("create form filters edits and enables submit only for valid required value
   await hours.press("8");
   await expect(hours).toHaveValue("2147483647");
   await hours.fill("24");
+  await session.fill("90");
   await student.pressSequentially("80.5a0");
   await expect(student).toHaveValue("80.50");
   await student.press("9");
@@ -75,10 +77,26 @@ test("inline editing swaps icons in the same row, filters input and cancels with
   const name = `Formato iconos ${Date.now()}`;
   await page.getByLabel("Nombre").fill(name);
   await page.getByLabel("Duración total (horas)").fill("24");
+  await page.getByLabel("Duración de sesión (minutos)").fill("90");
   await page.getByLabel("Precio estudiante (BOB)").fill("80");
   await page.getByLabel("Precio externo (BOB)").fill("100");
   await page.getByRole("button", { name: "Crear formato" }).click();
   await page.getByRole("link", { name: new RegExp(name) }).click();
+  await expect(
+    page.locator('[data-format-value="sessionMinutes"]'),
+  ).toContainText("90 minutos");
+  await page.locator('summary[aria-label="Editar duración de sesión"]').click();
+  await page
+    .getByRole("form", { name: "Editar duración de sesión" })
+    .getByLabel("Nueva duración de sesión")
+    .fill("150");
+  await page
+    .getByRole("form", { name: "Editar duración de sesión" })
+    .getByRole("button", { name: "Guardar duración de sesión" })
+    .click();
+  await expect(
+    page.locator('[data-format-value="sessionMinutes"]'),
+  ).toContainText("150 minutos");
   await page.setViewportSize({ width: 320, height: 700 });
   const path = new URL(page.url()).pathname;
   const row = page.locator("dl > div").filter({
@@ -263,6 +281,7 @@ test("used formats toggle availability in place and disable editors while inacti
   const name = `Formato en uso ${Date.now()}`;
   await page.getByLabel("Nombre").fill(name);
   await page.getByLabel("Duración total (horas)").fill("24");
+  await page.getByLabel("Duración de sesión (minutos)").fill("90");
   await page.getByLabel("Precio estudiante (BOB)").fill("80");
   await page.getByLabel("Precio externo (BOB)").fill("100");
   await page.getByRole("button", { name: "Crear formato" }).click();
@@ -276,10 +295,11 @@ test("used formats toggle availability in place and disable editors while inacti
       description: "Curso para probar el estado del formato asociado.",
       level: "INTERMEDIATE",
       courseTypeId: id,
-      schedule: "Lunes 18:30–20:30",
+      schedule: "Lunes a viernes, 18:30–20:00",
+      weekdays: "1,2,3,4,5",
       conditions: "Sujeto a cupo.",
       startsAt: "2027-03-01T18:30",
-      endsAt: "2027-04-01T20:30",
+      endsAt: "2027-03-22T20:00",
       minimumGrade: "70",
     },
   });
