@@ -93,12 +93,45 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   await expect(
     page.getByRole("img", { name: "Vista previa del encuadre del curso" }),
   ).toBeVisible();
+  const cropFrame = page.locator("[data-crop-frame]");
+  const cropFrameBox = await cropFrame.boundingBox();
+  expect(cropFrameBox).not.toBeNull();
+  expect(cropFrameBox!.width / cropFrameBox!.height).toBeCloseTo(8 / 5, 1);
+  const cropImage = page.getByRole("img", {
+    name: "Vista previa del encuadre del curso",
+  });
+  const initialImageBox = await cropImage.boundingBox();
+  expect(initialImageBox).not.toBeNull();
+  const zoom = page.getByRole("slider", { name: "Zoom" });
+  await zoom.fill("1.5");
+  await expect
+    .poll(async () => (await cropImage.boundingBox())?.width)
+    .toBeGreaterThan(initialImageBox!.width);
   await page.getByRole("button", { name: "Crear borrador" }).click();
   await expect(
     page.getByRole("alert").filter({ hasText: "Confirma el recorte" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Usar este recorte" }).click();
-  await expect(page.getByText("Foto lista para cargarse")).toBeVisible();
+  await expect(
+    page.getByText("Foto lista para crear el borrador.", { exact: true }),
+  ).toBeVisible();
+  const beforeDrag = await cropImage.boundingBox();
+  expect(beforeDrag).not.toBeNull();
+  await cropFrame.dragTo(cropFrame, {
+    sourcePosition: { x: cropFrameBox!.width / 2, y: cropFrameBox!.height / 2 },
+    targetPosition: {
+      x: cropFrameBox!.width / 2 + 18,
+      y: cropFrameBox!.height / 2,
+    },
+  });
+  await expect
+    .poll(async () => (await cropImage.boundingBox())?.x)
+    .not.toBe(beforeDrag!.x);
+  await page.getByRole("button", { name: "Crear borrador" }).click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Confirma el recorte" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Usar este recorte" }).click();
   await page
     .getByLabel("Inicio de clases (Bolivia)", { exact: true })
     .fill("06/03/2027");
@@ -121,7 +154,9 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   const invalidBody = await invalidResponse.json();
   expect(invalidBody.fieldErrors).toHaveProperty("startsAt");
   await expect(page.getByLabel("Nombre")).toHaveValue(/Curso con foto/);
-  await expect(page.getByText("Foto lista para cargarse")).toBeVisible();
+  await expect(
+    page.getByText("Foto lista para crear el borrador.", { exact: true }),
+  ).toBeVisible();
   await page
     .getByLabel("Inicio de clases (Bolivia)", { exact: true })
     .fill("01/03/2027");
@@ -152,6 +187,14 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   await expect(
     page.getByRole("img", { name: "Foto actual del curso" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Reemplazar imagen" }),
+  ).toBeVisible();
+  const chooser = page.waitForEvent("filechooser");
+  await page
+    .getByRole("button", { name: "Elegir otra imagen del curso" })
+    .click();
+  expect((await chooser).isMultiple()).toBe(false);
   const editorBox = await page
     .locator("[data-course-image-editor]")
     .boundingBox();
@@ -163,6 +206,9 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   await expect(page.locator('input[name="artwork"]')).toHaveValue(key);
   await expect(
     page.getByRole("img", { name: "Foto actual del curso" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Reemplazar imagen" }),
   ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileEditorBox = await page

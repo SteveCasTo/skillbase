@@ -100,7 +100,7 @@ test("published course is public end-to-end and withdrawal removes every public 
     await page.getByRole("button", { name: "Subir foto recortada" }).click();
     await expect(
       page.getByRole("status").filter({ hasText: "Foto cargada" }),
-    ).toContainText("aún no está guardada");
+    ).toContainText("Guardar cambios");
     artworkKey = await page.locator('input[name="artwork"]').inputValue();
     expect(artworkKey).toMatch(
       new RegExp(`^courses/${courseId}/[0-9a-f-]+\\.webp$`, "i"),
