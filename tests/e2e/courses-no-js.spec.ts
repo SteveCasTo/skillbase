@@ -105,6 +105,24 @@ test("new courses preserve values and can be corrected after server validation w
     /\/app\/cursos\/[0-9a-f-]+\/editar\?success=created/,
   );
   await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
+  await page.locator('[data-confirm-fallback="publish"] summary').click();
+  await expect(
+    page.getByRole("button", { name: "Confirmar publicación" }),
+  ).toBeVisible();
+  await page.locator('[data-confirm-fallback="publish"] summary').click();
+  await expect(
+    page.getByRole("button", { name: "Confirmar publicación" }),
+  ).not.toBeVisible();
+  await page.locator('[data-confirm-fallback="publish"] summary').click();
+  await page.getByRole("button", { name: "Confirmar publicación" }).click();
+  await expect(page).toHaveURL(/success=published/);
+  await page.locator('[data-confirm-fallback="withdraw"] summary').click();
+  await page.getByRole("button", { name: "Confirmar retiro" }).click();
+  await expect(page).toHaveURL(/success=withdrawn/);
+  await page.locator('[data-confirm-fallback="archive"] summary').click();
+  await page.getByRole("button", { name: "Confirmar archivo" }).click();
+  await expect(page).toHaveURL(/success=archived/);
+  await expect(page.getByLabel("Nombre")).toBeDisabled();
 });
 
 test("unused formats can be created, edited and deleted without JavaScript", async ({

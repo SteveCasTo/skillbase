@@ -133,21 +133,77 @@ if (course && Astro.request.method === "POST") {
         return Astro.redirect(`/app/cursos/${id}/editar?success=updated`, 303);
       } else if (intent === "publish") {
         course = await publishCourse(repository, user, id);
+        if (wantsJson)
+          return new Response(
+            JSON.stringify({
+              status: course.status,
+              revision: course.updatedAt.toISOString(),
+              featured: course.featured,
+            }),
+            {
+              headers: {
+                "Content-Type": "application/json",
+                "Cache-Control": "private, no-store",
+              },
+            },
+          );
         return Astro.redirect(
           `/app/cursos/${id}/editar?success=published`,
           303,
         );
       } else if (intent === "withdraw") {
         course = await withdrawCourse(repository, user, id);
+        if (wantsJson)
+          return new Response(
+            JSON.stringify({
+              status: course.status,
+              revision: course.updatedAt.toISOString(),
+              featured: course.featured,
+            }),
+            {
+              headers: {
+                "Content-Type": "application/json",
+                "Cache-Control": "private, no-store",
+              },
+            },
+          );
         return Astro.redirect(
           `/app/cursos/${id}/editar?success=withdrawn`,
           303,
         );
       } else if (intent === "archive") {
         course = await archiveCourse(repository, user, id);
+        if (wantsJson)
+          return new Response(
+            JSON.stringify({
+              status: course.status,
+              revision: course.updatedAt.toISOString(),
+              featured: course.featured,
+            }),
+            {
+              headers: {
+                "Content-Type": "application/json",
+                "Cache-Control": "private, no-store",
+              },
+            },
+          );
         return Astro.redirect(`/app/cursos/${id}/editar?success=archived`, 303);
       } else if (intent === "feature") {
         course = await featureCourse(repository, user, id);
+        if (wantsJson)
+          return new Response(
+            JSON.stringify({
+              status: course.status,
+              revision: course.updatedAt.toISOString(),
+              featured: course.featured,
+            }),
+            {
+              headers: {
+                "Content-Type": "application/json",
+                "Cache-Control": "private, no-store",
+              },
+            },
+          );
         return Astro.redirect(`/app/cursos/${id}/editar?success=featured`, 303);
       } else {
         Astro.response.status = 400;
@@ -296,11 +352,18 @@ const statusLabel = {
               </p>
             )}
             {course.status === "DRAFT" && (
-              <details class="rounded-lg border bg-card p-3">
+              <details
+                data-confirm-fallback="publish"
+                class="rounded-lg border bg-card p-3"
+              >
                 <summary class="flex min-h-11 cursor-pointer items-center px-2 text-sm font-semibold">
                   Publicar curso
                 </summary>
-                <form method="post" class="mutation-form mt-2">
+                <form
+                  method="post"
+                  data-astro-reload
+                  class="mutation-form mt-2"
+                >
                   <input type="hidden" name="intent" value="publish" />
                   <p class="mb-3 text-sm text-muted-foreground">
                     El curso y sus precios serán visibles para todos.
@@ -315,11 +378,18 @@ const statusLabel = {
               </details>
             )}
             {course.status === "PUBLISHED" && (
-              <details class="rounded-lg border bg-card p-3">
+              <details
+                data-confirm-fallback="withdraw"
+                class="rounded-lg border bg-card p-3"
+              >
                 <summary class="flex min-h-11 cursor-pointer items-center px-2 text-sm font-semibold">
                   Retirar publicación
                 </summary>
-                <form method="post" class="mutation-form mt-2">
+                <form
+                  method="post"
+                  data-astro-reload
+                  class="mutation-form mt-2"
+                >
                   <input type="hidden" name="intent" value="withdraw" />
                   <p class="mb-3 text-sm text-muted-foreground">
                     El curso dejará de ser público y volverá a borrador.
@@ -333,11 +403,14 @@ const statusLabel = {
                 </form>
               </details>
             )}
-            <details class="rounded-lg border border-destructive/30 bg-card p-3">
+            <details
+              data-confirm-fallback="archive"
+              class="rounded-lg border border-destructive/30 bg-card p-3"
+            >
               <summary class="flex min-h-11 cursor-pointer items-center px-2 text-sm font-semibold text-destructive">
                 Archivar curso
               </summary>
-              <form method="post" class="mutation-form mt-2">
+              <form method="post" data-astro-reload class="mutation-form mt-2">
                 <input type="hidden" name="intent" value="archive" />
                 <p class="mb-3 text-sm text-muted-foreground">
                   No podrás editar ni reactivar este curso.
@@ -350,40 +423,260 @@ const statusLabel = {
                 </button>
               </form>
             </details>
+            <div data-confirm-actions hidden class="flex flex-wrap gap-3">
+              {[
+                ...(course.status === "DRAFT"
+                  ? [{ intent: "publish", label: "Publicar curso" }]
+                  : [{ intent: "withdraw", label: "Retirar publicación" }]),
+                { intent: "archive", label: "Archivar curso" },
+              ].map((action) => (
+                <button
+                  type="button"
+                  data-confirm-trigger={action.intent}
+                  class="min-h-11 rounded-lg border px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
           </div>
+          <dialog
+            data-course-dialog
+            aria-labelledby="course-dialog-title"
+            aria-describedby="course-dialog-description"
+            class="m-auto w-[min(28rem,calc(100%-2rem))] rounded-xl border bg-card p-6 text-foreground shadow-xl backdrop:bg-black/60"
+          >
+            <h3 id="course-dialog-title" class="text-lg font-semibold"></h3>
+            <p
+              id="course-dialog-description"
+              class="mt-3 text-sm text-muted-foreground"
+            ></p>
+            <form
+              method="post"
+              data-course-dialog-form
+              class="mt-6 flex flex-wrap justify-end gap-3"
+            >
+              <input type="hidden" name="intent" />
+              <button
+                type="button"
+                data-dialog-cancel
+                class="min-h-11 rounded-lg border px-4"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                class="min-h-11 rounded-lg bg-destructive px-4 font-semibold text-destructive-foreground"
+              ></button>
+            </form>
+          </dialog>
         </section>
       )}
       <script>
+        import { navigate } from "astro:transitions/client";
         import { sileo } from "sileo";
-        const success = new URLSearchParams(window.location.search).get(
-          "success",
-        );
-        const messages: Record<string, string> = {
-          created: "Borrador creado. Ya puedes añadir una foto.",
-          updated: "Cambios guardados correctamente.",
-          published: "Curso publicado.",
-          withdrawn: "Curso retirado y devuelto a borrador.",
-          archived: "Curso archivado.",
-          featured: "Curso seleccionado como destacado.",
-        };
-        const message = success ? messages[success] : undefined;
-        if (message) {
-          window.addEventListener(
-            "load",
-            () => sileo.success({ title: message, duration: 6000 }),
-            { once: true },
+        document.addEventListener("astro:page-load", () => {
+          const success = new URLSearchParams(window.location.search).get(
+            "success",
           );
-        }
-        document
-          .querySelectorAll<HTMLFormElement>(".mutation-form")
-          .forEach((form) => {
-            form.addEventListener("submit", () => {
-              const button = form.querySelector<HTMLButtonElement>("button");
-              if (!button) return;
+          const messages: Record<string, string> = {
+            created: "Borrador creado. Ya puedes añadir una foto.",
+            updated: "Cambios guardados correctamente.",
+            published: "Curso publicado.",
+            withdrawn: "Curso retirado y devuelto a borrador.",
+            archived: "Curso archivado.",
+            featured: "Curso seleccionado como destacado.",
+          };
+          const message = success ? messages[success] : undefined;
+          if (message) {
+            sileo.success({ title: message, duration: 6000 });
+            const url = new URL(window.location.href);
+            url.searchParams.delete("success");
+            window.history.replaceState(
+              window.history.state,
+              "",
+              `${url.pathname}${url.search}${url.hash}`,
+            );
+          }
+          const dialog = document.querySelector<HTMLDialogElement>(
+            "[data-course-dialog]",
+          );
+          const actions = document.querySelector<HTMLElement>(
+            "[data-confirm-actions]",
+          );
+          const dialogForm = dialog?.querySelector<HTMLFormElement>(
+            "[data-course-dialog-form]",
+          );
+          const error =
+            document.querySelector<HTMLElement>("[data-save-error]");
+          let trigger: HTMLButtonElement | null = null;
+          if (dialog && actions && dialogForm) {
+            document
+              .querySelectorAll<HTMLElement>("[data-confirm-fallback]")
+              .forEach((element) => (element.hidden = true));
+            actions.hidden = false;
+            const descriptions: Record<string, string> = {
+              publish: "El curso y sus precios serán visibles para todos.",
+              withdraw: "El curso dejará de ser público y volverá a borrador.",
+              archive: "No podrás editar ni reactivar este curso.",
+            };
+            const labels: Record<string, string> = {
+              publish: "Confirmar publicación",
+              withdraw: "Confirmar retiro",
+              archive: "Confirmar archivo",
+            };
+            actions
+              .querySelectorAll<HTMLButtonElement>("[data-confirm-trigger]")
+              .forEach((button) =>
+                button.addEventListener("click", () => {
+                  trigger = button;
+                  const intent = button.dataset.confirmTrigger ?? "";
+                  dialogForm.querySelector<HTMLInputElement>(
+                    'input[name="intent"]',
+                  )!.value = intent;
+                  dialog.querySelector<HTMLElement>(
+                    "#course-dialog-title",
+                  )!.textContent = button.textContent;
+                  dialog.querySelector<HTMLElement>(
+                    "#course-dialog-description",
+                  )!.textContent = descriptions[intent] ?? "";
+                  dialogForm.querySelector<HTMLButtonElement>(
+                    'button[type="submit"]',
+                  )!.textContent = labels[intent] ?? "";
+                  dialog.showModal();
+                }),
+              );
+            dialog
+              .querySelector<HTMLButtonElement>("[data-dialog-cancel]")
+              ?.addEventListener("click", () => dialog.close());
+            dialog.addEventListener("close", () => trigger?.focus());
+            dialogForm.addEventListener("submit", (event) => {
+              event.preventDefault();
+              const button = dialogForm.querySelector<HTMLButtonElement>(
+                'button[type="submit"]',
+              )!;
+              if (button.disabled) return;
               button.disabled = true;
               button.setAttribute("aria-busy", "true");
+              if (error) error.hidden = true;
+              const intent = dialogForm.querySelector<HTMLInputElement>(
+                'input[name="intent"]',
+              )!.value;
+              void (async () => {
+                try {
+                  const response = await fetch(window.location.pathname, {
+                    method: "POST",
+                    headers: { Accept: "application/json" },
+                    body: new FormData(dialogForm),
+                  });
+                  if (
+                    response.redirected ||
+                    !response.headers
+                      .get("content-type")
+                      ?.includes("application/json")
+                  )
+                    throw new Error(
+                      "La sesión cambió. Recarga la página e inténtalo de nuevo.",
+                    );
+                  const result: unknown = await response.json();
+                  if (
+                    !response.ok ||
+                    !result ||
+                    typeof result !== "object" ||
+                    !("revision" in result) ||
+                    typeof result.revision !== "string"
+                  )
+                    throw new Error(
+                      result &&
+                        typeof result === "object" &&
+                        "message" in result &&
+                        typeof result.message === "string"
+                        ? result.message
+                        : "No se pudo completar la acción.",
+                    );
+                  dialog.close();
+                  await navigate(
+                    `${window.location.pathname}?success=${intent === "publish" ? "published" : intent === "withdraw" ? "withdrawn" : "archived"}`,
+                  );
+                } catch (failure) {
+                  dialog.close();
+                  if (error) {
+                    error.textContent =
+                      failure instanceof Error
+                        ? failure.message
+                        : "No se pudo completar la acción.";
+                    error.hidden = false;
+                    error.setAttribute("tabindex", "-1");
+                    error.focus();
+                  }
+                } finally {
+                  button.disabled = false;
+                  button.removeAttribute("aria-busy");
+                }
+              })();
             });
-          });
+          }
+          document
+            .querySelectorAll<HTMLFormElement>(
+              ".mutation-form:not([data-astro-reload])",
+            )
+            .forEach((form) =>
+              form.addEventListener("submit", (event) => {
+                event.preventDefault();
+                const button = form.querySelector<HTMLButtonElement>(
+                  'button[type="submit"]',
+                );
+                if (!button || button.disabled) return;
+                button.disabled = true;
+                void (async () => {
+                  try {
+                    const response = await fetch(window.location.pathname, {
+                      method: "POST",
+                      headers: { Accept: "application/json" },
+                      body: new FormData(form),
+                    });
+                    if (
+                      response.redirected ||
+                      !response.headers
+                        .get("content-type")
+                        ?.includes("application/json")
+                    )
+                      throw new Error(
+                        "La sesión cambió. Recarga la página e inténtalo de nuevo.",
+                      );
+                    const result: unknown = await response.json();
+                    if (
+                      !response.ok ||
+                      !result ||
+                      typeof result !== "object" ||
+                      !("revision" in result)
+                    )
+                      throw new Error(
+                        result &&
+                          typeof result === "object" &&
+                          "message" in result &&
+                          typeof result.message === "string"
+                          ? result.message
+                          : "No se pudo completar la acción.",
+                      );
+                    await navigate(
+                      `${window.location.pathname}?success=featured`,
+                    );
+                  } catch (failure) {
+                    if (error) {
+                      error.textContent =
+                        failure instanceof Error
+                          ? failure.message
+                          : "No se pudo completar la acción.";
+                      error.hidden = false;
+                    }
+                  } finally {
+                    button.disabled = false;
+                  }
+                })();
+              }),
+            );
+        });
       </script>
     </>
   )}

@@ -20,7 +20,7 @@ const isInstructor = hasRole(user, "INSTRUCTOR");
 const currentPath = Astro.url.pathname;
 ---
 
-<BaseLayout title={`${title} | SkillBase`}>
+<BaseLayout title={`${title} | SkillBase`} clientRouter>
   <div class="private-shell" data-private-shell>
     <aside class="private-sidebar" aria-label="Barra lateral">
       <div class="private-sidebar-panel">
@@ -157,138 +157,147 @@ const currentPath = Astro.url.pathname;
     </div>
   </div>
   <script>
-    const shell = document.querySelector<HTMLElement>("[data-private-shell]");
-    if (shell) {
-      const toggle = shell.querySelector<HTMLButtonElement>(
-        "[data-sidebar-toggle]",
-      );
-      const sidebar = shell.querySelector<HTMLElement>(".private-sidebar");
-      const openButton =
-        shell.querySelector<HTMLButtonElement>("[data-menu-open]");
-      const drawer = shell.querySelector<HTMLElement>("[data-mobile-drawer]");
-      const closeButton = drawer?.querySelector<HTMLButtonElement>(
-        ".private-mobile-panel [data-menu-close]",
-      );
-      const mobilePanel = drawer?.querySelector<HTMLElement>(
-        ".private-mobile-panel",
-      );
-      let keyboardFocus = false;
-      let returnFocus: HTMLElement | null = null;
+    document.addEventListener("astro:page-load", () => {
+      const shell = document.querySelector<HTMLElement>("[data-private-shell]");
+      if (shell) {
+        const toggle = shell.querySelector<HTMLButtonElement>(
+          "[data-sidebar-toggle]",
+        );
+        const sidebar = shell.querySelector<HTMLElement>(".private-sidebar");
+        const openButton =
+          shell.querySelector<HTMLButtonElement>("[data-menu-open]");
+        const drawer = shell.querySelector<HTMLElement>("[data-mobile-drawer]");
+        const closeButton = drawer?.querySelector<HTMLButtonElement>(
+          ".private-mobile-panel [data-menu-close]",
+        );
+        const mobilePanel = drawer?.querySelector<HTMLElement>(
+          ".private-mobile-panel",
+        );
+        let keyboardFocus = false;
+        let returnFocus: HTMLElement | null = null;
 
-      const closePreview = () => {
-        delete shell.dataset.preview;
-      };
-      const setCollapsed = (collapsed: boolean) => {
-        shell.dataset.collapsed = String(collapsed);
-        closePreview();
-        toggle?.setAttribute("aria-expanded", String(!collapsed));
-        toggle?.setAttribute(
-          "aria-label",
-          collapsed ? "Expandir barra lateral" : "Contraer barra lateral",
-        );
-        toggle?.setAttribute(
-          "title",
-          collapsed ? "Expandir barra lateral" : "Contraer barra lateral",
-        );
-        try {
-          localStorage.setItem("private-sidebar-collapsed", String(collapsed));
-        } catch {
-          /* Storage may be unavailable. */
-        }
-      };
-      try {
-        if (localStorage.getItem("private-sidebar-collapsed") === "true")
-          setCollapsed(true);
-      } catch {
-        /* Keep the default expanded state. */
-      }
-      toggle?.addEventListener("click", () =>
-        setCollapsed(shell.dataset.collapsed !== "true"),
-      );
-      sidebar?.addEventListener("pointerenter", (event) => {
-        if (event.pointerType === "mouse" && shell.dataset.collapsed === "true")
-          shell.dataset.preview = "true";
-      });
-      sidebar?.addEventListener("pointerleave", () => {
-        if (!keyboardFocus) closePreview();
-      });
-      sidebar?.addEventListener("focusin", () => {
-        if (keyboardFocus && shell.dataset.collapsed === "true")
-          shell.dataset.preview = "true";
-      });
-      sidebar?.addEventListener("focusout", (event) => {
-        if (!sidebar.contains(event.relatedTarget as Node | null)) {
-          keyboardFocus = false;
+        const closePreview = () => {
+          delete shell.dataset.preview;
+        };
+        const setCollapsed = (collapsed: boolean) => {
+          shell.dataset.collapsed = String(collapsed);
           closePreview();
-        }
-      });
-      document.addEventListener("keydown", (event) => {
-        if (event.key === "Tab") keyboardFocus = true;
-        if (event.key === "Escape") {
-          if (drawer && !drawer.hidden) closeDrawer();
-          else if (shell.dataset.preview === "true") {
-            closePreview();
-            keyboardFocus = false;
-            toggle?.focus();
+          toggle?.setAttribute("aria-expanded", String(!collapsed));
+          toggle?.setAttribute(
+            "aria-label",
+            collapsed ? "Expandir barra lateral" : "Contraer barra lateral",
+          );
+          toggle?.setAttribute(
+            "title",
+            collapsed ? "Expandir barra lateral" : "Contraer barra lateral",
+          );
+          try {
+            localStorage.setItem(
+              "private-sidebar-collapsed",
+              String(collapsed),
+            );
+          } catch {
+            /* Storage may be unavailable. */
           }
+        };
+        try {
+          if (localStorage.getItem("private-sidebar-collapsed") === "true")
+            setCollapsed(true);
+        } catch {
+          /* Keep the default expanded state. */
         }
-      });
-      sidebar?.addEventListener("pointerdown", () => {
-        keyboardFocus = false;
-      });
+        toggle?.addEventListener("click", () =>
+          setCollapsed(shell.dataset.collapsed !== "true"),
+        );
+        sidebar?.addEventListener("pointerenter", (event) => {
+          if (
+            event.pointerType === "mouse" &&
+            shell.dataset.collapsed === "true"
+          )
+            shell.dataset.preview = "true";
+        });
+        sidebar?.addEventListener("pointerleave", () => {
+          if (!keyboardFocus) closePreview();
+        });
+        sidebar?.addEventListener("focusin", () => {
+          if (keyboardFocus && shell.dataset.collapsed === "true")
+            shell.dataset.preview = "true";
+        });
+        sidebar?.addEventListener("focusout", (event) => {
+          if (!sidebar.contains(event.relatedTarget as Node | null)) {
+            keyboardFocus = false;
+            closePreview();
+          }
+        });
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Tab") keyboardFocus = true;
+          if (event.key === "Escape") {
+            if (drawer && !drawer.hidden) closeDrawer();
+            else if (shell.dataset.preview === "true") {
+              closePreview();
+              keyboardFocus = false;
+              toggle?.focus();
+            }
+          }
+        });
+        sidebar?.addEventListener("pointerdown", () => {
+          keyboardFocus = false;
+        });
 
-      const closeDrawer = (restoreFocus = true) => {
-        if (!drawer || drawer.hidden || drawer.dataset.state !== "open") return;
-        drawer.dataset.state = "closed";
-        drawer.inert = true;
-        openButton?.setAttribute("aria-expanded", "false");
-        document.body.classList.remove("private-drawer-open");
-        if (restoreFocus) returnFocus?.focus();
-        const animations = mobilePanel?.getAnimations() ?? [];
-        void Promise.allSettled(
-          animations.map((animation) => animation.finished),
-        ).then(() => {
-          if (drawer.dataset.state === "closed") drawer.hidden = true;
+        const closeDrawer = (restoreFocus = true) => {
+          if (!drawer || drawer.hidden || drawer.dataset.state !== "open")
+            return;
+          drawer.dataset.state = "closed";
+          drawer.inert = true;
+          openButton?.setAttribute("aria-expanded", "false");
+          document.body.classList.remove("private-drawer-open");
+          if (restoreFocus) returnFocus?.focus();
+          const animations = mobilePanel?.getAnimations() ?? [];
+          void Promise.allSettled(
+            animations.map((animation) => animation.finished),
+          ).then(() => {
+            if (drawer.dataset.state === "closed") drawer.hidden = true;
+          });
+        };
+        openButton?.addEventListener("click", () => {
+          if (!drawer) return;
+          returnFocus = openButton;
+          drawer.hidden = false;
+          drawer.inert = false;
+          mobilePanel?.getBoundingClientRect();
+          drawer.dataset.state = "open";
+          openButton.setAttribute("aria-expanded", "true");
+          document.body.classList.add("private-drawer-open");
+          closeButton?.focus();
         });
-      };
-      openButton?.addEventListener("click", () => {
-        if (!drawer) return;
-        returnFocus = openButton;
-        drawer.hidden = false;
-        drawer.inert = false;
-        mobilePanel?.getBoundingClientRect();
-        drawer.dataset.state = "open";
-        openButton.setAttribute("aria-expanded", "true");
-        document.body.classList.add("private-drawer-open");
-        closeButton?.focus();
-      });
-      drawer
-        ?.querySelectorAll<HTMLElement>("[data-menu-close]")
-        .forEach((button) =>
-          button.addEventListener("click", () => closeDrawer()),
-        );
-      window
-        .matchMedia("(min-width: 1024px)")
-        .addEventListener("change", (event) => {
-          if (event.matches) closeDrawer(false);
+        drawer
+          ?.querySelectorAll<HTMLElement>("[data-menu-close]")
+          .forEach((button) =>
+            button.addEventListener("click", () => closeDrawer()),
+          );
+        window
+          .matchMedia("(min-width: 1024px)")
+          .addEventListener("change", (event) => {
+            if (event.matches) closeDrawer(false);
+          });
+        drawer?.addEventListener("keydown", (event) => {
+          if (event.key !== "Tab") return;
+          const focusable = Array.from(
+            drawer.querySelectorAll<HTMLElement>(
+              "a, button:not([disabled]), summary",
+            ),
+          );
+          const first = focusable[0];
+          const last = focusable.at(-1);
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+          }
         });
-      drawer?.addEventListener("keydown", (event) => {
-        if (event.key !== "Tab") return;
-        const focusable = Array.from(
-          drawer.querySelectorAll<HTMLElement>(
-            "a, button:not([disabled]), summary",
-          ),
-        );
-        const first = focusable[0];
-        const last = focusable.at(-1);
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last?.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first?.focus();
-        }
-      });
-    }
+      }
+    });
   </script>
 </BaseLayout>
