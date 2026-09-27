@@ -3,7 +3,11 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { CourseRepository } from "@/application/courses/course-repository";
 import { CourseDomainError } from "@/domain/courses/errors";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
-import { planWeekdaySchedule } from "@/domain/courses/weekday-schedule";
+import {
+  GROUP_SCHEDULE,
+  planCourseDates,
+  planWeekdaySchedule,
+} from "@/domain/courses/weekday-schedule";
 import {
   assertTransition,
   normalizeSlug,
@@ -183,6 +187,24 @@ function assertSchedule(input: CourseData, revision: Revision): void {
       "El formato no tiene duración de sesión resuelta.",
       { courseTypeId: "Configura la duración de sesión del formato." },
     );
+  if (input.schedule === GROUP_SCHEDULE) {
+    const planned = planCourseDates({
+      startDate: instantToBoliviaCivil(input.startsAt).slice(0, 10),
+      weekdaysMask: input.weekdaysMask,
+      totalHours: revision.totalHours,
+      sessionMinutes: revision.sessionMinutes,
+    });
+    if (
+      input.startsAt.getTime() !== planned.startsAt.getTime() ||
+      input.endsAt.getTime() !== planned.endsAt.getTime()
+    )
+      throw new CourseDomainError(
+        "VALIDATION_FAILED",
+        "Las fechas no coinciden con el plan del curso.",
+        { endsAt: "Usa las fechas calculadas." },
+      );
+    return;
+  }
   const planned = planWeekdaySchedule({
     startsAt: instantToBoliviaCivil(input.startsAt),
     weekdaysMask: input.weekdaysMask,

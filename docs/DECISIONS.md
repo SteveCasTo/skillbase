@@ -475,3 +475,33 @@ La relación compuesta grupo → (curso, revisión) impide vincular una revisió
 - La capacidad cuenta como límite configurado, no como matrícula confirmada; los grupos cancelados conservan registro pero dejan de competir por horarios.
 - La elección y cambio de grupo por participantes, conteo real de ocupación, cancelaciones con inscripciones/pagos y sesiones de feriados requieren módulos posteriores de preinscripción, inscripción y operación.
 - El detalle público mantiene el horario editorial existente hasta que la selección de grupo y la disponibilidad real se implementen en el contrato público.
+
+---
+
+## ADR-020 — FECHAS COMUNES Y HORAS POR GRUPO
+
+**Fecha:** 2026-09-27
+
+**Estado:** Accepted
+
+### Contexto
+
+El curso tenía una hora de inicio y fin editorial calculada que se confundía con el horario real de sus grupos. Se necesita preparar varios grupos antes de publicar, sin cambiar los calendarios ya asignados ni los cursos históricos. El token de edición del curso perdía microsegundos al pasar de PostgreSQL a `Date`/ISO, causando falsos conflictos.
+
+### Decisión
+
+- Un curso nuevo planificado comparte fechas civiles de inicio y fin de Bolivia (almacenadas como 00:00 y 23:59), días L–V y duración de sesión. Cada grupo tiene su hora inicial, hora final derivada y cupo propio; `schedule` sigue siendo texto de compatibilidad sin atribuir una hora al curso.
+- El borrador puede tener cero o varios grupos. En el alta se guarda primero el curso y después se crean los grupos configurados; el reintento no vuelve a crear el borrador ni los grupos confirmados. La pestaña «Grupos» permite gestionar grupos en borrador o publicado, no en archivado. El primer grupo fija las fechas y revisión de formato también en borrador.
+- Los cursos históricos con grupos o con cierre de preinscripción a partir de la medianoche del primer día conservan sus instantes horarios; los demás cursos antiguos sin grupos y con horario estructurado generado se normalizan a fechas comunes. Se conserva el bloqueo del calendario con grupos y la validez de ventanas de preinscripción. Los demás cursos conservan su horario informativo.
+- `courses.updated_at` usa `timestamptz(3)` para que la comparación SQL de revisión coincida exactamente con el token de milisegundos enviado desde el navegador; no se elimina la comprobación optimista.
+
+### Alternativas
+
+- Mantener una hora global en el curso y obligar a los grupos a compartirla.
+- Exigir al menos un grupo antes de guardar un borrador.
+- Ignorar la revisión SQL al guardar, con riesgo de sobrescribir ediciones simultáneas.
+
+### Consecuencias
+
+- Las reglas horarias de ADR-018 y las restricciones de publicación para crear o cambiar grupos de ADR-019 quedan sustituidas por esta decisión; el cálculo de sesiones, la compatibilidad histórica, la auditoría y el control de solapamiento permanecen vigentes.
+- El alta con grupos e imagen realiza varias escrituras autorizadas: si alguna falla, conserva el borrador y ofrece reintentar las operaciones pendientes o abrirlo. No se anuncia atomicidad entre Storage y PostgreSQL.
