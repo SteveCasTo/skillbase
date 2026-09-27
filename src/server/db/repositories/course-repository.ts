@@ -302,6 +302,17 @@ export class DrizzleCourseRepository implements CourseRepository {
             "El curso cambió desde que abriste esta página.",
           );
         const existing = revisionFor(previous, await revisions(tx, [previous]));
+        const [group] = await tx
+          .select({ id: schema.groups.id })
+          .from(schema.groups)
+          .where(eq(schema.groups.courseId, id))
+          .limit(1);
+        if (group && existing.courseTypeId !== input.courseTypeId)
+          throw new CourseDomainError(
+            "VALIDATION_FAILED",
+            "Un curso con grupos no puede cambiar de formato.",
+            { courseTypeId: "Los grupos conservan el formato del curso." },
+          );
         // Published content is editable, but its commercial terms remain pinned until withdrawn.
         if (
           previous.status === "PUBLISHED" &&
@@ -312,7 +323,7 @@ export class DrizzleCourseRepository implements CourseRepository {
             "Retira el curso antes de cambiar su formato.",
           );
         const revision =
-          previous.status === "PUBLISHED"
+          previous.status === "PUBLISHED" || group
             ? existing
             : await currentRevision(tx, input.courseTypeId);
         if (input.weekdaysMask === null && previous.weekdaysMask !== null)
@@ -323,6 +334,23 @@ export class DrizzleCourseRepository implements CourseRepository {
           );
         assertSchedule(input, revision);
         const fields = changed(previous, input, revision.id);
+        if (
+          group &&
+          fields.some((field) =>
+            [
+              "startsAt",
+              "endsAt",
+              "weekdaysMask",
+              "schedule",
+              "courseTypeRevisionId",
+            ].includes(field),
+          )
+        )
+          throw new CourseDomainError(
+            "VALIDATION_FAILED",
+            "Un curso con grupos no puede cambiar sus fechas ni su horario.",
+            { startsAt: "El calendario ya está asignado a grupos." },
+          );
         if (!fields.length) return admin(previous, revision);
         const [row] = await tx
           .update(schema.courses)
@@ -376,11 +404,33 @@ export class DrizzleCourseRepository implements CourseRepository {
         assertTransition(previous.status, next);
         const existing = revisionFor(previous, await revisions(tx, [previous]));
         // Withdrawal is allowed even when the format was deactivated; publishing is not.
+        const [group] = await tx
+          .select({ id: schema.groups.id })
+          .from(schema.groups)
+          .where(eq(schema.groups.courseId, id))
+          .limit(1);
+        if (next === "PUBLISHED" && group) {
+          const [type] = await tx
+            .select({ active: schema.courseTypes.active })
+            .from(schema.courseTypes)
+            .where(eq(schema.courseTypes.id, existing.courseTypeId))
+            .for("update");
+          if (!type?.active)
+            throw new CourseDomainError(
+              "FORMAT_INACTIVE",
+              "El formato está desactivado.",
+              { courseTypeId: "Activa el formato antes de publicar." },
+            );
+        }
         const revision =
           next === "DRAFT"
-            ? await currentRevision(tx, existing.courseTypeId, false)
+            ? group
+              ? existing
+              : await currentRevision(tx, existing.courseTypeId, false)
             : next === "PUBLISHED"
-              ? await currentRevision(tx, existing.courseTypeId)
+              ? group
+                ? existing
+                : await currentRevision(tx, existing.courseTypeId)
               : existing;
         const [row] = await tx
           .update(schema.courses)
