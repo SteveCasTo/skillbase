@@ -71,6 +71,7 @@ const valuesFromCourse = (item: AdminCourseDto): CourseInput => ({
   instructorName: item.instructorName ?? "",
   artwork: item.artwork ?? "",
   schedule: item.schedule,
+  ...(item.weekdaysMask === 31 ? { weekdays: "1,2,3,4,5" } : {}),
   conditions: item.conditions,
   startsAt: dateInput(item.startsAt),
   endsAt: dateInput(item.endsAt),
@@ -258,6 +259,14 @@ const statusLabel = {
           revision={course.updatedAt.toISOString()}
           courseId={course.id}
           {baseline}
+          pinnedFormat={
+            course.status === "PUBLISHED"
+              ? {
+                  totalHours: course.totalHours,
+                  sessionMinutes: course.sessionMinutes,
+                }
+              : undefined
+          }
         />
       </div>
       {course.status !== "ARCHIVED" && (

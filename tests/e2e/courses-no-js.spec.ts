@@ -16,6 +16,7 @@ test("new courses preserve values and can be corrected after server validation w
   const format = page.getByRole("form", { name: "Crear formato" });
   await format.getByLabel("Nombre").fill(formatName);
   await format.getByLabel("Duración total (horas)").fill("24");
+  await format.getByLabel("Duración de sesión (minutos)").fill("90");
   await format.getByLabel("Precio estudiante (BOB)").fill("80");
   await format.getByLabel("Precio externo (BOB)").fill("100");
   await format.getByRole("button", { name: "Crear formato" }).click();
@@ -42,14 +43,16 @@ test("new courses preserve values and can be corrected after server validation w
   await course
     .getByLabel("Formato de curso")
     .selectOption({ label: formatName });
-  await course.getByLabel("Horario informativo").fill("Lunes 18:30–20:30");
+  await course
+    .getByLabel(/Horario calculado/)
+    .fill("Lunes a viernes, 18:30–20:00");
   await course.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
   await course
     .getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)", { exact: true })
     .fill("2027-03-01T18:30");
   await course
     .getByLabel("Finalización del curso (AAAA-MM-DDTHH:mm)", { exact: true })
-    .fill("2027-04-01T20:30");
+    .fill("2027-03-22T20:00");
   expect(
     await course.evaluate((form: HTMLFormElement, names: string[]) => {
       const data = new FormData(form);
@@ -83,8 +86,8 @@ test("new courses preserve values and can be corrected after server validation w
   await expect(course.getByLabel("Formato de curso")).toHaveValue(
     selectedFormat,
   );
-  await expect(course.getByLabel("Horario informativo")).toHaveValue(
-    "Lunes 18:30–20:30",
+  await expect(course.getByLabel(/Horario calculado/)).toHaveValue(
+    "Lunes a viernes, 18:30–20:00",
   );
   await expect(
     course.getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)", { exact: true }),
@@ -93,7 +96,7 @@ test("new courses preserve values and can be corrected after server validation w
     course.getByLabel("Finalización del curso (AAAA-MM-DDTHH:mm)", {
       exact: true,
     }),
-  ).toHaveValue("2027-04-01T20:30");
+  ).toHaveValue("2027-03-22T20:00");
   await expect(course.getByLabel("Nota mínima (0–100)")).toHaveValue("101");
 
   await course.getByLabel("Nota mínima (0–100)").fill("70");
@@ -115,6 +118,7 @@ test("unused formats can be created, edited and deleted without JavaScript", asy
   const create = page.getByRole("form", { name: "Crear formato" });
   await create.getByLabel("Nombre").fill(name);
   await create.getByLabel("Duración total (horas)").fill("24");
+  await create.getByLabel("Duración de sesión (minutos)").fill("90");
   await create.getByLabel("Precio estudiante (BOB)").fill("invalid");
   await create.getByLabel("Precio externo (BOB)").fill("100");
   await create.getByRole("button", { name: "Crear formato" }).click();
@@ -198,6 +202,7 @@ test("used formats require confirmation to deactivate without JavaScript", async
   const name = `Formato usado sin JS ${Date.now()}`;
   await page.getByLabel("Nombre").fill(name);
   await page.getByLabel("Duración total (horas)").fill("20");
+  await page.getByLabel("Duración de sesión (minutos)").fill("90");
   await page.getByLabel("Precio estudiante (BOB)").fill("80");
   await page.getByLabel("Precio externo (BOB)").fill("100");
   await page.getByRole("button", { name: "Crear formato" }).click();
@@ -210,10 +215,11 @@ test("used formats require confirmation to deactivate without JavaScript", async
       description: "Curso asociado para comprobar la confirmación.",
       level: "INTERMEDIATE",
       courseTypeId: path.split("/").at(-1)!,
-      schedule: "Lunes a viernes 16:00–17:30",
+      schedule: "Lunes a viernes, 16:00–17:30",
       conditions: "Sujeto a cupo.",
       startsAt: "2027-03-01T16:00",
-      endsAt: "2027-04-01T17:30",
+      endsAt: "2027-03-17T17:30",
+      weekdays: "1,2,3,4,5",
       minimumGrade: "70",
     },
   });
@@ -245,6 +251,7 @@ test("format mutations reject stale revisions, invalid origins and non-admin use
   const name = `Formato concurrencia ${Date.now()}`;
   await page.getByLabel("Nombre").fill(name);
   await page.getByLabel("Duración total (horas)").fill("20");
+  await page.getByLabel("Duración de sesión (minutos)").fill("90");
   await page.getByLabel("Precio estudiante (BOB)").fill("80");
   await page.getByLabel("Precio externo (BOB)").fill("100");
   await page.getByRole("button", { name: "Crear formato" }).click();

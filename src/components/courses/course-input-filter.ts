@@ -56,6 +56,7 @@ export const requiredCourseFields = [
 
 export function draftFieldsReady(
   values: Readonly<Record<string, string>>,
+  requireFuture = false,
 ): boolean {
   if (!requiredCourseFields.every((name) => values[name]?.trim())) return false;
   if (
@@ -78,5 +79,19 @@ export function draftFieldsReady(
   if (Boolean(registrationStart) !== Boolean(registrationEnd)) return false;
   if (registrationStart && !(civil(registrationStart) < civil(registrationEnd)))
     return false;
+  if (registrationEnd && !(civil(registrationEnd) < start)) return false;
+  if (values.weekdays !== undefined) {
+    if (values.weekdays !== "1,2,3,4,5") return false;
+    try {
+      if (
+        requireFuture &&
+        boliviaCivilToInstant(values.startsAt ?? "").getTime() < Date.now()
+      )
+        return false;
+      // The server checks the format duration and the complete plan against the revision.
+    } catch {
+      return false;
+    }
+  }
   return true;
 }
