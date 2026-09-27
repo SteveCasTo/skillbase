@@ -36,6 +36,25 @@ test("group derives fixed weekday session count and last date from its local hou
   ).toBe(true);
 });
 
+test("group hours use shared course civil dates even when course has canonical date bounds", () => {
+  const canonical = {
+    ...course,
+    startsAt: date("2027-03-01T00:00"),
+    endsAt: date("2027-03-17T23:59"),
+  };
+  expect(groupPlan(canonical, revision, "14:30")).toMatchObject({
+    startsAt: date("2027-03-01T14:30"),
+    endsAt: date("2027-03-17T16:00"),
+  });
+  expect(() =>
+    groupPlan(
+      { ...canonical, endsAt: date("2027-03-18T23:59") },
+      revision,
+      "14:30",
+    ),
+  ).toThrow("fecha final");
+});
+
 test("invalid times, capacities and unresolved history cannot be planned", () => {
   for (const value of [0, -1, 1.5, NaN, Infinity, 2_147_483_648])
     expect(() => assertCapacity(value)).toThrow();

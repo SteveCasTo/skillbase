@@ -1,17 +1,29 @@
 /** Browser orchestration only. Each write remains authorized and validated on the server. */
 import { navigate } from "astro:transitions/client";
 
-export function openCreatedCourse(id: string, success: "created" | "updated") {
+export function openCreatedCourse(
+  id: string,
+  success: "created" | "updated",
+  groups = false,
+) {
   if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id))
     throw new Error(
       "No se pudo abrir el borrador. Abre Cursos para continuar.",
     );
-  return navigate(`/app/cursos/${id}/editar?success=${success}`);
+  return navigate(
+    `/app/cursos/${id}/${groups ? "grupos" : "editar"}?success=${groups ? "created" : success}`,
+  );
+}
+
+export interface InitialGroup {
+  readonly startTime: string;
+  readonly capacity: number;
 }
 
 export async function createCourseWithArtwork(
   fields: FormData,
-  image: File,
+  image: File | null,
+  groups: readonly InitialGroup[],
   onDraft: (url: string, retry: () => Promise<void>) => void,
 ): Promise<void> {
   const response = await fetch("/app/cursos/nuevo", {
@@ -27,48 +39,131 @@ export async function createCourseWithArtwork(
     );
 
   const destination = `/app/cursos/${result.id}/editar`;
-  let attached = false;
-  const attach = async () => {
-    if (attached) {
-      await openCreatedCourse(result.id, "updated");
-      return;
-    }
-    const upload = new FormData();
-    upload.set("courseId", result.id);
-    upload.set("image", image);
-    const uploaded = await fetch("/app/cursos/imagen", {
-      method: "POST",
-      body: upload,
-      credentials: "same-origin",
-    });
-    const body: unknown = await uploaded.json();
-    if (!uploaded.ok || !isArtwork(body))
-      throw new Error(isError(body) ? body.error : "No se pudo subir la foto.");
-    const update = new FormData();
-    for (const [key, value] of fields) update.set(key, value);
-    update.set("intent", "update");
-    update.set("revision", result.revision);
-    update.set("artwork", body.artwork);
-    const saved = await fetch(destination, {
-      method: "POST",
-      body: update,
-      credentials: "same-origin",
+  let attached = !image;
+  let nextGroup = 0;
+  let uploadedKey: string | null = null;
+  let uncertainGroup = false;
+  const groupPath = `/app/cursos/${result.id}/grupos`;
+  const groupAlreadyExists = async (group: InitialGroup): Promise<boolean> => {
+    const response = await fetch(groupPath, {
       headers: { Accept: "application/json" },
+      credentials: "same-origin",
     });
     if (
-      saved.redirected ||
-      !saved.headers.get("content-type")?.includes("application/json")
+      !response.ok ||
+      response.redirected ||
+      !response.headers.get("content-type")?.includes("application/json")
     )
-      throw new Error("La sesión cambió. Abre el borrador para continuar.");
-    const outcome: unknown = await saved.json();
-    if (!saved.ok || !isRevision(outcome))
       throw new Error(
-        isMessage(outcome)
-          ? outcome.message
-          : "No se pudo asociar la foto. Abre el borrador y vuelve a guardarla.",
+        "No se pudo verificar el grupo. Abre el borrador para continuar.",
       );
-    attached = true;
-    await openCreatedCourse(result.id, "updated");
+    const body: unknown = await response.json();
+    if (
+      !body ||
+      typeof body !== "object" ||
+      !("groups" in body) ||
+      !Array.isArray(body.groups)
+    )
+      throw new Error(
+        "No se pudo verificar el grupo. Abre el borrador para continuar.",
+      );
+    return body.groups.some(
+      (existing: unknown) =>
+        existing !== null &&
+        typeof existing === "object" &&
+        "startTime" in existing &&
+        existing.startTime === group.startTime &&
+        "capacity" in existing &&
+        existing.capacity === group.capacity &&
+        "status" in existing &&
+        existing.status === "PLANNED",
+    );
+  };
+  const attach = async () => {
+    if (!attached && image) {
+      if (!uploadedKey) {
+        const upload = new FormData();
+        upload.set("courseId", result.id);
+        upload.set("image", image);
+        const uploaded = await fetch("/app/cursos/imagen", {
+          method: "POST",
+          body: upload,
+          credentials: "same-origin",
+        });
+        const body: unknown = await uploaded.json();
+        if (!uploaded.ok || !isArtwork(body))
+          throw new Error(
+            isError(body) ? body.error : "No se pudo subir la foto.",
+          );
+        uploadedKey = body.artwork;
+      }
+      const update = new FormData();
+      for (const [key, value] of fields) update.set(key, value);
+      update.set("intent", "update");
+      update.set("revision", result.revision);
+      update.set("artwork", uploadedKey);
+      const saved = await fetch(destination, {
+        method: "POST",
+        body: update,
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      if (
+        saved.redirected ||
+        !saved.headers.get("content-type")?.includes("application/json")
+      )
+        throw new Error("La sesión cambió. Abre el borrador para continuar.");
+      const outcome: unknown = await saved.json();
+      if (!saved.ok || !isRevision(outcome))
+        throw new Error(
+          isMessage(outcome)
+            ? outcome.message
+            : "No se pudo asociar la foto. Abre el borrador y vuelve a guardarla.",
+        );
+      attached = true;
+    }
+    for (; nextGroup < groups.length; nextGroup++) {
+      const group = groups[nextGroup]!;
+      if (uncertainGroup) {
+        if (await groupAlreadyExists(group)) {
+          uncertainGroup = false;
+          continue;
+        }
+        uncertainGroup = false;
+      }
+      const data = new FormData();
+      data.set("intent", "create");
+      data.set("startTime", group.startTime);
+      data.set("capacity", String(group.capacity));
+      try {
+        const response = await fetch(groupPath, {
+          method: "POST",
+          body: data,
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        });
+        if (
+          response.redirected ||
+          !response.headers.get("content-type")?.includes("application/json")
+        )
+          throw new Error("La sesión cambió. Abre el borrador para continuar.");
+        const outcome: unknown = await response.json();
+        if (!response.ok)
+          throw new Error(
+            isMessage(outcome)
+              ? outcome.message
+              : `No se pudo crear el grupo ${nextGroup + 1}. Abre el borrador para continuar.`,
+          );
+      } catch (error) {
+        uncertainGroup = true;
+        throw error;
+      }
+    }
+    await openCreatedCourse(
+      result.id,
+      image ? "updated" : "created",
+      groups.length > 0,
+    );
   };
   onDraft(destination, attach);
   await attach();

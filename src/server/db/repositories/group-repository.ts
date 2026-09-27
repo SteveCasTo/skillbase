@@ -31,7 +31,7 @@ export class DrizzleGroupRepository implements GroupRepository {
   private async lockedCourse(
     tx: Transaction,
     id: string,
-    requirePublished = true,
+    requireAvailable = true,
   ) {
     const [course] = await tx
       .select()
@@ -40,12 +40,12 @@ export class DrizzleGroupRepository implements GroupRepository {
       .for("update");
     if (
       !course ||
-      (requirePublished && course.status !== "PUBLISHED") ||
+      (requireAvailable && course.status === "ARCHIVED") ||
       course.weekdaysMask !== 31
     )
       throw new GroupError(
         "COURSE_UNAVAILABLE",
-        "Solo cursos publicados y planificados admiten grupos.",
+        "Solo cursos no archivados y planificados admiten grupos.",
       );
     const [revision] = await tx
       .select()
@@ -152,7 +152,7 @@ export class DrizzleGroupRepository implements GroupRepository {
       const { course, revision } = await this.lockedCourse(
         tx,
         reference.courseId,
-        operation === "schedule",
+        operation !== "cancel",
       );
       const [previous] = await tx
         .select()

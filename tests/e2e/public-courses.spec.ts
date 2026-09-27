@@ -47,7 +47,6 @@ test("published course is public end-to-end and withdrawal removes every public 
       );
     await page.getByLabel("Condiciones").fill("Inscripción sujeta a cupo.");
     for (const [label, date, time] of [
-      ["Inicio de clases (Bolivia)", "01/03/2027", "18:30"],
       ["Apertura de preinscripción", "01/01/2027", "08:00"],
       ["Cierre de preinscripción", "20/02/2027", "18:00"],
     ] as const) {
@@ -59,6 +58,9 @@ test("published course is public end-to-end and withdrawal removes every public 
         })
         .fill(time);
     }
+    await page
+      .getByLabel("Fecha de inicio de clases (Bolivia)")
+      .fill("2027-03-01");
     await page.getByLabel("Nota mínima (0–100)").fill("70");
     await page.getByRole("button", { name: "Crear borrador" }).click();
     await expect(page).toHaveURL(/\/app\/cursos\/[^/]+\/editar$/);
@@ -68,7 +70,7 @@ test("published course is public end-to-end and withdrawal removes every public 
     courseId = new URL(page.url()).pathname.split("/").at(-2);
     expect(courseId).toMatch(/^[0-9a-f-]{36}$/i);
 
-    // Generate a valid 400×250 WebP in Chromium; the editor then crops and uploads it.
+    // Generate a valid 400×250 WebP in Chromium; saving the form uploads the crop.
     const webpBytes = await page.evaluate(async () => {
       const canvas = new OffscreenCanvas(400, 250);
       const drawing = canvas.getContext("2d");
@@ -94,20 +96,18 @@ test("published course is public end-to-end and withdrawal removes every public 
       mimeType: "image/webp",
       buffer: Buffer.from(webpBytes),
     });
-    await expect(
-      page.getByRole("img", { name: "Vista previa del encuadre del curso" }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Subir foto recortada" }).click();
-    await expect(
-      page.getByRole("status").filter({ hasText: "Foto cargada" }),
-    ).toContainText("Guardar cambios");
-    artworkKey = await page.locator('input[name="artwork"]').inputValue();
-    expect(artworkKey).toMatch(
-      new RegExp(`^courses/${courseId}/[0-9a-f-]+\\.webp$`, "i"),
-    );
+    await page
+      .getByRole("dialog", { name: "Recortar foto del curso" })
+      .getByRole("button", { name: "Guardar recorte" })
+      .click();
+    await expect(page.locator('input[name="artwork"]')).toHaveValue("");
     await page.getByRole("button", { name: "Guardar cambios" }).click();
     await expect(page.locator("[data-sileo-toast]")).toContainText(
       "Cambios guardados",
+    );
+    artworkKey = await page.locator('input[name="artwork"]').inputValue();
+    expect(artworkKey).toMatch(
+      new RegExp(`^courses/${courseId}/[0-9a-f-]+\\.webp$`, "i"),
     );
     await expect(
       page.getByRole("button", { name: "Guardar cambios" }),

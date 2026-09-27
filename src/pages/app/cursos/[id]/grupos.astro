@@ -62,9 +62,27 @@ try {
 }
 
 const canCreate =
-  course?.status === "PUBLISHED" &&
+  course !== null &&
+  course.status !== "ARCHIVED" &&
   course.weekdaysMask === 31 &&
   course.sessionMinutes !== null;
+if (wantsJson && Astro.request.method === "GET")
+  return new Response(
+    JSON.stringify({
+      groups: groups.map((group) => ({
+        startTime: instantToBoliviaCivil(group.startsAt).slice(11, 16),
+        capacity: group.capacity,
+        status: group.status,
+      })),
+    }),
+    {
+      status: loadError ? 503 : course ? 200 : 404,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "private, no-store",
+      },
+    },
+  );
 const successMessages = {
   created: "Grupo creado.",
   schedule: "Horario actualizado.",
@@ -93,7 +111,7 @@ if (course && Astro.request.method === "POST") {
       if (!canCreate && failedIntent !== "cancel")
         throw new GroupError(
           "COURSE_UNAVAILABLE",
-          "Solo cursos publicados y planificados admiten grupos.",
+          "Solo cursos no archivados y planificados admiten grupos.",
         );
       let result: Group;
       if (failedIntent === "create") {
@@ -268,7 +286,7 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
         hidden
         class="mt-5 rounded-lg border border-destructive/40 p-4 text-sm text-destructive"
       ></p>
-      {course.status !== "PUBLISHED" || !canCreate ? (
+      {!canCreate ? (
         <section
           class="mt-8 rounded-xl bg-card p-6"
           aria-labelledby="unavailable-title"
@@ -277,8 +295,8 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
             Gestión de grupos no disponible
           </h2>
           <p class="mt-2 text-sm text-muted-foreground">
-            {course.status !== "PUBLISHED"
-              ? "Publica el curso para crear grupos. Los grupos anteriores se conservan como historial."
+            {course.status === "ARCHIVED"
+              ? "Un curso archivado no admite nuevos grupos. Los grupos anteriores se conservan como historial."
               : "Este curso no tiene una planificación estructurada o una duración de sesión conocida."}
           </p>
         </section>
@@ -296,6 +314,11 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
             {course.instructorName && (
               <> Instructor del curso: {course.instructorName}.</>
             )}
+          </p>
+          <p class="mt-2 text-sm text-muted-foreground">
+            Cada grupo tiene su propio horario y cupo. Al crear el primero, las
+            fechas del curso y su formato quedan fijados, incluso si sigue en
+            borrador.
           </p>
           <form
             method="post"

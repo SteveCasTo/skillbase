@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Move } from "lucide-react";
+import { ImagePlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -50,8 +50,6 @@ interface Props {
   currentArtwork?: string | null;
   /** URL derived server-side from the canonical saved artwork key. */
   currentArtworkUrl?: string | null;
-  /** Called only when the upload succeeds; persist the returned key via the admin save use case. */
-  onUploaded?: (key: string) => void;
   onPrepared?: (file: File | null) => void;
 }
 
@@ -59,19 +57,21 @@ export default function CourseImageEditor({
   courseId,
   currentArtwork,
   currentArtworkUrl,
-  onUploaded,
   onPrepared,
 }: Props) {
+  void courseId;
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [focusX, setFocusX] = useState(50);
   const [focusY, setFocusY] = useState(50);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(currentArtwork ?? "");
-  const [savedPreview, setSavedPreview] = useState<string | null>(null);
-  const [uploaded, setUploaded] = useState(false);
+  const saved = currentArtwork ?? "";
   const [busy, setBusy] = useState(false);
-  const [prepared, setPrepared] = useState(false);
+  const [confirmed, setConfirmed] = useState<{
+    file: File | null;
+    url: string;
+  } | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -85,6 +85,8 @@ export default function CourseImageEditor({
     focusY: number;
   } | null>(null);
   const frame = useRef<HTMLDivElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const replaceFocus = useRef<HTMLElement | null>(null);
   const cover = image
     ? Math.max(WIDTH / image.naturalWidth, HEIGHT / image.naturalHeight)
     : 0;
@@ -98,17 +100,26 @@ export default function CourseImageEditor({
     ++cropVersion.current;
     setFocusX(nextX);
     setFocusY(nextY);
-    setPrepared(false);
     setPreview(null);
-    notifyPrepared(null);
   };
   const notifyPrepared = (file: File | null) => {
     onPrepared?.(file);
-    if (!courseId)
-      window.dispatchEvent(
-        new CustomEvent("course-artwork-prepared", { detail: file }),
-      );
+    window.dispatchEvent(
+      new CustomEvent("course-artwork-prepared", { detail: file }),
+    );
   };
+
+  useEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+    if (dialogOpen && !element.open) element.showModal();
+    if (!dialogOpen && element.open) element.close();
+  }, [dialogOpen]);
+
+  function finishDialog() {
+    setDialogOpen(false);
+    requestAnimationFrame(() => replaceFocus.current?.focus());
+  }
 
   useEffect(() => {
     if (!image) return;
@@ -177,10 +188,23 @@ export default function CourseImageEditor({
 
   useEffect(
     () => () => {
-      if (savedPreview) URL.revokeObjectURL(savedPreview);
+      if (confirmed) URL.revokeObjectURL(confirmed.url);
     },
-    [savedPreview],
+    [confirmed],
   );
+
+  useEffect(() => {
+    const savedHandler = () => {
+      setConfirmed((previous) =>
+        previous?.file
+          ? { file: null, url: URL.createObjectURL(previous.file) }
+          : previous,
+      );
+    };
+    window.addEventListener("course-artwork-saved", savedHandler);
+    return () =>
+      window.removeEventListener("course-artwork-saved", savedHandler);
+  }, []);
 
   async function choose(file?: File) {
     if (!file || busy) return;
@@ -209,12 +233,9 @@ export default function CourseImageEditor({
         return;
       }
       ++cropVersion.current;
-      if (!courseId)
-        window.dispatchEvent(
-          new CustomEvent("course-artwork-selection", { detail: true }),
-        );
-      notifyPrepared(null);
-      setPrepared(false);
+      window.dispatchEvent(
+        new CustomEvent("course-artwork-selection", { detail: true }),
+      );
       setPreview(null);
       if (selection.current) URL.revokeObjectURL(selection.current);
       selection.current = url;
@@ -222,6 +243,7 @@ export default function CourseImageEditor({
       setFocusX(50);
       setFocusY(50);
       setImage(photo);
+      setDialogOpen(true);
     };
     photo.onerror = () => {
       URL.revokeObjectURL(url);
@@ -235,71 +257,14 @@ export default function CourseImageEditor({
     ++cropVersion.current;
     ++selectionVersion.current;
     setImage(null);
-    setPrepared(false);
     setError(null);
     if (input.current) input.current.value = "";
     if (selection.current) URL.revokeObjectURL(selection.current);
     selection.current = null;
-    notifyPrepared(null);
+    notifyPrepared(confirmed?.file ?? null);
     window.dispatchEvent(
       new CustomEvent("course-artwork-selection", { detail: false }),
     );
-  }
-
-  async function save() {
-    if (!courseId || !preview || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const blob = await fetch(preview)
-        .then((response) => response.blob())
-        .then(simpleWebp);
-      const form = new FormData();
-      form.append("courseId", courseId);
-      form.append(
-        "image",
-        new File([blob], "foto.webp", { type: "image/webp" }),
-      );
-      const response = await fetch("/app/cursos/imagen", {
-        method: "POST",
-        body: form,
-        credentials: "same-origin",
-      });
-      const body: unknown = await response.json();
-      if (
-        !response.ok ||
-        !body ||
-        typeof body !== "object" ||
-        !("artwork" in body) ||
-        typeof body.artwork !== "string"
-      )
-        throw new Error(
-          body &&
-            typeof body === "object" &&
-            "error" in body &&
-            typeof body.error === "string"
-            ? body.error
-            : "No se pudo subir la foto.",
-        );
-      setSaved(body.artwork);
-      setSavedPreview(URL.createObjectURL(blob));
-      setUploaded(true);
-      onUploaded?.(body.artwork);
-      window.dispatchEvent(
-        new CustomEvent("course-artwork-uploaded", {
-          detail: { courseId, key: body.artwork },
-        }),
-      );
-      setImage(null);
-      if (selection.current) URL.revokeObjectURL(selection.current);
-      selection.current = null;
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "No se pudo subir la foto.",
-      );
-    } finally {
-      setBusy(false);
-    }
   }
 
   async function prepare() {
@@ -314,11 +279,17 @@ export default function CourseImageEditor({
       if (version !== cropVersion.current) return;
       if (blob.size > 4 * 1024 * 1024)
         throw new Error("La foto recortada no puede superar 4 MB.");
-      notifyPrepared(new File([blob], "foto.webp", { type: "image/webp" }));
-      setPrepared(true);
+      const file = new File([blob], "foto.webp", { type: "image/webp" });
+      setConfirmed({ file, url: URL.createObjectURL(blob) });
+      notifyPrepared(file);
+      setImage(null);
+      if (selection.current) URL.revokeObjectURL(selection.current);
+      selection.current = null;
+      window.dispatchEvent(
+        new CustomEvent("course-artwork-selection", { detail: false }),
+      );
+      finishDialog();
     } catch (caught) {
-      notifyPrepared(null);
-      setPrepared(false);
       setError(
         caught instanceof Error
           ? caught.message
@@ -356,106 +327,38 @@ export default function CourseImageEditor({
           void choose(event.dataTransfer.files[0]);
         }}
       >
-        {image ? (
-          <div
-            ref={frame}
-            data-crop-frame
-            tabIndex={0}
-            role="group"
-            aria-label="Encuadre de la foto: arrastra para mover; usa las flechas para ajustar"
-            className="focus-visible:ring-ring absolute inset-0 cursor-grab overflow-hidden outline-none select-none focus-visible:ring-4 focus-visible:ring-inset active:cursor-grabbing"
-            style={{ touchAction: "none" }}
-            onPointerDown={(event) => {
-              if (event.button !== 0 || busy) return;
-              drag.current = {
-                x: event.clientX,
-                y: event.clientY,
-                focusX,
-                focusY,
-              };
-              event.currentTarget.setPointerCapture(event.pointerId);
-            }}
-            onPointerMove={(event) => {
-              if (!drag.current || !frame.current) return;
-              const bounds = frame.current.getBoundingClientRect();
-              const overflowX = bounds.width * (imageWidth - 1);
-              const overflowY = bounds.height * (imageHeight - 1);
-              changeCrop(
-                drag.current.focusX -
-                  (overflowX
-                    ? ((event.clientX - drag.current.x) / overflowX) * 100
-                    : 0),
-                drag.current.focusY -
-                  (overflowY
-                    ? ((event.clientY - drag.current.y) / overflowY) * 100
-                    : 0),
-              );
-            }}
-            onPointerUp={() => {
-              drag.current = null;
-            }}
-            onPointerCancel={() => {
-              drag.current = null;
-            }}
-            onKeyDown={(event) => {
-              if (busy) return;
-              const step = event.shiftKey ? 10 : 2;
-              if (
-                !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(
-                  event.key,
-                )
-              )
-                return;
-              event.preventDefault();
-              changeCrop(
-                focusX +
-                  (event.key === "ArrowLeft"
-                    ? -step
-                    : event.key === "ArrowRight"
-                      ? step
-                      : 0),
-                focusY +
-                  (event.key === "ArrowUp"
-                    ? -step
-                    : event.key === "ArrowDown"
-                      ? step
-                      : 0),
-              );
-            }}
-          >
-            <img
-              src={image.src}
-              alt="Vista previa del encuadre del curso"
-              draggable={false}
-              className="pointer-events-none absolute max-w-none"
-              style={{
-                width: `${imageWidth * 100}%`,
-                height: `${imageHeight * 100}%`,
-                left: `${(1 - imageWidth) * focusX}%`,
-                top: `${(1 - imageHeight) * focusY}%`,
-              }}
-            />
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-2 rounded-lg border border-white/70 shadow-[0_0_0_1px_rgb(0_0_0_/_0.15)]"
-            />
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 left-1/2 flex size-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
-            >
-              <Move className="size-4" />
-            </span>
-          </div>
-        ) : saved && (savedPreview || currentArtworkUrl) ? (
+        {confirmed ? (
           <button
             type="button"
             aria-label="Elegir otra imagen del curso"
-            className="focus-visible:outline-ring size-full cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-3px]"
-            onClick={() => input.current?.click()}
-            disabled={busy}
+            className="size-full"
+            onClick={(event) => {
+              replaceFocus.current = event.currentTarget;
+              input.current?.click();
+            }}
           >
             <img
-              src={savedPreview ?? currentArtworkUrl ?? ""}
+              src={confirmed.url}
+              alt={
+                confirmed.file
+                  ? "Vista previa del recorte del curso"
+                  : "Foto actual del curso"
+              }
+              className="size-full object-cover"
+            />
+          </button>
+        ) : saved && currentArtworkUrl ? (
+          <button
+            type="button"
+            aria-label="Elegir otra imagen del curso"
+            className="size-full"
+            onClick={(event) => {
+              replaceFocus.current = event.currentTarget;
+              input.current?.click();
+            }}
+          >
+            <img
+              src={currentArtworkUrl}
               alt="Foto actual del curso"
               className="size-full object-cover"
             />
@@ -469,7 +372,10 @@ export default function CourseImageEditor({
             <Button
               type="button"
               variant="outline"
-              onClick={() => input.current?.click()}
+              onClick={(event) => {
+                replaceFocus.current = event.currentTarget;
+                input.current?.click();
+              }}
             >
               Seleccionar foto
             </Button>
@@ -478,79 +384,207 @@ export default function CourseImageEditor({
             </span>
           </div>
         )}
-        {(image || saved) && (
+        {(image || saved || confirmed) && (
           <Button
             type="button"
             variant="secondary"
             size="sm"
             disabled={busy}
             className="absolute right-3 bottom-3 shadow-sm sm:opacity-0 sm:transition-opacity sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
-            onClick={() => input.current?.click()}
+            onClick={(event) => {
+              replaceFocus.current = event.currentTarget;
+              input.current?.click();
+            }}
           >
             <ImagePlus data-icon="inline-start" /> Reemplazar imagen
           </Button>
         )}
       </div>
-      {image && (
-        <div className="mt-4 flex flex-col gap-3">
-          <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs">
-            <span>Arrastra para encuadrar</span>
-            <span>1200 × 750 px</span>
-          </div>
-          <label className="flex items-center gap-3 text-sm">
-            <span>Zoom</span>
-            <input
-              className="accent-primary min-w-0 flex-1"
-              type="range"
-              disabled={busy}
-              min="1"
-              max="2"
-              step="0.05"
-              value={zoom}
-              onChange={(event) => {
-                ++cropVersion.current;
-                setZoom(Number(event.target.value));
-                setPrepared(false);
-                setPreview(null);
-                notifyPrepared(null);
-              }}
-            />
-          </label>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              disabled={busy || !preview}
-              onClick={() => void (courseId ? save() : prepare())}
-            >
-              {busy
-                ? "Preparando foto…"
-                : courseId
-                  ? "Subir foto recortada"
-                  : "Usar este recorte"}
-            </Button>
-            {!courseId && (
-              <Button type="button" variant="ghost" onClick={removeSelection}>
-                Quitar foto
-              </Button>
-            )}
-          </div>
-          {!courseId && (
-            <p role="status" className="text-muted-foreground text-sm">
-              {prepared
-                ? "Foto lista para crear el borrador."
-                : "Confirma el recorte antes de crear el borrador."}
-            </p>
-          )}
-        </div>
-      )}
-      {error && (
+      <dialog
+        ref={dialog}
+        aria-labelledby="course-crop-title"
+        onCancel={(event) => {
+          event.preventDefault();
+          removeSelection();
+          finishDialog();
+        }}
+        onClose={() => setDialogOpen(false)}
+        className="bg-card text-card-foreground fixed inset-0 m-auto max-h-[90dvh] w-[min(92vw,42rem)] max-w-none overflow-y-auto rounded-2xl p-5 shadow-xl backdrop:bg-black/60"
+      >
+        <h2 id="course-crop-title" className="text-lg font-semibold">
+          Recortar foto del curso
+        </h2>
+        {image && (
+          <>
+            <div className="bg-muted relative mt-4 aspect-[8/5] overflow-hidden rounded-xl select-none">
+              <img
+                src={image.src}
+                alt=""
+                draggable={false}
+                className="pointer-events-none absolute max-w-none"
+                style={{
+                  width: `${imageWidth * 80}%`,
+                  height: `${imageHeight * 80}%`,
+                  left: `${10 + (1 - imageWidth) * focusX * 0.8}%`,
+                  top: `${10 + (1 - imageHeight) * focusY * 0.8}%`,
+                }}
+              />
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 h-[10%] bg-black/50 backdrop-blur-[2px]"
+              />
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-[10%] bg-black/50 backdrop-blur-[2px]"
+              />
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute top-[10%] bottom-[10%] left-0 w-[10%] bg-black/50 backdrop-blur-[2px]"
+              />
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute top-[10%] right-0 bottom-[10%] w-[10%] bg-black/50 backdrop-blur-[2px]"
+              />
+              <div
+                ref={frame}
+                data-crop-frame
+                tabIndex={0}
+                role="group"
+                aria-label="Encuadre de la foto: arrastra para mover; usa las flechas para ajustar"
+                className="focus-visible:ring-ring absolute inset-[10%] cursor-grab rounded-lg border border-white outline-none focus-visible:ring-4 focus-visible:ring-inset active:cursor-grabbing"
+                style={{ touchAction: "none" }}
+                onPointerDown={(event) => {
+                  if (event.button !== 0 || busy) return;
+                  drag.current = {
+                    x: event.clientX,
+                    y: event.clientY,
+                    focusX,
+                    focusY,
+                  };
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }}
+                onPointerMove={(event) => {
+                  if (!drag.current || !frame.current) return;
+                  const bounds = frame.current.getBoundingClientRect();
+                  const overflowX = bounds.width * (imageWidth - 1);
+                  const overflowY = bounds.height * (imageHeight - 1);
+                  changeCrop(
+                    drag.current.focusX -
+                      (overflowX
+                        ? ((event.clientX - drag.current.x) / overflowX) * 100
+                        : 0),
+                    drag.current.focusY -
+                      (overflowY
+                        ? ((event.clientY - drag.current.y) / overflowY) * 100
+                        : 0),
+                  );
+                }}
+                onPointerUp={() => {
+                  drag.current = null;
+                }}
+                onPointerCancel={() => {
+                  drag.current = null;
+                }}
+                onKeyDown={(event) => {
+                  if (busy) return;
+                  const step = event.shiftKey ? 10 : 2;
+                  if (
+                    ![
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                    ].includes(event.key)
+                  )
+                    return;
+                  event.preventDefault();
+                  changeCrop(
+                    focusX +
+                      (event.key === "ArrowLeft"
+                        ? -step
+                        : event.key === "ArrowRight"
+                          ? step
+                          : 0),
+                    focusY +
+                      (event.key === "ArrowUp"
+                        ? -step
+                        : event.key === "ArrowDown"
+                          ? step
+                          : 0),
+                  );
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="bg-primary pointer-events-none absolute -top-1 -left-1 size-2 rounded-full border border-white shadow-sm"
+                />
+                <span
+                  aria-hidden="true"
+                  className="bg-primary pointer-events-none absolute -top-1 -right-1 size-2 rounded-full border border-white shadow-sm"
+                />
+                <span
+                  aria-hidden="true"
+                  className="bg-primary pointer-events-none absolute -bottom-1 -left-1 size-2 rounded-full border border-white shadow-sm"
+                />
+                <span
+                  aria-hidden="true"
+                  className="bg-primary pointer-events-none absolute -right-1 -bottom-1 size-2 rounded-full border border-white shadow-sm"
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex flex-col gap-3">
+              {error && (
+                <p role="alert" className="text-destructive text-sm">
+                  {error}
+                </p>
+              )}
+              <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs">
+                <span>Arrastra para encuadrar</span>
+                <span>1200 × 750 px</span>
+              </div>
+              <label className="flex items-center gap-3 text-sm">
+                <span>Zoom</span>
+                <input
+                  className="accent-primary min-w-0 flex-1"
+                  type="range"
+                  disabled={busy}
+                  min="1"
+                  max="2"
+                  step="0.05"
+                  value={zoom}
+                  onChange={(event) => {
+                    ++cropVersion.current;
+                    setZoom(Number(event.target.value));
+                    setPreview(null);
+                  }}
+                />
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  disabled={busy || !preview}
+                  onClick={() => void prepare()}
+                >
+                  {busy ? "Preparando foto…" : "Guardar recorte"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    removeSelection();
+                    finishDialog();
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </dialog>
+      {error && !dialogOpen && (
         <p role="alert" className="text-destructive mt-3 text-sm">
           {error}
-        </p>
-      )}
-      {saved && !image && uploaded && (
-        <p role="status" className="mt-3 text-sm">
-          Foto cargada. Usa “Guardar cambios” para conservarla.
         </p>
       )}
     </div>

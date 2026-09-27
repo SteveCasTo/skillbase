@@ -186,7 +186,7 @@ test("admin manages group hours, capacity and cancellation without a document re
   await expect(page.getByText("07:30–09:00 · Capacidad: 20")).toBeVisible();
 });
 
-test("planned groups remain cancellable after course withdrawal and archive", async ({
+test("withdrawn courses allow groups in draft; archive retains cancellation and history", async ({
   page,
   context,
 }) => {
@@ -212,14 +212,14 @@ test("planned groups remain cancellable after course withdrawal and archive", as
     ).status(),
   ).toBe(200);
   await page.goto(path);
-  await expect(page.getByRole("form", { name: "Añadir grupo" })).toHaveCount(0);
+  await expect(page.getByRole("form", { name: "Añadir grupo" })).toHaveCount(1);
   const groups = page.locator("[data-group-id]");
   await expect(
     groups.nth(0).getByRole("button", { name: "Cancelar grupo" }),
   ).toBeVisible();
   await expect(
     groups.nth(0).getByRole("button", { name: "Guardar horario" }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await groups.nth(0).getByRole("button", { name: "Cancelar grupo" }).click();
   await page
     .getByRole("dialog")
@@ -233,7 +233,7 @@ test("planned groups remain cancellable after course withdrawal and archive", as
         form: { intent: "create", startTime: "11:00", capacity: "10" },
       })
     ).status(),
-  ).toBe(409);
+  ).toBe(200);
 
   expect(
     (
