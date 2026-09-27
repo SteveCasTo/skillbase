@@ -75,7 +75,7 @@ Los niveles iniciales son:
 - Solo un usuario interno activo con rol `ADMIN` puede crear, modificar o cambiar el estado de un curso.
 - La publicación exige un formato activo/revisión válida con exactamente los precios `STUDENT` y `EXTERNAL` aplicables, ambos en `BOB`.
 - El contrato público devuelve exclusivamente cursos `PUBLISHED` y no expone identificadores, estado, nota mínima ni timestamps administrativos; catálogo y detalle están implementados por SSR.
-- El campo `schedule` sigue siendo texto informativo. El formulario ofrece un constructor de horario por días/horas, pero no persiste calendario estructurado ni reemplaza la futura planificación de sesiones.
+- El campo `schedule` sigue siendo texto informativo. Las ofertas nuevas planificadas lo generan a partir de lunes a viernes y la duración de sesión del formato; los cursos anteriores conservan su horario textual y todavía no hay sesiones operativas de grupos.
 - El contenido opcional Markdown se presenta sin HTML crudo y se filtran protocolos de enlaces no permitidos. Instructor se almacena como texto provisional, no como asignación de identidad.
 - Se puede seleccionar como destacado, con máximo uno entre cursos publicados; si no se designa uno, landing y catálogo usan fallback determinista.
 
@@ -87,6 +87,9 @@ Los niveles iniciales son:
 - Un formato asociado a uno o más cursos no se puede eliminar; debe desactivarse para impedir nuevas selecciones y conservar las referencias históricas. Solo un formato todavía no usado puede eliminarse.
 - La migración asigna a cursos existentes formatos/revisiones construidos con sus valores históricos exactos.
 - Los formatos de 20 h (80/100 Bs) y 30 h (120/150 Bs) los crea el seed local como defaults editables de desarrollo, no como precios universales.
+- Cada nueva revisión de formato registra también la duración de sesión en minutos. Los ejemplos 20 h/90 min y 30 h/150 min se configuran explícitamente; revisiones históricas sin esa información permanecen sin resolver, salvo coincidencias exactas con los ejemplos conocidos.
+- Los cursos nuevos con formato configurado se programan de lunes a viernes: se indica el inicio civil de Bolivia y el fin diario y la última fecha se derivan de sesiones completas, redondeando la cantidad al entero más cercano. Así, 20 h/90 min implica 13 sesiones y 19,5 h planificadas; 30 h/150 min implica 12 sesiones y 30 h. Se distinguen duración nominal y horas efectivamente planificadas. Feriados y recuperaciones quedan pendientes del calendario operativo de grupos.
+- El inicio de un curso nuevo planificado no puede ser pasado ni caer en fin de semana, el fin se valida contra el plan y la preinscripción opcional debe cerrar antes del inicio de clases. Las ofertas históricas sin planificación estructurada mantienen sus fechas y horario informativo originales.
 - El upload de artwork opcional se limita a administradores autorizados, y al faltar imagen se conserva fallback gráfico Cota Activa.
 - Con JavaScript, el administrador puede seleccionar y recortar artwork en el alta. Al crear se persiste primero el borrador, luego se sube WebP mediante el endpoint autorizado y se asocia con una edición que usa revisión optimista. Si falla la carga, el borrador permanece y se ofrece reintentar o abrir su edición. Sin JavaScript se puede crear sin foto y añadirla después desde edición.
 - El descuento del 50 % para auxiliares no está implementado: no existe elegibilidad validada ni tercer precio; permanece para fases de inscripción/descuentos posteriores.

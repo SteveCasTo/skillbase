@@ -413,3 +413,33 @@ Con JavaScript, toda mutación administrativa (incluidas altas, ediciones, cambi
 - La interfaz debe sincronizar los datos y tokens devueltos por el servidor y ofrecer recuperación si la sesión caduca o falla una solicitud.
 - Los tests cubren resultados del servidor, continuidad de la página, foco y el fallback sin JavaScript por flujo; las mutaciones que aún hacen redirect con JavaScript se migran por fases.
 - Esta decisión reemplaza la exigencia de Post/Redirect/Get para **todo** éxito mutable en ADR-015: PRG permanece para el fallback HTML.
+
+---
+
+## ADR-018 — PLANIFICACIÓN EDITORIAL DE LUNES A VIERNES
+
+**Fecha:** 2026-09-26
+
+**Estado:** Accepted — implementación de calendario editorial
+
+### Contexto
+
+Los checkboxes de días y el horario de texto libre no permiten derivar la fecha de finalización ni garantizar que el tiempo de cada clase coincida con el formato. Los cursos existentes y publicados contienen únicamente horas nominales y fechas informativas; no se conoce la duración histórica de sus sesiones.
+
+### Decisión
+
+Agregar minutos por sesión a cada nueva revisión inmutable de formato. Para cursos nuevos, fijar lunes a viernes, calcular el fin diario a partir del inicio civil de Bolivia y derivar la fecha final con sesiones completas, redondeando al número más cercano (empates hacia arriba). Mostrar por separado horas nominales del formato y horas planificadas cuando difieran: 20 h/90 min → 13 sesiones/19,5 h; 30 h/150 min → 12 sesiones/30 h. El fin es fijo; se cambia el formato o el inicio, no se edita la hora final. Revalidar en servidor y recalcular borradores al revisar un formato.
+
+Los cursos y revisiones históricos sin dato verificable conservan horario libre y `session_minutes = NULL`, respectivamente. La migración solo asigna 90/150 minutos a los ejemplos conocidos cuya revisión coincide por nombre, duración y precios; no inventa horarios pasados. La preinscripción opcional cierra antes del inicio. Los feriados, recuperaciones y calendarios operativos pertenecen a grupos futuros.
+
+### Alternativas
+
+- Conservar checkboxes de días y horarios libres en cursos nuevos.
+- Redondear a sesiones parciales o contabilizar 20 h como 21 h exactas.
+- Atribuir duración de sesión a todas las revisiones históricas según sus horas nominales.
+
+### Consecuencias
+
+- El planificador de dominio y el repositorio usan tiempo civil `America/La_Paz`, verifican las fechas derivadas y conservan las revisiones históricas de cursos publicados/archivados.
+- Esta planificación sigue siendo **editorial**; los futuros grupos definen sus horarios propios sin deducir asistencia ni inscripción de los cursos históricos.
+- Los cursos nuevos requieren formatos con duración de sesión conocida. La migración es aditiva y se prueba sobre datos legados además de una base nueva.
