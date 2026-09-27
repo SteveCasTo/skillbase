@@ -122,28 +122,28 @@ Administración debe poder crear grupos a partir de la demanda.
 
 Cada grupo debe permitir configurar:
 
-- instructor;
-- mínimo;
-- máximo si corresponde;
-- horario;
-- fechas;
+- capacidad máxima positiva propia (sin mínimo automático);
+- hora de inicio de clase y fin calculado según la revisión del formato;
+- fechas y días L–V heredados del curso publicado;
 - estado.
+
+El instructor sigue siendo un dato global del curso hasta que exista asignación real de usuarios instructores. Solo los grupos **del mismo curso** no pueden solapar horarios; los extremos contiguos son válidos. El cupo de un grupo no impide que administración decida impartirlo con menos participantes.
 
 ### RF-GRP-003
 
-Un grupo puede cerrarse si no alcanza el mínimo.
+Administración puede cancelar un grupo por demanda insuficiente sin borrarlo ni perder su historial; la cantidad de inscritos no determina automáticamente el cierre.
 
 ### RF-GRP-004
 
 Puede crearse un grupo adicional cuando exista demanda suficiente.
 
-Referencia inicial conocida: 15 estudiantes.
-
-Este valor debe ser configurable.
+La capacidad se define por grupo; 15 estudiantes no es un mínimo ni un valor obligatorio.
 
 ### RF-GRP-005
 
 Las sesiones afectadas por feriados deben poder reprogramarse.
+
+La reprogramación de sesiones individuales, las preinscripciones/inscripciones y los cambios de grupo de participantes quedan pendientes de sus módulos propios. No se crean ni asignan estudiantes automáticamente al abrir un segundo grupo.
 
 ## INSCRIPCIÓN
 

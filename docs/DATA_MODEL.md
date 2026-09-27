@@ -100,7 +100,7 @@ Cada revisión es inmutable. Sus precios `STUDENT` y `EXTERNAL`, en `BOB`, perte
 
 #### Relación con Course
 
-Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no conserva campos editables independientes para horas o precios. Al editar un tipo se crea una nueva revisión y los cursos `DRAFT` pasan a la revisión vigente; los cursos `PUBLISHED` y `ARCHIVED` mantienen la revisión exacta. Cursos históricos migrados reciben formatos/revisiones generados a partir de cada tupla distinta de duración y precios, sin sustituir sus valores por defaults.
+Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no conserva campos editables independientes para horas o precios. Al editar un tipo se crea una nueva revisión y los cursos `DRAFT` sin grupos pasan a la revisión vigente; los cursos con grupos y los `PUBLISHED`/`ARCHIVED` mantienen la revisión exacta. Cursos históricos migrados reciben formatos/revisiones generados a partir de cada tupla distinta de duración y precios, sin sustituir sus valores por defaults.
 
 ### Campos editoriales añadidos
 
@@ -114,13 +114,13 @@ Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no cons
 
 - id
 - courseId
-- instructorId
-- code
-- minimumParticipants
-- maximumParticipants
-- status
-- startsAt
-- endsAt
+- courseTypeRevisionId (revisión de formato conservada)
+- capacity (máximo por grupo; no mínimo)
+- status (`PLANNED` o `CANCELLED`)
+- startsAt / endsAt (primer y último encuentro, hora civil boliviana)
+- createdAt / updatedAt (concurrencia optimista)
+
+El modelo implementado crea grupos únicamente para cursos publicados con plan L–V y duración de sesión conocida. Los encuentros se repiten de lunes a viernes y solo cambia la hora inicial por grupo; la hora final y última fecha se derivan de la revisión fijada. No se almacena ni infiere número de inscritos mientras no exista el módulo de inscripciones. Las operaciones se auditan; la creación y las ediciones se serializan mediante bloqueo del curso padre y se rechazan solapamientos entre grupos planificados de ese mismo curso. Los grupos cancelados se conservan. La asignación de identidad del instructor, calendario de feriados, códigos visibles y entidades `Session` permanecen pendientes.
 
 ### Participant
 
