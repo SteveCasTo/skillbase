@@ -25,8 +25,8 @@ test("new courses preserve values and can be corrected after server validation w
   const course = page.locator("form.course-form");
   const courseName = `Curso sin JavaScript ${Date.now()}`;
   const uniqueFields = [
-    "startsAt",
-    "endsAt",
+    "startDate",
+    "endDate",
     "registrationStartAt",
     "registrationEndAt",
     "contentMarkdown",
@@ -43,16 +43,13 @@ test("new courses preserve values and can be corrected after server validation w
   await course
     .getByLabel("Formato de curso")
     .selectOption({ label: formatName });
-  await course
-    .getByLabel(/Horario calculado/)
-    .fill("Lunes a viernes, 18:30–20:00");
   await course.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
   await course
-    .getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)", { exact: true })
-    .fill("2027-03-01T18:30");
+    .getByLabel("Fecha de inicio de clases (Bolivia)", { exact: true })
+    .fill("2027-03-01");
   await course
-    .getByLabel("Finalización del curso (AAAA-MM-DDTHH:mm)", { exact: true })
-    .fill("2027-03-22T20:00");
+    .getByLabel("Fecha de finalización (Bolivia)", { exact: true })
+    .fill("2027-03-22");
   expect(
     await course.evaluate((form: HTMLFormElement, names: string[]) => {
       const data = new FormData(form);
@@ -86,17 +83,15 @@ test("new courses preserve values and can be corrected after server validation w
   await expect(course.getByLabel("Formato de curso")).toHaveValue(
     selectedFormat,
   );
-  await expect(course.getByLabel(/Horario calculado/)).toHaveValue(
-    "Lunes a viernes, 18:30–20:00",
+  await expect(
+    course.getByLabel("Fecha de inicio de clases (Bolivia)", { exact: true }),
+  ).toHaveValue("2027-03-01");
+  await expect(
+    course.getByLabel("Fecha de finalización (Bolivia)", { exact: true }),
+  ).toHaveValue("2027-03-22");
+  await expect(course.locator('[name="schedule"]')).toHaveValue(
+    "Lunes a viernes · horario por grupo",
   );
-  await expect(
-    course.getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)", { exact: true }),
-  ).toHaveValue("2027-03-01T18:30");
-  await expect(
-    course.getByLabel("Finalización del curso (AAAA-MM-DDTHH:mm)", {
-      exact: true,
-    }),
-  ).toHaveValue("2027-03-22T20:00");
   await expect(course.getByLabel("Nota mínima (0–100)")).toHaveValue("101");
 
   await course.getByLabel("Nota mínima (0–100)").fill("70");

@@ -67,6 +67,29 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
   await form.getByLabel("Capacidad").fill("15");
   await form.getByRole("button", { name: "Crear grupo" }).click();
   await expect(page).toHaveURL(/success=created/);
+  await page.goto(`/app/cursos/${id}/editar`);
+  await expect(page.getByLabel("Horario planificado histórico")).toHaveValue(
+    "Lunes a viernes, 08:00–09:30",
+  );
+  await expect(
+    page.getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)"),
+  ).toHaveValue("2027-03-01T08:00");
+  await page
+    .getByLabel("Descripción")
+    .fill("Curso histórico con grupo editado sin JavaScript.");
+  await page.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(page).toHaveURL(/success=updated/);
+  await page.goto(`/app/cursos/${id}/editar`);
+  await expect(page.getByLabel("Descripción")).toHaveValue(
+    "Curso histórico con grupo editado sin JavaScript.",
+  );
+  await expect(page.getByLabel("Horario planificado histórico")).toHaveValue(
+    "Lunes a viernes, 08:00–09:30",
+  );
+  await expect(
+    page.getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)"),
+  ).toHaveValue("2027-03-01T08:00");
+  await page.goto(`/app/cursos/${id}/grupos`);
   await page.locator("[data-cancel-fallback] summary").click();
   await expect(
     page.getByRole("button", { name: "Sí, cancelar grupo" }),

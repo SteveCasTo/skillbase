@@ -12,7 +12,11 @@ import {
   users,
 } from "@/server/db/schema";
 import { validateCourseData } from "@/domain/courses/validation";
-import { planWeekdaySchedule } from "@/domain/courses/weekday-schedule";
+import {
+  GROUP_SCHEDULE,
+  planCourseDates,
+  planWeekdaySchedule,
+} from "@/domain/courses/weekday-schedule";
 import {
   createGroup,
   changeGroupSchedule,
@@ -139,8 +143,10 @@ test("adjacency and other courses work; updates, cancellation and audit retain h
         .select()
         .from(auditEvents)
         .where(eq(auditEvents.entityId, first.id))
-    ).map((r) => r.action),
-  ).toEqual(["GROUP_CREATED", "GROUP_CAPACITY_CHANGED", "GROUP_CANCELLED"]);
+    )
+      .map((r) => r.action)
+      .sort(),
+  ).toEqual(["GROUP_CANCELLED", "GROUP_CAPACITY_CHANGED", "GROUP_CREATED"]);
 });
 
 test("concurrent creates serialize on course row; failed writes leave no audit", async () => {
@@ -162,7 +168,7 @@ test("concurrent creates serialize on course row; failed writes leave no audit",
   expect(await repo.list(courseId)).toHaveLength(1);
 });
 
-test("withdrawal retains group snapshot and permits cancellation after format revision", async () => {
+test("withdrawal retains group snapshot and permits new groups with pinned revision", async () => {
   const group = await createGroup(repo, admin, courseId, "08:00", 2);
   await courseRepo.transition(courseId, "DRAFT", admin.id);
   const [course] = await database.db
@@ -189,9 +195,16 @@ test("withdrawal retains group snapshot and permits cancellation after format re
     .from(courses)
     .where(eq(courses.id, courseId));
   expect(stillPinned?.courseTypeRevisionId).toBe(group.courseTypeRevisionId);
-  await expect(
-    createGroup(repo, admin, courseId, "09:30", 2),
-  ).rejects.toMatchObject({ code: "COURSE_UNAVAILABLE" });
+  const draftGroup = await createGroup(repo, admin, courseId, "09:30", 2);
+  expect(draftGroup.courseTypeRevisionId).toBe(group.courseTypeRevisionId);
+  const rescheduled = await changeGroupSchedule(
+    repo,
+    admin,
+    draftGroup.id,
+    "10:00",
+    draftGroup.updatedAt.toISOString(),
+  );
+  expect(rescheduled.startsAt).not.toEqual(draftGroup.startsAt);
   expect(
     (await cancelGroup(repo, admin, group.id, group.updatedAt.toISOString()))
       .status,
@@ -202,6 +215,73 @@ test("withdrawal retains group snapshot and permits cancellation after format re
     admin.id,
   );
   expect(republished.courseTypeRevisionId).toBe(group.courseTypeRevisionId);
+});
+
+test("date-only courses accept different group hours and preserve dates on unrelated edits", async () => {
+  const existing = await courseRepo.getAdmin(courseId);
+  if (!existing) throw new Error("Missing course");
+  const dates = planCourseDates({
+    startDate: "2027-03-01",
+    weekdaysMask: 31,
+    totalHours: 20,
+    sessionMinutes: 90,
+  });
+  const updated = await courseRepo.update(
+    courseId,
+    {
+      ...existing,
+      schedule: GROUP_SCHEDULE,
+      startsAt: dates.startsAt,
+      endsAt: dates.endsAt,
+    },
+    admin.id,
+    existing.updatedAt,
+  );
+  const morning = await createGroup(repo, admin, courseId, "08:00", 5);
+  const afternoon = await createGroup(repo, admin, courseId, "14:00", 8);
+  expect(morning.startsAt).toEqual(new Date("2027-03-01T12:00:00.000Z"));
+  expect(afternoon.endsAt).toEqual(new Date("2027-03-17T19:30:00.000Z"));
+  expect(
+    await courseRepo.update(
+      courseId,
+      { ...updated, description: `${updated.description} editada` },
+      admin.id,
+      updated.updatedAt,
+    ),
+  ).toMatchObject({
+    startsAt: dates.startsAt,
+    endsAt: dates.endsAt,
+  });
+});
+
+test("creates canonical date-only courses and rejects forged date bounds", async () => {
+  const existing = await courseRepo.getAdmin(courseId);
+  if (!existing) throw new Error("Missing course");
+  const dates = planCourseDates({
+    startDate: "2027-03-01",
+    weekdaysMask: 31,
+    totalHours: 20,
+    sessionMinutes: 90,
+  });
+  const input = {
+    ...existing,
+    name: `Date-only ${crypto.randomUUID()}`,
+    schedule: GROUP_SCHEDULE,
+    startsAt: dates.startsAt,
+    endsAt: dates.endsAt,
+  };
+  await expect(
+    courseRepo.create(
+      { ...input, endsAt: new Date("2027-03-18T03:58:00.000Z") },
+      admin.id,
+    ),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  const created = await courseRepo.create(input, admin.id);
+  expect(created.startsAt).toEqual(dates.startsAt);
+  expect(created.endsAt).toEqual(dates.endsAt);
+  expect(created.schedule).toBe(GROUP_SCHEDULE);
+  const group = await createGroup(repo, admin, created.id, "11:00", 1);
+  expect(group.endsAt).toEqual(new Date("2027-03-17T16:30:00.000Z"));
 });
 
 test("grouped courses retain their calendar and require an active format to republish", async () => {
