@@ -44,7 +44,7 @@ async function clear() {
     .delete(auditEvents)
     .where(sql`${auditEvents.entityType} in ('COURSE', 'COURSE_TYPE')`);
   await database.db.execute(
-    sql`truncate courses, course_type_revisions, course_types`,
+    sql`truncate groups, courses, course_type_revisions, course_types`,
   );
   await database.db
     .delete(users)

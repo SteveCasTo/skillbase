@@ -272,7 +272,7 @@ export class DrizzleFormatRepository implements FormatRepository {
           .select()
           .from(schema.courses)
           .where(
-            sql`${schema.courses.status} = 'DRAFT' and ${schema.courses.weekdaysMask} is not null and ${schema.courses.courseTypeRevisionId} in (select id from course_type_revisions where course_type_id = ${id})`,
+            sql`${schema.courses.status} = 'DRAFT' and ${schema.courses.weekdaysMask} is not null and ${schema.courses.courseTypeRevisionId} in (select id from course_type_revisions where course_type_id = ${id}) and not exists (select 1 from groups where course_id = ${schema.courses.id})`,
           );
         if (structuredDrafts.length && revision.sessionMinutes === null)
           throw new CourseDomainError(
@@ -304,7 +304,7 @@ export class DrizzleFormatRepository implements FormatRepository {
             updatedAt: sql`date_trunc('milliseconds', greatest(now(), ${schema.courses.updatedAt}) + interval '1 millisecond')`,
           })
           .where(
-            sql`${schema.courses.status} = 'DRAFT' and ${schema.courses.courseTypeRevisionId} in (select id from course_type_revisions where course_type_id = ${id})`,
+            sql`${schema.courses.status} = 'DRAFT' and ${schema.courses.courseTypeRevisionId} in (select id from course_type_revisions where course_type_id = ${id}) and not exists (select 1 from groups where course_id = ${schema.courses.id})`,
           );
         await tx
           .update(schema.courseTypes)

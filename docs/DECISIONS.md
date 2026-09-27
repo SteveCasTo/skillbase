@@ -443,3 +443,35 @@ Los cursos y revisiones históricos sin dato verificable conservan horario libre
 - El planificador de dominio y el repositorio usan tiempo civil `America/La_Paz`, verifican las fechas derivadas y conservan las revisiones históricas de cursos publicados/archivados.
 - Esta planificación sigue siendo **editorial**; los futuros grupos definen sus horarios propios sin deducir asistencia ni inscripción de los cursos históricos.
 - Los cursos nuevos requieren formatos con duración de sesión conocida. La migración es aditiva y se prueba sobre datos legados además de una base nueva.
+
+---
+
+## ADR-019 — GRUPOS CON CUPO Y HORARIO PROPIOS
+
+**Fecha:** 2026-09-27
+
+**Estado:** Accepted — administración de grupos inicial
+
+### Contexto
+
+Un curso puede atraer más participantes que los disponibles en un solo horario. La preinscripción y la inscripción todavía no están implementadas; no existen identidades de instructor asignadas a grupos ni aulas registradas. El calendario del curso tiene carácter editorial.
+
+### Decisión
+
+Cada curso publicado y planificado puede tener varios grupos con capacidad máxima individual positiva y sin mínimo automático. Todos comparten fechas L–V e instructor textual del curso, pero tienen hora de inicio distinta y fin derivado de la revisión de formato fijada. Solo los grupos planificados **del mismo curso** no pueden solaparse; los horarios contiguos y los de otros cursos sí. Administración puede ajustar horario/cupo o cancelar un grupo sin borrarlo; no se distribuyen participantes automáticamente.
+
+Una transacción bloquea el curso antes de comprobar conflictos y escribir grupos, con revisión optimista y auditoría. El curso conserva fechas y revisión vinculadas a grupos, incluso si vuelve a borrador, y su republicación exige un formato activo. El módulo usa casos de uso autorizados `ADMIN`, ruta privada enumerada, RLS y tabla sin grants Data API.
+
+La relación compuesta grupo → (curso, revisión) impide vincular una revisión ajena incluso fuera de la aplicación. Se admite cancelar grupos existentes después de retirar o archivar el curso; crear y cambiar horarios requiere publicación. El cupo está limitado al máximo `integer` de PostgreSQL.
+
+### Alternativas
+
+- Tratar cada grupo como un curso independiente.
+- Guardar un cupo global del curso y repartir estudiantes automáticamente.
+- Bloquear horarios entre cursos distintos sin datos de aulas o asignación real de instructores.
+
+### Consecuencias
+
+- La capacidad cuenta como límite configurado, no como matrícula confirmada; los grupos cancelados conservan registro pero dejan de competir por horarios.
+- La elección y cambio de grupo por participantes, conteo real de ocupación, cancelaciones con inscripciones/pagos y sesiones de feriados requieren módulos posteriores de preinscripción, inscripción y operación.
+- El detalle público mantiene el horario editorial existente hasta que la selección de grupo y la disponibilidad real se implementen en el contrato público.
