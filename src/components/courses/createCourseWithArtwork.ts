@@ -1,4 +1,14 @@
 /** Browser orchestration only. Each write remains authorized and validated on the server. */
+import { navigate } from "astro:transitions/client";
+
+export function openCreatedCourse(id: string, success: "created" | "updated") {
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id))
+    throw new Error(
+      "No se pudo abrir el borrador. Abre Cursos para continuar.",
+    );
+  return navigate(`/app/cursos/${id}/editar?success=${success}`);
+}
+
 export async function createCourseWithArtwork(
   fields: FormData,
   image: File,
@@ -17,7 +27,12 @@ export async function createCourseWithArtwork(
     );
 
   const destination = `/app/cursos/${result.id}/editar`;
+  let attached = false;
   const attach = async () => {
+    if (attached) {
+      await openCreatedCourse(result.id, "updated");
+      return;
+    }
     const upload = new FormData();
     upload.set("courseId", result.id);
     upload.set("image", image);
@@ -38,24 +53,28 @@ export async function createCourseWithArtwork(
       method: "POST",
       body: update,
       credentials: "same-origin",
+      headers: { Accept: "application/json" },
     });
-    // Browsers expose manual redirects as opaque responses (status 0).
-    // Follow the PRG redirect and verify its final same-origin destination.
     if (
-      !saved.ok ||
-      !saved.redirected ||
-      new URL(saved.url).pathname !== destination
+      saved.redirected ||
+      !saved.headers.get("content-type")?.includes("application/json")
     )
+      throw new Error("La sesión cambió. Abre el borrador para continuar.");
+    const outcome: unknown = await saved.json();
+    if (!saved.ok || !isRevision(outcome))
       throw new Error(
-        "No se pudo asociar la foto. Abre el borrador y vuelve a guardarla.",
+        isMessage(outcome)
+          ? outcome.message
+          : "No se pudo asociar la foto. Abre el borrador y vuelve a guardarla.",
       );
-    window.location.assign(`${destination}?success=updated`);
+    attached = true;
+    await openCreatedCourse(result.id, "updated");
   };
   onDraft(destination, attach);
   await attach();
 }
 
-function isError(value: unknown): value is { error: string } {
+export function isError(value: unknown): value is { error: string } {
   return Boolean(
     value &&
     typeof value === "object" &&
@@ -63,7 +82,7 @@ function isError(value: unknown): value is { error: string } {
     typeof value.error === "string",
   );
 }
-function formError(value: { error: string }): string {
+export function formError(value: { error: string }): string {
   if (
     !("fieldErrors" in value) ||
     !value.fieldErrors ||
@@ -91,5 +110,21 @@ function isArtwork(value: unknown): value is { artwork: string } {
     typeof value === "object" &&
     "artwork" in value &&
     typeof value.artwork === "string",
+  );
+}
+function isRevision(value: unknown): value is { revision: string } {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    "revision" in value &&
+    typeof value.revision === "string",
+  );
+}
+function isMessage(value: unknown): value is { message: string } {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    "message" in value &&
+    typeof value.message === "string",
   );
 }

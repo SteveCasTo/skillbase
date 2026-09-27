@@ -20,13 +20,9 @@ async function fillCourseFields(page: Page, formatName: string): Promise<void> {
   await page.getByRole("option", { name: "Medio" }).click();
   await page.getByRole("combobox", { name: "Formato de curso" }).click();
   await page.getByRole("option", { name: new RegExp(formatName) }).click();
-  await page.getByRole("checkbox", { name: "Lunes" }).click();
-  await page.getByLabel("Desde", { exact: true }).fill("18:30");
-  await page.getByLabel("Hasta", { exact: true }).fill("20:30");
   await page.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
   for (const [label, date, time] of [
-    ["Inicio del curso", "01/03/2027", "18:30"],
-    ["Finalización del curso", "01/04/2027", "20:30"],
+    ["Inicio de clases (Bolivia)", "01/03/2027", "18:30"],
     ["Apertura de preinscripción", "01/01/2027", "08:00"],
     ["Cierre de preinscripción", "20/02/2027", "18:00"],
   ] as const) {
@@ -41,16 +37,6 @@ async function fillCourseFields(page: Page, formatName: string): Promise<void> {
   await page.getByLabel("Nota mínima (0–100)").fill("70");
 }
 
-async function expectPostRedirect(page: Page, action: () => Promise<void>) {
-  const responsePromise = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      response.url().includes("/app/cursos/"),
-  );
-  await action();
-  expect((await responsePromise).status()).toBe(303);
-}
-
 test("admin crops a photo in the new-course form and can retry a failed upload without creating another draft", async ({
   page,
   context,
@@ -63,12 +49,29 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   const format = page.getByRole("form", { name: "Crear formato" });
   await format.getByLabel("Nombre").fill(formatName);
   await format.getByLabel("Duración total (horas)").fill("20");
+  await format.getByLabel("Duración de sesión (minutos)").fill("90");
   await format.getByLabel("Precio estudiante (BOB)").fill("80");
   await format.getByLabel("Precio externo (BOB)").fill("100");
+  await page.evaluate(() => {
+    (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
+  });
   await format.getByRole("button", { name: "Crear formato" }).click();
+  await expect(page).toHaveURL(/\/app\/formatos$/);
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { navigationMarker?: boolean }).navigationMarker,
+    ),
+  ).toBe(true);
   await page.goto("/app/cursos/nuevo");
   await page.getByLabel("Nombre").fill(`Curso con foto ${Date.now()}`);
   await fillCourseFields(page, formatName);
+  await expect(
+    page.getByText(
+      /13 sesiones de 90 min · 19\.5 h planificadas frente a 20 h configuradas/,
+    ),
+  ).toBeVisible();
+  await expect(page.getByText("17/03/2027 20:00")).toBeVisible();
   const bytes = await page.evaluate(async () => {
     const canvas = new OffscreenCanvas(400, 250);
     const ctx = canvas.getContext("2d")!;
@@ -97,8 +100,8 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   await page.getByRole("button", { name: "Usar este recorte" }).click();
   await expect(page.getByText("Foto lista para cargarse")).toBeVisible();
   await page
-    .getByLabel("Finalización del curso", { exact: true })
-    .fill("01/02/2027");
+    .getByLabel("Inicio de clases (Bolivia)", { exact: true })
+    .fill("06/03/2027");
   const create = page.getByRole("button", { name: "Crear borrador" });
   await expect(create).toBeDisabled();
   const invalidForm = await page
@@ -106,6 +109,7 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
     .evaluate((form) =>
       Object.fromEntries(new FormData(form as HTMLFormElement).entries()),
     );
+  invalidForm.endsAt = "2027-03-17T20:00";
   const invalidResponse = await page.request.post("/app/cursos/nuevo", {
     form: invalidForm,
     headers: {
@@ -115,12 +119,12 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   });
   expect(invalidResponse.status()).toBe(422);
   const invalidBody = await invalidResponse.json();
-  expect(invalidBody.fieldErrors).toHaveProperty("endsAt");
+  expect(invalidBody.fieldErrors).toHaveProperty("startsAt");
   await expect(page.getByLabel("Nombre")).toHaveValue(/Curso con foto/);
   await expect(page.getByText("Foto lista para cargarse")).toBeVisible();
   await page
-    .getByLabel("Finalización del curso", { exact: true })
-    .fill("01/04/2027");
+    .getByLabel("Inicio de clases (Bolivia)", { exact: true })
+    .fill("01/03/2027");
   let failed = false;
   await page.route("**/app/cursos/imagen", async (route) => {
     if (!failed) {
@@ -141,12 +145,40 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
     .getAttribute("href");
   expect(draftUrl).toMatch(/\/app\/cursos\/[0-9a-f-]+\/editar/);
   await page.getByRole("button", { name: "Reintentar foto" }).click();
-  await expect(page).toHaveURL(/\/editar\?success=updated$/);
+  await expect(page).toHaveURL(/\/editar$/);
   expect(page.url()).toContain(draftUrl!);
   const key = await page.locator('input[name="artwork"]').inputValue();
   expect(key).toMatch(/^courses\/[0-9a-f-]+\/[0-9a-f-]+\.webp$/);
+  await expect(
+    page.getByRole("img", { name: "Foto actual del curso" }),
+  ).toBeVisible();
+  const editorBox = await page
+    .locator("[data-course-image-editor]")
+    .boundingBox();
+  const nameBox = await page.getByLabel("Nombre").boundingBox();
+  expect(editorBox).not.toBeNull();
+  expect(nameBox).not.toBeNull();
+  expect(editorBox!.x).toBeLessThan(nameBox!.x);
   await page.reload();
   await expect(page.locator('input[name="artwork"]')).toHaveValue(key);
+  await expect(
+    page.getByRole("img", { name: "Foto actual del curso" }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileEditorBox = await page
+    .locator("[data-course-image-editor]")
+    .boundingBox();
+  const mobileNameBox = await page.getByLabel("Nombre").boundingBox();
+  expect(mobileEditorBox).not.toBeNull();
+  expect(mobileNameBox).not.toBeNull();
+  expect(mobileEditorBox!.y).toBeLessThan(mobileNameBox!.y);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
   const env = getTestSupabaseEnvironment();
   const storage = createClient(env.apiUrl, env.serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -173,6 +205,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     .getByRole("form", { name: "Crear formato" })
     .getByLabel("Duración total (horas)")
     .fill("20");
+  await page.getByLabel("Duración de sesión (minutos)").fill("90");
   await page
     .getByRole("form", { name: "Crear formato" })
     .getByLabel("Precio estudiante (BOB)")
@@ -213,7 +246,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await grade.press("ControlOrMeta+A");
   await grade.press("ControlOrMeta+V");
   await expect(grade).toHaveValue("70");
-  const startDate = page.getByLabel("Inicio del curso", { exact: true });
+  const startDate = page.getByLabel("Inicio de clases (Bolivia)", {
+    exact: true,
+  });
   await startDate.focus();
   await page.keyboard.press("End");
   await page.keyboard.type("x");
@@ -223,7 +258,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await startDate.press("ControlOrMeta+V");
   await expect(startDate).toHaveValue("01/03/2027");
   const startTime = page.getByRole("textbox", {
-    name: "Hora de inicio del curso",
+    name: "Hora de inicio de clases (bolivia)",
   });
   await startTime.focus();
   await page.keyboard.press("End");
@@ -241,23 +276,35 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   ).toBeVisible();
   await startDate.fill("01/03/2027");
   await expect(create).toBeEnabled();
+  await startDate.fill("06/03/2027");
+  await expect(create).toBeDisabled();
+  await startDate.fill("01/03/2020");
+  await expect(create).toBeDisabled();
+  await startDate.fill("01/03/2027");
+  await expect(create).toBeEnabled();
   const calendarTrigger = page.locator("#startsAt-calendar");
   await calendarTrigger.click();
   await expect(page.getByRole("grid")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(calendarTrigger).toBeFocused();
   await page.getByLabel("Instructor (opcional)").fill("Docente E2E");
-  await page.getByRole("checkbox", { name: "Miércoles" }).click();
   await expect(page.locator('input[name="schedule"]')).toHaveValue(
-    "Lunes y Miércoles, 18:30–20:30",
+    "Lunes a viernes, 18:30–20:00",
   );
   await page
     .getByLabel("Contenido del curso (Markdown, opcional)")
     .fill("## Temario\n- Unidad uno");
+  await page.evaluate(() => {
+    (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
+  });
   await page.getByRole("button", { name: "Crear borrador" }).click();
-  await expect(page).toHaveURL(
-    /\/app\/cursos\/[^/]+\/editar\?success=created$/,
-  );
+  await expect(page).toHaveURL(/\/app\/cursos\/[^/]+\/editar$/);
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { navigationMarker?: boolean }).navigationMarker,
+    ),
+  ).toBe(true);
   await expect(page.locator("[data-sileo-toast]")).toContainText(
     "Borrador creado",
   );
@@ -279,16 +326,12 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     (input as HTMLInputElement).value = "70";
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  const courseStart = page.locator('input[name="startsAt"]');
-  await courseStart.evaluate((input) => {
-    (input as HTMLInputElement).value = "2027-02-30T18:30";
-    input.dispatchEvent(new Event("change", { bubbles: true }));
+  const courseStart = page.getByLabel("Inicio de clases (Bolivia)", {
+    exact: true,
   });
+  await courseStart.fill("30/02/2027");
   await expect(save).toBeDisabled();
-  await courseStart.evaluate((input) => {
-    (input as HTMLInputElement).value = "2027-03-01T18:30";
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await courseStart.fill("01/03/2027");
   await expect(save).toBeEnabled();
   await page.getByLabel("Nombre").fill("Curso E2E conservación");
   await expect(save).toBeDisabled();
@@ -342,24 +385,18 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await page.getByRole("option", { name: "Medio" }).click();
   await expect(save).toBeDisabled();
   await page
-    .getByRole("textbox", { name: "Hora de inicio del curso", exact: true })
+    .getByRole("textbox", {
+      name: "Hora de inicio de clases (bolivia)",
+      exact: true,
+    })
     .fill("19:30");
   await expect(save).toBeEnabled();
   await page
-    .getByRole("textbox", { name: "Hora de inicio del curso", exact: true })
+    .getByRole("textbox", {
+      name: "Hora de inicio de clases (bolivia)",
+      exact: true,
+    })
     .fill("18:30");
-  await expect(save).toBeDisabled();
-  await page
-    .getByLabel("Finalización del curso", { exact: true })
-    .fill("02/04/2027");
-  await expect(save).toBeEnabled();
-  await page
-    .getByLabel("Finalización del curso", { exact: true })
-    .fill("01/04/2027");
-  await expect(save).toBeDisabled();
-  await page.getByRole("checkbox", { name: "Viernes" }).click();
-  await expect(save).toBeEnabled();
-  await page.getByRole("checkbox", { name: "Viernes" }).click();
   await expect(save).toBeDisabled();
   const markdown = page.getByLabel("Contenido del curso (Markdown, opcional)");
   await markdown.fill("## Temario\n- Unidad uno\nNota");
@@ -372,7 +409,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await markdown.fill("## Temario\n- Unidad uno");
   await expect(save).toBeDisabled();
   await expect(
-    page.getByLabel("Inicio del curso", { exact: true }),
+    page.getByLabel("Inicio de clases (Bolivia)", { exact: true }),
   ).toHaveValue("01/03/2027");
   await expect(page.locator('input[name="startsAt"]')).toHaveValue(
     "2027-03-01T18:30",
@@ -384,7 +421,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     "Docente E2E",
   );
   await expect(page.locator('input[name="schedule"]')).toHaveValue(
-    "Lunes y Miércoles, 18:30–20:30",
+    "Lunes a viernes, 18:30–20:00",
   );
   await page.locator('input[name="artwork"]').evaluate((input) => {
     (input as HTMLInputElement).value = "https://example.test/forged.webp";
@@ -413,11 +450,6 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await expect(save).toBeDisabled();
-  await page.getByRole("button", { name: "Escribir horario libre" }).click();
-  await page
-    .getByLabel("Horario informativo")
-    .fill("Horario especial acordado con el grupo");
-
   await page
     .getByLabel("Descripción")
     .fill("Contenido actualizado antes de publicar.");
@@ -436,43 +468,105 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
         (window as Window & { navigationMarker?: boolean }).navigationMarker,
     ),
   ).toBe(true);
-  await expect(page.getByLabel("Horario informativo")).toHaveValue(
-    "Horario especial acordado con el grupo",
+  await expect(page.locator('input[name="schedule"]')).toHaveValue(
+    "Lunes a viernes, 18:30–20:00",
   );
   await expect(page.locator("[data-sileo-toast]")).toContainText(
     "Cambios guardados",
   );
   await expect(save).toBeDisabled();
-  await page.getByText("Publicar curso", { exact: true }).click();
-  await expectPostRedirect(page, () =>
-    page.getByRole("button", { name: "Confirmar publicación" }).click(),
+  await page.getByRole("button", { name: "Publicar curso" }).click();
+  const dialog = page.getByRole("dialog", { name: "Publicar curso" });
+  await expect(dialog.getByRole("button", { name: "Cancelar" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Publicar curso" }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "Publicar curso" }).click();
+  const publishedElsewhere = await page.request.post(
+    new URL(page.url()).pathname,
+    {
+      headers: {
+        Origin: new URL(page.url()).origin,
+        Accept: "application/json",
+      },
+      form: { intent: "publish" },
+    },
   );
-  await expect(page).toHaveURL(/\?success=published$/);
+  expect(publishedElsewhere.status()).toBe(200);
+  await dialog.getByRole("button", { name: "Confirmar publicación" }).click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: /PUBLISHED/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Publicar curso" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { navigationMarker?: boolean }).navigationMarker,
+    ),
+  ).toBe(true);
+  const withdrawnElsewhere = await page.request.post(
+    new URL(page.url()).pathname,
+    {
+      headers: {
+        Origin: new URL(page.url()).origin,
+        Accept: "application/json",
+      },
+      form: { intent: "withdraw" },
+    },
+  );
+  expect(withdrawnElsewhere.status()).toBe(200);
+  await page.getByRole("button", { name: "Publicar curso" }).click();
+  await dialog.getByRole("button", { name: "Confirmar publicación" }).click();
+  await expect(
+    page
+      .locator("span")
+      .filter({ hasText: /^Publicado$/ })
+      .first(),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { navigationMarker?: boolean }).navigationMarker,
+    ),
+  ).toBe(true);
   await expect(page.locator("[data-sileo-toast]")).toContainText(
     "Curso publicado",
   );
-  await expectPostRedirect(page, () =>
-    page.getByRole("button", { name: "Destacar en la cartelera" }).click(),
-  );
+  await page.getByRole("button", { name: "Destacar en la cartelera" }).click();
   await expect(page.getByText("Destacado en la cartelera")).toBeVisible();
   await page.reload();
   await expect(page.getByText("Destacado en la cartelera")).toBeVisible();
+  await page.evaluate(() => {
+    (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
+  });
 
-  await page.getByText("Retirar publicación", { exact: true }).click();
-  await expectPostRedirect(page, () =>
-    page.getByRole("button", { name: "Confirmar retiro" }).click(),
-  );
+  await page.getByRole("button", { name: "Retirar publicación" }).click();
+  await page
+    .getByRole("dialog", { name: "Retirar publicación" })
+    .getByRole("button", { name: "Confirmar retiro" })
+    .click();
   await expect(page.locator("[data-sileo-toast]")).toContainText(
     "devuelto a borrador",
   );
-  await page.getByText("Archivar curso", { exact: true }).click();
-  await expectPostRedirect(page, () =>
-    page.getByRole("button", { name: "Confirmar archivo" }).click(),
-  );
+  await page.getByRole("button", { name: "Archivar curso" }).click();
+  await page
+    .getByRole("dialog", { name: "Archivar curso" })
+    .getByRole("button", { name: "Confirmar archivo" })
+    .click();
   await expect(page.locator("[data-sileo-toast]")).toContainText(
     "Curso archivado",
   );
   await expect(page.getByLabel("Nombre")).toBeDisabled();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { navigationMarker?: boolean }).navigationMarker,
+    ),
+  ).toBe(true);
 });
 
 test("instructor is denied and mutation without expected origin is rejected", async ({

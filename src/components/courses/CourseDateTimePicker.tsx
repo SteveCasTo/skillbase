@@ -19,6 +19,8 @@ interface Props {
   required: boolean;
   disabled?: boolean;
   error?: string;
+  weekdaysOnly?: boolean;
+  futureOnly?: boolean;
 }
 
 function parseDate(value: string): Date | undefined {
@@ -45,6 +47,8 @@ export default function CourseDateTimePicker({
   required,
   disabled = false,
   error,
+  weekdaysOnly = false,
+  futureOnly = false,
 }: Props) {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
   const [date, setDate] = useState(
@@ -52,17 +56,58 @@ export default function CourseDateTimePicker({
   );
   const [time, setTime] = useState(match ? `${match[4]}:${match[5]}` : "");
   const [open, setOpen] = useState(false);
+  const [bounds, setBounds] = useState({
+    start: "",
+    registrationEnd: "",
+  });
   const field = useRef<HTMLInputElement>(null);
   const dateField = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const form = field.current?.closest("form");
+    if (!form) return;
+    const sync = () => {
+      const data = new FormData(form);
+      setBounds({
+        start: String(data.get("startsAt") ?? ""),
+        registrationEnd: String(data.get("registrationEndAt") ?? ""),
+      });
+    };
+    sync();
+    form.addEventListener("course-form-change", sync);
+    form.addEventListener("change", sync);
+    return () => {
+      form.removeEventListener("course-form-change", sync);
+      form.removeEventListener("change", sync);
+    };
+  }, []);
   const selected = parseDate(date);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/La_Paz",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (name: "year" | "month" | "day") =>
+    parts.find((item) => item.type === name)?.value ?? "";
+  const today = `${part("year")}-${part("month")}-${part("day")}`;
+  const dateKey = selected
+    ? `${selected.getFullYear().toString().padStart(4, "0")}-${String(selected.getMonth() + 1).padStart(2, "0")}-${String(selected.getDate()).padStart(2, "0")}`
+    : "";
+  const blocked = Boolean(
+    selected &&
+    ((weekdaysOnly && (selected.getDay() === 0 || selected.getDay() === 6)) ||
+      (futureOnly && dateKey < today)),
+  );
   const problem =
     date && !selected
       ? "Ingresa una fecha válida (DD/MM/AAAA)."
-      : time && !validTime(time)
-        ? "Ingresa una hora válida (HH:mm)."
-        : "";
+      : blocked
+        ? "Selecciona un día hábil que no haya pasado."
+        : time && !validTime(time)
+          ? "Ingresa una hora válida (HH:mm)."
+          : "";
   const combined =
-    selected && validTime(time)
+    selected && !blocked && validTime(time)
       ? `${selected.getFullYear().toString().padStart(4, "0")}-${String(selected.getMonth() + 1).padStart(2, "0")}-${String(selected.getDate()).padStart(2, "0")}T${time}`
       : !match && date === value && !time
         ? value
@@ -144,6 +189,20 @@ export default function CourseDateTimePicker({
               mode="single"
               locale={es}
               selected={selected}
+              disabled={(day) =>
+                (weekdaysOnly && (day.getDay() === 0 || day.getDay() === 6)) ||
+                (futureOnly &&
+                  `${day.getFullYear().toString().padStart(4, "0")}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}` <
+                    today) ||
+                (name === "registrationEndAt" &&
+                  Boolean(bounds.start) &&
+                  `${day.getFullYear().toString().padStart(4, "0")}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}` >
+                    bounds.start.slice(0, 10)) ||
+                (name === "registrationStartAt" &&
+                  Boolean(bounds.registrationEnd) &&
+                  `${day.getFullYear().toString().padStart(4, "0")}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}` >
+                    bounds.registrationEnd.slice(0, 10))
+              }
               onSelect={(next) => {
                 if (next) {
                   setDate(localDate(next));

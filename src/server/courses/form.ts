@@ -10,6 +10,7 @@ export function courseInputFromFormData(formData: FormData): CourseInput {
     "instructorName",
     "artwork",
     "schedule",
+    "weekdays",
     "conditions",
     "startsAt",
     "endsAt",
@@ -19,9 +20,11 @@ export function courseInputFromFormData(formData: FormData): CourseInput {
     "revision",
   ] as const;
   return Object.fromEntries(
-    fields.map((field) => {
-      const value = formData.get(field);
-      return [field, typeof value === "string" ? value : ""];
-    }),
+    fields
+      .filter((field) => field !== "weekdays" || formData.has(field))
+      .map((field) => {
+        const value = formData.get(field);
+        return [field, typeof value === "string" ? value : ""];
+      }),
   );
 }

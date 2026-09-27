@@ -42,5 +42,27 @@ test("private success toast uses semantic theme colors in light and dark modes",
     for (const [toastColor, themeColor] of colors) {
       expect(toastColor).toBe(themeColor);
     }
+    const surface = await page
+      .locator("[data-sileo-toast]")
+      .evaluate((toast) => {
+        const rect = toast.querySelector<SVGRectElement>("[data-sileo-pill]");
+        const title = toast.querySelector<HTMLElement>("[data-sileo-title]");
+        if (!rect || !title) throw new Error("Toast surface not found");
+        const sample = document.createElement("div");
+        sample.style.backgroundColor = "var(--card)";
+        document.body.append(sample);
+        const card = getComputedStyle(sample).backgroundColor;
+        sample.remove();
+        return {
+          fill: getComputedStyle(rect).fill,
+          card,
+          title: getComputedStyle(title).color,
+          foreground: getComputedStyle(document.documentElement)
+            .getPropertyValue("--card-foreground")
+            .trim(),
+        };
+      });
+    expect(surface.fill).toBe(surface.card);
+    expect(surface.title).toBe(surface.foreground);
   }
 });

@@ -47,6 +47,8 @@ interface Props {
   courseId?: string;
   /** Server-generated key already saved for this course, not an arbitrary URL. */
   currentArtwork?: string | null;
+  /** URL derived server-side from the canonical saved artwork key. */
+  currentArtworkUrl?: string | null;
   /** Called only when the upload succeeds; persist the returned key via the admin save use case. */
   onUploaded?: (key: string) => void;
   onPrepared?: (file: File | null) => void;
@@ -55,6 +57,7 @@ interface Props {
 export default function CourseImageEditor({
   courseId,
   currentArtwork,
+  currentArtworkUrl,
   onUploaded,
   onPrepared,
 }: Props) {
@@ -64,6 +67,7 @@ export default function CourseImageEditor({
   const [focusY, setFocusY] = useState(50);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(currentArtwork ?? "");
+  const [savedPreview, setSavedPreview] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [prepared, setPrepared] = useState(false);
@@ -213,6 +217,7 @@ export default function CourseImageEditor({
             : "No se pudo subir la foto.",
         );
       setSaved(body.artwork);
+      setSavedPreview(preview);
       setUploaded(true);
       onUploaded?.(body.artwork);
       window.dispatchEvent(
@@ -256,14 +261,12 @@ export default function CourseImageEditor({
   }
 
   return (
-    <section
-      className="bg-card rounded-xl border p-5 shadow-xs sm:p-7"
-      aria-labelledby="course-image-title"
-    >
-      <h2 id="course-image-title" className="text-xl font-semibold">
-        Foto del curso (opcional)
-      </h2>
-      <p className="text-muted-foreground mt-2 text-sm">
+    <div className="min-w-0" data-course-image-editor>
+      <p className="text-sm font-medium" id="course-image-title">
+        Foto del curso{" "}
+        <span className="text-muted-foreground font-normal">(opcional)</span>
+      </p>
+      <p className="text-muted-foreground mt-1 text-sm">
         {courseId
           ? "Usa una foto propia o autorizada. Recórtala y guarda los cambios tras subirla."
           : "Usa una foto propia o autorizada. Recórtala antes de crear el borrador; se cargará al guardarlo."}
@@ -277,7 +280,7 @@ export default function CourseImageEditor({
         onChange={(event) => void choose(event.target.files?.[0])}
       />
       <div
-        className={`mt-5 rounded-lg border-2 border-dashed p-5 text-center ${dragging ? "border-primary bg-secondary" : "border-border"}`}
+        className={`mt-4 rounded-lg border-2 border-dashed p-4 text-center ${dragging ? "border-primary bg-secondary" : "border-border"}`}
         onDragOver={(event) => {
           event.preventDefault();
           setDragging(true);
@@ -312,12 +315,12 @@ export default function CourseImageEditor({
         </Button>
       )}
       {preview && image && (
-        <div className="mt-5 space-y-4">
+        <div className="mt-4 space-y-4">
           <p className="text-sm font-medium">Vista previa del recorte</p>
           <img
             src={preview}
             alt="Vista previa del encuadre del curso"
-            className="aspect-[8/5] w-full max-w-xl rounded-lg object-cover"
+            className="aspect-[4/3] w-full rounded-lg object-cover"
           />
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="grid gap-2 text-sm">
@@ -384,6 +387,13 @@ export default function CourseImageEditor({
           )}
         </div>
       )}
+      {saved && !image && (savedPreview || currentArtworkUrl) && (
+        <img
+          src={savedPreview ?? currentArtworkUrl ?? ""}
+          alt="Foto actual del curso"
+          className="mt-4 aspect-[4/3] w-full rounded-lg object-cover"
+        />
+      )}
       {error && (
         <p role="alert" className="text-destructive mt-3 text-sm">
           {error}
@@ -396,6 +406,6 @@ export default function CourseImageEditor({
             : "Este curso ya tiene una foto guardada. Sube otra para reemplazarla."}
         </p>
       )}
-    </section>
+    </div>
   );
 }

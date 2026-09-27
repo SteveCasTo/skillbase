@@ -350,14 +350,12 @@ Una persona se preinscribe y administración ve la demanda acumulada.
 
 ### Objetivos
 
-- Crear grupos.
-- Definir mínimo.
-- Definir cupo.
-- Asignar instructor.
-- Definir horario.
-- Gestionar cancelación.
-- Gestionar grupo adicional.
-- Gestionar reemplazo por feriados.
+- [x] Crear y administrar grupos con cupo máximo propio, sin mínimo obligatorio.
+- [x] Definir horario L–V independiente por grupo, sin solapamiento dentro del curso.
+- [x] Gestionar cancelación conservando historial y permitir grupos adicionales.
+- Asignar instructor real cuando exista el módulo de asignaciones; mientras tanto se conserva el instructor textual del curso.
+- Gestionar reemplazo por feriados cuando existan sesiones y calendario operativo.
+- Vincular preinscritos e inscritos a grupos cuando estén disponibles esos módulos.
 
 ### Resultado demostrable
 

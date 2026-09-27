@@ -16,6 +16,8 @@ export const PRIVATE_ROUTE_POLICIES = {
 
 const COURSE_EDIT_PATH =
   /^\/app\/cursos\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/editar$/i;
+const COURSE_GROUPS_PATH =
+  /^\/app\/cursos\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/grupos$/i;
 const FORMAT_DETAIL_PATH =
   /^\/app\/formatos\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 
@@ -31,7 +33,10 @@ export function getPrivateRoutePolicy(
       normalizedPath as keyof typeof PRIVATE_ROUTE_POLICIES
     ] ?? null;
   if (exact) return exact;
-  if (COURSE_EDIT_PATH.test(normalizedPath))
+  if (
+    COURSE_EDIT_PATH.test(normalizedPath) ||
+    COURSE_GROUPS_PATH.test(normalizedPath)
+  )
     return { access: "ROLES", roles: ["ADMIN"] };
   return FORMAT_DETAIL_PATH.test(normalizedPath)
     ? { access: "ROLES", roles: ["ADMIN"] }

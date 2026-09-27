@@ -36,4 +36,43 @@ describe("course Markdown", () => {
       false,
     );
   });
+
+  test("renders practical block syntax and all six heading levels", () => {
+    const nodes = parseCourseMarkdown(
+      "# Uno\n## Dos\n### Tres\n#### Cuatro\n##### Cinco\n###### Seis\n\n> cita\n\n```ts\nconst x = 1;\n```\n\n---",
+    );
+
+    expect(
+      nodes.filter((node) => node.type === "heading").map((node) => node.level),
+    ).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(nodes.map((node) => node.type)).toEqual([
+      "heading",
+      "heading",
+      "heading",
+      "heading",
+      "heading",
+      "heading",
+      "blockquote",
+      "code-block",
+      "separator",
+    ]);
+    expect(nodes[6]!.children?.[0]).toMatchObject({
+      type: "text",
+      value: "cita",
+    });
+    expect(nodes[7]).toMatchObject({
+      type: "code-block",
+      value: "const x = 1;",
+    });
+  });
+
+  test("rejects unsafe and malformed URL schemes", () => {
+    const nodes = parseCourseMarkdown(
+      "[script](javascript:alert(1)) [data](data:text/html,x) [space](https://example.com\\@evil.test)",
+    );
+
+    expect(nodes[0]!.children?.every((node) => node.type !== "link")).toBe(
+      true,
+    );
+  });
 });

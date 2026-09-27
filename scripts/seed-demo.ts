@@ -2,6 +2,8 @@ import { createDatabase } from "@/server/db/client";
 import { courseTypeRevisions, courseTypes, courses } from "@/server/db/schema";
 import { getLocalSupabaseEnvironment } from "./supabase-local-env";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+import { planWeekdaySchedule } from "@/domain/courses/weekday-schedule";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required in .env.");
@@ -33,12 +35,10 @@ const samples = [
       "Aprende a construir sitios accesibles con HTML, CSS y JavaScript.",
     level: "BASIC",
     format: "Formato 20 horas",
-    schedule: "Lunes y miércoles, 18:00 a 20:00",
     conditions: "No se requieren conocimientos previos.",
     contentMarkdown:
       "## Lo que aprenderás\n\nEstructura web, estilos y primeros pasos con JavaScript.",
     startsAt: after(40),
-    endsAt: after(70),
     registrationStartAt: after(-7),
     registrationEndAt: after(30),
     status: "PUBLISHED",
@@ -51,11 +51,9 @@ const samples = [
       "Explora conjuntos de datos y comunica hallazgos con claridad.",
     level: "INTERMEDIATE",
     format: "Formato 30 horas",
-    schedule: "Martes y jueves, 19:00 a 21:00",
     conditions: "Se recomienda familiaridad con hojas de cálculo.",
     contentMarkdown: null,
     startsAt: after(55),
-    endsAt: after(85),
     registrationStartAt: after(5),
     registrationEndAt: after(45),
     status: "PUBLISHED",
@@ -67,11 +65,9 @@ const samples = [
     description: "Practica fundamentos de diseño centrado en las personas.",
     level: "BASIC",
     format: "Formato 20 horas",
-    schedule: "Sábados, 09:00 a 12:00",
     conditions: "Abierto a participantes de cualquier especialidad.",
     contentMarkdown: null,
     startsAt: after(65),
-    endsAt: after(95),
     registrationStartAt: after(-3),
     registrationEndAt: after(50),
     status: "PUBLISHED",
@@ -84,11 +80,9 @@ const samples = [
       "Reconoce riesgos frecuentes y buenas prácticas de protección.",
     level: "BASIC",
     format: "Formato 30 horas",
-    schedule: "Viernes, 17:00 a 20:00",
     conditions: "Solo necesitas experiencia básica usando computadoras.",
     contentMarkdown: null,
     startsAt: after(75),
-    endsAt: after(105),
     registrationStartAt: after(10),
     registrationEndAt: after(60),
     status: "PUBLISHED",
@@ -101,11 +95,9 @@ const samples = [
       "Planifica actividades y coordina equipos mediante casos prácticos.",
     level: "INTERMEDIATE",
     format: "Formato 30 horas",
-    schedule: "Miércoles, 18:00 a 21:00",
     conditions: "No se requieren herramientas de pago.",
     contentMarkdown: null,
     startsAt: after(90),
-    endsAt: after(120),
     registrationStartAt: null,
     registrationEndAt: null,
     status: "DRAFT",
@@ -117,7 +109,12 @@ const database = createDatabase(connectionString);
 try {
   const created = await database.db.transaction(async (tx) => {
     const formats = await tx
-      .select({ name: courseTypes.name, revisionId: courseTypeRevisions.id })
+      .select({
+        name: courseTypes.name,
+        revisionId: courseTypeRevisions.id,
+        totalHours: courseTypeRevisions.totalHours,
+        sessionMinutes: courseTypeRevisions.sessionMinutes,
+      })
       .from(courseTypes)
       .innerJoin(
         courseTypeRevisions,
@@ -127,10 +124,9 @@ try {
         inArray(courseTypes.name, ["Formato 20 horas", "Formato 30 horas"]),
       )
       .orderBy(desc(courseTypeRevisions.revisionNumber));
-    const revisions = new Map<string, string>();
+    const revisions = new Map<string, (typeof formats)[number]>();
     for (const format of formats) {
-      if (!revisions.has(format.name))
-        revisions.set(format.name, format.revisionId);
+      if (!revisions.has(format.name)) revisions.set(format.name, format);
     }
 
     const existing = await tx
@@ -152,22 +148,37 @@ try {
     let inserted = 0;
     for (const sample of samples) {
       if (slugs.has(sample.slug)) continue;
-      const revisionId = revisions.get(sample.format);
-      if (!revisionId) throw new Error(`Missing seed format: ${sample.format}`);
+      const revision = revisions.get(sample.format);
+      if (!revision?.sessionMinutes)
+        throw new Error(`Seed format needs session minutes: ${sample.format}`);
+      let start = instantToBoliviaCivil(sample.startsAt).slice(0, 10);
+      // Start on the next weekday, at a stable Bolivia civil hour, regardless of the host timezone.
+      while ([0, 6].includes(new Date(`${start}T00:00:00Z`).getUTCDay()))
+        start = new Date(new Date(`${start}T00:00:00Z`).getTime() + day)
+          .toISOString()
+          .slice(0, 10);
+      const startsAt = `${start}T18:00`;
+      const plan = planWeekdaySchedule({
+        startsAt,
+        weekdaysMask: 31,
+        totalHours: revision.totalHours,
+        sessionMinutes: revision.sessionMinutes,
+      });
       await tx.insert(courses).values({
         slug: sample.slug,
         name: sample.name,
         description: sample.description,
         level: sample.level,
-        schedule: sample.schedule,
+        schedule: `Lunes a viernes, 18:00–${plan.endTime}`,
+        weekdaysMask: 31,
         conditions: sample.conditions,
         contentMarkdown: sample.contentMarkdown,
-        startsAt: sample.startsAt,
-        endsAt: sample.endsAt,
+        startsAt: plan.sessions[0]!.startsAt,
+        endsAt: plan.endsAt,
         registrationStartAt: sample.registrationStartAt,
         registrationEndAt: sample.registrationEndAt,
         status: sample.status,
-        courseTypeRevisionId: revisionId,
+        courseTypeRevisionId: revision.revisionId,
         featured: sample.featured && !featured,
         minimumGrade: 70,
         instructorName: "Equipo docente de ejemplo",

@@ -3,6 +3,7 @@ import {
   check,
   boolean,
   decimal,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -12,6 +13,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -129,6 +131,8 @@ export const courseTypeRevisions = pgTable(
       .references(() => courseTypes.id, { onDelete: "restrict" }),
     revisionNumber: integer("revision_number").notNull(),
     totalHours: integer("total_hours").notNull(),
+    // NULL marks historical terms whose session duration was never recorded.
+    sessionMinutes: integer("session_minutes"),
     studentAmount: decimal("student_amount", {
       precision: 12,
       scale: 2,
@@ -148,6 +152,10 @@ export const courseTypeRevisions = pgTable(
     ),
     index("course_type_revisions_type_idx").on(table.courseTypeId),
     check("course_type_revisions_hours_check", sql`${table.totalHours} > 0`),
+    check(
+      "course_type_revisions_session_minutes_check",
+      sql`${table.sessionMinutes} between 15 and 480`,
+    ),
     check(
       "course_type_revisions_prices_check",
       sql`${table.studentAmount} >= 0 and ${table.externalAmount} >= 0`,
@@ -175,6 +183,7 @@ export const courses = pgTable(
     artwork: text("artwork"),
     featured: boolean("featured").notNull().default(false),
     schedule: text("schedule").notNull(),
+    weekdaysMask: integer("weekdays_mask"),
     conditions: text("conditions").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
@@ -198,6 +207,10 @@ export const courses = pgTable(
     index("courses_status_idx").on(table.status),
     index("courses_status_created_at_idx").on(table.status, table.createdAt),
     index("courses_course_type_revision_idx").on(table.courseTypeRevisionId),
+    unique("courses_id_course_type_revision_id_unique").on(
+      table.id,
+      table.courseTypeRevisionId,
+    ),
     uniqueIndex("courses_one_published_featured_unique")
       .on(table.featured)
       .where(sql`${table.status} = 'PUBLISHED' and ${table.featured} = true`),
@@ -231,9 +244,45 @@ export const courses = pgTable(
     ),
     check("courses_dates_check", sql`${table.startsAt} < ${table.endsAt}`),
     check(
+      "courses_weekdays_mask_check",
+      sql`${table.weekdaysMask} between 1 and 31`,
+    ),
+    check(
       "courses_registration_window_check",
       sql`(${table.registrationStartAt} is null and ${table.registrationEndAt} is null) or (${table.registrationStartAt} is not null and ${table.registrationEndAt} is not null and ${table.registrationStartAt} < ${table.registrationEndAt})`,
     ),
+  ],
+);
+
+export const groupStatus = pgEnum("group_status", ["PLANNED", "CANCELLED"]);
+
+export const groups = pgTable(
+  "groups",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    courseId: uuid("course_id").notNull(),
+    courseTypeRevisionId: uuid("course_type_revision_id").notNull(),
+    capacity: integer("capacity").notNull(),
+    status: groupStatus("status").notNull().default("PLANNED"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("groups_course_id_idx").on(table.courseId),
+    index("groups_course_type_revision_id_idx").on(table.courseTypeRevisionId),
+    foreignKey({
+      name: "groups_course_revision_fk",
+      columns: [table.courseId, table.courseTypeRevisionId],
+      foreignColumns: [courses.id, courses.courseTypeRevisionId],
+    }).onDelete("restrict"),
+    check("groups_capacity_check", sql`${table.capacity} > 0`),
+    check("groups_dates_check", sql`${table.startsAt} < ${table.endsAt}`),
   ],
 );
 

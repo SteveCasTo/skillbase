@@ -123,17 +123,17 @@ const success = Astro.url.searchParams.get("success");
   )}
   <script>
     import { sileo } from "sileo";
-
-    const success = new URLSearchParams(window.location.search).get("success");
-    const messages: Record<string, string> = {
-      deleted: "Formato eliminado.",
-      created: "Formato creado.",
-    };
-    const message = success ? messages[success] : undefined;
-    if (message) {
-      window.addEventListener(
-        "load",
-        () => {
+    document.addEventListener("astro:page-load", () => {
+      const success = new URLSearchParams(window.location.search).get(
+        "success",
+      );
+      const messages: Record<string, string> = {
+        deleted: "Formato eliminado.",
+        created: "Formato creado.",
+      };
+      const message = success ? messages[success] : undefined;
+      if (message) {
+        {
           sileo.success({ title: message, duration: 6000 });
           const url = new URL(window.location.href);
           url.searchParams.delete("success");
@@ -142,9 +142,8 @@ const success = Astro.url.searchParams.get("success");
             "",
             `${url.pathname}${url.search}${url.hash}`,
           );
-        },
-        { once: true },
-      );
-    }
+        }
+      }
+    });
   </script>
 </PrivateLayout>

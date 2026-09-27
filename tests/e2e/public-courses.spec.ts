@@ -23,6 +23,7 @@ test("published course is public end-to-end and withdrawal removes every public 
     const createFormat = page.getByRole("form", { name: "Crear formato" });
     await createFormat.getByLabel("Nombre").fill(formatName);
     await createFormat.getByLabel("Duración total (horas)").fill("20");
+    await createFormat.getByLabel("Duración de sesión (minutos)").fill("90");
     await createFormat.getByLabel("Precio estudiante (BOB)").fill("80");
     await createFormat.getByLabel("Precio externo (BOB)").fill("100.50");
     await createFormat.getByRole("button", { name: "Crear formato" }).click();
@@ -42,15 +43,11 @@ test("published course is public end-to-end and withdrawal removes every public 
     await page
       .getByLabel("Contenido del curso (Markdown, opcional)")
       .fill(
-        "## Temario público\n- **Unidad segura**\n\n[Enlace inseguro](javascript:alert(1))\n<script>alert(2)</script>",
+        "## Temario público\n- **Unidad segura**\n\n> Nota del curso\n\n```ts\nconst ejemplo = 1;\n```\n\n---\n\n[Guía válida](https://example.com/guia)\n[Enlace inseguro](javascript:alert(1))\n<script>alert(2)</script>",
       );
-    await page.getByRole("checkbox", { name: "Lunes" }).click();
-    await page.getByLabel("Desde", { exact: true }).fill("18:30");
-    await page.getByLabel("Hasta", { exact: true }).fill("20:30");
     await page.getByLabel("Condiciones").fill("Inscripción sujeta a cupo.");
     for (const [label, date, time] of [
-      ["Inicio del curso", "01/03/2027", "18:30"],
-      ["Finalización del curso", "01/04/2027", "20:30"],
+      ["Inicio de clases (Bolivia)", "01/03/2027", "18:30"],
       ["Apertura de preinscripción", "01/01/2027", "08:00"],
       ["Cierre de preinscripción", "20/02/2027", "18:00"],
     ] as const) {
@@ -64,8 +61,9 @@ test("published course is public end-to-end and withdrawal removes every public 
     }
     await page.getByLabel("Nota mínima (0–100)").fill("70");
     await page.getByRole("button", { name: "Crear borrador" }).click();
-    await expect(page).toHaveURL(
-      /\/app\/cursos\/[^/]+\/editar\?success=created$/,
+    await expect(page).toHaveURL(/\/app\/cursos\/[^/]+\/editar$/);
+    await expect(page.locator("[data-sileo-toast]")).toContainText(
+      "Borrador creado",
     );
     courseId = new URL(page.url()).pathname.split("/").at(-2);
     expect(courseId).toMatch(/^[0-9a-f-]{36}$/i);
@@ -100,9 +98,9 @@ test("published course is public end-to-end and withdrawal removes every public 
       page.getByRole("img", { name: "Vista previa del encuadre del curso" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Subir foto recortada" }).click();
-    await expect(page.getByRole("status")).toContainText(
-      "aún no está guardada",
-    );
+    await expect(
+      page.getByRole("status").filter({ hasText: "Foto cargada" }),
+    ).toContainText("aún no está guardada");
     artworkKey = await page.locator('input[name="artwork"]').inputValue();
     expect(artworkKey).toMatch(
       new RegExp(`^courses/${courseId}/[0-9a-f-]+\\.webp$`, "i"),
@@ -115,9 +113,12 @@ test("published course is public end-to-end and withdrawal removes every public 
       page.getByRole("button", { name: "Guardar cambios" }),
     ).toBeDisabled();
 
-    await page.getByText("Publicar curso", { exact: true }).click();
+    await page.getByRole("button", { name: "Publicar curso" }).click();
     await page.getByRole("button", { name: "Confirmar publicación" }).click();
-    await expect(page).toHaveURL(/success=published/);
+    await expect(page.locator("[data-sileo-toast]")).toContainText(
+      "Curso publicado",
+    );
+    await expect(page).toHaveURL(/\/app\/cursos\/[^/]+\/editar$/);
     await page
       .getByRole("button", { name: "Destacar en la cartelera" })
       .click();
@@ -160,12 +161,12 @@ test("published course is public end-to-end and withdrawal removes every public 
     ).toContainText(/1.*marzo.*2027/i);
     await expect(
       page.locator("dt").filter({ hasText: "Finalización" }).locator("+ dd"),
-    ).toContainText(/1.*abril.*2027/i);
+    ).toContainText(/17.*marzo.*2027/i);
     await expect(
       page.getByText("Docente público E2E", { exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Temario público" }),
+      page.getByRole("heading", { level: 2, name: "Temario público" }),
     ).toBeVisible();
     await expect(
       page.getByText("Unidad segura", { exact: true }),
@@ -173,6 +174,16 @@ test("published course is public end-to-end and withdrawal removes every public 
     await expect(page.locator(".course-markdown strong")).toHaveText(
       "Unidad segura",
     );
+    await expect(page.locator(".course-markdown blockquote")).toHaveText(
+      "Nota del curso",
+    );
+    await expect(page.locator(".course-markdown pre code")).toContainText(
+      "const ejemplo = 1;",
+    );
+    await expect(page.locator(".course-markdown hr")).toHaveCount(1);
+    await expect(
+      page.getByRole("link", { name: "Guía válida" }),
+    ).toHaveAttribute("href", "https://example.com/guia");
     await expect(
       page.locator("script").filter({ hasText: "alert(2)" }),
     ).toHaveCount(0);
@@ -187,7 +198,7 @@ test("published course is public end-to-end and withdrawal removes every public 
     // The upload really reached public Storage; remove it even when later assertions fail.
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     await page.goto(`/app/cursos/${courseId}/editar`);
-    await page.getByText("Retirar publicación", { exact: true }).click();
+    await page.getByRole("button", { name: "Retirar publicación" }).click();
     await page.getByRole("button", { name: "Confirmar retiro" }).click();
     await expect(page.locator("[data-sileo-toast]")).toContainText(
       "devuelto a borrador",
@@ -211,7 +222,7 @@ test("published course is public end-to-end and withdrawal removes every public 
 
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     await page.goto(`/app/cursos/${courseId}/editar`);
-    await page.getByText("Archivar curso", { exact: true }).click();
+    await page.getByRole("button", { name: "Archivar curso" }).click();
     await page.getByRole("button", { name: "Confirmar archivo" }).click();
     await expect(page.locator("[data-sileo-toast]")).toContainText(
       "Curso archivado",

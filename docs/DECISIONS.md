@@ -386,3 +386,92 @@ Fase 2A almacena `totalHours` y los precios `STUDENT`/`EXTERNAL` directamente po
 - La cartelera agrupa afiches en tríos, convierte cuatro remanentes en dos pares y deja un remanente único en una fila completa; desktop varía proporciones, tablet equilibra dos columnas y mobile usa una columna uniforme. Cada pieza es un enlace de tarjeta completa.
 
 Los formatos de desarrollo seeded (20 horas: Bs 80/100; 30 horas: Bs 120/150) son valores iniciales editables de entorno local, no una tarifa universal ni un precio para auxiliares.
+
+---
+
+## ADR-017 — MUTACIONES ADMINISTRATIVAS SIN RECARGA
+
+**Fecha:** 2026-09-26
+
+**Estado:** Accepted — aplicación progresiva
+
+### Contexto
+
+Las recargas completas tras guardar, eliminar o cambiar un estado interrumpen el trabajo en formularios, la posición de lectura y los controles interactivos. El contrato SSR de las páginas administrativas ya ofrece POST HTML y validación de servidor.
+
+### Decisión
+
+Con JavaScript, toda mutación administrativa (incluidas altas, ediciones, cambios de estado y eliminaciones) debe confirmar en la interfaz y actualizar el contenido pertinente sin recargar el documento. Los POST con `Accept: application/json` reutilizan el mismo caso de uso, autorización, comprobación de origen, validación y control de concurrencia que el formulario HTML. Errores persistentes y revisiones optimistas se reflejan en la vista. Para acciones irreversibles o de alto impacto se pide confirmación accesible; las operaciones no se ejecutan al cerrar el diálogo. Sin JavaScript se conserva POST/redirect y una confirmación HTML utilizable.
+
+### Alternativas
+
+- Recargar la página después de cada operación.
+- Mantener una implementación de reglas distinta en el cliente.
+
+### Consecuencias
+
+- La interfaz debe sincronizar los datos y tokens devueltos por el servidor y ofrecer recuperación si la sesión caduca o falla una solicitud.
+- Los tests cubren resultados del servidor, continuidad de la página, foco y el fallback sin JavaScript por flujo; las mutaciones que aún hacen redirect con JavaScript se migran por fases.
+- Esta decisión reemplaza la exigencia de Post/Redirect/Get para **todo** éxito mutable en ADR-015: PRG permanece para el fallback HTML.
+
+---
+
+## ADR-018 — PLANIFICACIÓN EDITORIAL DE LUNES A VIERNES
+
+**Fecha:** 2026-09-26
+
+**Estado:** Accepted — implementación de calendario editorial
+
+### Contexto
+
+Los checkboxes de días y el horario de texto libre no permiten derivar la fecha de finalización ni garantizar que el tiempo de cada clase coincida con el formato. Los cursos existentes y publicados contienen únicamente horas nominales y fechas informativas; no se conoce la duración histórica de sus sesiones.
+
+### Decisión
+
+Agregar minutos por sesión a cada nueva revisión inmutable de formato. Para cursos nuevos, fijar lunes a viernes, calcular el fin diario a partir del inicio civil de Bolivia y derivar la fecha final con sesiones completas, redondeando al número más cercano (empates hacia arriba). Mostrar por separado horas nominales del formato y horas planificadas cuando difieran: 20 h/90 min → 13 sesiones/19,5 h; 30 h/150 min → 12 sesiones/30 h. El fin es fijo; se cambia el formato o el inicio, no se edita la hora final. Revalidar en servidor y recalcular borradores al revisar un formato.
+
+Los cursos y revisiones históricos sin dato verificable conservan horario libre y `session_minutes = NULL`, respectivamente. La migración solo asigna 90/150 minutos a los ejemplos conocidos cuya revisión coincide por nombre, duración y precios; no inventa horarios pasados. La preinscripción opcional cierra antes del inicio. Los feriados, recuperaciones y calendarios operativos pertenecen a grupos futuros.
+
+### Alternativas
+
+- Conservar checkboxes de días y horarios libres en cursos nuevos.
+- Redondear a sesiones parciales o contabilizar 20 h como 21 h exactas.
+- Atribuir duración de sesión a todas las revisiones históricas según sus horas nominales.
+
+### Consecuencias
+
+- El planificador de dominio y el repositorio usan tiempo civil `America/La_Paz`, verifican las fechas derivadas y conservan las revisiones históricas de cursos publicados/archivados.
+- Esta planificación sigue siendo **editorial**; los futuros grupos definen sus horarios propios sin deducir asistencia ni inscripción de los cursos históricos.
+- Los cursos nuevos requieren formatos con duración de sesión conocida. La migración es aditiva y se prueba sobre datos legados además de una base nueva.
+
+---
+
+## ADR-019 — GRUPOS CON CUPO Y HORARIO PROPIOS
+
+**Fecha:** 2026-09-27
+
+**Estado:** Accepted — administración de grupos inicial
+
+### Contexto
+
+Un curso puede atraer más participantes que los disponibles en un solo horario. La preinscripción y la inscripción todavía no están implementadas; no existen identidades de instructor asignadas a grupos ni aulas registradas. El calendario del curso tiene carácter editorial.
+
+### Decisión
+
+Cada curso publicado y planificado puede tener varios grupos con capacidad máxima individual positiva y sin mínimo automático. Todos comparten fechas L–V e instructor textual del curso, pero tienen hora de inicio distinta y fin derivado de la revisión de formato fijada. Solo los grupos planificados **del mismo curso** no pueden solaparse; los horarios contiguos y los de otros cursos sí. Administración puede ajustar horario/cupo o cancelar un grupo sin borrarlo; no se distribuyen participantes automáticamente.
+
+Una transacción bloquea el curso antes de comprobar conflictos y escribir grupos, con revisión optimista y auditoría. El curso conserva fechas y revisión vinculadas a grupos, incluso si vuelve a borrador, y su republicación exige un formato activo. El módulo usa casos de uso autorizados `ADMIN`, ruta privada enumerada, RLS y tabla sin grants Data API.
+
+La relación compuesta grupo → (curso, revisión) impide vincular una revisión ajena incluso fuera de la aplicación. Se admite cancelar grupos existentes después de retirar o archivar el curso; crear y cambiar horarios requiere publicación. El cupo está limitado al máximo `integer` de PostgreSQL.
+
+### Alternativas
+
+- Tratar cada grupo como un curso independiente.
+- Guardar un cupo global del curso y repartir estudiantes automáticamente.
+- Bloquear horarios entre cursos distintos sin datos de aulas o asignación real de instructores.
+
+### Consecuencias
+
+- La capacidad cuenta como límite configurado, no como matrícula confirmada; los grupos cancelados conservan registro pero dejan de competir por horarios.
+- La elección y cambio de grupo por participantes, conteo real de ocupación, cancelaciones con inscripciones/pagos y sesiones de feriados requieren módulos posteriores de preinscripción, inscripción y operación.
+- El detalle público mantiene el horario editorial existente hasta que la selección de grupo y la disponibilidad real se implementen en el contrato público.

@@ -63,7 +63,8 @@ Implementación actual:
 - nombre, descripción, horario informativo y condiciones son obligatorios y no vacíos.
 - `course_type_revision_id` es obligatorio; horas y precios se resuelven desde esa revisión en lugar de guardarse directamente en `courses`/`course_prices`.
 - `minimum_grade` está limitado a `0..100`; todavía no existe `minimum_attendance` ni cálculo académico.
-- `schedule` continúa como texto no vacío por compatibilidad. El constructor administrativo ayuda a ingresar días/horas, pero persiste una cadena informativa, no una estructura calendario.
+- `schedule` continúa como texto no vacío por compatibilidad. Los nuevos cursos generan su resumen a partir del plan fijo de lunes a viernes; los históricos conservan su texto informativo.
+- `weekdays_mask` es `31` para nuevos cursos planificados de lunes a viernes; los cursos históricos sin planificación estructurada lo conservan nulo. El resumen de horario sigue siendo texto de compatibilidad y se calcula para los cursos nuevos; las fechas editoriales de inicio/fin se derivan del formato y el inicio civil. Esto aún no sustituye la entidad futura de sesiones de grupo.
 - `content_markdown` e `instructor_name` son campos de texto opcionales. `artwork` almacena una key canónica del objeto de Storage, no una URL arbitraria. `featured` solo puede ser true en un curso publicado y un índice parcial permite como máximo un destacado publicado.
 - fechas públicas de inicio y fin usan `timestamptz`, son obligatorias y mantienen `starts_at < ends_at`; la UI recibe tiempo civil estricto `YYYY-MM-DDTHH:mm` de `America/La_Paz` y lo convierte a instante UTC.
 - la ventana de preinscripción usa dos `timestamptz`: ambos son nulos o ambos existen con inicio anterior al fin. La conversión inversa UTC → Bolivia preserva exactamente la hora civil al reeditar.
@@ -88,15 +89,18 @@ Representa un formato administrado. `active` permite activarlo o desactivarlo si
 - courseTypeId
 - revisionNumber
 - totalHours
+- sessionMinutes (nullable solo en revisiones históricas sin dato verificable)
 - studentAmount
 - externalAmount
 - createdAt
 
 Cada revisión es inmutable. Sus precios `STUDENT` y `EXTERNAL`, en `BOB`, pertenecen directamente a esa revisión y no son overrides del curso. Los importes son `numeric(12,2)` y se representan como strings en TypeScript. Una restricción de base de datos rechaza UPDATE/DELETE de revisiones.
 
+`session_minutes` registra minutos por clase (15–480). En la migración es nulo para términos anteriores que nunca especificaron duración de sesión; únicamente las revisiones de los ejemplos conocidos que coinciden por nombre, duración y precios reciben 90/150 minutos. Los nuevos formatos requieren el valor. Los borradores planificados se recalculan al cambiar la revisión vigente sin alterar los cursos publicados o archivados.
+
 #### Relación con Course
 
-Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no conserva campos editables independientes para horas o precios. Al editar un tipo se crea una nueva revisión y los cursos `DRAFT` pasan a la revisión vigente; los cursos `PUBLISHED` y `ARCHIVED` mantienen la revisión exacta. Cursos históricos migrados reciben formatos/revisiones generados a partir de cada tupla distinta de duración y precios, sin sustituir sus valores por defaults.
+Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no conserva campos editables independientes para horas o precios. Al editar un tipo se crea una nueva revisión y los cursos `DRAFT` sin grupos pasan a la revisión vigente; los cursos con grupos y los `PUBLISHED`/`ARCHIVED` mantienen la revisión exacta. Cursos históricos migrados reciben formatos/revisiones generados a partir de cada tupla distinta de duración y precios, sin sustituir sus valores por defaults.
 
 ### Campos editoriales añadidos
 
@@ -110,13 +114,13 @@ Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no cons
 
 - id
 - courseId
-- instructorId
-- code
-- minimumParticipants
-- maximumParticipants
-- status
-- startsAt
-- endsAt
+- courseTypeRevisionId (revisión de formato conservada)
+- capacity (máximo por grupo; no mínimo)
+- status (`PLANNED` o `CANCELLED`)
+- startsAt / endsAt (primer y último encuentro, hora civil boliviana)
+- createdAt / updatedAt (concurrencia optimista)
+
+El modelo implementado crea grupos únicamente para cursos publicados con plan L–V y duración de sesión conocida. Los encuentros se repiten de lunes a viernes y solo cambia la hora inicial por grupo; la hora final y última fecha se derivan de la revisión fijada. No se almacena ni infiere número de inscritos mientras no exista el módulo de inscripciones. Las operaciones se auditan; la creación y las ediciones se serializan mediante bloqueo del curso padre y se rechazan solapamientos entre grupos planificados de ese mismo curso. Los grupos cancelados se conservan. La asignación de identidad del instructor, calendario de feriados, códigos visibles y entidades `Session` permanecen pendientes.
 
 ### Participant
 
