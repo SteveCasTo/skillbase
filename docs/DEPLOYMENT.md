@@ -154,7 +154,7 @@ El job `integration-e2e` instala Chromium y ejecuta los runners aislados. `test:
 
 El proyecto cloud Supabase `SkillBase` (`fvzxqlezdrlzykyoevub`) y el proyecto Vercel `stevecasto-projects/skillbase` están enlazados. El dominio de producción es `https://skillbase-alpha.vercel.app`; `skillbase.vercel.app` no está disponible porque pertenece a otra cuenta.
 
-Por petición explícita se cargaron manualmente en producción los dos formatos de ejemplo de 20 y 30 horas (80/100 y 120/150 BOB) y los cinco cursos sintéticos de `seed-demo`, todos en estado `DRAFT` y sin destacado. El formato local adicional `Promedio` no se cargó. Esta carga puntual no forma parte de las migraciones ni del despliegue automático; los ejemplos no constituyen oferta académica aprobada y solo pueden mostrarse públicamente mediante publicación administrativa posterior.
+Por petición explícita se cargaron manualmente en producción los dos formatos de ejemplo de 20 y 30 horas (80/100 y 120/150 BOB) y los cinco cursos sintéticos de `seed-demo`. El formato local adicional `Promedio` no se cargó. Esta carga puntual no forma parte de las migraciones ni del despliegue automático. Cuatro demos están publicados y `demo-gestion-de-proyectos` permanece en borrador; su estado editorial no se cambia durante la reconciliación.
 
 ### Reconciliación manual de los cinco demos cloud
 
@@ -171,6 +171,8 @@ bun scripts/reconcile-production-demo-courses.ts --apply --confirm-project-ref f
 ```
 
 Omitir `--accept-edited-calendars` cuando no hay ediciones de calendario auditadas. La aplicación revalida el snapshot bajo locks en una única operación SQL atómica; cualquier cambio posterior o grupo inesperado impide escribir. Si ya se aplicó el mismo snapshot, repetir **el mismo comando apply** responde sin nuevas escrituras/auditorías. Verificar el resultado mediante las vistas administrativas; el comando preview está pensado para el estado previo y rechaza grupos existentes. Ante error o discrepancia, no repetir con un hash anterior: investigar primero y crear un preview nuevo solo si los grupos continúan ausentes. No pegar el snapshot ni la salida de la CLI en tickets o logs públicos; el backup local no equivale al backup/PITR gestionado de producción.
+
+El 28 de septiembre de 2026 se aplicó esta reconciliación a los cinco demos cloud después del despliegue del PR #100. El snapshot privado previo permanece fuera del repositorio. Se comprobaron cinco calendarios L–V, seis grupos (cinco marcados como publicados y uno de borrador), la conservación de todos los demás campos de curso, revisiones de formato y eventos de auditoría anteriores, y las cuatro fichas públicas sin horas ni horario heredado. La cartelera pública tampoco muestra fechas; las fechas se consultan en cada ficha.
 
 El job `deploy` se ejecuta únicamente en pushes a `master`, y su condición requiere éxito explícito de `quality` e `integration-e2e`. Aplica migraciones Drizzle y despliega el output preconstruido con Vercel CLI. La integración Git automática de Vercel está desconectada para impedir despliegues paralelos que omitan estos gates.
 
