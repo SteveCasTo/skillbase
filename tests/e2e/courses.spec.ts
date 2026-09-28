@@ -219,6 +219,13 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   const artwork = page.locator('input[name="artwork"]');
   const key = await artwork.inputValue();
   expect(key).toMatch(/^courses\/[0-9a-f-]+\/[0-9a-f-]+\.webp$/);
+  // The editor and persisted photo must be present in the server response,
+  // rather than disappearing until the React islands finish loading.
+  const editHtml = await (await page.request.get(draftUrl!)).text();
+  expect(editHtml).toContain('id="contentMarkdown"');
+  expect(editHtml).toContain('data-course-image-editor="true"');
+  expect(editHtml).toContain("Foto actual del curso");
+  expect(editHtml).toContain(key);
   await expect(
     page.getByRole("img", { name: "Foto actual del curso" }),
   ).toBeVisible();
@@ -486,6 +493,17 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(page.locator("[data-sileo-toast]")).toContainText(
     "Borrador creado",
   );
+  const savedCourseEditUrl = page.url();
+  await page.goto("/app/cursos");
+  const savedCourseCard = page
+    .locator("article")
+    .filter({ hasText: "Curso E2E conservación" });
+  await expect(savedCourseCard).toBeVisible();
+  const savedCourseTimes = savedCourseCard.locator("time");
+  await expect(savedCourseTimes).toHaveCount(2);
+  await expect(savedCourseTimes.nth(0)).toContainText(/2027.*\d{2}:\d{2}/);
+  await expect(savedCourseTimes.nth(1)).toContainText(/2027.*\d{2}:\d{2}/);
+  await page.goto(savedCourseEditUrl);
   const save = page.getByRole("button", { name: "Guardar cambios" });
   await expect(save).toBeDisabled();
   await page.getByLabel("Nombre").fill("Curso temporalmente inválido");
@@ -607,6 +625,8 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(page.getByRole("alert").first()).toContainText(
     "imagen seleccionada",
   );
+  await expect(markdown).toBeVisible();
+  await expect(markdown).toHaveValue("## Temario\n- Unidad uno");
   await expect(page.getByLabel("Nombre")).toHaveValue("Curso E2E conservación");
   await expect(page.getByRole("combobox", { name: "Nivel" })).toContainText(
     "Medio",
