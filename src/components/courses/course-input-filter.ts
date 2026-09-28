@@ -1,5 +1,8 @@
 /** UI-only admission rules. Server validation remains authoritative. */
-import { boliviaCivilToInstant } from "@/domain/courses/bolivia-time";
+import {
+  boliviaCivilToInstant,
+  instantToBoliviaCivil,
+} from "@/domain/courses/bolivia-time";
 export type CourseInputKind = "text" | "multiline" | "grade" | "date" | "time";
 
 export function acceptsCourseInput(
@@ -74,18 +77,51 @@ export function draftFieldsReady(
   const start = civil(values.startsAt ?? "");
   const end = civil(values.endsAt ?? "");
   if (!(start < end)) return false;
-  const registrationStart = values.registrationStartAt ?? "";
-  const registrationEnd = values.registrationEndAt ?? "";
+  const dateOnly = values.registrationStartDate !== undefined;
+  const registrationStart = dateOnly
+    ? (values.registrationStartDate ?? "")
+    : (values.registrationStartAt ?? "");
+  const registrationEnd = dateOnly
+    ? (values.registrationEndDate ?? "")
+    : (values.registrationEndAt ?? "");
   if (Boolean(registrationStart) !== Boolean(registrationEnd)) return false;
-  if (registrationStart && !(civil(registrationStart) < civil(registrationEnd)))
-    return false;
-  if (registrationEnd && !(civil(registrationEnd) < start)) return false;
+  if (dateOnly) {
+    const validDate = (value: string) => {
+      try {
+        boliviaCivilToInstant(`${value}T00:00`);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    if (
+      (registrationStart && !validDate(registrationStart)) ||
+      (registrationEnd && !validDate(registrationEnd))
+    )
+      return false;
+    if (registrationStart && registrationStart > registrationEnd) return false;
+    if (
+      registrationEnd &&
+      registrationEnd >= (values.startsAt ?? "").slice(0, 10)
+    )
+      return false;
+  } else {
+    if (
+      registrationStart &&
+      !(civil(registrationStart) < civil(registrationEnd))
+    )
+      return false;
+    if (registrationEnd && !(civil(registrationEnd) < start)) return false;
+  }
   if (values.weekdays !== undefined) {
     if (values.weekdays !== "1,2,3,4,5") return false;
     try {
       if (
         requireFuture &&
-        boliviaCivilToInstant(values.startsAt ?? "").getTime() < Date.now()
+        (dateOnly
+          ? (values.startsAt ?? "").slice(0, 10) <
+            instantToBoliviaCivil(new Date()).slice(0, 10)
+          : boliviaCivilToInstant(values.startsAt ?? "").getTime() < Date.now())
       )
         return false;
       // The server checks the format duration and the complete plan against the revision.

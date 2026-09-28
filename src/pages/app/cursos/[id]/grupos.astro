@@ -9,6 +9,7 @@ import {
 } from "@/application/groups/manage-groups";
 import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import CourseTabs from "@/components/courses/CourseTabs.astro";
+import { groupEndTime } from "@/components/courses/group-schedule-preview";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 import { GroupError } from "@/domain/groups/rules";
 import type { Group } from "@/domain/groups/types";
@@ -320,9 +321,35 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
             fechas del curso y su formato quedan fijados, incluso si sigue en
             borrador.
           </p>
+          <p class="mt-2 text-sm text-muted-foreground">
+            Los grupos planificados no pueden tener horarios superpuestos; los
+            turnos consecutivos sí están permitidos.
+          </p>
+          {groups.some((group) => group.status !== "CANCELLED") && (
+            <p class="mt-2 text-sm text-muted-foreground">
+              Horarios ocupados:{" "}
+              {groups
+                .filter((group) => group.status !== "CANCELLED")
+                .map(
+                  (group) =>
+                    `${civilTime(group.startsAt)}–${civilTime(group.endsAt)}`,
+                )
+                .join(" · ")}
+            </p>
+          )}
           <form
             method="post"
             data-group-form
+            data-session-minutes={course.sessionMinutes}
+            data-occupied={JSON.stringify(
+              groups
+                .filter((group) => group.status !== "CANCELLED")
+                .map((group) => ({
+                  id: group.id,
+                  start: civilTime(group.startsAt),
+                  end: civilTime(group.endsAt),
+                })),
+            )}
             class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end"
             aria-label="Añadir grupo"
           >
@@ -350,6 +377,18 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
                 class="min-h-11 w-full rounded-lg border bg-background px-3"
               />
               <p
+                data-group-end
+                class="mt-1 text-xs text-muted-foreground"
+                aria-live="polite"
+              >
+                {groupEndTime(
+                  failedIntent === "create" ? attemptedTime : "",
+                  course.sessionMinutes,
+                )
+                  ? `Fin calculado: ${groupEndTime(attemptedTime, course.sessionMinutes)}`
+                  : "El fin se calcula según el formato."}
+              </p>
+              <p
                 id="new-time-error"
                 data-field-error="startTime"
                 role="alert"
@@ -365,7 +404,7 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
             </div>
             <div class="sm:w-40">
               <label for="new-capacity" class="mb-2 block text-sm font-medium">
-                Capacidad
+                Capacidad (personas)
               </label>
               <input
                 id="new-capacity"
@@ -455,6 +494,20 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
                         <form
                           method="post"
                           data-group-form
+                          data-session-minutes={course.sessionMinutes}
+                          data-occupied={JSON.stringify(
+                            groups
+                              .filter(
+                                (other) =>
+                                  other.status !== "CANCELLED" &&
+                                  other.id !== group.id,
+                              )
+                              .map((other) => ({
+                                id: other.id,
+                                start: civilTime(other.startsAt),
+                                end: civilTime(other.endsAt),
+                              })),
+                          )}
                           aria-label={`Cambiar horario del grupo ${index + 1}`}
                           class="flex flex-col gap-2"
                         >
@@ -464,6 +517,13 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
                             name="groupId"
                             value={group.id}
                           />
+                          <p
+                            data-group-end
+                            class="text-xs text-muted-foreground"
+                            aria-live="polite"
+                          >
+                            Fin calculado: {civilTime(group.endsAt)}
+                          </p>
                           <input
                             type="hidden"
                             name="revision"
@@ -680,7 +740,49 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
       <script>
         import { navigate } from "astro:transitions/client";
         import { sileo } from "sileo";
+        import { groupEndTime } from "@/components/courses/group-schedule-preview";
         document.addEventListener("astro:page-load", () => {
+          document
+            .querySelectorAll<HTMLFormElement>(
+              "[data-group-form][data-session-minutes]",
+            )
+            .forEach((form) => {
+              const input =
+                form.querySelector<HTMLInputElement>('[name="startTime"]');
+              const output =
+                form.querySelector<HTMLElement>("[data-group-end]");
+              if (!input || !output) return;
+              const minutes = Number(form.dataset.sessionMinutes);
+              const occupied = JSON.parse(form.dataset.occupied ?? "[]") as {
+                start: string;
+                end: string;
+              }[];
+              const sync = () => {
+                const end = groupEndTime(input.value, minutes);
+                const overlapping =
+                  end &&
+                  occupied.some(
+                    (slot) => input.value < slot.end && slot.start < end,
+                  );
+                output.textContent = !input.value
+                  ? "El fin se calcula según el formato."
+                  : !end
+                    ? "El grupo debe terminar el mismo día."
+                    : overlapping
+                      ? `Fin calculado: ${end}. Este horario se solapa con otro grupo.`
+                      : `Fin calculado: ${end}`;
+                output.classList.toggle(
+                  "text-destructive",
+                  Boolean(input.value && (!end || overlapping)),
+                );
+                output.classList.toggle(
+                  "text-muted-foreground",
+                  !input.value || Boolean(end && !overlapping),
+                );
+              };
+              input.addEventListener("input", sync);
+              sync();
+            });
           const message = new URLSearchParams(location.search).get("success");
           const messages: Record<string, string> = {
             created: "Grupo creado.",

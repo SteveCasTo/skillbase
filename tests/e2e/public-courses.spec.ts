@@ -43,24 +43,18 @@ test("published course is public end-to-end and withdrawal removes every public 
     await page
       .getByLabel("Contenido del curso (Markdown, opcional)")
       .fill(
-        "## Temario público\n- **Unidad segura**\n\n> Nota del curso\n\n```ts\nconst ejemplo = 1;\n```\n\n---\n\n[Guía válida](https://example.com/guia)\n[Enlace inseguro](javascript:alert(1))\n<script>alert(2)</script>",
+        "## Temario público\n- **Unidad segura**\n  - Unidad anidada\n\n> Nota del curso\n\n```ts\nconst ejemplo = 1;\n```\n\n---\n\n[Guía válida](https://example.com/guia)\n[Enlace inseguro](javascript:alert(1))\n<script>alert(2)</script>",
       );
     await page.getByLabel("Condiciones").fill("Inscripción sujeta a cupo.");
-    for (const [label, date, time] of [
-      ["Apertura de preinscripción", "01/01/2027", "08:00"],
-      ["Cierre de preinscripción", "20/02/2027", "18:00"],
+    for (const [label, date] of [
+      ["Apertura de preinscripción", "01/01/2027"],
+      ["Último día de preinscripción", "20/02/2027"],
     ] as const) {
       await page.getByLabel(label, { exact: true }).fill(date);
-      await page
-        .getByRole("textbox", {
-          name: `Hora de ${label.toLowerCase()}`,
-          exact: true,
-        })
-        .fill(time);
     }
     await page
       .getByLabel("Fecha de inicio de clases (Bolivia)")
-      .fill("2027-03-01");
+      .fill("01/03/2027");
     await page.getByLabel("Nota mínima (0–100)").fill("70");
     await page.getByRole("button", { name: "Crear borrador" }).click();
     await expect(page).toHaveURL(/\/app\/cursos\/[^/]+\/editar$/);
@@ -171,6 +165,14 @@ test("published course is public end-to-end and withdrawal removes every public 
     await expect(
       page.getByText("Unidad segura", { exact: true }),
     ).toBeVisible();
+    await expect(page.locator(".course-markdown > ul")).toHaveCSS(
+      "list-style-type",
+      "disc",
+    );
+    await expect(page.locator(".course-markdown > ul ul")).toHaveCSS(
+      "list-style-type",
+      "circle",
+    );
     await expect(page.locator(".course-markdown strong")).toHaveText(
       "Unidad segura",
     );

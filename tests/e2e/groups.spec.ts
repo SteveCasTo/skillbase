@@ -69,6 +69,9 @@ test("admin manages group hours, capacity and cancellation without a document re
   });
   const create = page.getByRole("form", { name: "Añadir grupo" });
   await create.getByLabel("Hora de inicio").fill("08:00");
+  await expect(create.locator("[data-group-end]")).toContainText(
+    "Fin calculado: 09:30",
+  );
   await create.getByLabel("Capacidad").fill("15");
   await create.getByRole("button", { name: "Crear grupo" }).click();
   await expect(page.getByText("08:00–09:30 · Capacidad: 15")).toBeVisible();
@@ -84,6 +87,7 @@ test("admin manages group hours, capacity and cancellation without a document re
   expect(conflict.status()).toBe(409);
   await expect(page.getByText("08:00–09:30 · Capacidad: 15")).toBeVisible();
   await create.getByLabel("Hora de inicio").fill("09:00");
+  await expect(create.locator("[data-group-end]")).toContainText("se solapa");
   await create.getByLabel("Capacidad").fill("7");
   await create.getByRole("button", { name: "Crear grupo" }).click();
   await expect(page.getByRole("alert")).toContainText(

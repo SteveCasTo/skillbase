@@ -27,8 +27,8 @@ test("new courses preserve values and can be corrected after server validation w
   const uniqueFields = [
     "startDate",
     "endDate",
-    "registrationStartAt",
-    "registrationEndAt",
+    "registrationStartDate",
+    "registrationEndDate",
     "contentMarkdown",
     "schedule",
   ];
@@ -50,6 +50,12 @@ test("new courses preserve values and can be corrected after server validation w
   await course
     .getByLabel("Fecha de finalización (Bolivia)", { exact: true })
     .fill("2027-03-22");
+  await course
+    .getByLabel("Apertura de preinscripción (Bolivia)")
+    .fill("2027-01-01");
+  await course
+    .getByLabel("Último día de preinscripción (Bolivia)")
+    .fill("2027-02-20");
   expect(
     await course.evaluate((form: HTMLFormElement, names: string[]) => {
       const data = new FormData(form);
@@ -93,6 +99,12 @@ test("new courses preserve values and can be corrected after server validation w
     "Lunes a viernes · horario por grupo",
   );
   await expect(course.getByLabel("Nota mínima (0–100)")).toHaveValue("101");
+  await expect(course.locator('[name="registrationStartDate"]')).toHaveValue(
+    "2027-01-01",
+  );
+  await expect(course.locator('[name="registrationEndDate"]')).toHaveValue(
+    "2027-02-20",
+  );
 
   await course.getByLabel("Nota mínima (0–100)").fill("70");
   await course.getByRole("button", { name: "Crear borrador" }).click();
