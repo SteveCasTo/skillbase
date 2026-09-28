@@ -165,6 +165,7 @@ test("sidebar toggle supports Enter and Space and preserves its state across Ast
     )
     .toBe("true");
 
+  await page.locator(".private-main-scroll").hover();
   await page.locator(".private-brand-mark").hover();
   await expect(shell).toHaveAttribute("data-preview", "true");
   await page
