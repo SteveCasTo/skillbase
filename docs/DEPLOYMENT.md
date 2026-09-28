@@ -137,6 +137,8 @@ Como mínimo:
 
 Agregar herramientas externas únicamente cuando exista beneficio claro.
 
+Las lecturas de cursos y los pasos de autenticación registran un aviso `[slow-operation]` cuando permanecen pendientes más de 5 segundos, y otro al terminar. El middleware mide el render SSR por ruta normalizada (sin IDs, slugs, credenciales ni datos personales). Ante un 504, buscar el aviso previo en los logs de la misma invocación de Vercel para distinguir Auth, persistencia y render; este diagnóstico no cancela solicitudes ni sustituye límites de tiempo en las dependencias.
+
 ## PIPELINE IMPLEMENTADO
 
 `.github/workflows/ci.yml` se ejecuta únicamente en:
