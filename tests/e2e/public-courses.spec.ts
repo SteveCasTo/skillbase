@@ -130,6 +130,11 @@ test("published course is public end-to-end and withdrawal removes every public 
     );
 
     await page.goto("/cursos");
+    await expect(
+      page
+        .getByRole("navigation", { name: "Navegación principal" })
+        .getByRole("link", { name: "Cursos" }),
+    ).toHaveAttribute("href", "/cursos");
     await expect(page.locator(".back-link")).toHaveCount(0);
     await expect(page.locator(".catalog-intro h1")).toHaveCSS(
       "max-width",
@@ -162,6 +167,10 @@ test("published course is public end-to-end and withdrawal removes every public 
     detailUrl = (await catalogCourse.getAttribute("href")) ?? undefined;
     await catalogCourse.click();
     await expect(page.locator(".back-link")).toHaveCount(0);
+    const registration = page.locator(".registration-window");
+    await expect(registration).toContainText("Abre");
+    await expect(registration).toContainText("Cierra");
+    await expect(registration).not.toContainText(/a las|p\. m\.|a\. m\./i);
 
     await expect(
       page.getByRole("heading", { level: 1, name: courseName }),
@@ -348,8 +357,10 @@ test("unknown slug uses the same public 404 without exposing private data", asyn
     page.getByRole("heading", { name: "Curso no encontrado." }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Ver todos los cursos" }),
-  ).toBeVisible();
+    page
+      .getByRole("navigation", { name: "Navegación de pie de página" })
+      .getByRole("link", { name: "Cursos" }),
+  ).toHaveAttribute("href", "/cursos");
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
     "content",
     "noindex,nofollow",

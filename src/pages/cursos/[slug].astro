@@ -37,6 +37,7 @@ const artworkUrl = publicArtworkUrl(
   course?.artwork,
   import.meta.env.PUBLIC_SUPABASE_URL,
 );
+const registrationDates = course ? registrationWindow(course) : null;
 ---
 
 <CourseShell
@@ -123,10 +124,19 @@ const artworkUrl = publicArtworkUrl(
                   <dd>{course.instructorName}</dd>
                 </div>
               )}
-              {registrationWindow(course) && (
-                <div>
+              {registrationDates && (
+                <div class="registration-window">
                   <dt>Ventana de preinscripción</dt>
-                  <dd>{registrationWindow(course)}</dd>
+                  <dd>
+                    <span>
+                      <span>Abre</span>
+                      <strong>{registrationDates.opens}</strong>
+                    </span>
+                    <span>
+                      <span>Cierra</span>
+                      <strong>{registrationDates.closes}</strong>
+                    </span>
+                  </dd>
                 </div>
               )}
             </dl>

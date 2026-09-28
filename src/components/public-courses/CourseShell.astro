@@ -1,8 +1,9 @@
 ---
 import "@fontsource/alef/700.css";
 import "@/styles/public-courses.css";
+import "@/styles/public-header.css";
 
-import ThemeToggle from "@/components/ThemeToggle.astro";
+import LandingHeader from "@/components/landing/LandingHeader.astro";
 import BaseLayout from "@/layouts/BaseLayout.astro";
 
 interface Props {
@@ -21,32 +22,7 @@ const { title, description, noindex = false } = Astro.props;
   allowSystemTheme={false}
 >
   <div class="public-courses">
-    <a class="skip-link" href="#main-content">
-      Saltar al contenido principal
-    </a>
-    <header class="course-header">
-      <div class="course-header-inner">
-        <a
-          class="course-brand"
-          href="/"
-          aria-label="Formación continua, inicio"
-        >
-          <strong>Formación continua</strong>
-          <span>Informática y Sistemas · FCyT · UMSS</span>
-        </a>
-        <nav aria-label="Navegación principal">
-          <a
-            href="/cursos"
-            aria-current={Astro.url.pathname === "/cursos" ? "page" : undefined}
-          >
-            Cursos
-          </a>
-          <a href="/#participar">Cómo participar</a>
-          <a href="/#certificados">Certificados</a>
-        </nav>
-        <ThemeToggle />
-      </div>
-    </header>
+    <LandingHeader onLanding={false} />
     <main id="main-content" tabindex="-1">
       <slot />
     </main>

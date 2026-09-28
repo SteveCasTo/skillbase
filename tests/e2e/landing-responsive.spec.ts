@@ -230,9 +230,7 @@ test("header course link and hero action land on the featured course below the h
     { width: 390, height: 844 },
   ]) {
     await openPreview(page, viewport);
-    const headerLink = page
-      .getByRole("navigation", { name: "Navegación principal" })
-      .getByRole("link", { name: "Cursos" });
+    const headerLink = page.locator('.primary-nav a[href="#cursos"]');
     await expect(headerLink).toHaveAttribute("href", "#cursos");
     await expect(
       page.getByRole("link", { name: "Explorar cursos" }),

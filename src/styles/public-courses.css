@@ -43,91 +43,20 @@ html.dark:has(.public-courses) {
     outline: 3px solid var(--signal);
     outline-offset: 4px;
   }
-  .skip-link {
-    position: absolute;
-    top: 0.5rem;
-    left: 0.5rem;
-    z-index: 20;
-    transform: translateY(-160%);
-    background: var(--deep);
-    color: #fff;
-    padding: 0.75rem 1rem;
-    border-radius: 10px;
-  }
-  .skip-link:focus-visible {
-    transform: translateY(0);
-  }
-  .course-header {
-    border-bottom: 1px solid var(--rule);
-  }
-  .course-header-inner {
-    width: min(100% - 3rem, 86rem);
-    margin: auto;
-    min-height: 5.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 2rem;
-  }
-  .course-brand {
-    display: grid;
-    gap: 0.2rem;
-    flex-shrink: 0;
-    text-decoration: none;
-    color: var(--ink);
-  }
-  .course-brand strong {
-    font-family: Alef, sans-serif;
-    font-size: 1.2rem;
-    line-height: 1.1;
-  }
-  .course-brand span {
-    font-size: 0.66rem;
-    font-weight: 600;
-    color: var(--soft);
-  }
-  .course-header nav {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: clamp(1rem, 2vw, 2.5rem);
-  }
-  .course-header nav a,
   .course-footer a {
     color: var(--ink);
     font-size: 0.8rem;
     font-weight: 700;
     text-decoration: none;
   }
-  .course-header nav a:hover,
   .course-footer a:hover {
     color: var(--blue);
     text-decoration: underline;
   }
-  .course-header nav a[aria-current] {
-    color: var(--blue);
-    text-decoration: underline;
-  }
-  .theme-toggle {
-    position: relative;
-    min-width: 2.75rem;
-    min-height: 2.75rem;
-    border: 1px solid var(--rule);
-    border-radius: 50%;
-    background: var(--field);
-    color: var(--ink);
-  }
-  .theme-toggle svg {
-    position: absolute;
-    opacity: 0;
-  }
-  .theme-toggle[data-current-theme="light"] .theme-toggle-sun,
-  .theme-toggle[data-current-theme="dark"] .theme-toggle-moon {
-    opacity: 1;
-  }
   main {
     width: min(100% - 3rem, 86rem);
     margin: auto;
+    padding-top: calc(4.75rem + 1rem);
     padding-bottom: clamp(5rem, 10vw, 10rem);
   }
   h1,
@@ -138,19 +67,19 @@ html.dark:has(.public-courses) {
     text-wrap: balance;
   }
   .catalog-intro {
-    padding: clamp(1rem, 3vw, 3rem) 0 clamp(3rem, 7vw, 6rem);
+    padding: clamp(1.5rem, 3vw, 2.5rem) 0 clamp(1.5rem, 3vw, 2.5rem);
   }
   .catalog-intro h1 {
-    font-size: clamp(3rem, 7vw, 6rem);
+    font-size: clamp(2.6rem, 5vw, 4.5rem);
     line-height: 1.03;
   }
   .catalog-intro > p {
-    margin-top: 1.5rem;
+    margin-top: 0.75rem;
     color: var(--soft);
     line-height: 1.75;
   }
   .section-label {
-    margin-bottom: 1.75rem;
+    margin-bottom: 1rem;
     padding-top: 1rem;
     border-top: 1px solid var(--rule);
     font-size: 1.2rem;
@@ -497,6 +426,19 @@ html.dark:has(.public-courses) {
     line-height: 1.5;
     overflow-wrap: anywhere;
   }
+  .registration-window dd {
+    display: grid;
+    gap: 0.75rem 1.5rem;
+  }
+  .registration-window dd > span {
+    display: grid;
+    gap: 0.25rem;
+  }
+  .registration-window dd > span > span {
+    color: var(--soft);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
   .prices {
     padding-top: 2.5rem;
   }
@@ -517,6 +459,9 @@ html.dark:has(.public-courses) {
     }
     .detail-aside > dl > div:nth-child(n + 5) {
       grid-column: 1 / -1;
+    }
+    .registration-window dd {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
   .detail-state {
@@ -545,16 +490,6 @@ html.dark:has(.public-courses) {
     gap: 1.5rem;
   }
   @media (max-width: 860px) {
-    .course-header-inner {
-      flex-wrap: wrap;
-      padding: 1rem 0;
-      gap: 0.75rem 1rem;
-    }
-    .course-header nav {
-      order: 3;
-      width: 100%;
-      gap: 1.5rem;
-    }
     .detail-body {
       gap: 2rem;
     }
@@ -579,15 +514,6 @@ html.dark:has(.public-courses) {
     }
   }
   @media (max-width: 400px) {
-    .course-header nav {
-      gap: 0.8rem;
-    }
-    .course-header nav a {
-      font-size: 0.7rem;
-    }
-    .course-brand span {
-      font-size: 0.56rem;
-    }
     .catalog-intro h1,
     .detail-heading h1 {
       font-size: 2.8rem;
