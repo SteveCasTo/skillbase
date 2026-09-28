@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ImagePlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import CourseArtworkPreview from "./CourseArtworkPreview";
 
 const WIDTH = 1200;
 const HEIGHT = 750;
@@ -559,6 +560,7 @@ export default function CourseImageEditor({
                   }}
                 />
               </label>
+              <CourseArtworkPreview src={preview} />
               <div className="flex flex-wrap items-center gap-3">
                 <Button
                   type="button"
