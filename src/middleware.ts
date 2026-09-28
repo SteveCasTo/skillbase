@@ -15,12 +15,21 @@ import { createRequestSupabaseClient } from "@/server/auth/supabase";
 import { getDatabase } from "@/server/db/client";
 import { DrizzleAuthUserRepository } from "@/server/db/repositories/auth-user-repository";
 import { getPublicAuthEnvironment } from "@/server/environment";
+import { traceSlowOperation } from "@/server/observability/slow-operation";
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname, search } = context.url;
   const routeContext = getAuthRouteContext(pathname);
+  const route = pathname.startsWith("/app/cursos/")
+    ? "/app/cursos/[id]"
+    : pathname.startsWith("/cursos/")
+      ? "/cursos/[slug]"
+      : ["/", "/cursos", "/app", "/app/cursos"].includes(pathname)
+        ? pathname
+        : "other";
+  const render = () => traceSlowOperation(`render ${route}`, next);
   if (routeContext === "NONE") {
-    const response = await next();
+    const response = await render();
     if (isSessionDependentPath(pathname)) applyPrivateNoStore(response);
     return response;
   }
@@ -34,7 +43,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   let response: Response;
   if (routeContext === "CLIENT") {
-    response = await next();
+    response = await render();
   } else {
     const repository = new DrizzleAuthUserRepository(getDatabase());
     const auth = await loadRequestAuthContext(supabase, repository);
@@ -45,7 +54,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (pathname === "/login" && auth.internalUser) {
       response = context.redirect("/app", 303);
     } else if (!isPrivatePath(pathname)) {
-      response = await next();
+      response = await render();
     } else if (!auth.authUser) {
       response = context.redirect(loginRedirect(pathname, search), 303);
     } else if (!auth.internalUser) {
@@ -60,13 +69,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
       } else if (policy.access === "ROLES") {
         try {
           requireRoles(auth.internalUser, policy.roles);
-          response = await next();
+          response = await render();
         } catch (error) {
           if (!(error instanceof AuthorizationError)) throw error;
           response = context.redirect("/unauthorized?reason=forbidden", 303);
         }
       } else {
-        response = await next();
+        response = await render();
       }
     }
   }

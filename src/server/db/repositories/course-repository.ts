@@ -21,6 +21,7 @@ import type {
   PublicCourseDto,
 } from "@/domain/courses/types";
 import * as schema from "@/server/db/schema";
+import { traceSlowOperation } from "@/server/observability/slow-operation";
 import { CourseInfrastructureError } from "./course-infrastructure-error";
 
 type Database = PostgresJsDatabase<typeof schema>;
@@ -33,7 +34,7 @@ async function persistence<T>(
   work: () => Promise<T>,
 ): Promise<T> {
   try {
-    return await work();
+    return await traceSlowOperation(`courses.${operation}`, work);
   } catch (error) {
     if (error instanceof CourseDomainError) throw error;
     throw new CourseInfrastructureError(

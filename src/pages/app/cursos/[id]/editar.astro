@@ -30,6 +30,7 @@ import { CourseInfrastructureError } from "@/server/db/repositories/course-infra
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
 import { DrizzleFormatRepository } from "@/server/db/repositories/format-repository";
 import { getPublicAuthEnvironment } from "@/server/environment";
+import { traceSlowOperation } from "@/server/observability/slow-operation";
 import {
   ArtworkValidationError,
   artworkKeyForCourse,
@@ -49,9 +50,8 @@ let formats: readonly CourseFormat[] = [];
 try {
   course = await getAdminCourse(repository, user, id);
   if (course)
-    formats = await listFormats(
-      new DrizzleFormatRepository(getDatabase()),
-      user,
+    formats = await traceSlowOperation("formats.listAdmin", () =>
+      listFormats(new DrizzleFormatRepository(getDatabase()), user),
     );
   if (!course) Astro.response.status = 404;
 } catch (error) {

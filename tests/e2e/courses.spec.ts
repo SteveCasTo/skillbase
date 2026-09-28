@@ -44,6 +44,19 @@ test("missing format is announced beside the selector and focuses it without an 
   context,
 }) => {
   await signInFixture(context, AUTH_FIXTURES.admin.email);
+  // This test must not depend on formats created by another spec or test.
+  await page.goto("/app/formatos");
+  await page.getByRole("link", { name: "Nuevo formato" }).click();
+  const formatForm = page.getByRole("form", { name: "Crear formato" });
+  await formatForm
+    .getByLabel("Nombre")
+    .fill(`Formato sin selección ${Date.now()}`);
+  await formatForm.getByLabel("Duración total (horas)").fill("20");
+  await page.getByLabel("Duración de sesión (minutos)").fill("90");
+  await formatForm.getByLabel("Precio estudiante (BOB)").fill("80");
+  await formatForm.getByLabel("Precio externo (BOB)").fill("100");
+  await formatForm.getByRole("button", { name: "Crear formato" }).click();
+  await expect(page).toHaveURL(/\/app\/formatos$/);
   await page.goto("/app/cursos/nuevo");
   const create = page.getByRole("button", { name: "Crear borrador" });
   await expect(create).toBeEnabled();
@@ -454,6 +467,11 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   );
   await page.goto("/app/cursos/nuevo");
   const create = page.getByRole("button", { name: "Crear borrador" });
+  // SSR keeps the form usable without JS; wait until client validation takes over.
+  await expect(page.locator(".course-form")).toHaveAttribute(
+    "data-validation-initialized",
+    "true",
+  );
   await expect(create).toBeDisabled();
   await page.getByLabel("Nombre").fill("Curso E2E conservación");
   await expect(create).toBeEnabled();

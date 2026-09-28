@@ -897,6 +897,7 @@ const currentArtworkUrl = publicArtworkUrl(
           // The SSR button stays usable without JavaScript. Once JS runs, wait for
           // all form-associated islands before comparing against persisted values.
           button.disabled = true;
+          form.dataset.validationInitialized = "true";
           let ready = false;
           const fields = baseline ? Object.keys(baseline) : [];
           const sync = () => {
