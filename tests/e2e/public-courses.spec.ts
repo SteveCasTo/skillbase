@@ -50,10 +50,13 @@ test("published course is public end-to-end and withdrawal removes every public 
       ["Apertura de preinscripción", "01/01/2027"],
       ["Último día de preinscripción", "20/02/2027"],
     ] as const) {
-      await page.getByLabel(label, { exact: true }).fill(date);
+      await page.getByRole("textbox", { name: label, exact: true }).fill(date);
     }
     await page
-      .getByLabel("Fecha de inicio de clases (Bolivia)")
+      .getByRole("textbox", {
+        name: "Fecha de inicio de clases (Bolivia)",
+        exact: true,
+      })
       .fill("01/03/2027");
     await page.getByLabel("Nota mínima (0–100)").fill("70");
     await page.getByRole("button", { name: "Crear borrador" }).click();

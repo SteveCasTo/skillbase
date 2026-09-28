@@ -145,7 +145,7 @@ export default function CourseDatePicker({
               variant="outline"
               size="icon"
               className="size-11 shrink-0"
-              aria-label="Abrir calendario…"
+              aria-label={`Elegir fecha de ${label.toLowerCase()}`}
               disabled={disabled}
             >
               <CalendarDays aria-hidden="true" />
