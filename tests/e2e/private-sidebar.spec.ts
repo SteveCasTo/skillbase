@@ -130,14 +130,14 @@ test("collapsed rail expands on hover without shifting main and persists across 
     .getByRole("navigation", { name: "Navegación privada" })
     .locator(".private-parent-active");
   await page.locator(".private-main-scroll").hover();
-  const activeColor = await activeGroup.evaluate(
-    (element) => getComputedStyle(element).backgroundColor,
+  const activeWeight = await activeGroup.evaluate(
+    (element) => getComputedStyle(element).fontWeight,
   );
-  const inactiveColor = await page
+  const inactiveWeight = await page
     .getByRole("navigation", { name: "Navegación privada" })
     .getByRole("link", { name: "Resumen" })
-    .evaluate((element) => getComputedStyle(element).backgroundColor);
-  expect(activeColor).not.toBe(inactiveColor);
+    .evaluate((element) => getComputedStyle(element).fontWeight);
+  expect(activeWeight).not.toBe(inactiveWeight);
   await expect(
     page.getByRole("button", { name: "Expandir barra lateral" }),
   ).toBeVisible();

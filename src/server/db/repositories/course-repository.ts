@@ -465,6 +465,17 @@ export class DrizzleCourseRepository implements CourseRepository {
           .where(eq(schema.courses.id, id))
           .returning();
         if (!row) throw new Error("Transition failed");
+        if (next === "PUBLISHED")
+          await tx
+            .update(schema.groups)
+            .set({ publishedAt: new Date() })
+            .where(
+              and(
+                eq(schema.groups.courseId, id),
+                eq(schema.groups.status, "PLANNED"),
+                sql`${schema.groups.publishedAt} is null`,
+              ),
+            );
         await tx.insert(schema.auditEvents).values({
           actorId,
           entityType: "COURSE",

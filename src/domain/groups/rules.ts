@@ -9,6 +9,8 @@ export type GroupErrorCode =
   | "COURSE_UNAVAILABLE"
   | "GROUP_NOT_FOUND"
   | "GROUP_CANCELLED"
+  | "GROUP_ACTIVE"
+  | "GROUP_PUBLISHED"
   | "STALE_GROUP"
   | "SCHEDULE_CONFLICT";
 

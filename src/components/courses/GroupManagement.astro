@@ -1,0 +1,669 @@
+---
+import type { AdminCourseDto } from "@/domain/courses/types";
+import type { Group } from "@/domain/groups/types";
+import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+import { groupEndTime } from "./group-schedule-preview";
+
+interface Props {
+  course: AdminCourseDto;
+  groups: readonly Group[];
+  canCreate: boolean;
+  failedIntent: string;
+  failedGroupId: string;
+  attemptedTime: string;
+  attemptedCapacity: string;
+  fieldError: string;
+  fieldErrorTarget: string;
+}
+const {
+  course,
+  groups,
+  canCreate,
+  failedIntent,
+  failedGroupId,
+  attemptedTime,
+  attemptedCapacity,
+  fieldError,
+  fieldErrorTarget,
+} = Astro.props;
+const time = (date: Date) => instantToBoliviaCivil(date).slice(11, 16);
+const occupied = (except?: string) =>
+  JSON.stringify(
+    groups
+      .filter((group) => group.status !== "CANCELLED" && group.id !== except)
+      .map((group) => ({
+        start: time(group.startsAt),
+        end: time(group.endsAt),
+      })),
+  );
+---
+
+<section aria-labelledby="group-list-title" class="mt-8">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 id="group-list-title" class="text-xl font-semibold">
+      Grupos del curso
+    </h2>
+    {canCreate && (
+      <button
+        type="button"
+        data-new-trigger
+        hidden
+        class="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring"
+      >
+        Nuevo grupo
+      </button>
+    )}
+  </div>
+  {canCreate && (
+    <details data-new-fallback class="mt-4" open={failedIntent === "create"}>
+      <summary class="inline-flex min-h-11 cursor-pointer items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring">
+        Nuevo grupo
+      </summary>
+      <div class="mt-3 rounded-xl bg-card p-5">
+        <h3 class="font-semibold">Nuevo grupo</h3>
+        <form
+          method="post"
+          data-group-form
+          data-session-minutes={course.sessionMinutes}
+          data-occupied={occupied()}
+          aria-label="Nuevo grupo"
+          class="mt-4 grid gap-4 sm:grid-cols-2"
+        >
+          <input type="hidden" name="intent" value="create" />
+          <div>
+            <label for="new-time" class="mb-2 block text-sm font-medium">
+              Hora de inicio
+            </label>
+            <input
+              id="new-time"
+              name="startTime"
+              type="time"
+              required
+              value={failedIntent === "create" ? attemptedTime : ""}
+              aria-invalid={
+                failedIntent === "create" &&
+                fieldError &&
+                fieldErrorTarget === "startTime"
+                  ? "true"
+                  : undefined
+              }
+              aria-describedby={
+                failedIntent === "create" &&
+                fieldError &&
+                fieldErrorTarget === "startTime"
+                  ? "new-time-error"
+                  : undefined
+              }
+              class="min-h-11 w-full rounded-lg border bg-background px-3"
+            />
+            <p
+              data-group-end
+              aria-live="polite"
+              class="mt-1 text-xs text-muted-foreground"
+            >
+              {groupEndTime(attemptedTime, course.sessionMinutes ?? 0)
+                ? `Fin: ${groupEndTime(attemptedTime, course.sessionMinutes ?? 0)}`
+                : ""}
+            </p>
+            <p
+              id="new-time-error"
+              data-field-error="startTime"
+              role="alert"
+              hidden={
+                failedIntent !== "create" ||
+                !fieldError ||
+                fieldErrorTarget !== "startTime"
+              }
+              class="mt-1 text-sm text-destructive"
+            >
+              {fieldError}
+            </p>
+          </div>
+          <div>
+            <label for="new-capacity" class="mb-2 block text-sm font-medium">
+              Capacidad
+            </label>
+            <input
+              id="new-capacity"
+              name="capacity"
+              type="number"
+              min="1"
+              step="1"
+              required
+              value={failedIntent === "create" ? attemptedCapacity : ""}
+              aria-invalid={
+                failedIntent === "create" &&
+                fieldError &&
+                fieldErrorTarget === "capacity"
+                  ? "true"
+                  : undefined
+              }
+              aria-describedby={
+                failedIntent === "create" &&
+                fieldError &&
+                fieldErrorTarget === "capacity"
+                  ? "new-capacity-error"
+                  : undefined
+              }
+              class="min-h-11 w-full rounded-lg border bg-background px-3"
+            />
+            <p
+              id="new-capacity-error"
+              data-field-error="capacity"
+              role="alert"
+              hidden={
+                failedIntent !== "create" ||
+                !fieldError ||
+                fieldErrorTarget !== "capacity"
+              }
+              class="mt-1 text-sm text-destructive"
+            >
+              {fieldError}
+            </p>
+          </div>
+          <button
+            type="submit"
+            class="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60 sm:col-span-2 sm:justify-self-end"
+          >
+            Crear grupo
+          </button>
+        </form>
+      </div>
+    </details>
+  )}
+  {!canCreate && (
+    <p class="mt-4 text-sm text-muted-foreground">
+      {course.status === "ARCHIVED"
+        ? "Curso archivado. Los grupos anteriores se conservan."
+        : "Este curso necesita un calendario estructurado para gestionar grupos."}
+    </p>
+  )}
+  {groups.length === 0 ? (
+    <p class="mt-4 rounded-xl bg-card p-6 text-sm text-muted-foreground">
+      Todavía no hay grupos.
+      {canCreate ? " Crea el primero con su horario y capacidad." : ""}
+    </p>
+  ) : (
+    <ul class="mt-4 grid gap-3">
+      {groups.map((group, index) => {
+        const published = group.publishedAt !== null;
+        const intent = published
+          ? group.status === "CANCELLED"
+            ? "reactivate"
+            : "cancel"
+          : "delete";
+        const action =
+          intent === "delete"
+            ? "Eliminar"
+            : intent === "cancel"
+              ? "Desactivar"
+              : "Reactivar";
+        return (
+          <li
+            data-group-id={group.id}
+            class="min-w-0 rounded-xl bg-card p-4 sm:p-5"
+          >
+            <article aria-labelledby={`group-${group.id}`}>
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex min-w-0 flex-wrap items-center gap-2">
+                  <h3 id={`group-${group.id}`} class="font-semibold">
+                    Grupo {index + 1}
+                  </h3>
+                  <span class="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
+                    {group.status === "CANCELLED" ? "Inactivo" : "Planificado"}
+                  </span>
+                </div>
+                {(intent !== "reactivate" || canCreate) && (
+                  <div class="shrink-0">
+                    <button
+                      type="button"
+                      hidden
+                      data-action-trigger={intent}
+                      aria-label={`${action} grupo ${index + 1}`}
+                      title={`${action} grupo ${index + 1}`}
+                      class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      {intent === "reactivate" ? (
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          class="size-5"
+                        >
+                          <path d="M3 12a9 9 0 1 0 3-6.7M3 3v6h6" />
+                        </svg>
+                      ) : intent === "delete" ? (
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          class="size-5"
+                        >
+                          <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6" />
+                        </svg>
+                      ) : (
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          class="size-5"
+                        >
+                          <circle cx="12" cy="12" r="9" />
+                          <path d="M9 9l6 6m0-6-6 6" />
+                        </svg>
+                      )}
+                    </button>
+                    <details data-action-fallback class="relative">
+                      <summary class="inline-flex min-h-11 cursor-pointer items-center text-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">
+                        {action} grupo
+                      </summary>
+                      <div class="mt-2 rounded-lg border p-3 text-sm">
+                        <p>
+                          {intent === "delete"
+                            ? "Se eliminará permanentemente. No se puede deshacer."
+                            : intent === "cancel"
+                              ? "El grupo quedará inactivo y conservará su historial."
+                              : "El grupo volverá a estar activo."}
+                        </p>
+                        <form
+                          method="post"
+                          data-group-form
+                          class="mt-3 flex flex-wrap items-center gap-3"
+                        >
+                          <input type="hidden" name="intent" value={intent} />
+                          <input
+                            type="hidden"
+                            name="groupId"
+                            value={group.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="revision"
+                            value={group.updatedAt.toISOString()}
+                          />
+                          <button
+                            type="submit"
+                            class="min-h-11 rounded-lg border border-destructive px-3 font-semibold text-destructive"
+                          >
+                            Sí, {action.toLowerCase()} grupo
+                          </button>
+                          <a
+                            href={Astro.url.pathname}
+                            class="inline-flex min-h-11 items-center underline"
+                          >
+                            Volver
+                          </a>
+                        </form>
+                      </div>
+                    </details>
+                  </div>
+                )}
+              </div>
+              <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                <div class="min-w-0" data-group-field="schedule">
+                  <span class="font-medium">Horario</span>{" "}
+                  <span data-field-value>
+                    {time(group.startsAt)}–{time(group.endsAt)}
+                  </span>
+                  {canCreate && group.status !== "CANCELLED" && (
+                    <button
+                      type="button"
+                      hidden
+                      data-edit-trigger
+                      aria-label={`Editar horario del grupo ${index + 1}`}
+                      title="Editar horario"
+                      class="ml-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg align-middle hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        class="size-4"
+                      >
+                        <path d="m16 4 4 4-11 11-5 1 1-5L16 4zM14 6l4 4" />
+                      </svg>
+                    </button>
+                  )}
+                  {canCreate && group.status !== "CANCELLED" && (
+                    <details
+                      data-edit-fallback
+                      open={
+                        failedIntent === "schedule" &&
+                        failedGroupId === group.id
+                      }
+                      class="mt-1"
+                    >
+                      <summary class="cursor-pointer underline underline-offset-4">
+                        Editar horario
+                      </summary>
+                      <form
+                        method="post"
+                        data-group-form
+                        data-session-minutes={course.sessionMinutes}
+                        data-occupied={occupied(group.id)}
+                        aria-label={`Cambiar horario del grupo ${index + 1}`}
+                        class="mt-2 flex flex-wrap items-end gap-2"
+                      >
+                        <input type="hidden" name="intent" value="schedule" />
+                        <input type="hidden" name="groupId" value={group.id} />
+                        <input
+                          type="hidden"
+                          name="revision"
+                          value={group.updatedAt.toISOString()}
+                        />
+                        <div>
+                          <label
+                            for={`time-${group.id}`}
+                            class="mb-1 block text-sm font-medium"
+                          >
+                            Hora de inicio
+                          </label>
+                          <input
+                            id={`time-${group.id}`}
+                            name="startTime"
+                            type="time"
+                            required
+                            value={
+                              failedIntent === "schedule" &&
+                              failedGroupId === group.id
+                                ? attemptedTime
+                                : time(group.startsAt)
+                            }
+                            aria-invalid={
+                              failedIntent === "schedule" &&
+                              failedGroupId === group.id &&
+                              fieldError
+                                ? "true"
+                                : undefined
+                            }
+                            aria-describedby={
+                              failedIntent === "schedule" &&
+                              failedGroupId === group.id &&
+                              fieldError
+                                ? `time-${group.id}-error`
+                                : undefined
+                            }
+                            class="min-h-11 rounded-lg border bg-background px-3"
+                          />
+                          <p
+                            data-group-end
+                            aria-live="polite"
+                            class="text-xs text-muted-foreground"
+                          >
+                            Fin: {time(group.endsAt)}
+                          </p>
+                          <p
+                            id={`time-${group.id}-error`}
+                            data-field-error="startTime"
+                            role="alert"
+                            hidden={
+                              failedIntent !== "schedule" ||
+                              failedGroupId !== group.id ||
+                              !fieldError
+                            }
+                            class="text-sm text-destructive"
+                          >
+                            {fieldError}
+                          </p>
+                        </div>
+                        <button
+                          type="submit"
+                          class="min-h-11 rounded-lg bg-primary px-3 font-semibold text-primary-foreground"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          type="button"
+                          data-edit-cancel
+                          hidden
+                          class="min-h-11 rounded-lg border px-3"
+                        >
+                          Cancelar
+                        </button>
+                      </form>
+                    </details>
+                  )}
+                </div>
+                <div data-group-field="capacity">
+                  <span class="font-medium">Capacidad</span>{" "}
+                  <span data-field-value>{group.capacity}</span>
+                  {canCreate && group.status !== "CANCELLED" && (
+                    <button
+                      type="button"
+                      hidden
+                      data-edit-trigger
+                      aria-label={`Editar capacidad del grupo ${index + 1}`}
+                      title="Editar capacidad"
+                      class="ml-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg align-middle hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        class="size-4"
+                      >
+                        <path d="m16 4 4 4-11 11-5 1 1-5L16 4zM14 6l4 4" />
+                      </svg>
+                    </button>
+                  )}
+                  {canCreate && group.status !== "CANCELLED" && (
+                    <details
+                      data-edit-fallback
+                      open={
+                        failedIntent === "capacity" &&
+                        failedGroupId === group.id
+                      }
+                      class="mt-1"
+                    >
+                      <summary class="cursor-pointer underline underline-offset-4">
+                        Editar capacidad
+                      </summary>
+                      <form
+                        method="post"
+                        data-group-form
+                        aria-label={`Cambiar capacidad del grupo ${index + 1}`}
+                        class="mt-2 flex flex-wrap items-end gap-2"
+                      >
+                        <input type="hidden" name="intent" value="capacity" />
+                        <input type="hidden" name="groupId" value={group.id} />
+                        <input
+                          type="hidden"
+                          name="revision"
+                          value={group.updatedAt.toISOString()}
+                        />
+                        <div>
+                          <label
+                            for={`capacity-${group.id}`}
+                            class="mb-1 block text-sm font-medium"
+                          >
+                            Capacidad
+                          </label>
+                          <input
+                            id={`capacity-${group.id}`}
+                            name="capacity"
+                            type="number"
+                            min="1"
+                            step="1"
+                            required
+                            value={
+                              failedIntent === "capacity" &&
+                              failedGroupId === group.id
+                                ? attemptedCapacity
+                                : group.capacity
+                            }
+                            aria-invalid={
+                              failedIntent === "capacity" &&
+                              failedGroupId === group.id &&
+                              fieldError
+                                ? "true"
+                                : undefined
+                            }
+                            aria-describedby={
+                              failedIntent === "capacity" &&
+                              failedGroupId === group.id &&
+                              fieldError
+                                ? `capacity-${group.id}-error`
+                                : undefined
+                            }
+                            class="min-h-11 w-32 rounded-lg border bg-background px-3"
+                          />
+                          <p
+                            id={`capacity-${group.id}-error`}
+                            data-field-error="capacity"
+                            role="alert"
+                            hidden={
+                              failedIntent !== "capacity" ||
+                              failedGroupId !== group.id ||
+                              !fieldError
+                            }
+                            class="text-sm text-destructive"
+                          >
+                            {fieldError}
+                          </p>
+                        </div>
+                        <button
+                          type="submit"
+                          class="min-h-11 rounded-lg bg-primary px-3 font-semibold text-primary-foreground"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          type="button"
+                          data-edit-cancel
+                          hidden
+                          class="min-h-11 rounded-lg border px-3"
+                        >
+                          Cancelar
+                        </button>
+                      </form>
+                    </details>
+                  )}
+                </div>
+              </div>
+            </article>
+          </li>
+        );
+      })}
+    </ul>
+  )}
+</section>
+<dialog
+  data-new-dialog
+  aria-labelledby="new-dialog-title"
+  class="m-auto w-[min(26rem,calc(100%-2rem))] rounded-xl bg-card p-5 text-foreground shadow-xl backdrop:bg-black/60"
+>
+  <h2 id="new-dialog-title" class="text-lg font-semibold">
+    Nuevo grupo
+  </h2>
+  <form
+    method="post"
+    data-group-form
+    data-session-minutes={course.sessionMinutes}
+    data-occupied={occupied()}
+    aria-label="Nuevo grupo"
+    class="mt-4 grid gap-4"
+  >
+    <input type="hidden" name="intent" value="create" />
+    <div>
+      <label for="dialog-time" class="mb-2 block text-sm font-medium">
+        Hora de inicio
+      </label>
+      <input
+        id="dialog-time"
+        name="startTime"
+        type="time"
+        required
+        class="min-h-11 w-full rounded-lg border bg-background px-3"
+      />
+      <p
+        data-group-end
+        aria-live="polite"
+        class="mt-1 text-xs text-muted-foreground"
+      ></p>
+      <p
+        id="dialog-time-error"
+        data-field-error="startTime"
+        role="alert"
+        hidden
+        class="mt-1 text-sm text-destructive"
+      ></p>
+    </div>
+    <div>
+      <label for="dialog-capacity" class="mb-2 block text-sm font-medium">
+        Capacidad
+      </label>
+      <input
+        id="dialog-capacity"
+        name="capacity"
+        type="number"
+        min="1"
+        step="1"
+        required
+        class="min-h-11 w-full rounded-lg border bg-background px-3"
+      />
+      <p
+        id="dialog-capacity-error"
+        data-field-error="capacity"
+        role="alert"
+        hidden
+        class="mt-1 text-sm text-destructive"
+      ></p>
+    </div>
+    <div class="flex justify-end gap-2">
+      <button
+        type="button"
+        data-dialog-close
+        class="min-h-11 rounded-lg border px-4"
+      >
+        Cancelar
+      </button>
+      <button
+        type="submit"
+        class="min-h-11 rounded-lg bg-primary px-4 font-semibold text-primary-foreground"
+      >
+        Crear grupo
+      </button>
+    </div>
+  </form>
+</dialog>
+<dialog
+  data-action-dialog
+  role="alertdialog"
+  aria-labelledby="action-dialog-title"
+  aria-describedby="action-dialog-description"
+  class="m-auto w-[min(28rem,calc(100%-2rem))] rounded-xl bg-card p-6 text-foreground shadow-xl backdrop:bg-black/60"
+>
+  <h2 id="action-dialog-title" class="text-lg font-semibold"></h2>
+  <p id="action-dialog-description" class="mt-3 text-sm"></p>
+  <form
+    method="post"
+    data-group-form
+    class="mt-6 flex flex-wrap justify-end gap-2"
+  >
+    <input type="hidden" name="intent" />
+    <input type="hidden" name="groupId" />
+    <input type="hidden" name="revision" />
+    <button
+      type="button"
+      data-dialog-close
+      class="min-h-11 rounded-lg border px-4"
+    >
+      Volver
+    </button>
+    <button
+      type="submit"
+      class="min-h-11 rounded-lg bg-destructive px-4 font-semibold text-destructive-foreground"
+    ></button>
+  </form>
+</dialog>
+<script src="./group-management-client.ts"></script>

@@ -124,6 +124,7 @@ const success = Astro.url.searchParams.get("success");
   <script>
     import { sileo } from "sileo";
     document.addEventListener("astro:page-load", () => {
+      if (window.location.pathname !== "/app/formatos") return;
       const success = new URLSearchParams(window.location.search).get(
         "success",
       );

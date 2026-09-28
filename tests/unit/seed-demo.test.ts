@@ -62,6 +62,9 @@ describe("development demo course planning", () => {
       ).toEqual(course.endsAt);
       expect(groups.length).toBeGreaterThan(0);
       for (const group of groups) {
+        expect(group.publishedAt).toEqual(
+          course.status === "PUBLISHED" ? now : null,
+        );
         expect(group.capacity).toBeGreaterThan(0);
         const time = instantToBoliviaCivil(group.startsAt).slice(11);
         expect(groupPlan(course, revision, time).endsAt).toEqual(group.endsAt);

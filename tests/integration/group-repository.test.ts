@@ -22,7 +22,9 @@ import {
   changeGroupSchedule,
   changeGroupCapacity,
   cancelGroup,
+  deleteGroup,
   listGroups,
+  reactivateGroup,
 } from "@/application/groups/manage-groups";
 import type { InternalUser } from "@/domain/auth/types";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
@@ -215,6 +217,205 @@ test("withdrawal retains group snapshot and permits new groups with pinned revis
     admin.id,
   );
   expect(republished.courseTypeRevisionId).toBe(group.courseTypeRevisionId);
+});
+
+test("publication is tracked per group, including publication after draft creation", async () => {
+  const exposed = await createGroup(repo, admin, courseId, "08:00", 3);
+  expect(exposed.publishedAt).toBeInstanceOf(Date);
+  await courseRepo.transition(courseId, "DRAFT", admin.id);
+  const draftOnly = await createGroup(repo, admin, courseId, "09:30", 3);
+  expect(draftOnly.publishedAt).toBeNull();
+  await expect(
+    deleteGroup(repo, admin, exposed.id, exposed.updatedAt.toISOString()),
+  ).rejects.toMatchObject({ code: "GROUP_PUBLISHED" });
+  await deleteGroup(
+    repo,
+    admin,
+    draftOnly.id,
+    draftOnly.updatedAt.toISOString(),
+  );
+  expect((await repo.list(courseId)).map((group) => group.id)).toEqual([
+    exposed.id,
+  ]);
+  expect(
+    (
+      await database.db
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.entityId, draftOnly.id))
+    ).map((event) => event.action),
+  ).toEqual(["GROUP_CREATED", "GROUP_DELETED"]);
+  await expect(
+    database.db.delete(groups).where(eq(groups.id, exposed.id)).execute(),
+  ).rejects.toThrow();
+  const unexposed = await createGroup(repo, admin, courseId, "09:30", 4);
+  await courseRepo.transition(courseId, "PUBLISHED", admin.id);
+  const [nowExposed] = await database.db
+    .select()
+    .from(groups)
+    .where(eq(groups.id, unexposed.id));
+  expect(nowExposed?.publishedAt).toBeInstanceOf(Date);
+  await courseRepo.transition(courseId, "DRAFT", admin.id);
+  await expect(
+    deleteGroup(repo, admin, unexposed.id, unexposed.updatedAt.toISOString()),
+  ).rejects.toMatchObject({ code: "GROUP_PUBLISHED" });
+});
+
+test("cancelled draft groups stay deletable until active on publication", async () => {
+  await courseRepo.transition(courseId, "DRAFT", admin.id);
+  const group = await createGroup(repo, admin, courseId, "08:00", 2);
+  const cancelled = await cancelGroup(
+    repo,
+    admin,
+    group.id,
+    group.updatedAt.toISOString(),
+  );
+  await courseRepo.transition(courseId, "PUBLISHED", admin.id);
+  const [stillDraftOnly] = await database.db
+    .select()
+    .from(groups)
+    .where(eq(groups.id, group.id));
+  expect(stillDraftOnly?.publishedAt).toBeNull();
+  await deleteGroup(repo, admin, group.id, cancelled.updatedAt.toISOString());
+});
+
+test("reactivating a previously unexposed group on a published course records exposure", async () => {
+  await courseRepo.transition(courseId, "DRAFT", admin.id);
+  const group = await createGroup(repo, admin, courseId, "08:00", 2);
+  const cancelled = await cancelGroup(
+    repo,
+    admin,
+    group.id,
+    group.updatedAt.toISOString(),
+  );
+  await courseRepo.transition(courseId, "PUBLISHED", admin.id);
+  const active = await reactivateGroup(
+    repo,
+    admin,
+    group.id,
+    cancelled.updatedAt.toISOString(),
+  );
+  expect(active.publishedAt).toBeInstanceOf(Date);
+  await expect(
+    deleteGroup(repo, admin, active.id, active.updatedAt.toISOString()),
+  ).rejects.toMatchObject({ code: "GROUP_PUBLISHED" });
+});
+
+test("reactivation checks overlaps, state, revision, course availability and permissions", async () => {
+  const group = await createGroup(repo, admin, courseId, "08:00", 2);
+  const cancelled = await cancelGroup(
+    repo,
+    admin,
+    group.id,
+    group.updatedAt.toISOString(),
+  );
+  const replacement = await createGroup(repo, admin, courseId, "08:00", 3);
+  await expect(
+    reactivateGroup(repo, admin, group.id, cancelled.updatedAt.toISOString()),
+  ).rejects.toMatchObject({ code: "SCHEDULE_CONFLICT" });
+  await cancelGroup(
+    repo,
+    admin,
+    replacement.id,
+    replacement.updatedAt.toISOString(),
+  );
+  await expect(
+    reactivateGroup(repo, admin, group.id, group.updatedAt.toISOString()),
+  ).rejects.toMatchObject({ code: "STALE_GROUP" });
+  const active = await reactivateGroup(
+    repo,
+    admin,
+    group.id,
+    cancelled.updatedAt.toISOString(),
+  );
+  expect(active.status).toBe("PLANNED");
+  expect(active.publishedAt).toEqual(group.publishedAt);
+  await expect(
+    reactivateGroup(repo, admin, group.id, active.updatedAt.toISOString()),
+  ).rejects.toMatchObject({ code: "GROUP_ACTIVE" });
+  await expect(
+    deleteGroup(
+      repo,
+      { ...admin, roles: ["INSTRUCTOR"] },
+      group.id,
+      active.updatedAt.toISOString(),
+    ),
+  ).rejects.toThrow();
+  await expect(
+    reactivateGroup(
+      repo,
+      { ...admin, status: "DISABLED" },
+      group.id,
+      active.updatedAt.toISOString(),
+    ),
+  ).rejects.toThrow();
+  const [event] = await database.db
+    .select()
+    .from(auditEvents)
+    .where(eq(auditEvents.entityId, group.id))
+    .orderBy(sql`created_at desc`)
+    .limit(1);
+  expect(event?.action).toBe("GROUP_REACTIVATED");
+  await courseRepo.transition(courseId, "ARCHIVED", admin.id);
+  const archivedCancelled = await cancelGroup(
+    repo,
+    admin,
+    group.id,
+    active.updatedAt.toISOString(),
+  );
+  await expect(
+    reactivateGroup(
+      repo,
+      admin,
+      group.id,
+      archivedCancelled.updatedAt.toISOString(),
+    ),
+  ).rejects.toMatchObject({ code: "COURSE_UNAVAILABLE" });
+});
+
+test("parallel delete and cancellation serialize and stale attempts leave no extra audit", async () => {
+  await courseRepo.transition(courseId, "DRAFT", admin.id);
+  const group = await createGroup(repo, admin, courseId, "08:00", 2);
+  const results = await Promise.allSettled([
+    deleteGroup(repo, admin, group.id, group.updatedAt.toISOString()),
+    cancelGroup(repo, admin, group.id, group.updatedAt.toISOString()),
+  ]);
+  expect(
+    results.filter((result) => result.status === "fulfilled"),
+  ).toHaveLength(1);
+  expect(
+    (
+      await database.db
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.entityId, group.id))
+    ).filter((event) => event.action !== "GROUP_CREATED"),
+  ).toHaveLength(1);
+});
+
+test("deletion rejects stale revisions and rolls back if audit cannot be written", async () => {
+  await courseRepo.transition(courseId, "DRAFT", admin.id);
+  const group = await createGroup(repo, admin, courseId, "08:00", 2);
+  const updated = await changeGroupCapacity(
+    repo,
+    admin,
+    group.id,
+    3,
+    group.updatedAt.toISOString(),
+  );
+  await expect(
+    deleteGroup(repo, admin, group.id, group.updatedAt.toISOString()),
+  ).rejects.toMatchObject({ code: "STALE_GROUP" });
+  await expect(
+    repo.delete(group.id, crypto.randomUUID(), updated.updatedAt),
+  ).rejects.toThrow();
+  expect((await repo.list(courseId)).map((entry) => entry.id)).toContain(
+    group.id,
+  );
+  await deleteGroup(repo, admin, group.id, updated.updatedAt.toISOString());
+  await expect(
+    deleteGroup(repo, admin, group.id, updated.updatedAt.toISOString()),
+  ).rejects.toMatchObject({ code: "GROUP_NOT_FOUND" });
 });
 
 test("date-only courses accept different group hours and preserve dates on unrelated edits", async () => {
