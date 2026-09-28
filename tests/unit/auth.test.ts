@@ -278,6 +278,7 @@ describe("environment configuration", () => {
       max: 1,
       idleTimeout: 20,
       connectTimeout: 10,
+      maxPipeline: 1,
     });
   });
 
