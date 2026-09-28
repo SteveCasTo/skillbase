@@ -133,11 +133,31 @@ test("published course is public end-to-end and withdrawal removes every public 
     );
 
     await page.goto("/cursos");
+    await expect(
+      page
+        .getByRole("navigation", { name: "Navegación principal" })
+        .getByRole("link", { name: "Cursos" }),
+    ).toHaveAttribute("href", "/cursos");
+    await expect(page.locator(".back-link")).toHaveCount(0);
+    await expect(page.locator(".catalog-intro h1")).toHaveCSS(
+      "max-width",
+      "none",
+    );
+    await expect(page.locator(".catalog-intro > p")).toHaveCSS(
+      "max-width",
+      "none",
+    );
     const catalogCourse = page.getByRole("link", {
       name: `Ver curso: ${courseName}`,
     });
     await expect(catalogCourse).toBeVisible();
+    await expect(catalogCourse.locator("..")).toHaveClass(/is-visible/);
+    await expect(catalogCourse.locator("..")).toHaveCSS(
+      "animation-name",
+      "row-acquires-signal",
+    );
     const catalogImage = catalogCourse.locator("img");
+    await expect(catalogImage).toHaveCSS("object-fit", "cover");
     await expect(catalogImage).toHaveAttribute(
       "src",
       new RegExp(`/${courseId}/`),
@@ -149,6 +169,11 @@ test("published course is public end-to-end and withdrawal removes every public 
     expect(imageResponse.headers()["content-type"]).toContain("image/webp");
     detailUrl = (await catalogCourse.getAttribute("href")) ?? undefined;
     await catalogCourse.click();
+    await expect(page.locator(".back-link")).toHaveCount(0);
+    const registration = page.locator(".registration-window");
+    await expect(registration).toContainText("Abre");
+    await expect(registration).toContainText("Cierra");
+    await expect(registration).not.toContainText(/a las|p\. m\.|a\. m\./i);
 
     await expect(
       page.getByRole("heading", { level: 1, name: courseName }),
@@ -199,6 +224,39 @@ test("published course is public end-to-end and withdrawal removes every public 
       "src",
       new RegExp(`/${courseId}/`),
     );
+    const content = page.locator(".detail-main");
+    const facts = page.getByRole("complementary", {
+      name: "Información del curso",
+    });
+    const [desktopContent, desktopFacts] = await Promise.all([
+      content.boundingBox(),
+      facts.boundingBox(),
+    ]);
+    expect(desktopContent).not.toBeNull();
+    expect(desktopFacts).not.toBeNull();
+    expect(desktopFacts!.x).toBeGreaterThan(desktopContent!.x);
+    expect(desktopFacts!.width / desktopContent!.width).toBeCloseTo(1, 1);
+    const startFact = facts.locator(":scope > dl > div").nth(0);
+    const endFact = facts.locator(":scope > dl > div").nth(1);
+    const [desktopStart, desktopEnd] = await Promise.all([
+      startFact.boundingBox(),
+      endFact.boundingBox(),
+    ]);
+    expect(desktopEnd!.x).toBeGreaterThan(desktopStart!.x);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const [mobileContent, mobileFacts] = await Promise.all([
+      content.boundingBox(),
+      facts.boundingBox(),
+    ]);
+    expect(mobileContent).not.toBeNull();
+    expect(mobileFacts).not.toBeNull();
+    expect(mobileFacts!.y).toBeGreaterThan(mobileContent!.y);
+    expect(mobileFacts!.width).toBeCloseTo(mobileContent!.width, 0);
+    const [mobileStart, mobileEnd] = await Promise.all([
+      startFact.boundingBox(),
+      endFact.boundingBox(),
+    ]);
+    expect(mobileEnd!.y).toBeGreaterThan(mobileStart!.y);
 
     // The upload really reached public Storage; remove it even when later assertions fail.
     await signInFixture(context, AUTH_FIXTURES.admin.email);
@@ -302,8 +360,10 @@ test("unknown slug uses the same public 404 without exposing private data", asyn
     page.getByRole("heading", { name: "Curso no encontrado." }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Ver todos los cursos" }),
-  ).toBeVisible();
+    page
+      .getByRole("navigation", { name: "Navegación de pie de página" })
+      .getByRole("link", { name: "Cursos" }),
+  ).toHaveAttribute("href", "/cursos");
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
     "content",
     "noindex,nofollow",

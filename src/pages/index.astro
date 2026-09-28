@@ -85,10 +85,6 @@ const moreCourses = featuredCourse
   const revealTargets = document.querySelectorAll<HTMLElement>(
     "[data-signal-reveal]",
   );
-  const mobileViewport = window.matchMedia("(max-width: 639px)");
-  const siteHeader = document.querySelector<HTMLElement>(".site-header");
-  let lastScrollY = Math.max(window.scrollY, 0);
-  let scrollFrame = 0;
 
   if (!reducedMotion.matches && "IntersectionObserver" in window) {
     document.documentElement.classList.add("motion-enhanced");
@@ -104,39 +100,4 @@ const moreCourses = featuredCourse
     );
     for (const target of revealTargets) revealObserver.observe(target);
   }
-
-  const showMobileHeader = () =>
-    siteHeader?.classList.remove("is-scroll-hidden");
-  const updateHeader = () => {
-    scrollFrame = 0;
-    if (!siteHeader) return;
-
-    const currentScrollY = Math.max(window.scrollY, 0);
-    siteHeader.classList.toggle("is-scrolled", currentScrollY > 24);
-
-    if (!mobileViewport.matches) {
-      showMobileHeader();
-      lastScrollY = currentScrollY;
-      return;
-    }
-    const delta = currentScrollY - lastScrollY;
-    if (currentScrollY < 96 || siteHeader.contains(document.activeElement)) {
-      showMobileHeader();
-    } else if (delta > 8) {
-      siteHeader.classList.add("is-scroll-hidden");
-    } else if (delta < -8) {
-      showMobileHeader();
-    }
-    if (Math.abs(delta) > 8) lastScrollY = currentScrollY;
-  };
-  window.addEventListener(
-    "scroll",
-    () => {
-      if (!scrollFrame) scrollFrame = requestAnimationFrame(updateHeader);
-    },
-    { passive: true },
-  );
-  mobileViewport.addEventListener("change", updateHeader);
-  siteHeader?.addEventListener("focusin", showMobileHeader);
-  updateHeader();
 </script>

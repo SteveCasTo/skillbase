@@ -163,11 +163,38 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   const cropFrameBox = await cropFrame.boundingBox();
   expect(cropFrameBox).not.toBeNull();
   expect(cropFrameBox!.width / cropFrameBox!.height).toBeCloseTo(8 / 5, 1);
-  const cropImage = cropDialog.locator("img[alt='']");
+  const cropImage = cropDialog.locator('img[draggable="false"]');
   const initialImageBox = await cropImage.boundingBox();
   expect(initialImageBox).not.toBeNull();
+  const contexts = cropDialog.getByRole("region", {
+    name: "Vistas previas públicas",
+  });
+  await expect(contexts.getByText("Destacado en escritorio")).toBeVisible();
+  const previewImage = contexts.locator("img").first();
+  const initialPreview = await previewImage.getAttribute("src");
+  expect(initialPreview).toMatch(/^blob:/);
+  await contexts.getByRole("button", { name: "Afiches" }).click();
+  await expect(contexts.getByText("Afiche ancho")).toBeVisible();
+  await expect(contexts.getByText("Afiche estrecho")).toBeVisible();
+  await contexts.getByRole("button", { name: "Móvil" }).click();
+  await expect(contexts.getByText("Destacado móvil")).toBeVisible();
+  await expect(contexts.getByText("Otro curso móvil")).toBeVisible();
+  await contexts.getByRole("button", { name: "Detalle" }).click();
+  await expect(contexts.getByText("Detalle en escritorio")).toBeVisible();
+  await expect(contexts.getByText("Detalle en móvil")).toBeVisible();
+  const [desktopDetail, mobileDetail] = await Promise.all([
+    contexts.locator(".artwork-context-first").boundingBox(),
+    contexts.locator(".artwork-context-second").boundingBox(),
+  ]);
+  expect(desktopDetail).not.toBeNull();
+  expect(mobileDetail).not.toBeNull();
+  expect(desktopDetail!.width).toBeGreaterThan(mobileDetail!.width);
+  expect(desktopDetail!.width / desktopDetail!.height).toBeCloseTo(1.15, 1);
   const zoom = cropDialog.getByRole("slider", { name: "Zoom" });
   await zoom.fill("1.5");
+  await expect
+    .poll(() => previewImage.getAttribute("src"))
+    .not.toBe(initialPreview);
   await expect
     .poll(async () => (await cropImage.boundingBox())?.width)
     .toBeGreaterThan(initialImageBox!.width);
