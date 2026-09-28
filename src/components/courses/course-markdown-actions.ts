@@ -43,8 +43,12 @@ export function applyMarkdownAction(
       action === "blockquote")
   ) {
     start = value.lastIndexOf("\n", start - 1) + 1;
-    const lineEnd = value.indexOf("\n", end);
-    end = lineEnd === -1 ? value.length : lineEnd;
+    if (end > start && value[end - 1] === "\n") {
+      end -= 1;
+    } else {
+      const lineEnd = value.indexOf("\n", end);
+      end = lineEnd === -1 ? value.length : lineEnd;
+    }
   }
   const selected = value.slice(start, end);
   let replacement: string;

@@ -39,6 +39,9 @@ describe("course Markdown toolbar actions", () => {
   });
 
   test("prefixes selected lines with parser-supported list syntax", () => {
+    expect(applyMarkdownAction("uno\ndos", 0, 4, "unordered-list").value).toBe(
+      "- uno\ndos",
+    );
     expect(applyMarkdownAction("uno\ndos", 0, 7, "ordered-list").value).toBe(
       "1. uno\n2. dos",
     );

@@ -44,6 +44,11 @@ const levelLabel = {
   INTERMEDIATE: "Medio",
   ADVANCED: "Avanzado",
 } as const;
+const adminDateTimeFormatter = new Intl.DateTimeFormat("es-BO", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "America/La_Paz",
+});
 ---
 
 <PrivateLayout title="Cursos">
@@ -154,6 +159,18 @@ const levelLabel = {
                   <div>
                     <dt class="text-muted-foreground">Formato · duración</dt>
                     <dd class="mt-1 font-medium">{course.totalHours} horas</dd>
+                  </div>
+                  <div class="col-span-2">
+                    <dt class="text-muted-foreground">Fechas del curso</dt>
+                    <dd class="mt-1 font-medium">
+                      <time datetime={course.startsAt.toISOString()}>
+                        {adminDateTimeFormatter.format(course.startsAt)}
+                      </time>
+                      {" — "}
+                      <time datetime={course.endsAt.toISOString()}>
+                        {adminDateTimeFormatter.format(course.endsAt)}
+                      </time>
+                    </dd>
                   </div>
                   <div>
                     <dt class="text-muted-foreground">Estudiante</dt>

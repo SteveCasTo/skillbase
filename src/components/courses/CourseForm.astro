@@ -139,7 +139,7 @@ const currentArtworkUrl = publicArtworkUrl(
       <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.4fr)] lg:items-start">
         {!disabled && (
           <CourseImageEditor
-            client:only="react"
+            client:load
             {...(courseId ? { courseId } : {})}
             currentArtwork={displayedArtwork ?? null}
             currentArtworkUrl={currentArtworkUrl}
@@ -289,22 +289,12 @@ const currentArtworkUrl = publicArtworkUrl(
             Contenido del curso (Markdown, opcional)
           </label>
           <CourseMarkdownEditor
-            client:only="react"
+            client:load
             value={values.contentMarkdown ?? ""}
             error={errors.contentMarkdown ?? ""}
             disabled={disabled}
             describedBy="contentMarkdown-help"
           />
-          <noscript>
-            <textarea
-              class={area}
-              id="contentMarkdown"
-              name="contentMarkdown"
-              data-course-input="multiline"
-              rows="9"
-              disabled={disabled}
-            >{values.contentMarkdown ?? ""}</textarea>
-          </noscript>
           <span class="mt-1 block text-xs text-muted-foreground">
             <span id="contentMarkdown-help">
               Usa encabezados con ## y listas con -; el texto se publicará junto

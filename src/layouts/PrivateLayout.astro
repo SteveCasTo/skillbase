@@ -157,9 +157,10 @@ const currentPath = Astro.url.pathname;
     </div>
   </div>
   <script>
-    document.addEventListener("astro:page-load", () => {
+    const initializePrivateNavigation = () => {
       const shell = document.querySelector<HTMLElement>("[data-private-shell]");
-      if (shell) {
+      if (shell && shell.dataset.navigationInitialized !== "true") {
+        shell.dataset.navigationInitialized = "true";
         const toggle = shell.querySelector<HTMLButtonElement>(
           "[data-sidebar-toggle]",
         );
@@ -200,12 +201,14 @@ const currentPath = Astro.url.pathname;
             /* Storage may be unavailable. */
           }
         };
+        let isCollapsed = false;
         try {
-          if (localStorage.getItem("private-sidebar-collapsed") === "true")
-            setCollapsed(true);
+          isCollapsed =
+            localStorage.getItem("private-sidebar-collapsed") === "true";
         } catch {
           /* Keep the default expanded state. */
         }
+        setCollapsed(isCollapsed);
         toggle?.addEventListener("click", () =>
           setCollapsed(shell.dataset.collapsed !== "true"),
         );
@@ -298,6 +301,8 @@ const currentPath = Astro.url.pathname;
           }
         });
       }
-    });
+    };
+    initializePrivateNavigation();
+    document.addEventListener("astro:page-load", initializePrivateNavigation);
   </script>
 </BaseLayout>

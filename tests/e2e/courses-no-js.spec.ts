@@ -39,11 +39,14 @@ test("new courses preserve values and can be corrected after server validation w
   await course
     .getByLabel("Descripción")
     .fill("Contenido para probar la recuperación tras validar en servidor.");
-  await course.getByLabel("Nivel").selectOption("INTERMEDIATE");
+  await course.locator('select[name="level"]').selectOption("INTERMEDIATE");
   await course
     .getByLabel("Formato de curso")
     .selectOption({ label: formatName });
   await course.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
+  await course
+    .getByLabel("Contenido del curso (Markdown, opcional)")
+    .fill("## Temario visible sin JavaScript");
   await course
     .getByLabel("Fecha de inicio de clases (Bolivia)", { exact: true })
     .fill("2027-03-01");
@@ -85,7 +88,14 @@ test("new courses preserve values and can be corrected after server validation w
   await expect(course.getByLabel("Descripción")).toHaveValue(
     "Contenido para probar la recuperación tras validar en servidor.",
   );
-  await expect(course.getByLabel("Nivel")).toHaveValue("INTERMEDIATE");
+  const markdown = course.getByLabel(
+    "Contenido del curso (Markdown, opcional)",
+  );
+  await expect(markdown).toBeVisible();
+  await expect(markdown).toHaveValue("## Temario visible sin JavaScript");
+  await expect(course.locator('select[name="level"]')).toHaveValue(
+    "INTERMEDIATE",
+  );
   await expect(course.getByLabel("Formato de curso")).toHaveValue(
     selectedFormat,
   );
@@ -112,6 +122,8 @@ test("new courses preserve values and can be corrected after server validation w
     /\/app\/cursos\/[0-9a-f-]+\/editar\?success=created/,
   );
   await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
+  await expect(markdown).toBeVisible();
+  await expect(markdown).toHaveValue("## Temario visible sin JavaScript");
   await page.locator('[data-confirm-fallback="publish"] summary').click();
   await expect(
     page.getByRole("button", { name: "Confirmar publicación" }),
