@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
@@ -46,93 +47,50 @@ export function createDatabase(
   };
 }
 
-let runtimeDatabase: ReturnType<typeof createDatabase> | undefined;
-let lastProbe = 0;
-let pendingProbe: Promise<void> | undefined;
-
-interface ProbeConnection {
-  probe(): Promise<void>;
-  discard(): Promise<void>;
+interface RequestDatabaseScope {
+  connection?: ReturnType<typeof createDatabase>;
+  deadline?: ReturnType<typeof setTimeout>;
+  readonly readDeadlineMs?: number;
+  readonly databaseUrl?: string;
 }
 
-async function probeWithDeadline(
-  connection: ProbeConnection,
-  timeoutMs: number,
-) {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    await Promise.race([
-      connection.probe(),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error("Database probe timed out")),
-          timeoutMs,
-        );
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
+const requestDatabase = new AsyncLocalStorage<RequestDatabaseScope>();
 
-export async function recoverDatabaseConnection<T extends ProbeConnection>(
-  connection: T,
-  create: () => T,
-  timeoutMs = 5_000,
+/** Do not reuse a serverless invocation's TCP socket on a later request. */
+export async function withRequestDatabase<T>(
+  work: () => Promise<T>,
+  readDeadlineMs?: number,
+  databaseUrl?: string,
 ): Promise<T> {
-  try {
-    await probeWithDeadline(connection, timeoutMs);
-    return connection;
-  } catch {
-    const replacement = create();
-    void connection.discard().catch(() => {});
+  const scope: RequestDatabaseScope = {
+    ...(readDeadlineMs === undefined ? {} : { readDeadlineMs }),
+    ...(databaseUrl === undefined ? {} : { databaseUrl }),
+  };
+  return requestDatabase.run(scope, async () => {
     try {
-      await probeWithDeadline(replacement, timeoutMs);
-    } catch (error) {
-      void replacement.discard().catch(() => {});
-      throw error;
+      return await work();
+    } finally {
+      if (scope.deadline) clearTimeout(scope.deadline);
+      if (scope.connection) await scope.connection.discard();
     }
-    console.warn("[database] stale connection recycled");
-    return replacement;
-  }
-}
-
-/** Check a socket after serverless suspension before handing it to a request. */
-export async function ensureRuntimeDatabaseHealthy(): Promise<void> {
-  if (pendingProbe) return pendingProbe;
-  if (runtimeDatabase && Date.now() - lastProbe < 5_000) return;
-
-  pendingProbe = (async () => {
-    const connection =
-      runtimeDatabase ??
-      createDatabase(
-        getDatabaseEnvironment().databaseUrl,
-        RUNTIME_DATABASE_OPTIONS,
-      );
-    runtimeDatabase = connection;
-    try {
-      // A frozen function may reuse a dead socket. Verify and replace it before
-      // any request queues a real query behind the stale connection.
-      runtimeDatabase = await recoverDatabaseConnection(connection, () =>
-        createDatabase(
-          getDatabaseEnvironment().databaseUrl,
-          RUNTIME_DATABASE_OPTIONS,
-        ),
-      );
-      lastProbe = Date.now();
-    } catch (error) {
-      runtimeDatabase = undefined;
-      throw error;
-    }
-  })().finally(() => {
-    pendingProbe = undefined;
   });
-  return pendingProbe;
 }
 
 export function getDatabase() {
-  runtimeDatabase ??= createDatabase(getDatabaseEnvironment().databaseUrl, {
-    ...RUNTIME_DATABASE_OPTIONS,
-  });
-  return runtimeDatabase.db;
+  const scope = requestDatabase.getStore();
+  if (!scope) throw new Error("Database access requires a request scope");
+  if (!scope.connection) {
+    scope.connection = createDatabase(
+      scope.databaseUrl ?? getDatabaseEnvironment().databaseUrl,
+      RUNTIME_DATABASE_OPTIONS,
+    );
+    if (scope.readDeadlineMs)
+      scope.deadline = setTimeout(() => {
+        console.warn(
+          "[database] read deadline exceeded; closing request connection",
+        );
+        void scope.connection?.discard().catch(() => {});
+      }, scope.readDeadlineMs);
+  }
+  return scope.connection.db;
 }

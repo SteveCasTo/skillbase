@@ -391,6 +391,10 @@ test("retries a persisted initial group after its POST response is lost and crea
   await format.getByLabel("Precio estudiante (BOB)").fill("80");
   await format.getByLabel("Precio externo (BOB)").fill("100");
   await format.getByRole("button", { name: "Crear formato" }).click();
+  await expect(page).toHaveURL(/\/app\/formatos$/);
+  await expect(page.locator("[data-sileo-toast]")).toContainText(
+    "Formato creado",
+  );
   await page.goto("/app/cursos/nuevo");
   await page.getByLabel("Nombre").fill(`Curso retry grupo ${Date.now()}`);
   await fillCourseFields(page, formatName);
