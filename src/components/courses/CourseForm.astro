@@ -927,9 +927,10 @@ const currentArtworkUrl = publicArtworkUrl(
                   typeof entry[1] === "string",
               ),
             );
-            // The format determines the plan. Permit an attempt without it so
-            // the user gets a field-level error instead of an inert button.
-            const awaitingFormat = !baseline && !values.courseTypeId;
+            // Keep an untouched draft disabled, but once named permit an
+            // attempt without a format to show its field-level error.
+            const awaitingFormat =
+              !baseline && !values.courseTypeId && Boolean(values.name?.trim());
             const valid =
               form.checkValidity() && draftFieldsReady(values, !baseline);
             button.disabled =

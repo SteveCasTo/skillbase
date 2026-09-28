@@ -59,6 +59,7 @@ test("missing format is announced beside the selector and focuses it without an 
   await expect(page).toHaveURL(/\/app\/formatos$/);
   await page.goto("/app/cursos/nuevo");
   const create = page.getByRole("button", { name: "Crear borrador" });
+  await page.getByLabel("Nombre").fill("Curso sin formato");
   await expect(create).toBeEnabled();
   await create.click();
   const format = page.getByRole("combobox", { name: "Formato de curso" });
