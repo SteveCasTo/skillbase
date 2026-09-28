@@ -164,6 +164,8 @@ export function planDemoCourses(
 
       const plannedGroups = sample.groups.map(({ startTime, capacity }) => ({
         capacity,
+        // Seed has no human actor or publication action; preserve exposure directly.
+        publishedAt: sample.status === "PUBLISHED" ? now : null,
         ...groupPlan({ ...dates, weekdaysMask: 31 }, revision, startTime),
       }));
       if (
@@ -285,6 +287,7 @@ if (import.meta.main) {
             courseId: inserted.id,
             courseTypeRevisionId: course.courseTypeRevisionId,
             capacity: group.capacity,
+            publishedAt: group.publishedAt,
             startsAt: group.startsAt,
             endsAt: group.endsAt,
           })),
