@@ -144,6 +144,61 @@ test("collapsed rail expands on hover without shifting main and persists across 
   await expect(logoutButton).toBeHidden();
 });
 
+test("sidebar toggle supports Enter and Space and preserves its state across Astro navigation", async ({
+  context,
+  page,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app");
+
+  const shell = page.locator("[data-private-shell]");
+  const toggle = page.locator("[data-private-shell] [data-sidebar-toggle]");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+  await toggle.focus();
+  await page.keyboard.press("Enter");
+  await expect(shell).toHaveAttribute("data-collapsed", "true");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem("private-sidebar-collapsed")),
+    )
+    .toBe("true");
+
+  await page.locator(".private-brand-mark").hover();
+  await expect(shell).toHaveAttribute("data-preview", "true");
+  await page
+    .getByRole("navigation", { name: "Navegación privada" })
+    .getByRole("link", { name: "Formatos" })
+    .click();
+  await expect(page).toHaveURL(/\/app\/formatos$/);
+  await expect(shell).toHaveAttribute("data-collapsed", "true");
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem("private-sidebar-collapsed")),
+    )
+    .toBe("true");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+  await toggle.focus();
+  await page.keyboard.press("Space");
+  await expect(shell).toHaveAttribute("data-collapsed", "false");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem("private-sidebar-collapsed")),
+    )
+    .toBe("false");
+
+  await page
+    .getByRole("navigation", { name: "Navegación privada" })
+    .getByRole("link", { name: "Resumen" })
+    .click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(shell).toHaveAttribute("data-collapsed", "false");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+});
+
 test("courses page has a single create-course action", async ({
   context,
   page,
