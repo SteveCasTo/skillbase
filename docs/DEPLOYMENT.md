@@ -139,6 +139,8 @@ Agregar herramientas externas únicamente cuando exista beneficio claro.
 
 Las lecturas de cursos y los pasos de autenticación registran un aviso `[slow-operation]` cuando permanecen pendientes más de 5 segundos, y otro al terminar. El middleware mide el render SSR por ruta normalizada (sin IDs, slugs, credenciales ni datos personales). Ante un 504, buscar el aviso previo en los logs de la misma invocación de Vercel para distinguir Auth, persistencia y render; este diagnóstico no cancela solicitudes ni sustituye límites de tiempo en las dependencias.
 
+El runtime comprueba la conexión PostgreSQL antes de las rutas que usan la base cuando lleva más de 5 segundos sin comprobarse. Si la prueba de 5 segundos falla, descarta el cliente potencialmente obsoleto y comprueba uno nuevo antes de atender la solicitud; registra `[database] stale connection recycled` sin datos de usuario. El cliente limita el pipelining a una consulta para el pooler transaccional. Esto mitiga los bloqueos por sockets suspendidos descritos por Supabase para Vercel, pero los 504 previos no prueban por sí solos que ese fuera el origen; correlacionar nuevas trazas con fallos posteriores antes de afirmar causa raíz.
+
 ## PIPELINE IMPLEMENTADO
 
 `.github/workflows/ci.yml` se ejecuta únicamente en:
