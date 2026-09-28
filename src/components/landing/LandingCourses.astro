@@ -4,11 +4,7 @@ import { ArrowRight } from "lucide-react";
 import type { PublicCourseDto } from "@/domain/courses/types";
 import CourseArtwork from "./CourseArtwork.astro";
 import { groupPosterRows } from "./course-poster-rows";
-import {
-  availabilityLabels,
-  courseDateRange,
-  levelLabels,
-} from "./course-presentation";
+import { availabilityLabels, levelLabels } from "./course-presentation";
 
 interface Props {
   featuredCourse: PublicCourseDto | undefined;
@@ -70,10 +66,6 @@ const revealDelayBySlug = new Map(
           <p class="course-description">{featuredCourse.description}</p>
           <div class="editorial-rule" aria-hidden="true" />
           <dl class="course-summary">
-            <div>
-              <dt>Fechas</dt>
-              <dd>{courseDateRange(featuredCourse)}</dd>
-            </div>
             <div>
               <dt>Nivel y duración</dt>
               <dd>
@@ -168,10 +160,6 @@ const revealDelayBySlug = new Map(
                     <h3 title={course.name}>{course.name}</h3>
                     <p class="poster-description">{course.description}</p>
                     <dl class="poster-facts">
-                      <div>
-                        <dt>Fechas</dt>
-                        <dd>{courseDateRange(course)}</dd>
-                      </div>
                       <div>
                         <dt>Nivel y duración</dt>
                         <dd>

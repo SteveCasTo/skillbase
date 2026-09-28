@@ -127,6 +127,8 @@ test("published course is public end-to-end and withdrawal removes every public 
       name: new RegExp(courseName),
     });
     await expect(landingCourse).toBeVisible();
+    await expect(landingCourse).not.toContainText(/marzo|febrero|fechas/i);
+    await expect(landingCourse).toContainText("20 horas");
     await expect(landingCourse.locator("img")).toHaveAttribute(
       "src",
       new RegExp(`/${courseId}/`),
@@ -151,6 +153,8 @@ test("published course is public end-to-end and withdrawal removes every public 
       name: `Ver curso: ${courseName}`,
     });
     await expect(catalogCourse).toBeVisible();
+    await expect(catalogCourse).not.toContainText(/marzo|febrero|fechas/i);
+    await expect(catalogCourse).toContainText("20 horas");
     await expect(catalogCourse.locator("..")).toHaveClass(/is-visible/);
     await expect(catalogCourse.locator("..")).toHaveCSS(
       "animation-name",
@@ -174,16 +178,25 @@ test("published course is public end-to-end and withdrawal removes every public 
     await expect(registration).toContainText("Abre");
     await expect(registration).toContainText("Cierra");
     await expect(registration).not.toContainText(/a las|p\. m\.|a\. m\./i);
+    await expect(registration).toContainText("1 de enero de 2027");
+    await expect(registration).toContainText("20 de febrero de 2027");
+    await expect(registration).not.toContainText(/\b\d{1,2}:\d{2}\b/);
+    await expect(page.getByRole("heading", { name: "Horario" })).toHaveCount(0);
 
     await expect(
       page.getByRole("heading", { level: 1, name: courseName }),
     ).toBeVisible();
     await expect(
       page.locator("dt").filter({ hasText: "Inicio" }).locator("+ dd"),
-    ).toContainText(/1.*marzo.*2027/i);
+    ).toHaveText("1 de marzo de 2027");
     await expect(
       page.locator("dt").filter({ hasText: "Finalización" }).locator("+ dd"),
-    ).toContainText(/17.*marzo.*2027/i);
+    ).toHaveText("17 de marzo de 2027");
+    await expect(
+      page
+        .getByRole("complementary", { name: "Información del curso" })
+        .getByText("20 horas"),
+    ).toBeVisible();
     await expect(
       page.getByText("Docente público E2E", { exact: true }),
     ).toBeVisible();
@@ -331,7 +344,7 @@ test("public catalog and detail are available without a session, with useful emp
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
       name?.replace("Ver curso: ", "") ?? "",
     );
-    await expect(page.getByRole("heading", { name: "Horario" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Horario" })).toHaveCount(0);
     await expect(
       page.getByRole("heading", { name: "Condiciones" }),
     ).toBeVisible();
