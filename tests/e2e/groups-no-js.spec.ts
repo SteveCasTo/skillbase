@@ -35,6 +35,8 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
       conditions: "Cupo limitado.",
       startsAt: "2027-03-01T08:00",
       endsAt: "2027-03-17T09:30",
+      registrationStartAt: "2027-01-01T08:00",
+      registrationEndAt: "2027-02-20T18:00",
       weekdays: "1,2,3,4,5",
       minimumGrade: "70",
     },
@@ -74,6 +76,14 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
   await expect(
     page.getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)"),
   ).toHaveValue("2027-03-01T08:00");
+  await expect(page.locator('[name="registrationStartDate"]')).toHaveCount(0);
+  await expect(page.locator('[name="registrationEndDate"]')).toHaveCount(0);
+  await expect(page.locator('[name="registrationStartAt"]')).toHaveValue(
+    "2027-01-01T08:00",
+  );
+  await expect(page.locator('[name="registrationEndAt"]')).toHaveValue(
+    "2027-02-20T18:00",
+  );
   await page
     .getByLabel("Descripción")
     .fill("Curso histórico con grupo editado sin JavaScript.");
@@ -89,6 +99,12 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
   await expect(
     page.getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)"),
   ).toHaveValue("2027-03-01T08:00");
+  await expect(page.locator('[name="registrationStartAt"]')).toHaveValue(
+    "2027-01-01T08:00",
+  );
+  await expect(page.locator('[name="registrationEndAt"]')).toHaveValue(
+    "2027-02-20T18:00",
+  );
   await page.goto(`/app/cursos/${id}/grupos`);
   await page.locator("[data-cancel-fallback] summary").click();
   await expect(

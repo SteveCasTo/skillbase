@@ -4,6 +4,7 @@ import type { CourseFormat } from "@/domain/courses/formats";
 import CourseSelect from "./CourseSelect";
 import CourseImageEditor from "./CourseImageEditor";
 import CourseDateTimePicker from "./CourseDateTimePicker";
+import CourseDatePicker from "./CourseDatePicker";
 import CourseSchedulePicker from "./CourseSchedulePicker";
 import CourseWeekdayPlanner from "./CourseWeekdayPlanner";
 import CourseMarkdownEditor from "./CourseMarkdownEditor";
@@ -41,6 +42,12 @@ const control =
   "mt-2 min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";
 const area = `${control} min-h-28 resize-y`;
 const errorId = (name: string) => (errors[name] ? `${name}-error` : undefined);
+const legacy = Boolean(courseId && !baseline?.weekdays);
+const historicalHourlyPlan = Boolean(
+  courseId && baseline?.weekdays && !baseline.startsAt?.endsWith("T00:00"),
+);
+const dateOnlyRegistration =
+  !courseId || baseline?.registrationStartDate !== undefined;
 const trackedFields = [
   "name",
   "description",
@@ -52,8 +59,9 @@ const trackedFields = [
   "conditions",
   "startsAt",
   "endsAt",
-  "registrationStartAt",
-  "registrationEndAt",
+  ...(dateOnlyRegistration
+    ? (["registrationStartDate", "registrationEndDate"] as const)
+    : (["registrationStartAt", "registrationEndAt"] as const)),
   "minimumGrade",
   "artwork",
 ] as const;
@@ -66,10 +74,6 @@ const displayedArtwork = courseId
 const currentArtworkUrl = publicArtworkUrl(
   displayedArtwork,
   import.meta.env.PUBLIC_SUPABASE_URL,
-);
-const legacy = Boolean(courseId && !baseline?.weekdays);
-const historicalHourlyPlan = Boolean(
-  courseId && baseline?.weekdays && !baseline.startsAt?.endsWith("T00:00"),
 );
 ---
 
@@ -400,24 +404,75 @@ const historicalHourlyPlan = Boolean(
             )}
             startsAt={values.startsAt ?? ""}
             endsAt={values.endsAt ?? ""}
-            error={errors.startsAt ?? errors.endsAt ?? errors.weekdays ?? ""}
+            error={
+              errors.startDate ??
+              errors.startsAt ??
+              errors.endsAt ??
+              errors.weekdays ??
+              ""
+            }
             disabled={disabled}
           />
         )}
-        {[
-          { name: "registrationStartAt", label: "Apertura de preinscripción" },
-          { name: "registrationEndAt", label: "Cierre de preinscripción" },
-        ].map(({ name, label }) => (
-          <CourseDateTimePicker
-            client:only="react"
-            name={name}
-            label={label}
-            value={values[name] ?? ""}
-            required={false}
-            disabled={disabled}
-            error={errors[name] ?? ""}
-          />
-        ))}
+        {dateOnlyRegistration
+          ? (
+              [
+                {
+                  name: "registrationStartDate",
+                  label: "Apertura de preinscripción",
+                },
+                {
+                  name: "registrationEndDate",
+                  label: "Último día de preinscripción",
+                },
+              ] as const
+            ).map(({ name, label }) => (
+              <CourseDatePicker
+                client:only="react"
+                name={name}
+                label={label}
+                value={values[name] ?? ""}
+                disabled={disabled}
+                error={
+                  errors[name] ??
+                  errors[
+                    name === "registrationStartDate"
+                      ? "registrationStartAt"
+                      : "registrationEndAt"
+                  ] ??
+                  ""
+                }
+              />
+            ))
+          : (
+              [
+                {
+                  name: "registrationStartAt",
+                  label: "Apertura de preinscripción",
+                },
+                {
+                  name: "registrationEndAt",
+                  label: "Cierre de preinscripción",
+                },
+              ] as const
+            ).map(({ name, label }) => (
+              <CourseDateTimePicker
+                client:only="react"
+                name={name}
+                label={label}
+                value={values[name] ?? ""}
+                required={false}
+                disabled={disabled}
+                error={errors[name] ?? ""}
+              />
+            ))}
+        {dateOnlyRegistration && (
+          <p class="text-xs text-muted-foreground lg:col-span-2">
+            El plazo incluye todo el día de cierre en Bolivia. Completa ambas
+            fechas o deja ambas vacías; el cierre debe ser anterior al inicio de
+            clases.
+          </p>
+        )}
         <noscript>
           {legacy || historicalHourlyPlan
             ? [
@@ -457,17 +512,33 @@ const historicalHourlyPlan = Boolean(
                   />
                 </label>
               ))}
-          {[
-            {
-              name: "registrationStartAt",
-              label: "Apertura de preinscripción",
-            },
-            { name: "registrationEndAt", label: "Cierre de preinscripción" },
-          ].map(({ name, label }) => (
+          {(dateOnlyRegistration
+            ? ([
+                {
+                  name: "registrationStartDate",
+                  label: "Apertura de preinscripción",
+                },
+                {
+                  name: "registrationEndDate",
+                  label: "Último día de preinscripción",
+                },
+              ] as const)
+            : ([
+                {
+                  name: "registrationStartAt",
+                  label: "Apertura de preinscripción",
+                },
+                {
+                  name: "registrationEndAt",
+                  label: "Cierre de preinscripción",
+                },
+              ] as const)
+          ).map(({ name, label }) => (
             <label class="text-sm font-medium">
-              {label} (AAAA-MM-DDTHH:mm)
+              {label} ({dateOnlyRegistration ? "Bolivia" : "AAAA-MM-DDTHH:mm"})
               <input
                 class={control}
+                type={dateOnlyRegistration ? "date" : "text"}
                 name={name}
                 value={values[name] ?? ""}
                 disabled={disabled}
@@ -492,13 +563,17 @@ const historicalHourlyPlan = Boolean(
           crear el primero, las fechas y el formato quedan fijados en el
           borrador.
         </p>
+        <p class="mt-2 text-sm text-muted-foreground">
+          Las clases son de lunes a viernes. Los horarios de los grupos no deben
+          solaparse; los turnos consecutivos sí están permitidos.
+        </p>
         <div data-initial-group-list class="mt-5 flex flex-col gap-3"></div>
         <template data-initial-group-template>
           <div
-            class="flex flex-wrap items-end gap-3 rounded-lg border p-3"
+            class="grid gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
             data-initial-group
           >
-            <label class="min-w-32 flex-1 text-sm font-medium">
+            <label class="min-w-0 text-sm font-medium">
               Hora de inicio
               <input
                 class={control}
@@ -506,9 +581,15 @@ const historicalHourlyPlan = Boolean(
                 name="initialGroupTime"
                 required
               />
+              <span
+                class="mt-1 block text-xs font-normal text-muted-foreground"
+                data-initial-group-end
+              >
+                Fin: selecciona formato y hora
+              </span>
             </label>
-            <label class="min-w-32 flex-1 text-sm font-medium">
-              Capacidad
+            <label class="min-w-0 text-sm font-medium">
+              Capacidad (personas)
               <input
                 class={control}
                 type="number"
@@ -557,10 +638,13 @@ const historicalHourlyPlan = Boolean(
         Aprobación
       </h2>
       <div class="mt-6 grid gap-5 sm:grid-cols-3">
-        <label>
-          <span class="text-sm font-medium">Nota mínima (0–100)</span>
+        <div>
+          <label for="minimumGrade" class="text-sm font-medium">
+            Nota mínima (0–100)
+          </label>
           <input
             class={control}
+            id="minimumGrade"
             name="minimumGrade"
             type="text"
             inputmode="numeric"
@@ -578,7 +662,7 @@ const historicalHourlyPlan = Boolean(
               {errors.minimumGrade}
             </span>
           )}
-        </label>
+        </div>
       </div>
     </section>
   </fieldset>
@@ -612,6 +696,7 @@ const historicalHourlyPlan = Boolean(
     requiredCourseFields,
     type CourseInputKind,
   } from "./course-input-filter";
+  import { groupEndTime } from "./group-schedule-preview";
   document.addEventListener("astro:page-load", () => {
     let preparedImage: File | null = null;
     let imageSelected = false;
@@ -634,6 +719,67 @@ const historicalHourlyPlan = Boolean(
         const groupTemplate = form.querySelector<HTMLTemplateElement>(
           "[data-initial-group-template]",
         );
+        const updateGroupPreviews = () => {
+          const formats = JSON.parse(form.dataset.groupFormats ?? "[]") as [
+            string,
+            number | null,
+          ][];
+          const minutes =
+            formats.find(
+              ([id]) => id === String(new FormData(form).get("courseTypeId")),
+            )?.[1] ?? null;
+          const intervals: [number, number][] = [];
+          let issue = "";
+          groupList
+            ?.querySelectorAll<HTMLElement>("[data-initial-group]")
+            .forEach((row, index) => {
+              const input = row.querySelector<HTMLInputElement>(
+                '[name="initialGroupTime"]',
+              );
+              const hint = row.querySelector<HTMLElement>(
+                "[data-initial-group-end]",
+              );
+              if (!input || !hint) return;
+              input.setAttribute(
+                "aria-label",
+                `Hora de inicio del grupo ${index + 1}`,
+              );
+              const time = input.value;
+              const end = groupEndTime(time, minutes);
+              hint.textContent = end
+                ? `Fin calculado: ${end}`
+                : time
+                  ? "El grupo debe terminar el mismo día."
+                  : minutes === null
+                    ? "Fin: selecciona formato y hora"
+                    : "Fin: selecciona la hora";
+              if (time && !end)
+                issue = "Elige horarios que terminen el mismo día.";
+              if (end) {
+                const [hour, minute] = time.split(":").map(Number);
+                const start = hour! * 60 + minute!;
+                const finish = start + minutes!;
+                if (
+                  intervals.some(
+                    ([otherStart, otherEnd]) =>
+                      start < otherEnd && otherStart < finish,
+                  )
+                )
+                  issue = "Los horarios de los grupos no pueden solaparse.";
+                intervals.push([start, finish]);
+              }
+            });
+          const warning = form.querySelector<HTMLElement>(
+            "[data-initial-group-error]",
+          );
+          if (warning) {
+            warning.textContent = issue;
+            warning.hidden = !issue;
+          }
+        };
+        form.addEventListener("input", updateGroupPreviews);
+        form.addEventListener("change", updateGroupPreviews);
+        form.addEventListener("course-form-change", updateGroupPreviews);
         form
           .querySelector<HTMLButtonElement>("[data-add-initial-group]")
           ?.addEventListener("click", () => {
@@ -745,8 +891,8 @@ const historicalHourlyPlan = Boolean(
                   ? fields
                   : [
                       ...requiredCourseFields,
-                      "registrationStartAt",
-                      "registrationEndAt",
+                      "registrationStartDate",
+                      "registrationEndDate",
                     ]
               ).every((name) => current.has(name))
             )

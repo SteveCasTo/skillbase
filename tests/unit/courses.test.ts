@@ -23,6 +23,7 @@ import {
   logCourseInfrastructureError,
 } from "@/server/courses/errors";
 import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
+import { courseInputFromFormData } from "@/server/courses/form";
 
 const validInput = {
   courseTypeId: "00000000-0000-4000-8000-000000000001",
@@ -74,6 +75,77 @@ describe("course domain", () => {
       "2027-01-01 10:00",
     ])
       expect(() => boliviaCivilToInstant(invalid)).toThrow();
+  });
+
+  test("normalizes date-only registration windows to Bolivia civil days", () => {
+    const fields = new FormData();
+    fields.set("registrationStartDate", "2027-01-01");
+    fields.set("registrationEndDate", "2027-01-09");
+    fields.set("registrationStartAt", "2026-12-01T12:00");
+    fields.set("registrationEndAt", "2027-01-09T12:00");
+    const parsed = courseInputFromFormData(fields);
+    expect(parsed.registrationStartDate).toBe("2027-01-01");
+    expect(parsed.registrationEndDate).toBe("2027-01-09");
+    const result = validateCourseData({
+      ...validInput,
+      startsAt: "2027-01-10T00:00",
+      registrationStartDate: parsed.registrationStartDate,
+      registrationEndDate: parsed.registrationEndDate,
+    });
+    expect(result.registrationStartAt?.toISOString()).toBe(
+      "2027-01-01T04:00:00.000Z",
+    );
+    expect(result.registrationEndAt?.toISOString()).toBe(
+      "2027-01-10T04:00:00.000Z",
+    );
+    expect(() =>
+      validateCourseData({
+        ...validInput,
+        registrationStartDate: "2027-02-30",
+        registrationEndDate: "2027-03-01",
+      }),
+    ).toThrow();
+    expect(() =>
+      validateCourseData({
+        ...validInput,
+        registrationStartDate: "2027-01-01",
+        registrationEndDate: "2027-01-10",
+      }),
+    ).toThrow();
+  });
+
+  test("keeps the weekday planner's calculated endsAt on create", () => {
+    const fields = new FormData();
+    fields.set("startDate", "2027-03-01");
+    fields.set("startsAt", "2027-03-01T00:00");
+    fields.set("endsAt", "2027-03-17T23:59");
+
+    const parsed = courseInputFromFormData(fields);
+
+    expect(parsed.startsAt).toBe("2027-03-01T00:00");
+    expect(parsed.endsAt).toBe("2027-03-17T23:59");
+  });
+
+  test("preserves legacy registration datetimes when date-only controls are absent", () => {
+    const formData = new FormData();
+    formData.set("registrationStartAt", "2026-12-01T12:00");
+    formData.set("registrationEndAt", "2027-01-09T12:00");
+    const parsed = courseInputFromFormData(formData);
+    expect(parsed.registrationStartDate).toBeUndefined();
+    expect(parsed.registrationEndDate).toBeUndefined();
+    const result = validateCourseData({
+      ...validInput,
+      registrationStartAt: parsed.registrationStartAt,
+      registrationEndAt: parsed.registrationEndAt,
+      registrationStartDate: parsed.registrationStartDate,
+      registrationEndDate: parsed.registrationEndDate,
+    });
+    expect(result.registrationStartAt?.toISOString()).toBe(
+      "2026-12-01T16:00:00.000Z",
+    );
+    expect(result.registrationEndAt?.toISOString()).toBe(
+      "2027-01-09T16:00:00.000Z",
+    );
   });
 
   test("requires an explicit minimum grade while accepting zero", () => {

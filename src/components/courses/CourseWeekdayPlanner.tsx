@@ -7,6 +7,7 @@ import {
   planWeekdaySchedule,
 } from "@/domain/courses/weekday-schedule";
 import CourseDateTimePicker from "./CourseDateTimePicker";
+import CourseDatePicker from "./CourseDatePicker";
 
 interface Props {
   formats: readonly Pick<
@@ -32,7 +33,6 @@ export default function CourseWeekdayPlanner({
   const [start, setStart] = useState(startsAt);
   const [startDate, setStartDate] = useState(startsAt.slice(0, 10));
   const [formatId, setFormatId] = useState("");
-  const today = instantToBoliviaCivil(new Date()).slice(0, 10);
   // Older planned courses still have an hourly course schedule. Keep their
   // persisted instants on edit rather than silently converting grouped courses.
   const oldHourlyPlan =
@@ -57,8 +57,6 @@ export default function CourseWeekdayPlanner({
   let plan: ReturnType<typeof planWeekdaySchedule> | null = null;
   let dates: ReturnType<typeof planCourseDates> | null = null;
   let problem = "";
-  if (!oldHourlyPlan && newCourse && startDate && startDate < today)
-    problem = "Selecciona una fecha que no haya pasado.";
   if (!oldHourlyPlan && startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
     const weekday = new Date(`${startDate}T00:00:00Z`).getUTCDay();
     if (weekday === 0 || weekday === 6)
@@ -121,37 +119,44 @@ export default function CourseWeekdayPlanner({
           futureOnly={newCourse}
         />
       ) : (
-        <div className="flex min-w-0 flex-col gap-2">
-          <label htmlFor="startsAt-date" className="text-sm font-medium">
-            Fecha de inicio de clases (Bolivia)
-          </label>
-          <input
-            id="startsAt-date"
-            type="date"
-            required
-            disabled={disabled}
-            min={newCourse ? today : undefined}
-            value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
-            aria-invalid={Boolean(error || problem)}
-            aria-describedby={error || problem ? "startsAt-error" : undefined}
-            className="bg-background min-h-11 w-full rounded-lg border px-3"
-          />
+        <div className="min-w-0">
+          {newCourse ? (
+            <CourseDatePicker
+              name="startDate"
+              label="Fecha de inicio de clases (Bolivia)"
+              value={startsAt.slice(0, 10)}
+              onDateChange={setStartDate}
+              required
+              disabled={disabled ?? false}
+              error={error || problem}
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              <label htmlFor="startsAt-date" className="text-sm font-medium">
+                Fecha de inicio de clases (Bolivia)
+              </label>
+              <input
+                id="startsAt-date"
+                type="date"
+                required
+                disabled={disabled}
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="bg-background min-h-11 w-full rounded-lg border px-3"
+              />
+              {(error || problem) && (
+                <p role="alert" className="text-destructive text-sm">
+                  {error || problem}
+                </p>
+              )}
+            </div>
+          )}
           <input
             type="hidden"
             name="startsAt"
             value={courseStart}
             disabled={disabled}
           />
-          {(error || problem) && (
-            <p
-              id="startsAt-error"
-              role="alert"
-              className="text-destructive text-sm"
-            >
-              {error || problem}
-            </p>
-          )}
         </div>
       )}
       <div className="flex min-w-0 flex-col gap-2 text-sm">
@@ -161,7 +166,7 @@ export default function CourseWeekdayPlanner({
           aria-live="polite"
         >
           {end
-            ? `${end.slice(8, 10)}/${end.slice(5, 7)}/${end.slice(0, 4)}${oldHourlyPlan ? ` ${end.slice(11)}` : ""}`
+            ? `${startDate.slice(8, 10)}/${startDate.slice(5, 7)}/${startDate.slice(0, 4)} – ${end.slice(8, 10)}/${end.slice(5, 7)}/${end.slice(0, 4)}${oldHourlyPlan ? ` ${end.slice(11)}` : ""}`
             : "Selecciona formato y fecha de inicio"}
         </output>
         <input

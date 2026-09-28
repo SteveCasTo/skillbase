@@ -63,6 +63,14 @@ try {
 
 const dateInput = (date: Date | null) =>
   date ? instantToBoliviaCivil(date) : "";
+const dateOnlyPlan = (item: AdminCourseDto) =>
+  item.weekdaysMask === 31 &&
+  dateInput(item.startsAt).endsWith("T00:00") &&
+  dateInput(item.endsAt).endsWith("T23:59") &&
+  (!item.registrationStartAt ||
+    dateInput(item.registrationStartAt).endsWith("T00:00")) &&
+  (!item.registrationEndAt ||
+    dateInput(item.registrationEndAt).endsWith("T00:00"));
 const valuesFromCourse = (item: AdminCourseDto): CourseInput => ({
   name: item.name,
   description: item.description,
@@ -76,8 +84,19 @@ const valuesFromCourse = (item: AdminCourseDto): CourseInput => ({
   conditions: item.conditions,
   startsAt: dateInput(item.startsAt),
   endsAt: dateInput(item.endsAt),
-  registrationStartAt: dateInput(item.registrationStartAt),
-  registrationEndAt: dateInput(item.registrationEndAt),
+  ...(dateOnlyPlan(item)
+    ? {
+        registrationStartDate: dateInput(item.registrationStartAt).slice(0, 10),
+        registrationEndDate: item.registrationEndAt
+          ? dateInput(
+              new Date(item.registrationEndAt.getTime() - 86400000),
+            ).slice(0, 10)
+          : "",
+      }
+    : {
+        registrationStartAt: dateInput(item.registrationStartAt),
+        registrationEndAt: dateInput(item.registrationEndAt),
+      }),
   minimumGrade: String(item.minimumGrade),
 });
 // Keep the persisted snapshot even when a failed POST re-renders attempted values.

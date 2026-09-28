@@ -64,6 +64,40 @@ function optionalDate(
   return date;
 }
 
+function optionalRegistrationDate(
+  input: CourseInput,
+  dateKey: string,
+  legacyKey: string,
+  isClosing: boolean,
+  errors: Record<string, string>,
+): Date | null {
+  if (input[dateKey] === undefined)
+    return optionalDate(input, legacyKey, errors);
+  const raw = input[dateKey] ?? "";
+  if (!raw) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    errors[dateKey] = "La fecha debe usar el formato YYYY-MM-DD.";
+    return null;
+  }
+  let civilDate = raw;
+  try {
+    // Reuse strict Bolivia civil validation rather than allowing Date rollover.
+    boliviaCivilToInstant(`${raw}T00:00`);
+    if (isClosing) {
+      const year = Number(raw.slice(0, 4));
+      const month = Number(raw.slice(5, 7));
+      const day = Number(raw.slice(8, 10));
+      civilDate = new Date(Date.UTC(year, month - 1, day + 1))
+        .toISOString()
+        .slice(0, 10);
+    }
+    return boliviaCivilToInstant(`${civilDate}T00:00`);
+  } catch {
+    errors[dateKey] = "La fecha debe ser una fecha civil válida de Bolivia.";
+    return null;
+  }
+}
+
 export function money(
   input: CourseInput,
   key: string,
@@ -129,16 +163,32 @@ export function validateCourseData(input: CourseInput): CourseData {
   const endsAt = dateValue(input, "endsAt", "La fecha de finalización", errors);
   if (!errors.startsAt && !errors.endsAt && startsAt >= endsAt)
     errors.endsAt = "La finalización debe ser posterior al inicio.";
-  const registrationStartAt = optionalDate(
+  const registrationStartAt = optionalRegistrationDate(
     input,
+    "registrationStartDate",
     "registrationStartAt",
+    false,
     errors,
   );
-  const registrationEndAt = optionalDate(input, "registrationEndAt", errors);
+  const registrationEndAt = optionalRegistrationDate(
+    input,
+    "registrationEndDate",
+    "registrationEndAt",
+    true,
+    errors,
+  );
   if ((registrationStartAt === null) !== (registrationEndAt === null)) {
-    errors.registrationStartAt =
+    const startKey =
+      input.registrationStartDate !== undefined
+        ? "registrationStartDate"
+        : "registrationStartAt";
+    const endKey =
+      input.registrationEndDate !== undefined
+        ? "registrationEndDate"
+        : "registrationEndAt";
+    errors[startKey] =
       "Completa ambas fechas de preinscripción o deja ambas vacías.";
-    errors.registrationEndAt =
+    errors[endKey] =
       "Completa ambas fechas de preinscripción o deja ambas vacías.";
   } else if (
     registrationStartAt &&
@@ -151,7 +201,7 @@ export function validateCourseData(input: CourseInput): CourseData {
     !errors.startsAt &&
     !errors.registrationEndAt &&
     registrationEndAt &&
-    registrationEndAt >= startsAt
+    registrationEndAt > startsAt
   )
     errors.registrationEndAt =
       "El cierre debe ser anterior al inicio de clases.";
