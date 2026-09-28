@@ -130,11 +130,26 @@ test("published course is public end-to-end and withdrawal removes every public 
     );
 
     await page.goto("/cursos");
+    await expect(page.locator(".back-link")).toHaveCount(0);
+    await expect(page.locator(".catalog-intro h1")).toHaveCSS(
+      "max-width",
+      "none",
+    );
+    await expect(page.locator(".catalog-intro > p")).toHaveCSS(
+      "max-width",
+      "none",
+    );
     const catalogCourse = page.getByRole("link", {
       name: `Ver curso: ${courseName}`,
     });
     await expect(catalogCourse).toBeVisible();
+    await expect(catalogCourse.locator("..")).toHaveClass(/is-visible/);
+    await expect(catalogCourse.locator("..")).toHaveCSS(
+      "animation-name",
+      "row-acquires-signal",
+    );
     const catalogImage = catalogCourse.locator("img");
+    await expect(catalogImage).toHaveCSS("object-fit", "cover");
     await expect(catalogImage).toHaveAttribute(
       "src",
       new RegExp(`/${courseId}/`),
@@ -146,6 +161,7 @@ test("published course is public end-to-end and withdrawal removes every public 
     expect(imageResponse.headers()["content-type"]).toContain("image/webp");
     detailUrl = (await catalogCourse.getAttribute("href")) ?? undefined;
     await catalogCourse.click();
+    await expect(page.locator(".back-link")).toHaveCount(0);
 
     await expect(
       page.getByRole("heading", { level: 1, name: courseName }),

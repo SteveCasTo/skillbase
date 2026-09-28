@@ -222,6 +222,39 @@ test("header becomes a floating island after scrolling", async ({ page }) => {
   expect((await box(headerInner)).y).toBeGreaterThan(0);
 });
 
+test("header course link and hero action land on the featured course below the header", async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 390, height: 844 },
+  ]) {
+    await openPreview(page, viewport);
+    const headerLink = page
+      .getByRole("navigation", { name: "Navegación principal" })
+      .getByRole("link", { name: "Cursos" });
+    await expect(headerLink).toHaveAttribute("href", "#cursos");
+    await expect(
+      page.getByRole("link", { name: "Explorar cursos" }),
+    ).toHaveAttribute("href", "#cursos");
+    if (viewport.width < 1180)
+      await page.getByRole("link", { name: "Explorar cursos" }).click();
+    else await headerLink.click();
+    await expect(page).toHaveURL(/#cursos$/);
+    await expect(page.locator("#cursos")).toHaveCount(1);
+    await expect
+      .poll(async () => (await box(page.locator("#cursos"))).y)
+      .toBeLessThan(130);
+    const featuredTop = (await box(page.locator("#cursos"))).y;
+    const headerBottom =
+      (await box(page.locator(".site-header .header-inner"))).y +
+      (await box(page.locator(".site-header .header-inner"))).height;
+    expect(featuredTop).toBeGreaterThanOrEqual(
+      viewport.width < 640 ? 64 : headerBottom,
+    );
+  }
+});
+
 test("skip link moves keyboard focus to the main content", async ({ page }) => {
   await openPreview(page, { width: 390, height: 844 });
   await page.keyboard.press("Tab");

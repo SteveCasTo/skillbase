@@ -4,6 +4,7 @@ import { Image } from "astro:assets";
 
 import previewCoursePhoto from "../../../assets/plates/course-python-preview.jpg";
 import { publicArtworkUrl } from "@/server/courses/artwork";
+import CourseArtworkFallback from "@/components/public-courses/CourseArtworkFallback.astro";
 
 interface Props {
   slug: string;
@@ -28,12 +29,6 @@ const remoteArtwork = publicArtworkUrl(
   artworkKey,
   import.meta.env.PUBLIC_SUPABASE_URL,
 );
-const initials = name
-  .split(/\s+/)
-  .filter((word) => word.length > 2)
-  .slice(0, 2)
-  .map((word) => word[0]?.toLocaleUpperCase("es-BO") ?? "")
-  .join("");
 ---
 
 <div
@@ -66,10 +61,6 @@ const initials = name
       decoding="async"
     />
   ) : (
-    <div class="course-artwork-fallback" aria-hidden="true">
-      <span class="fallback-rule" />
-      <strong>{initials || "CA"}</strong>
-      <span class="fallback-caption">Cota Activa · curso</span>
-    </div>
+    <CourseArtworkFallback {name} />
   )}
 </div>

@@ -14,6 +14,7 @@ import MarkdownNode from "@/components/public-courses/MarkdownNode.astro";
 import { getDatabase } from "@/server/db/client";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
 import { publicArtworkUrl } from "@/server/courses/artwork";
+import CourseArtworkFallback from "@/components/public-courses/CourseArtworkFallback.astro";
 
 const slug = Astro.params.slug;
 let course: DisplayCourse | null = null;
@@ -47,9 +48,6 @@ const artworkUrl = publicArtworkUrl(
   noindex={!course}
 >
   <div class="detail-wrap">
-    <a class="back-link" href="/cursos">
-      ← Volver a todos los cursos
-    </a>
     {course ? (
       <>
         <header class="detail-hero">
@@ -71,11 +69,8 @@ const artworkUrl = publicArtworkUrl(
               />
             </div>
           ) : (
-            <div class="detail-art" aria-hidden="true">
-              <span>
-                {course.name.trim().slice(0, 1).toLocaleUpperCase("es-BO")}
-              </span>
-              <small>Cota Activa / Formación continua</small>
+            <div class="detail-art has-fallback" aria-hidden="true">
+              <CourseArtworkFallback name={course.name} />
             </div>
           )}
         </header>
@@ -170,7 +165,6 @@ const artworkUrl = publicArtworkUrl(
             ? "La consulta no está disponible en este momento. Intenta de nuevo más tarde."
             : "Este curso no está disponible en la cartelera pública. Consulta la oferta vigente."}
         </p>
-        <a href="/cursos">Ver todos los cursos</a>
       </section>
     )}
   </div>
