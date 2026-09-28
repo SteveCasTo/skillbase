@@ -78,3 +78,23 @@ export async function cancelGroup(
   admin(user);
   return repo.cancel(id, user.id, revision(expectedRevision));
 }
+
+export async function reactivateGroup(
+  repo: GroupRepository,
+  user: InternalUser,
+  id: string,
+  expectedRevision: string,
+) {
+  admin(user);
+  return repo.reactivate(id, user.id, revision(expectedRevision));
+}
+
+export async function deleteGroup(
+  repo: GroupRepository,
+  user: InternalUser,
+  id: string,
+  expectedRevision: string,
+): Promise<void> {
+  admin(user);
+  await repo.delete(id, user.id, revision(expectedRevision));
+}

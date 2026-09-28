@@ -4,6 +4,7 @@ export interface Group {
   readonly courseTypeRevisionId: string;
   readonly capacity: number;
   readonly status: "PLANNED" | "CANCELLED";
+  readonly publishedAt: Date | null;
   readonly startsAt: Date;
   readonly endsAt: Date;
   readonly createdAt: Date;

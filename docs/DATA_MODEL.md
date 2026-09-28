@@ -117,10 +117,11 @@ Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no cons
 - courseTypeRevisionId (revisión de formato conservada)
 - capacity (máximo por grupo; no mínimo)
 - status (`PLANNED` o `CANCELLED`)
+- publishedAt (nullable; instante de primera exposición pública, inmutable una vez definido)
 - startsAt / endsAt (primer y último encuentro, hora civil boliviana)
 - createdAt / updatedAt (concurrencia optimista)
 
-El modelo implementado crea grupos únicamente para cursos publicados con plan L–V y duración de sesión conocida. Los encuentros se repiten de lunes a viernes y solo cambia la hora inicial por grupo; la hora final y última fecha se derivan de la revisión fijada. No se almacena ni infiere número de inscritos mientras no exista el módulo de inscripciones. Las operaciones se auditan; la creación y las ediciones se serializan mediante bloqueo del curso padre y se rechazan solapamientos entre grupos planificados de ese mismo curso. Los grupos cancelados se conservan. La asignación de identidad del instructor, calendario de feriados, códigos visibles y entidades `Session` permanecen pendientes.
+La creación está disponible para cursos `DRAFT` o `PUBLISHED` con plan L–V y duración de sesión conocida; no para cursos archivados. Los grupos creados en curso publicado marcan `published_at` inmediatamente; si un curso borrador se publica después, las operaciones posteriores reflejan su exposición. La migración 0009 reconstruye la exposición histórica desde estados y auditoría de cursos, y un trigger impide borrar grupos con `published_at` o alterar ese instante. Por tanto, un grupo que nunca fue publicado puede eliminarse; uno ya publicado se conserva y se desactiva/cancela o reactiva. Los encuentros se repiten de lunes a viernes y solo cambia la hora inicial por grupo; la hora final y última fecha se derivan de la revisión fijada. No se almacena ni infiere número de inscritos mientras no exista el módulo de inscripciones. Las operaciones se auditan; la creación y las ediciones se serializan mediante bloqueo del curso padre y se rechazan solapamientos entre grupos planificados de ese mismo curso. La asignación de identidad del instructor, calendario de feriados, códigos visibles y entidades `Session` permanecen pendientes.
 
 ### Participant
 
