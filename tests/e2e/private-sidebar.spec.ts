@@ -130,18 +130,74 @@ test("collapsed rail expands on hover without shifting main and persists across 
     .getByRole("navigation", { name: "Navegación privada" })
     .locator(".private-parent-active");
   await page.locator(".private-main-scroll").hover();
-  const activeColor = await activeGroup.evaluate(
-    (element) => getComputedStyle(element).backgroundColor,
+  const activeWeight = await activeGroup.evaluate(
+    (element) => getComputedStyle(element).fontWeight,
   );
-  const inactiveColor = await page
+  const inactiveWeight = await page
     .getByRole("navigation", { name: "Navegación privada" })
     .getByRole("link", { name: "Resumen" })
-    .evaluate((element) => getComputedStyle(element).backgroundColor);
-  expect(activeColor).not.toBe(inactiveColor);
+    .evaluate((element) => getComputedStyle(element).fontWeight);
+  expect(activeWeight).not.toBe(inactiveWeight);
   await expect(
     page.getByRole("button", { name: "Expandir barra lateral" }),
   ).toBeVisible();
   await expect(logoutButton).toBeHidden();
+});
+
+test("sidebar toggle supports Enter and Space and preserves its state across Astro navigation", async ({
+  context,
+  page,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app");
+
+  const shell = page.locator("[data-private-shell]");
+  const toggle = page.locator("[data-private-shell] [data-sidebar-toggle]");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+  await toggle.focus();
+  await page.keyboard.press("Enter");
+  await expect(shell).toHaveAttribute("data-collapsed", "true");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem("private-sidebar-collapsed")),
+    )
+    .toBe("true");
+
+  await page.locator(".private-main-scroll").hover();
+  await page.locator(".private-brand-mark").hover();
+  await expect(shell).toHaveAttribute("data-preview", "true");
+  await page
+    .getByRole("navigation", { name: "Navegación privada" })
+    .getByRole("link", { name: "Formatos" })
+    .click();
+  await expect(page).toHaveURL(/\/app\/formatos$/);
+  await expect(shell).toHaveAttribute("data-collapsed", "true");
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem("private-sidebar-collapsed")),
+    )
+    .toBe("true");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+  await toggle.focus();
+  await page.keyboard.press("Space");
+  await expect(shell).toHaveAttribute("data-collapsed", "false");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem("private-sidebar-collapsed")),
+    )
+    .toBe("false");
+
+  await page
+    .getByRole("navigation", { name: "Navegación privada" })
+    .getByRole("link", { name: "Resumen" })
+    .click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(shell).toHaveAttribute("data-collapsed", "false");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
 });
 
 test("courses page has a single create-course action", async ({

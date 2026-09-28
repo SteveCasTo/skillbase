@@ -5,11 +5,15 @@ import {
   changeGroupCapacity,
   changeGroupSchedule,
   createGroup,
+  deleteGroup,
   listGroups,
+  reactivateGroup,
 } from "@/application/groups/manage-groups";
 import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import CourseTabs from "@/components/courses/CourseTabs.astro";
+import GroupManagement from "@/components/courses/GroupManagement.astro";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+void instantToBoliviaCivil; // Astro checker omits references in returned responses.
 import { GroupError } from "@/domain/groups/rules";
 import type { Group } from "@/domain/groups/types";
 import type { AdminCourseDto } from "@/domain/courses/types";
@@ -62,14 +66,34 @@ try {
 }
 
 const canCreate =
-  course?.status === "PUBLISHED" &&
+  course !== null &&
+  course.status !== "ARCHIVED" &&
   course.weekdaysMask === 31 &&
   course.sessionMinutes !== null;
+if (wantsJson && Astro.request.method === "GET")
+  return new Response(
+    JSON.stringify({
+      groups: groups.map((group) => ({
+        startTime: instantToBoliviaCivil(group.startsAt).slice(11, 16),
+        capacity: group.capacity,
+        status: group.status,
+      })),
+    }),
+    {
+      status: loadError ? 503 : course ? 200 : 404,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "private, no-store",
+      },
+    },
+  );
 const successMessages = {
   created: "Grupo creado.",
   schedule: "Horario actualizado.",
   capacity: "Capacidad actualizada.",
   cancelled: "Grupo cancelado; su historial se conserva.",
+  reactivated: "Grupo reactivado.",
+  deleted: "Grupo eliminado.",
 } as const;
 const success = Astro.url.searchParams.get("success");
 const successMessage =
@@ -90,12 +114,12 @@ if (course && Astro.request.method === "POST") {
     attemptedTime = String(form.get("startTime") ?? "");
     attemptedCapacity = String(form.get("capacity") ?? "");
     try {
-      if (!canCreate && failedIntent !== "cancel")
+      if (!canCreate && !["cancel", "delete"].includes(failedIntent))
         throw new GroupError(
           "COURSE_UNAVAILABLE",
-          "Solo cursos publicados y planificados admiten grupos.",
+          "Solo cursos no archivados y planificados admiten grupos.",
         );
-      let result: Group;
+      let result: Group | null = null;
       if (failedIntent === "create") {
         result = await createGroup(
           repository,
@@ -104,7 +128,11 @@ if (course && Astro.request.method === "POST") {
           attemptedTime,
           Number(attemptedCapacity),
         );
-      } else if (["schedule", "capacity", "cancel"].includes(failedIntent)) {
+      } else if (
+        ["schedule", "capacity", "cancel", "reactivate", "delete"].includes(
+          failedIntent,
+        )
+      ) {
         // Mutations address a group by ID; constrain it to the course in this URL.
         if (!groups.some((group) => group.id === failedGroupId))
           throw new GroupError(
@@ -128,18 +156,28 @@ if (course && Astro.request.method === "POST") {
             Number(attemptedCapacity),
             revision,
           );
-        else
+        else if (failedIntent === "cancel")
           result = await cancelGroup(repository, user, failedGroupId, revision);
+        else if (failedIntent === "reactivate")
+          result = await reactivateGroup(
+            repository,
+            user,
+            failedGroupId,
+            revision,
+          );
+        else await deleteGroup(repository, user, failedGroupId, revision);
       } else {
         Astro.response.status = 400;
         throw new Error("invalid_intent");
       }
-      void result;
+      void result; // Astro's frontmatter checker omits references in returned responses.
       if (wantsJson)
         return new Response(
           JSON.stringify({
-            id: result.id,
-            revision: result.updatedAt.toISOString(),
+            id: result?.id ?? failedGroupId,
+            revision:
+              result?.updatedAt.toISOString() ??
+              String(form.get("revision") ?? ""),
           }),
           {
             headers: {
@@ -149,7 +187,7 @@ if (course && Astro.request.method === "POST") {
           },
         );
       return Astro.redirect(
-        `${path}?success=${failedIntent === "cancel" ? "cancelled" : failedIntent === "create" ? "created" : failedIntent}`,
+        `${path}?success=${failedIntent === "cancel" ? "cancelled" : failedIntent === "create" ? "created" : failedIntent === "reactivate" ? "reactivated" : failedIntent === "delete" ? "deleted" : failedIntent}`,
         303,
       );
     } catch (error) {
@@ -192,12 +230,6 @@ if (wantsJson && Astro.request.method === "POST")
     },
   );
 
-const civilTime = (date: Date) => instantToBoliviaCivil(date).slice(11, 16);
-const civilDate = (date: Date) =>
-  new Intl.DateTimeFormat("es-BO", {
-    dateStyle: "long",
-    timeZone: "America/La_Paz",
-  }).format(date);
 const fieldErrorTarget =
   failedIntent === "capacity" ||
   (failedIntent === "create" && /capacidad/i.test(fieldError))
@@ -268,590 +300,17 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
         hidden
         class="mt-5 rounded-lg border border-destructive/40 p-4 text-sm text-destructive"
       ></p>
-      {course.status !== "PUBLISHED" || !canCreate ? (
-        <section
-          class="mt-8 rounded-xl bg-card p-6"
-          aria-labelledby="unavailable-title"
-        >
-          <h2 id="unavailable-title" class="text-lg font-semibold">
-            Gestión de grupos no disponible
-          </h2>
-          <p class="mt-2 text-sm text-muted-foreground">
-            {course.status !== "PUBLISHED"
-              ? "Publica el curso para crear grupos. Los grupos anteriores se conservan como historial."
-              : "Este curso no tiene una planificación estructurada o una duración de sesión conocida."}
-          </p>
-        </section>
-      ) : (
-        <section
-          aria-labelledby="new-group-title"
-          class="mt-8 rounded-xl bg-card p-5 sm:p-6"
-        >
-          <h2 id="new-group-title" class="text-xl font-semibold">
-            Añadir grupo
-          </h2>
-          <p class="mt-2 text-sm text-muted-foreground">
-            Del {civilDate(course.startsAt)} al {civilDate(course.endsAt)} ·
-            Lunes a viernes · Sesiones de {course.sessionMinutes} minutos.
-            {course.instructorName && (
-              <> Instructor del curso: {course.instructorName}.</>
-            )}
-          </p>
-          <form
-            method="post"
-            data-group-form
-            class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end"
-            aria-label="Añadir grupo"
-          >
-            <input type="hidden" name="intent" value="create" />
-            <div class="sm:w-40">
-              <label for="new-time" class="mb-2 block text-sm font-medium">
-                Hora de inicio
-              </label>
-              <input
-                id="new-time"
-                name="startTime"
-                type="time"
-                required
-                value={failedIntent === "create" ? attemptedTime : ""}
-                aria-invalid={
-                  fieldError && fieldErrorTarget === "startTime"
-                    ? "true"
-                    : undefined
-                }
-                aria-describedby={
-                  fieldError && fieldErrorTarget === "startTime"
-                    ? "new-time-error"
-                    : undefined
-                }
-                class="min-h-11 w-full rounded-lg border bg-background px-3"
-              />
-              <p
-                id="new-time-error"
-                data-field-error="startTime"
-                role="alert"
-                hidden={
-                  !fieldError ||
-                  failedIntent !== "create" ||
-                  fieldErrorTarget !== "startTime"
-                }
-                class="mt-1 text-sm text-destructive"
-              >
-                {fieldError}
-              </p>
-            </div>
-            <div class="sm:w-40">
-              <label for="new-capacity" class="mb-2 block text-sm font-medium">
-                Capacidad
-              </label>
-              <input
-                id="new-capacity"
-                name="capacity"
-                type="number"
-                min="1"
-                step="1"
-                required
-                value={failedIntent === "create" ? attemptedCapacity : ""}
-                aria-invalid={
-                  fieldError && fieldErrorTarget === "capacity"
-                    ? "true"
-                    : undefined
-                }
-                aria-describedby={
-                  fieldError &&
-                  failedIntent === "create" &&
-                  fieldErrorTarget === "capacity"
-                    ? "new-capacity-error"
-                    : undefined
-                }
-                class="min-h-11 w-full rounded-lg border bg-background px-3"
-              />
-              <p
-                id="new-capacity-error"
-                data-field-error="capacity"
-                role="alert"
-                hidden={
-                  !fieldError ||
-                  failedIntent !== "create" ||
-                  fieldErrorTarget !== "capacity"
-                }
-                class="mt-1 text-sm text-destructive"
-              >
-                {fieldError}
-              </p>
-            </div>
-            <button
-              type="submit"
-              class="min-h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-            >
-              Crear grupo
-            </button>
-          </form>
-        </section>
-      )}
-      <section aria-labelledby="group-list-title" class="mt-9">
-        <h2 id="group-list-title" class="text-xl font-semibold">
-          Grupos del curso
-        </h2>
-        {groups.length === 0 ? (
-          <p class="mt-4 rounded-xl bg-card p-6 text-sm text-muted-foreground">
-            Todavía no hay grupos.{" "}
-            {canCreate
-              ? "Añade el primero con su horario y capacidad."
-              : "Cuando el curso admita grupos, aparecerán aquí."}
-          </p>
-        ) : (
-          <ul class="mt-4 grid gap-4 lg:grid-cols-2">
-            {groups.map((group, index) => (
-              <li
-                class="min-w-0 rounded-xl bg-card p-5 sm:p-6"
-                data-group-id={group.id}
-              >
-                <article aria-labelledby={`group-${group.id}`}>
-                  <div class="flex flex-wrap items-center justify-between gap-2">
-                    <h3 id={`group-${group.id}`} class="font-semibold">
-                      Grupo {index + 1}
-                    </h3>
-                    <span class="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
-                      {group.status === "CANCELLED"
-                        ? "Cancelado"
-                        : "Planificado"}
-                    </span>
-                  </div>
-                  <p class="mt-3 text-sm">
-                    {civilTime(group.startsAt)}–{civilTime(group.endsAt)} ·
-                    Capacidad: {group.capacity}
-                  </p>
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    Del {civilDate(group.startsAt)} al {civilDate(group.endsAt)}{" "}
-                    · Lunes a viernes
-                  </p>
-                  {group.status !== "CANCELLED" && (
-                    <div class="mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
-                      {canCreate && (
-                        <form
-                          method="post"
-                          data-group-form
-                          aria-label={`Cambiar horario del grupo ${index + 1}`}
-                          class="flex flex-col gap-2"
-                        >
-                          <input type="hidden" name="intent" value="schedule" />
-                          <input
-                            type="hidden"
-                            name="groupId"
-                            value={group.id}
-                          />
-                          <input
-                            type="hidden"
-                            name="revision"
-                            value={group.updatedAt.toISOString()}
-                          />
-                          <label
-                            for={`time-${group.id}`}
-                            class="text-sm font-medium"
-                          >
-                            Nueva hora de inicio
-                          </label>
-                          <input
-                            id={`time-${group.id}`}
-                            name="startTime"
-                            type="time"
-                            required
-                            value={
-                              failedIntent === "schedule" &&
-                              failedGroupId === group.id
-                                ? attemptedTime
-                                : civilTime(group.startsAt)
-                            }
-                            aria-invalid={
-                              fieldError &&
-                              failedIntent === "schedule" &&
-                              failedGroupId === group.id
-                                ? "true"
-                                : undefined
-                            }
-                            aria-describedby={
-                              fieldError &&
-                              failedIntent === "schedule" &&
-                              failedGroupId === group.id
-                                ? `time-${group.id}-error`
-                                : undefined
-                            }
-                            class="min-h-11 w-full rounded-lg border bg-background px-3"
-                          />
-                          <p
-                            id={`time-${group.id}-error`}
-                            data-field-error="startTime"
-                            role="alert"
-                            hidden={
-                              !fieldError ||
-                              failedIntent !== "schedule" ||
-                              failedGroupId !== group.id
-                            }
-                            class="text-sm text-destructive"
-                          >
-                            {fieldError}
-                          </p>
-                          <button
-                            type="submit"
-                            class="min-h-11 rounded-lg border px-3 text-sm font-semibold hover:bg-secondary disabled:opacity-60"
-                          >
-                            Guardar horario
-                          </button>
-                        </form>
-                      )}
-                      {canCreate && (
-                        <form
-                          method="post"
-                          data-group-form
-                          aria-label={`Cambiar capacidad del grupo ${index + 1}`}
-                          class="flex flex-col gap-2"
-                        >
-                          <input type="hidden" name="intent" value="capacity" />
-                          <input
-                            type="hidden"
-                            name="groupId"
-                            value={group.id}
-                          />
-                          <input
-                            type="hidden"
-                            name="revision"
-                            value={group.updatedAt.toISOString()}
-                          />
-                          <label
-                            for={`capacity-${group.id}`}
-                            class="text-sm font-medium"
-                          >
-                            Nueva capacidad
-                          </label>
-                          <input
-                            id={`capacity-${group.id}`}
-                            name="capacity"
-                            type="number"
-                            min="1"
-                            step="1"
-                            required
-                            value={
-                              failedIntent === "capacity" &&
-                              failedGroupId === group.id
-                                ? attemptedCapacity
-                                : group.capacity
-                            }
-                            aria-invalid={
-                              fieldError &&
-                              failedIntent === "capacity" &&
-                              failedGroupId === group.id
-                                ? "true"
-                                : undefined
-                            }
-                            aria-describedby={
-                              fieldError &&
-                              failedIntent === "capacity" &&
-                              failedGroupId === group.id
-                                ? `capacity-${group.id}-error`
-                                : undefined
-                            }
-                            class="min-h-11 w-full rounded-lg border bg-background px-3"
-                          />
-                          <p
-                            id={`capacity-${group.id}-error`}
-                            data-field-error="capacity"
-                            role="alert"
-                            hidden={
-                              !fieldError ||
-                              failedIntent !== "capacity" ||
-                              failedGroupId !== group.id
-                            }
-                            class="text-sm text-destructive"
-                          >
-                            {fieldError}
-                          </p>
-                          <button
-                            type="submit"
-                            class="min-h-11 rounded-lg border px-3 text-sm font-semibold hover:bg-secondary disabled:opacity-60"
-                          >
-                            Guardar capacidad
-                          </button>
-                        </form>
-                      )}
-                      <details data-cancel-fallback class="sm:col-span-2">
-                        <summary class="inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold text-destructive">
-                          Cancelar grupo
-                        </summary>
-                        <p class="my-2 text-sm">
-                          Se conservará el grupo cancelado en el historial.
-                          ¿Continuar?
-                        </p>
-                        <form method="post" data-group-form>
-                          <input type="hidden" name="intent" value="cancel" />
-                          <input
-                            type="hidden"
-                            name="groupId"
-                            value={group.id}
-                          />
-                          <input
-                            type="hidden"
-                            name="revision"
-                            value={group.updatedAt.toISOString()}
-                          />
-                          <button
-                            type="submit"
-                            class="min-h-11 rounded-lg bg-destructive px-4 text-sm font-semibold text-destructive-foreground"
-                          >
-                            Sí, cancelar grupo
-                          </button>
-                        </form>
-                      </details>
-                      <button
-                        type="button"
-                        data-cancel-trigger={group.id}
-                        hidden
-                        class="min-h-11 justify-self-start rounded-lg border px-4 text-sm font-semibold text-destructive focus-visible:outline-2 focus-visible:outline-ring sm:col-span-2"
-                      >
-                        Cancelar grupo
-                      </button>
-                    </div>
-                  )}
-                </article>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <dialog
-        data-group-dialog
-        aria-labelledby="group-dialog-title"
-        aria-describedby="group-dialog-description"
-        class="m-auto w-[min(28rem,calc(100%-2rem))] rounded-xl bg-card p-6 text-foreground shadow-xl backdrop:bg-black/60"
-      >
-        <h2 id="group-dialog-title" class="text-lg font-semibold">
-          Cancelar grupo
-        </h2>
-        <p id="group-dialog-description" class="mt-3 text-sm">
-          El grupo quedará cancelado, pero su historial se conservará.
-          ¿Continuar?
-        </p>
-        <form
-          method="post"
-          data-group-form
-          class="mt-6 flex flex-wrap justify-end gap-3"
-        >
-          <input type="hidden" name="intent" value="cancel" />
-          <input type="hidden" name="groupId" />
-          <input type="hidden" name="revision" />
-          <button
-            type="button"
-            data-dialog-close
-            class="min-h-11 rounded-lg border px-4"
-          >
-            Volver
-          </button>
-          <button
-            type="submit"
-            class="min-h-11 rounded-lg bg-destructive px-4 font-semibold text-destructive-foreground"
-          >
-            Sí, cancelar grupo
-          </button>
-        </form>
-      </dialog>
-      <script>
-        import { navigate } from "astro:transitions/client";
-        import { sileo } from "sileo";
-        document.addEventListener("astro:page-load", () => {
-          const message = new URLSearchParams(location.search).get("success");
-          const messages: Record<string, string> = {
-            created: "Grupo creado.",
-            schedule: "Horario actualizado.",
-            capacity: "Capacidad actualizada.",
-            cancelled: "Grupo cancelado; su historial se conserva.",
-          };
-          if (message && messages[message]) {
-            sileo.success({ title: messages[message], duration: 6000 });
-            history.replaceState(history.state, "", location.pathname);
-          }
-          const dialog = document.querySelector<HTMLDialogElement>(
-            "[data-group-dialog]",
-          );
-          const error =
-            document.querySelector<HTMLElement>("[data-group-error]");
-          document
-            .querySelector<HTMLButtonElement>("[data-reload-page]")
-            ?.addEventListener("click", () => location.reload());
-          let trigger: HTMLButtonElement | null = null;
-          if (dialog) {
-            document
-              .querySelectorAll<HTMLElement>("[data-cancel-fallback]")
-              .forEach((node) => (node.hidden = true));
-            document
-              .querySelectorAll<HTMLButtonElement>("[data-cancel-trigger]")
-              .forEach((button) => {
-                button.hidden = false;
-                button.addEventListener("click", () => {
-                  trigger = button;
-                  const card = button.closest<HTMLElement>("[data-group-id]");
-                  const fallback = card?.querySelector<HTMLFormElement>(
-                    "[data-cancel-fallback] form",
-                  );
-                  const form = dialog.querySelector<HTMLFormElement>("form");
-                  if (!fallback || !form) return;
-                  form.querySelector<HTMLInputElement>(
-                    'input[name="groupId"]',
-                  )!.value = String(new FormData(fallback).get("groupId"));
-                  form.querySelector<HTMLInputElement>(
-                    'input[name="revision"]',
-                  )!.value = String(new FormData(fallback).get("revision"));
-                  dialog.showModal();
-                });
-              });
-            dialog
-              .querySelector("[data-dialog-close]")
-              ?.addEventListener("click", () => dialog.close());
-            dialog.addEventListener("close", () => trigger?.focus());
-          }
-          document
-            .querySelectorAll<HTMLFormElement>("[data-group-form]")
-            .forEach((form) =>
-              form.addEventListener("submit", (event) => {
-                event.preventDefault();
-                const button = form.querySelector<HTMLButtonElement>(
-                  'button[type="submit"]',
-                );
-                if (!button || button.disabled) return;
-                button.disabled = true;
-                button.setAttribute("aria-busy", "true");
-                if (error) error.hidden = true;
-                const intent = String(new FormData(form).get("intent"));
-                void (async () => {
-                  try {
-                    const response = await fetch(location.pathname, {
-                      method: "POST",
-                      headers: { Accept: "application/json" },
-                      body: new FormData(form),
-                    });
-                    if (
-                      response.redirected ||
-                      !response.headers
-                        .get("content-type")
-                        ?.includes("application/json")
-                    )
-                      throw new Error(
-                        "La sesión cambió. Recarga la página e inténtalo de nuevo.",
-                      );
-                    const result: unknown = await response.json();
-                    if (!response.ok) {
-                      const details =
-                        result && typeof result === "object" ? result : null;
-                      const message =
-                        details &&
-                        "message" in details &&
-                        typeof details.message === "string"
-                          ? details.message
-                          : "No se pudo completar la acción.";
-                      const code =
-                        details &&
-                        "code" in details &&
-                        typeof details.code === "string"
-                          ? details.code
-                          : "";
-                      if (code === "STALE_GROUP")
-                        throw new Error(`__stale_revision__:${message}`);
-                      if (
-                        (response.status === 422 ||
-                          code === "SCHEDULE_CONFLICT") &&
-                        (intent === "create" ||
-                          intent === "schedule" ||
-                          intent === "capacity")
-                      ) {
-                        const target =
-                          intent === "capacity" ||
-                          (intent === "create" && /capacidad/i.test(message))
-                            ? "capacity"
-                            : "startTime";
-                        const field = form.querySelector<HTMLInputElement>(
-                          `[name="${target}"]`,
-                        );
-                        const fieldError = form.querySelector<HTMLElement>(
-                          `[data-field-error="${target}"]`,
-                        );
-                        if (field && fieldError) {
-                          fieldError.textContent = message;
-                          fieldError.hidden = false;
-                          field.setAttribute("aria-invalid", "true");
-                          field.setAttribute("aria-describedby", fieldError.id);
-                          field.focus();
-                          throw new Error("__field_error__");
-                        }
-                      }
-                      throw new Error(message);
-                    }
-                    if (
-                      !result ||
-                      typeof result !== "object" ||
-                      !("revision" in result) ||
-                      typeof result.revision !== "string"
-                    )
-                      throw new Error(
-                        result &&
-                          typeof result === "object" &&
-                          "message" in result &&
-                          typeof result.message === "string"
-                          ? result.message
-                          : "No se pudo completar la acción.",
-                      );
-                    if (dialog?.open) dialog.close();
-                    await navigate(
-                      `${location.pathname}?success=${intent === "cancel" ? "cancelled" : intent === "create" ? "created" : intent}`,
-                    );
-                  } catch (failure) {
-                    if (dialog?.open) dialog.close();
-                    if (
-                      failure instanceof Error &&
-                      failure.message === "__field_error__"
-                    )
-                      return;
-                    if (error) {
-                      const staleMessage =
-                        failure instanceof Error &&
-                        failure.message.startsWith("__stale_revision__:");
-                      error.replaceChildren();
-                      error.append(
-                        document.createTextNode(
-                          staleMessage
-                            ? `${failure.message.slice("__stale_revision__:".length)} `
-                            : failure instanceof Error
-                              ? failure.message
-                              : "No se pudo completar la acción.",
-                        ),
-                      );
-                      if (staleMessage) {
-                        const reload = document.createElement("button");
-                        reload.type = "button";
-                        reload.textContent = "Recargar datos actuales";
-                        reload.className =
-                          "mt-2 min-h-11 underline underline-offset-4";
-                        reload.addEventListener("click", () =>
-                          location.reload(),
-                        );
-                        error.append(reload);
-                      }
-                      error.hidden = false;
-                      error.tabIndex = -1;
-                      error.focus();
-                    }
-                    if (
-                      failure instanceof Error &&
-                      failure.message.startsWith("__stale_revision__:")
-                    )
-                      return;
-                  } finally {
-                    button.disabled = false;
-                    button.removeAttribute("aria-busy");
-                  }
-                })();
-              }),
-            );
-        });
-      </script>
+      <GroupManagement
+        course={course}
+        groups={groups}
+        canCreate={canCreate}
+        failedIntent={failedIntent}
+        failedGroupId={failedGroupId}
+        attemptedTime={attemptedTime}
+        attemptedCapacity={attemptedCapacity}
+        fieldError={fieldError}
+        fieldErrorTarget={fieldErrorTarget}
+      />
     </>
   )}
 </PrivateLayout>

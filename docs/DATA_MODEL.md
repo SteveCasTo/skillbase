@@ -63,13 +63,13 @@ Implementación actual:
 - nombre, descripción, horario informativo y condiciones son obligatorios y no vacíos.
 - `course_type_revision_id` es obligatorio; horas y precios se resuelven desde esa revisión en lugar de guardarse directamente en `courses`/`course_prices`.
 - `minimum_grade` está limitado a `0..100`; todavía no existe `minimum_attendance` ni cálculo académico.
-- `schedule` continúa como texto no vacío por compatibilidad. Los nuevos cursos generan su resumen a partir del plan fijo de lunes a viernes; los históricos conservan su texto informativo.
-- `weekdays_mask` es `31` para nuevos cursos planificados de lunes a viernes; los cursos históricos sin planificación estructurada lo conservan nulo. El resumen de horario sigue siendo texto de compatibilidad y se calcula para los cursos nuevos; las fechas editoriales de inicio/fin se derivan del formato y el inicio civil. Esto aún no sustituye la entidad futura de sesiones de grupo.
+- `schedule` continúa como texto no vacío por compatibilidad. Los cursos nuevos usan «Lunes a viernes · horario por grupo» y los históricos conservan su texto informativo u horario planificado.
+- `weekdays_mask` es `31` para nuevos cursos planificados de lunes a viernes; los cursos históricos sin planificación estructurada lo conservan nulo. Los nuevos `starts_at`/`ends_at` representan las fechas comunes en Bolivia (00:00 de la primera y 23:59 de la última); la hora diaria vive en cada grupo. Los cursos existentes con grupos o con cierre de preinscripción el primer día conservan sus instantes horarios para no invalidar el calendario o la ventana de inscripción. Esto aún no sustituye la entidad futura de sesiones de grupo.
 - `content_markdown` e `instructor_name` son campos de texto opcionales. `artwork` almacena una key canónica del objeto de Storage, no una URL arbitraria. `featured` solo puede ser true en un curso publicado y un índice parcial permite como máximo un destacado publicado.
-- fechas públicas de inicio y fin usan `timestamptz`, son obligatorias y mantienen `starts_at < ends_at`; la UI recibe tiempo civil estricto `YYYY-MM-DDTHH:mm` de `America/La_Paz` y lo convierte a instante UTC.
+- fechas públicas de inicio y fin usan `timestamptz`, son obligatorias y mantienen `starts_at < ends_at`. Para cursos nuevos planificados, la UI recibe fechas civiles `YYYY-MM-DD` y las convierte a los límites del día en `America/La_Paz` (00:00 inicial y 23:59 final); los cursos históricos que conservan horas se editan como tiempo civil estricto `YYYY-MM-DDTHH:mm`. La ventana de preinscripción también conserva precisión de hora.
 - la ventana de preinscripción usa dos `timestamptz`: ambos son nulos o ambos existen con inicio anterior al fin. La conversión inversa UTC → Bolivia preserva exactamente la hora civil al reeditar.
 - el slug normalizado es único, se genera al crear bajo un advisory lock global de asignación, resuelve colisiones —incluidas bases solapadas concurrentes— con sufijo numérico y no se modifica después.
-- `updated_at` funciona como revisión optimista del curso y su referencia a formato; una edición con revisión obsoleta no actualiza ninguna fila.
+- `updated_at` funciona como revisión optimista del curso y su referencia a formato; una edición con revisión obsoleta no actualiza ninguna fila. Se persiste con precisión de milisegundos (`timestamptz(3)`) para coincidir con `Date`/ISO en el navegador y evitar falsos conflictos por microsegundos.
 - no existe borrado físico de cursos en el contrato de aplicación; `ARCHIVED` es terminal durante esta fase.
 - la proyección pública solo se construye para cursos `PUBLISHED`, omite identificadores, estado, nota mínima y timestamps administrativos, y deriva la disponibilidad desde la ventana. La landing, catálogo y detalle consumen proyecciones server-side.
 
@@ -117,10 +117,11 @@ Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no cons
 - courseTypeRevisionId (revisión de formato conservada)
 - capacity (máximo por grupo; no mínimo)
 - status (`PLANNED` o `CANCELLED`)
+- publishedAt (nullable; instante de primera exposición pública, inmutable una vez definido)
 - startsAt / endsAt (primer y último encuentro, hora civil boliviana)
 - createdAt / updatedAt (concurrencia optimista)
 
-El modelo implementado crea grupos únicamente para cursos publicados con plan L–V y duración de sesión conocida. Los encuentros se repiten de lunes a viernes y solo cambia la hora inicial por grupo; la hora final y última fecha se derivan de la revisión fijada. No se almacena ni infiere número de inscritos mientras no exista el módulo de inscripciones. Las operaciones se auditan; la creación y las ediciones se serializan mediante bloqueo del curso padre y se rechazan solapamientos entre grupos planificados de ese mismo curso. Los grupos cancelados se conservan. La asignación de identidad del instructor, calendario de feriados, códigos visibles y entidades `Session` permanecen pendientes.
+La creación está disponible para cursos `DRAFT` o `PUBLISHED` con plan L–V y duración de sesión conocida; no para cursos archivados. Los grupos creados en curso publicado marcan `published_at` inmediatamente; si un curso borrador se publica después, las operaciones posteriores reflejan su exposición. La migración 0009 reconstruye la exposición histórica desde estados y auditoría de cursos, y un trigger impide borrar grupos con `published_at` o alterar ese instante. Por tanto, un grupo que nunca fue publicado puede eliminarse; uno ya publicado se conserva y se desactiva/cancela o reactiva. Los encuentros se repiten de lunes a viernes y solo cambia la hora inicial por grupo; la hora final y última fecha se derivan de la revisión fijada. No se almacena ni infiere número de inscritos mientras no exista el módulo de inscripciones. Las operaciones se auditan; la creación y las ediciones se serializan mediante bloqueo del curso padre y se rechazan solapamientos entre grupos planificados de ese mismo curso. La asignación de identidad del instructor, calendario de feriados, códigos visibles y entidades `Session` permanecen pendientes.
 
 ### Participant
 

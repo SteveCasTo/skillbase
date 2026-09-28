@@ -1,10 +1,32 @@
 import { describe, expect, test } from "bun:test";
 import {
+  GROUP_SCHEDULE,
+  planCourseDates,
   planWeekdaySchedule,
   weekdayMask,
 } from "@/domain/courses/weekday-schedule";
 
 describe("weekday schedule in Bolivia civil time", () => {
+  test("course dates have canonical civil-day bounds without a shared hourly schedule", () => {
+    const dates = planCourseDates({
+      startDate: "2027-04-30",
+      weekdaysMask: 31,
+      totalHours: 20,
+      sessionMinutes: 90,
+    });
+    expect(dates.startsAt.toISOString()).toBe("2027-04-30T04:00:00.000Z");
+    expect(dates.endsAt.toISOString()).toBe("2027-05-19T03:59:00.000Z");
+    expect(dates.sessionCount).toBe(13);
+    expect(GROUP_SCHEDULE).not.toMatch(/\d{2}:\d{2}/);
+    expect(() =>
+      planCourseDates({
+        startDate: "2027-05-01",
+        weekdaysMask: 31,
+        totalHours: 20,
+        sessionMinutes: 90,
+      }),
+    ).toThrow();
+  });
   test("rounds half-up, skips weekends and exposes planned vs configured duration", () => {
     const plan = planWeekdaySchedule({
       startsAt: "2027-03-01T18:00",

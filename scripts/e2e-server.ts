@@ -12,6 +12,8 @@ const { dev } = await import("astro");
 const server = await dev({
   // Vite must not load the developer's .env over the isolated test values.
   vite: { envDir: process.env.TEST_SUPABASE_WORKDIR! },
+  // The dev-only overlay can intercept clicks on public course cards in E2E.
+  devToolbar: { enabled: false },
   server: {
     host: "127.0.0.1",
     port: 4321,

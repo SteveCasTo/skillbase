@@ -19,6 +19,7 @@ interface Props {
   onChange: (value: string) => void;
   disabled?: boolean;
   invalid?: boolean;
+  errorId?: string;
 }
 
 export function TimePicker({
@@ -28,6 +29,7 @@ export function TimePicker({
   onChange,
   disabled,
   invalid,
+  errorId,
 }: Props) {
   const [open, setOpen] = useState(false);
   const hours = validTime(value) ? Number(value.slice(0, 2)) : 9;
@@ -40,7 +42,7 @@ export function TimePicker({
     onChange(next.map((number) => String(number).padStart(2, "0")).join(":"));
   }
   return (
-    <div className="flex min-w-0 items-center gap-1">
+    <div className="flex min-w-0 flex-1 basis-full items-center gap-2 sm:basis-0">
       <Input
         id={id}
         type="text"
@@ -49,10 +51,11 @@ export function TimePicker({
         placeholder="HH:mm"
         aria-label={label}
         aria-invalid={invalid}
+        aria-describedby={errorId}
         value={value}
         data-course-input="time"
         disabled={disabled}
-        className="h-11 w-[4.5rem] px-1 text-center text-xs tabular-nums sm:w-24 sm:px-2 sm:text-sm"
+        className="h-11 min-w-0 flex-1 tabular-nums"
         onChange={(event) =>
           onChange(nextCourseInput("time", value, event.target.value))
         }
@@ -70,34 +73,50 @@ export function TimePicker({
             <Clock3 aria-hidden="true" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-auto p-3">
-          <div className="flex gap-4">
+        <PopoverContent
+          align="end"
+          className="w-[min(18rem,calc(100vw-2rem))] p-4"
+        >
+          <div className="flex flex-col gap-4">
             {(["hours", "minutes"] as const).map((part) => (
-              <div key={part} className="flex flex-col items-center gap-2">
-                <span className="text-muted-foreground text-xs">
+              <div
+                key={part}
+                className="flex items-center justify-between gap-3"
+              >
+                <span className="text-sm font-medium">
                   {part === "hours" ? "Horas" : "Minutos"}
                 </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  aria-label={`Aumentar ${part === "hours" ? "horas" : "minutos"}`}
-                  onClick={() => adjust(part, 1)}
-                >
-                  <Plus aria-hidden="true" />
-                </Button>
-                <span className="min-w-10 text-center font-medium tabular-nums">
-                  {String(part === "hours" ? hours : minutes).padStart(2, "0")}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  aria-label={`Disminuir ${part === "hours" ? "horas" : "minutos"}`}
-                  onClick={() => adjust(part, -1)}
-                >
-                  <Minus aria-hidden="true" />
-                </Button>
+                <div className="bg-muted flex items-center gap-1 rounded-lg p-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-10"
+                    aria-label={`Disminuir ${part === "hours" ? "horas" : "minutos"}`}
+                    onClick={() => adjust(part, -1)}
+                  >
+                    <Minus aria-hidden="true" />
+                  </Button>
+                  <output
+                    className="min-w-8 text-center text-base font-semibold tabular-nums"
+                    aria-live="polite"
+                  >
+                    {String(part === "hours" ? hours : minutes).padStart(
+                      2,
+                      "0",
+                    )}
+                  </output>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-10"
+                    aria-label={`Aumentar ${part === "hours" ? "horas" : "minutos"}`}
+                    onClick={() => adjust(part, 1)}
+                  >
+                    <Plus aria-hidden="true" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

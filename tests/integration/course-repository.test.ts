@@ -4,6 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import { createDatabase } from "@/server/db/client";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
 import { DrizzleFormatRepository } from "@/server/db/repositories/format-repository";
+import { DrizzleGroupRepository } from "@/server/db/repositories/group-repository";
 import {
   auditEvents,
   courseTypeRevisions,
@@ -12,7 +13,10 @@ import {
   users,
 } from "@/server/db/schema";
 import { validateCourseData } from "@/domain/courses/validation";
+import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 import {
+  GROUP_SCHEDULE,
+  planCourseDates,
   planWeekdaySchedule,
   weekdayMask,
 } from "@/domain/courses/weekday-schedule";
@@ -42,7 +46,9 @@ const failure = async (promise: Promise<unknown>) => {
 async function clear() {
   await database.db
     .delete(auditEvents)
-    .where(sql`${auditEvents.entityType} in ('COURSE', 'COURSE_TYPE')`);
+    .where(
+      sql`${auditEvents.entityType} in ('COURSE', 'COURSE_TYPE') or (${auditEvents.entityType} = 'GROUP' and ${auditEvents.actorId} in (select id from users where email = 'course.actor@repository.test'))`,
+    );
   await database.db.execute(
     sql`truncate groups, courses, course_type_revisions, course_types`,
   );
@@ -328,6 +334,173 @@ describe("course format persistence", () => {
       "Lunes a viernes, 18:00–20:30",
     );
     expect((await repository.getAdmin(draft.id))?.sessionMinutes).toBe(150);
+  });
+  test("replans ungrouped draft dates without inventing a shared group hour", async () => {
+    const initial = planCourseDates({
+      startDate: "2027-03-01",
+      weekdaysMask: 31,
+      totalHours: 30,
+      sessionMinutes: 150,
+    });
+    const course = await repository.create(
+      validateCourseData({
+        ...COURSE_FIXTURES.publishedOpenRegistration,
+        courseTypeId: formatId,
+        weekdays: "1,2,3,4,5",
+        schedule: GROUP_SCHEDULE,
+        startsAt: "2027-03-01T00:00",
+        endsAt: "2027-03-16T23:59",
+      }),
+      actorId,
+    );
+    expect(course.endsAt).toEqual(initial.endsAt);
+    await formats.revise(
+      formatId,
+      {
+        totalHours: 20,
+        sessionMinutes: 90,
+        studentAmount: "80.00",
+        externalAmount: "100.00",
+      },
+      actorId,
+    );
+    const expected = planCourseDates({
+      startDate: "2027-03-01",
+      weekdaysMask: 31,
+      totalHours: 20,
+      sessionMinutes: 90,
+    });
+    const updated = await repository.getAdmin(course.id);
+    expect(updated?.endsAt).toEqual(expected.endsAt);
+    expect(updated?.schedule).toBe(GROUP_SCHEDULE);
+    expect(updated?.updatedAt.getTime()).toBeGreaterThan(
+      course.updatedAt.getTime(),
+    );
+  });
+  test("a first group pins the course plan during a concurrent format revision", async () => {
+    const plan = planCourseDates({
+      startDate: "2027-03-01",
+      weekdaysMask: 31,
+      totalHours: 30,
+      sessionMinutes: 150,
+    });
+    const course = await repository.create(
+      validateCourseData({
+        ...COURSE_FIXTURES.publishedOpenRegistration,
+        courseTypeId: formatId,
+        weekdays: "1,2,3,4,5",
+        schedule: GROUP_SCHEDULE,
+        startsAt: "2027-03-01T00:00",
+        endsAt: "2027-03-16T23:59",
+      }),
+      actorId,
+    );
+    expect(course.endsAt).toEqual(plan.endsAt);
+    const groupsRepo = new DrizzleGroupRepository(database.db);
+    const [groupResult, revisionResult] = await Promise.allSettled([
+      groupsRepo.create(course.id, "08:00", 10, actorId),
+      formats.revise(
+        formatId,
+        {
+          totalHours: 20,
+          sessionMinutes: 90,
+          studentAmount: "80.00",
+          externalAmount: "100.00",
+        },
+        actorId,
+      ),
+    ]);
+    expect(groupResult.status).toBe("fulfilled");
+    expect(revisionResult.status).toBe("fulfilled");
+    if (groupResult.status !== "fulfilled") return;
+    const stored = await repository.getAdmin(course.id);
+    expect(stored).not.toBeNull();
+    if (!stored) return;
+    expect(groupResult.value.courseTypeRevisionId).toBe(
+      stored.courseTypeRevisionId,
+    );
+    expect(instantToBoliviaCivil(groupResult.value.endsAt).slice(0, 10)).toBe(
+      instantToBoliviaCivil(stored.endsAt).slice(0, 10),
+    );
+  });
+  test("keeps the format and first-group plan consistent in either operation order", async () => {
+    const groupsRepo = new DrizzleGroupRepository(database.db);
+    for (const order of ["format-first", "group-first"] as const) {
+      const format = await formats.create(
+        `Interleaving ${order}`,
+        {
+          totalHours: 30,
+          sessionMinutes: 150,
+          studentAmount: "120.00",
+          externalAmount: "150.00",
+        },
+        actorId,
+      );
+      const course = await repository.create(
+        validateCourseData({
+          ...COURSE_FIXTURES.publishedOpenRegistration,
+          name: `Interleaving course ${order}`,
+          courseTypeId: format.id,
+          weekdays: "1,2,3,4,5",
+          schedule: GROUP_SCHEDULE,
+          startsAt: "2027-03-01T00:00",
+          endsAt: "2027-03-16T23:59",
+        }),
+        actorId,
+      );
+      const revise = () =>
+        formats.revise(
+          format.id,
+          {
+            totalHours: 20,
+            sessionMinutes: 90,
+            studentAmount: "80.00",
+            externalAmount: "100.00",
+          },
+          actorId,
+        );
+      if (order === "format-first") {
+        await revise();
+        await groupsRepo.create(course.id, "08:00", 10, actorId);
+      } else {
+        await groupsRepo.create(course.id, "08:00", 10, actorId);
+        await revise();
+      }
+      const stored = await repository.getAdmin(course.id);
+      const [group] = await groupsRepo.list(course.id);
+      expect(stored).not.toBeNull();
+      expect(group).toMatchObject({
+        courseTypeRevisionId: stored!.courseTypeRevisionId,
+      });
+      expect(instantToBoliviaCivil(group!.endsAt).slice(0, 10)).toBe(
+        instantToBoliviaCivil(stored!.endsAt).slice(0, 10),
+      );
+    }
+  });
+  test("stores course revision timestamps at the browser's millisecond precision", async () => {
+    const [column] = await database.db.execute(sql`
+      select datetime_precision as precision from information_schema.columns
+      where table_schema = 'public' and table_name = 'courses' and column_name = 'updated_at'
+    `);
+    expect(column?.precision).toBe(3);
+    const created = await repository.create(input(), actorId);
+    const edited = await repository.update(
+      created.id,
+      { ...input(), description: "Edited with a browser revision" },
+      actorId,
+      new Date(created.updatedAt.toISOString()),
+    );
+    expect(edited.description).toBe("Edited with a browser revision");
+    const [stored] = await database.db.execute(sql`
+      select updated_at = date_trunc('milliseconds', updated_at) as exact
+      from courses where id = ${created.id}
+    `);
+    expect(stored?.exact).toBe(true);
+    expect(
+      await failure(
+        repository.update(created.id, input(), actorId, created.updatedAt),
+      ),
+    ).toMatchObject({ code: "STALE_COURSE" });
   });
   test("revisions are immutable; drafts follow latest while published and archived stay pinned", async () => {
     const draft = await repository.create(input(), actorId);

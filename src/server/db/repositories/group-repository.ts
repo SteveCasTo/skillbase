@@ -1,4 +1,4 @@
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq, ne, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { GroupRepository } from "@/application/groups/group-repository";
 import {
@@ -31,7 +31,8 @@ export class DrizzleGroupRepository implements GroupRepository {
   private async lockedCourse(
     tx: Transaction,
     id: string,
-    requirePublished = true,
+    requireAvailable = true,
+    requirePlan = true,
   ) {
     const [course] = await tx
       .select()
@@ -40,18 +41,18 @@ export class DrizzleGroupRepository implements GroupRepository {
       .for("update");
     if (
       !course ||
-      (requirePublished && course.status !== "PUBLISHED") ||
-      course.weekdaysMask !== 31
+      (requireAvailable && course.status === "ARCHIVED") ||
+      (requirePlan && course.weekdaysMask !== 31)
     )
       throw new GroupError(
         "COURSE_UNAVAILABLE",
-        "Solo cursos publicados y planificados admiten grupos.",
+        "Solo cursos no archivados y planificados admiten grupos.",
       );
     const [revision] = await tx
       .select()
       .from(schema.courseTypeRevisions)
       .where(eq(schema.courseTypeRevisions.id, course.courseTypeRevisionId));
-    if (!revision || revision.sessionMinutes === null)
+    if (!revision || (requirePlan && revision.sessionMinutes === null))
       throw new GroupError(
         "COURSE_UNAVAILABLE",
         "El formato no tiene duración de sesión conocida.",
@@ -121,6 +122,7 @@ export class DrizzleGroupRepository implements GroupRepository {
           courseId,
           courseTypeRevisionId: revision.id,
           capacity,
+          publishedAt: course.status === "PUBLISHED" ? new Date() : null,
           startsAt: plan.startsAt,
           endsAt: plan.endsAt,
         })
@@ -138,7 +140,7 @@ export class DrizzleGroupRepository implements GroupRepository {
     id: string,
     actorId: string,
     expected: Date,
-    operation: "schedule" | "capacity" | "cancel",
+    operation: "schedule" | "capacity" | "cancel" | "reactivate",
     value?: string | number,
   ): Promise<Row> {
     return this.db.transaction(async (tx) => {
@@ -152,7 +154,8 @@ export class DrizzleGroupRepository implements GroupRepository {
       const { course, revision } = await this.lockedCourse(
         tx,
         reference.courseId,
-        operation === "schedule",
+        operation !== "cancel",
+        operation !== "cancel",
       );
       const [previous] = await tx
         .select()
@@ -161,12 +164,16 @@ export class DrizzleGroupRepository implements GroupRepository {
         .for("update");
       if (!previous)
         throw new GroupError("GROUP_NOT_FOUND", "El grupo no existe.");
+      if (previous.courseId !== course.id)
+        throw new GroupError("GROUP_NOT_FOUND", "El grupo no existe.");
       if (previous.updatedAt.getTime() !== expected.getTime())
         throw new GroupError(
           "STALE_GROUP",
           "El grupo cambió desde la última lectura.",
         );
-      if (previous.status === "CANCELLED")
+      if (operation === "reactivate" && previous.status !== "CANCELLED")
+        throw new GroupError("GROUP_ACTIVE", "El grupo ya está planificado.");
+      if (operation !== "reactivate" && previous.status === "CANCELLED")
         throw new GroupError(
           "GROUP_CANCELLED",
           "Un grupo cancelado no puede modificarse.",
@@ -180,7 +187,7 @@ export class DrizzleGroupRepository implements GroupRepository {
           "El formato del curso ya no coincide con el grupo.",
         );
       let changes: Partial<
-        Pick<Row, "startsAt" | "endsAt" | "capacity" | "status">
+        Pick<Row, "startsAt" | "endsAt" | "capacity" | "status" | "publishedAt">
       >;
       if (operation === "schedule") {
         const plan = groupPlan(course, revision, value as string);
@@ -192,6 +199,25 @@ export class DrizzleGroupRepository implements GroupRepository {
         assertCapacity(value as number);
         if (previous.capacity === value) return previous;
         changes = { capacity: value as number };
+      } else if (operation === "reactivate") {
+        if (previous.courseTypeRevisionId !== revision.id)
+          throw new GroupError(
+            "COURSE_UNAVAILABLE",
+            "El formato del curso ya no coincide con el grupo.",
+          );
+        await this.assertFree(
+          tx,
+          course.id,
+          previous.startsAt,
+          previous.endsAt,
+          id,
+        );
+        changes = {
+          status: "PLANNED",
+          publishedAt:
+            previous.publishedAt ??
+            (course.status === "PUBLISHED" ? new Date() : null),
+        };
       } else changes = { status: "CANCELLED" };
       const [row] = await tx
         .update(schema.groups)
@@ -213,8 +239,10 @@ export class DrizzleGroupRepository implements GroupRepository {
           ? "GROUP_SCHEDULE_CHANGED"
           : operation === "capacity"
             ? "GROUP_CAPACITY_CHANGED"
-            : "GROUP_CANCELLED",
-        operation === "cancel"
+            : operation === "reactivate"
+              ? "GROUP_REACTIVATED"
+              : "GROUP_CANCELLED",
+        operation === "cancel" || operation === "reactivate"
           ? {}
           : {
               from:
@@ -249,5 +277,61 @@ export class DrizzleGroupRepository implements GroupRepository {
   }
   cancel(id: string, actorId: string, revision: Date) {
     return this.mutate(id, actorId, revision, "cancel");
+  }
+  reactivate(id: string, actorId: string, revision: Date) {
+    return this.mutate(id, actorId, revision, "reactivate");
+  }
+
+  async delete(id: string, actorId: string, expected: Date): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const [reference] = await tx
+        .select({ courseId: schema.groups.courseId })
+        .from(schema.groups)
+        .where(eq(schema.groups.id, id));
+      if (!reference)
+        throw new GroupError("GROUP_NOT_FOUND", "El grupo no existe.");
+      const { course } = await this.lockedCourse(
+        tx,
+        reference.courseId,
+        false,
+        false,
+      );
+      const [previous] = await tx
+        .select()
+        .from(schema.groups)
+        .where(eq(schema.groups.id, id))
+        .for("update");
+      if (!previous || previous.courseId !== course.id)
+        throw new GroupError("GROUP_NOT_FOUND", "El grupo no existe.");
+      if (previous.updatedAt.getTime() !== expected.getTime())
+        throw new GroupError(
+          "STALE_GROUP",
+          "El grupo cambió desde la última lectura.",
+        );
+      if (previous.publishedAt !== null)
+        throw new GroupError(
+          "GROUP_PUBLISHED",
+          "Un grupo que ya fue publicado no puede eliminarse; desactívalo.",
+        );
+      const [deleted] = await tx
+        .delete(schema.groups)
+        .where(
+          and(
+            eq(schema.groups.id, id),
+            eq(schema.groups.updatedAt, expected),
+            sql`${schema.groups.publishedAt} is null`,
+          ),
+        )
+        .returning();
+      if (!deleted)
+        throw new GroupError(
+          "STALE_GROUP",
+          "El grupo cambió antes de eliminarlo.",
+        );
+      await this.audit(tx, actorId, previous, "GROUP_DELETED", {
+        courseId: previous.courseId,
+        status: previous.status,
+      });
+    });
   }
 }

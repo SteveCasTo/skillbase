@@ -7,24 +7,35 @@ import {
   availabilityLabels,
 } from "@/components/landing/course-presentation";
 import { publicArtworkUrl } from "@/server/courses/artwork";
+import CourseArtworkFallback from "./CourseArtworkFallback.astro";
 
 interface Props {
   course: DisplayCourse;
   prominent?: boolean;
+  revealDelay?: number;
 }
-const { course, prominent = false } = Astro.props;
+const { course, prominent = false, revealDelay = 0 } = Astro.props;
 const artworkUrl = publicArtworkUrl(
   course.artwork,
   import.meta.env.PUBLIC_SUPABASE_URL,
 );
 ---
 
-<article class:list={["catalog-poster", { prominent }]}>
+<article
+  class:list={["catalog-poster", { prominent }]}
+  style={`--poster-reveal-delay: ${revealDelay}ms`}
+>
   <a
     href={`/cursos/${encodeURIComponent(course.slug)}`}
     aria-label={`Ver curso: ${course.name}`}
   >
-    <div class="poster-art" aria-hidden="true">
+    <div
+      class:list={[
+        "poster-art",
+        { "has-photo": artworkUrl, "has-fallback": !artworkUrl },
+      ]}
+      aria-hidden="true"
+    >
       {artworkUrl ? (
         <img
           src={artworkUrl}
@@ -35,12 +46,7 @@ const artworkUrl = publicArtworkUrl(
           decoding="async"
         />
       ) : (
-        <>
-          <span class="poster-monogram">
-            {course.name.trim().slice(0, 1).toLocaleUpperCase("es-BO")}
-          </span>
-          <span class="poster-mark">Cota Activa / Formación continua</span>
-        </>
+        <CourseArtworkFallback name={course.name} />
       )}
     </div>
     <div class="poster-copy">

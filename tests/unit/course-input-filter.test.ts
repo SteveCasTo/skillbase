@@ -38,6 +38,28 @@ describe("course editor input admission", () => {
   });
 });
 
+test("date-only preregistration accepts inclusive closing day and rejects invalid ranges", () => {
+  const planned = {
+    ...complete,
+    startsAt: "2027-03-01T00:00",
+    endsAt: "2027-03-05T23:59",
+    weekdays: "1,2,3,4,5",
+    registrationStartDate: "2027-02-28",
+    registrationEndDate: "2027-02-28",
+  };
+  expect(draftFieldsReady(planned)).toBe(true);
+  expect(draftFieldsReady({ ...planned, registrationEndDate: "" })).toBe(false);
+  expect(
+    draftFieldsReady({ ...planned, registrationEndDate: "2027-03-01" }),
+  ).toBe(false);
+  expect(
+    draftFieldsReady({ ...planned, registrationStartDate: "2027-03-02" }),
+  ).toBe(false);
+  expect(
+    draftFieldsReady({ ...planned, registrationStartDate: "2027-02-30" }),
+  ).toBe(false);
+});
+
 const complete = {
   name: "Curso",
   description: "Descripción",

@@ -1,32 +1,23 @@
 import { createDatabase } from "@/server/db/client";
-import { courseTypeRevisions, courseTypes, courses } from "@/server/db/schema";
+import {
+  courseTypeRevisions,
+  courseTypes,
+  courses,
+  groups,
+} from "@/server/db/schema";
+import {
+  boliviaCivilToInstant,
+  instantToBoliviaCivil,
+} from "@/domain/courses/bolivia-time";
+import {
+  GROUP_SCHEDULE,
+  planCourseDates,
+} from "@/domain/courses/weekday-schedule";
+import { groupPlan, overlaps } from "@/domain/groups/rules";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import { getLocalSupabaseEnvironment } from "./supabase-local-env";
-import { and, desc, eq, inArray } from "drizzle-orm";
-import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
-import { planWeekdaySchedule } from "@/domain/courses/weekday-schedule";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error("DATABASE_URL is required in .env.");
-
-const configured = new URL(connectionString);
-const local = new URL(getLocalSupabaseEnvironment().databaseUrl);
-if (
-  configured.hostname !== local.hostname ||
-  configured.port !== local.port ||
-  configured.pathname !== local.pathname ||
-  configured.username !== local.username
-) {
-  throw new Error(
-    "db:seed:demo only accepts the running local Supabase database.",
-  );
-}
-
-// Reuse the agreed 20 h / 30 h formats and optional admin invitation.
-await import("./seed");
-
-const day = 24 * 60 * 60 * 1000;
-const now = Date.now();
-const after = (days: number) => new Date(now + days * day);
+const DAY_MS = 86400000;
 const samples = [
   {
     slug: "demo-programacion-web",
@@ -38,11 +29,14 @@ const samples = [
     conditions: "No se requieren conocimientos previos.",
     contentMarkdown:
       "## Lo que aprenderás\n\nEstructura web, estilos y primeros pasos con JavaScript.",
-    startsAt: after(40),
-    registrationStartAt: after(-7),
-    registrationEndAt: after(30),
+    startOffset: 40,
+    registrationOffset: -7,
     status: "PUBLISHED",
     featured: true,
+    groups: [
+      { startTime: "09:00", capacity: 20 },
+      { startTime: "18:00", capacity: 15 },
+    ],
   },
   {
     slug: "demo-analisis-de-datos",
@@ -53,11 +47,11 @@ const samples = [
     format: "Formato 30 horas",
     conditions: "Se recomienda familiaridad con hojas de cálculo.",
     contentMarkdown: null,
-    startsAt: after(55),
-    registrationStartAt: after(5),
-    registrationEndAt: after(45),
+    startOffset: 55,
+    registrationOffset: 5,
     status: "PUBLISHED",
     featured: false,
+    groups: [{ startTime: "09:00", capacity: 25 }],
   },
   {
     slug: "demo-diseno-de-interfaces",
@@ -67,11 +61,11 @@ const samples = [
     format: "Formato 20 horas",
     conditions: "Abierto a participantes de cualquier especialidad.",
     contentMarkdown: null,
-    startsAt: after(65),
-    registrationStartAt: after(-3),
-    registrationEndAt: after(50),
+    startOffset: 65,
+    registrationOffset: -3,
     status: "PUBLISHED",
     featured: false,
+    groups: [{ startTime: "14:00", capacity: 18 }],
   },
   {
     slug: "demo-ciberseguridad-basica",
@@ -82,11 +76,11 @@ const samples = [
     format: "Formato 30 horas",
     conditions: "Solo necesitas experiencia básica usando computadoras.",
     contentMarkdown: null,
-    startsAt: after(75),
-    registrationStartAt: after(10),
-    registrationEndAt: after(60),
+    startOffset: 75,
+    registrationOffset: 10,
     status: "PUBLISHED",
     featured: false,
+    groups: [{ startTime: "18:00", capacity: 22 }],
   },
   {
     slug: "demo-gestion-de-proyectos",
@@ -97,99 +91,214 @@ const samples = [
     format: "Formato 30 horas",
     conditions: "No se requieren herramientas de pago.",
     contentMarkdown: null,
-    startsAt: after(90),
-    registrationStartAt: null,
-    registrationEndAt: null,
+    startOffset: 90,
+    registrationOffset: null,
     status: "DRAFT",
     featured: false,
+    groups: [{ startTime: "09:00", capacity: 16 }],
   },
 ] as const;
 
-const database = createDatabase(connectionString);
-try {
-  const created = await database.db.transaction(async (tx) => {
-    const formats = await tx
-      .select({
-        name: courseTypes.name,
-        revisionId: courseTypeRevisions.id,
-        totalHours: courseTypeRevisions.totalHours,
-        sessionMinutes: courseTypeRevisions.sessionMinutes,
-      })
-      .from(courseTypes)
-      .innerJoin(
-        courseTypeRevisions,
-        eq(courseTypeRevisions.courseTypeId, courseTypes.id),
-      )
-      .where(
-        inArray(courseTypes.name, ["Formato 20 horas", "Formato 30 horas"]),
-      )
-      .orderBy(desc(courseTypeRevisions.revisionNumber));
-    const revisions = new Map<string, (typeof formats)[number]>();
-    for (const format of formats) {
-      if (!revisions.has(format.name)) revisions.set(format.name, format);
-    }
+type Revision = {
+  revisionId: string;
+  totalHours: number;
+  sessionMinutes: number | null;
+};
 
-    const existing = await tx
-      .select({ slug: courses.slug })
-      .from(courses)
-      .where(
-        inArray(
-          courses.slug,
-          samples.map((sample) => sample.slug),
-        ),
-      );
-    const slugs = new Set(existing.map((course) => course.slug));
-    const [featured] = await tx
-      .select({ id: courses.id })
-      .from(courses)
-      .where(and(eq(courses.status, "PUBLISHED"), eq(courses.featured, true)))
-      .limit(1);
+function civilDateAtOffset(today: string, offset: number): string {
+  return new Date(Date.parse(`${today}T00:00:00Z`) + offset * DAY_MS)
+    .toISOString()
+    .slice(0, 10);
+}
 
-    let inserted = 0;
-    for (const sample of samples) {
-      if (slugs.has(sample.slug)) continue;
+function nextWeekday(date: string): string {
+  let result = date;
+  while ([0, 6].includes(new Date(`${result}T00:00:00Z`).getUTCDay())) {
+    result = civilDateAtOffset(result, 1);
+  }
+  return result;
+}
+
+/** Only plan missing slugs: rerunning the seed never rewrites an edited demo or adds groups to it. */
+export function planDemoCourses(
+  now: Date,
+  revisions: ReadonlyMap<string, Revision>,
+  existingSlugs: ReadonlySet<string> = new Set(),
+) {
+  const today = instantToBoliviaCivil(now).slice(0, 10);
+  return samples
+    .filter((sample) => !existingSlugs.has(sample.slug))
+    .map((sample) => {
       const revision = revisions.get(sample.format);
-      if (!revision?.sessionMinutes)
+      if (!revision || revision.sessionMinutes === null)
         throw new Error(`Seed format needs session minutes: ${sample.format}`);
-      let start = instantToBoliviaCivil(sample.startsAt).slice(0, 10);
-      // Start on the next weekday, at a stable Bolivia civil hour, regardless of the host timezone.
-      while ([0, 6].includes(new Date(`${start}T00:00:00Z`).getUTCDay()))
-        start = new Date(new Date(`${start}T00:00:00Z`).getTime() + day)
-          .toISOString()
-          .slice(0, 10);
-      const startsAt = `${start}T18:00`;
-      const plan = planWeekdaySchedule({
-        startsAt,
+      const startDate = nextWeekday(
+        civilDateAtOffset(today, sample.startOffset),
+      );
+      const dates = planCourseDates({
+        startDate,
         weekdaysMask: 31,
         totalHours: revision.totalHours,
         sessionMinutes: revision.sessionMinutes,
       });
-      await tx.insert(courses).values({
-        slug: sample.slug,
-        name: sample.name,
-        description: sample.description,
-        level: sample.level,
-        schedule: `Lunes a viernes, 18:00–${plan.endTime}`,
-        weekdaysMask: 31,
-        conditions: sample.conditions,
-        contentMarkdown: sample.contentMarkdown,
-        startsAt: plan.sessions[0]!.startsAt,
-        endsAt: plan.endsAt,
-        registrationStartAt: sample.registrationStartAt,
-        registrationEndAt: sample.registrationEndAt,
-        status: sample.status,
-        courseTypeRevisionId: revision.revisionId,
-        featured: sample.featured && !featured,
-        minimumGrade: 70,
-        instructorName: "Equipo docente de ejemplo",
-      });
-      inserted++;
-    }
-    return inserted;
-  });
-  console.info(
-    `Demo courses: ${created} created, ${samples.length - created} already present.`,
-  );
-} finally {
-  await database.close();
+      const registrationStartAt =
+        sample.registrationOffset === null
+          ? null
+          : boliviaCivilToInstant(
+              `${civilDateAtOffset(today, sample.registrationOffset)}T00:00`,
+            );
+      // Exclusive boundary at midnight: the last registration day is seven days before classes.
+      const registrationEndAt =
+        sample.registrationOffset === null
+          ? null
+          : boliviaCivilToInstant(`${civilDateAtOffset(startDate, -6)}T00:00`);
+      if (
+        registrationStartAt &&
+        registrationEndAt &&
+        !(
+          registrationStartAt < registrationEndAt &&
+          registrationEndAt < dates.startsAt
+        )
+      )
+        throw new Error(`Invalid demo registration window: ${sample.slug}`);
+
+      const plannedGroups = sample.groups.map(({ startTime, capacity }) => ({
+        capacity,
+        // Seed has no human actor or publication action; preserve exposure directly.
+        publishedAt: sample.status === "PUBLISHED" ? now : null,
+        ...groupPlan({ ...dates, weekdaysMask: 31 }, revision, startTime),
+      }));
+      if (
+        plannedGroups.some((group, index) =>
+          plannedGroups
+            .slice(index + 1)
+            .some((other) =>
+              overlaps(
+                group.startsAt,
+                group.endsAt,
+                other.startsAt,
+                other.endsAt,
+              ),
+            ),
+        )
+      )
+        throw new Error(`Overlapping demo groups: ${sample.slug}`);
+
+      return {
+        course: {
+          slug: sample.slug,
+          name: sample.name,
+          description: sample.description,
+          level: sample.level,
+          schedule: GROUP_SCHEDULE,
+          weekdaysMask: 31,
+          conditions: sample.conditions,
+          contentMarkdown: sample.contentMarkdown,
+          startsAt: dates.startsAt,
+          endsAt: dates.endsAt,
+          registrationStartAt,
+          registrationEndAt,
+          status: sample.status,
+          featured: sample.featured,
+          courseTypeRevisionId: revision.revisionId,
+          minimumGrade: 70,
+          instructorName: "Equipo docente de ejemplo",
+        },
+        groups: plannedGroups,
+      };
+    });
+}
+
+if (import.meta.main) {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("DATABASE_URL is required in .env.");
+  const configured = new URL(connectionString);
+  const local = new URL(getLocalSupabaseEnvironment().databaseUrl);
+  if (
+    configured.hostname !== local.hostname ||
+    configured.port !== local.port ||
+    configured.pathname !== local.pathname ||
+    configured.username !== local.username
+  )
+    throw new Error(
+      "db:seed:demo only accepts the running local Supabase database.",
+    );
+
+  // Development formats only; never reset or migrate existing local data.
+  await import("./seed");
+  const database = createDatabase(connectionString);
+  try {
+    const created = await database.db.transaction(async (tx) => {
+      // Match the course repository's lock order for concurrent format/slug changes.
+      await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+      await tx.execute(sql`select pg_advisory_xact_lock(20260915, 1)`);
+      const formats = await tx
+        .select({
+          name: courseTypes.name,
+          revisionId: courseTypeRevisions.id,
+          totalHours: courseTypeRevisions.totalHours,
+          sessionMinutes: courseTypeRevisions.sessionMinutes,
+        })
+        .from(courseTypes)
+        .innerJoin(
+          courseTypeRevisions,
+          eq(courseTypeRevisions.courseTypeId, courseTypes.id),
+        )
+        .where(
+          inArray(courseTypes.name, ["Formato 20 horas", "Formato 30 horas"]),
+        )
+        .orderBy(desc(courseTypeRevisions.revisionNumber));
+      const revisions = new Map<string, Revision>();
+      for (const format of formats) {
+        if (!revisions.has(format.name)) revisions.set(format.name, format);
+      }
+      const existing = await tx
+        .select({ slug: courses.slug })
+        .from(courses)
+        .where(
+          inArray(
+            courses.slug,
+            samples.map((sample) => sample.slug),
+          ),
+        );
+      const planned = planDemoCourses(
+        new Date(),
+        revisions,
+        new Set(existing.map(({ slug }) => slug)),
+      );
+      const [featured] = await tx
+        .select({ id: courses.id })
+        .from(courses)
+        .where(
+          sql`${courses.status} = 'PUBLISHED' and ${courses.featured} = true`,
+        )
+        .limit(1);
+      let hasFeatured = Boolean(featured);
+      for (const { course, groups: plannedGroups } of planned) {
+        const isFeatured = course.featured && !hasFeatured;
+        const [inserted] = await tx
+          .insert(courses)
+          .values({ ...course, featured: isFeatured })
+          .returning({ id: courses.id });
+        if (!inserted) throw new Error("Demo course insert failed");
+        hasFeatured ||= isFeatured;
+        await tx.insert(groups).values(
+          plannedGroups.map((group) => ({
+            courseId: inserted.id,
+            courseTypeRevisionId: course.courseTypeRevisionId,
+            capacity: group.capacity,
+            publishedAt: group.publishedAt,
+            startsAt: group.startsAt,
+            endsAt: group.endsAt,
+          })),
+        );
+      }
+      return planned.length;
+    });
+    console.info(
+      `Demo courses: ${created} created, ${samples.length - created} already present.`,
+    );
+  } finally {
+    await database.close();
+  }
 }

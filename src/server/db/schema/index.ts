@@ -198,7 +198,7 @@ export const courses = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 })
       .notNull()
       .defaultNow(),
   },
@@ -264,6 +264,7 @@ export const groups = pgTable(
     courseTypeRevisionId: uuid("course_type_revision_id").notNull(),
     capacity: integer("capacity").notNull(),
     status: groupStatus("status").notNull().default("PLANNED"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })

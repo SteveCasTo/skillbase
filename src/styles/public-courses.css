@@ -43,105 +43,21 @@ html.dark:has(.public-courses) {
     outline: 3px solid var(--signal);
     outline-offset: 4px;
   }
-  .skip-link {
-    position: absolute;
-    top: 0.5rem;
-    left: 0.5rem;
-    z-index: 20;
-    transform: translateY(-160%);
-    background: var(--deep);
-    color: #fff;
-    padding: 0.75rem 1rem;
-    border-radius: 10px;
-  }
-  .skip-link:focus-visible {
-    transform: translateY(0);
-  }
-  .course-header {
-    border-bottom: 1px solid var(--rule);
-  }
-  .course-header-inner {
-    width: min(100% - 3rem, 86rem);
-    margin: auto;
-    min-height: 5.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 2rem;
-  }
-  .course-brand {
-    display: grid;
-    gap: 0.2rem;
-    flex-shrink: 0;
-    text-decoration: none;
-    color: var(--ink);
-  }
-  .course-brand strong {
-    font-family: Alef, sans-serif;
-    font-size: 1.2rem;
-    line-height: 1.1;
-  }
-  .course-brand span {
-    font-size: 0.66rem;
-    font-weight: 600;
-    color: var(--soft);
-  }
-  .course-header nav {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: clamp(1rem, 2vw, 2.5rem);
-  }
-  .course-header nav a,
   .course-footer a {
     color: var(--ink);
     font-size: 0.8rem;
     font-weight: 700;
     text-decoration: none;
   }
-  .course-header nav a:hover,
   .course-footer a:hover {
     color: var(--blue);
     text-decoration: underline;
   }
-  .course-header nav a[aria-current] {
-    color: var(--blue);
-    text-decoration: underline;
-  }
-  .theme-toggle {
-    position: relative;
-    min-width: 2.75rem;
-    min-height: 2.75rem;
-    border: 1px solid var(--rule);
-    border-radius: 50%;
-    background: var(--field);
-    color: var(--ink);
-  }
-  .theme-toggle svg {
-    position: absolute;
-    opacity: 0;
-  }
-  .theme-toggle[data-current-theme="light"] .theme-toggle-sun,
-  .theme-toggle[data-current-theme="dark"] .theme-toggle-moon {
-    opacity: 1;
-  }
   main {
     width: min(100% - 3rem, 86rem);
     margin: auto;
+    padding-top: calc(4.75rem + 1rem);
     padding-bottom: clamp(5rem, 10vw, 10rem);
-  }
-  .back-link {
-    display: inline-flex;
-    align-items: center;
-    min-height: 2.75rem;
-    margin: 2rem 0;
-    color: var(--blue);
-    font-size: 0.85rem;
-    font-weight: 700;
-    text-decoration: none;
-  }
-  .back-link:hover {
-    text-decoration: underline;
   }
   h1,
   h2 {
@@ -151,21 +67,19 @@ html.dark:has(.public-courses) {
     text-wrap: balance;
   }
   .catalog-intro {
-    padding: clamp(1rem, 3vw, 3rem) 0 clamp(3rem, 7vw, 6rem);
+    padding: clamp(1.5rem, 3vw, 2.5rem) 0 clamp(1.5rem, 3vw, 2.5rem);
   }
   .catalog-intro h1 {
-    max-width: 13ch;
-    font-size: clamp(3rem, 7vw, 6rem);
+    font-size: clamp(2.6rem, 5vw, 4.5rem);
     line-height: 1.03;
   }
   .catalog-intro > p {
-    max-width: 56ch;
-    margin-top: 1.5rem;
+    margin-top: 0.75rem;
     color: var(--soft);
     line-height: 1.75;
   }
   .section-label {
-    margin-bottom: 1.75rem;
+    margin-bottom: 1rem;
     padding-top: 1rem;
     border-top: 1px solid var(--rule);
     font-size: 1.2rem;
@@ -191,37 +105,60 @@ html.dark:has(.public-courses) {
     text-decoration: none;
     color: inherit;
   }
+  .catalog-list.motion-enhanced .catalog-poster.is-visible {
+    animation: row-acquires-signal 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--poster-reveal-delay, 0ms);
+  }
+  @keyframes row-acquires-signal {
+    from {
+      opacity: 0;
+      transform: translateY(1.1rem);
+    }
+  }
   .catalog-poster.prominent a {
     grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
   }
   .poster-art {
-    display: flex;
+    position: relative;
+    display: block;
     min-height: 16rem;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: clamp(1.4rem, 3vw, 3rem);
+    overflow: hidden;
     background: #176ba0;
     color: #fff;
-  }
-  .catalog-grid .catalog-poster:nth-child(3n + 2) .poster-art {
-    background: #245773;
-  }
-  .catalog-grid .catalog-poster:nth-child(3n + 3) .poster-art {
-    background: #a9471d;
   }
   .prominent .poster-art {
     min-height: 31rem;
     background: #102e43;
   }
-  .poster-monogram {
-    font-family: Alef, sans-serif;
-    font-size: clamp(8rem, 18vw, 19rem);
-    line-height: 0.85;
-    opacity: 0.7;
+  .poster-art.has-fallback .course-artwork-fallback,
+  .detail-art.has-fallback .course-artwork-fallback {
+    min-height: inherit;
   }
-  .poster-mark {
-    font-size: 0.7rem;
-    font-weight: 700;
+  .poster-art img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 48% 56%;
+    filter: saturate(0.76) contrast(1.04);
+    transform: scale(1.04);
+    transition:
+      transform 700ms cubic-bezier(0.16, 1, 0.3, 1),
+      filter 500ms ease-out;
+  }
+  .prominent .poster-art img {
+    object-position: 50% 50%;
+  }
+  .catalog-poster a:is(:hover, :focus-visible) .poster-art img {
+    filter: saturate(0.9) contrast(1.06);
+    transform: scale(1.085);
+  }
+  .catalog-poster a:is(:hover, :focus-visible) .course-artwork-fallback {
+    background-position: 56% 16%;
+  }
+  .catalog-poster a:is(:hover, :focus-visible) .course-artwork-fallback strong {
+    transform: translateY(-0.3rem);
   }
   .poster-copy {
     display: flex;
@@ -301,7 +238,7 @@ html.dark:has(.public-courses) {
     font-size: clamp(1.7rem, 3vw, 3rem);
   }
   .catalog-state p {
-    margin: 1rem 0 2rem;
+    margin: 1rem 0 0;
     line-height: 1.7;
   }
   .catalog-state a {
@@ -310,6 +247,7 @@ html.dark:has(.public-courses) {
     align-items: center;
     color: var(--blue);
     font-weight: 700;
+    margin-top: 2rem;
   }
   .detail-hero {
     display: grid;
@@ -344,12 +282,8 @@ html.dark:has(.public-courses) {
     background: #176ba0;
     color: #fff;
   }
-  .detail-art span {
-    font-family: Alef, sans-serif;
-    font-size: clamp(10rem, 20vw, 19rem);
-    line-height: 1;
-  }
-  .detail-art.has-photo {
+  .detail-art.has-photo,
+  .detail-art.has-fallback {
     padding: 0;
   }
   .detail-art img {
@@ -364,8 +298,8 @@ html.dark:has(.public-courses) {
   }
   .detail-body {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
-    gap: clamp(2rem, 7vw, 8rem);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(2rem, 5vw, 5rem);
     padding-top: 3.5rem;
   }
   .detail-section {
@@ -432,6 +366,24 @@ html.dark:has(.public-courses) {
   .course-markdown :where(ul, ol) {
     padding-inline-start: 1.5rem;
   }
+  .course-markdown ul {
+    list-style: disc;
+  }
+  .course-markdown ol {
+    list-style: decimal;
+  }
+  .course-markdown ul ul {
+    list-style: circle;
+  }
+  .course-markdown ul ul ul {
+    list-style: square;
+  }
+  .course-markdown ol ol {
+    list-style: lower-alpha;
+  }
+  .course-markdown ol ol ol {
+    list-style: lower-roman;
+  }
   .course-markdown li + li {
     margin-top: 0.35rem;
   }
@@ -474,6 +426,19 @@ html.dark:has(.public-courses) {
     line-height: 1.5;
     overflow-wrap: anywhere;
   }
+  .registration-window dd {
+    display: grid;
+    gap: 0.75rem 1.5rem;
+  }
+  .registration-window dd > span {
+    display: grid;
+    gap: 0.25rem;
+  }
+  .registration-window dd > span > span {
+    color: var(--soft);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
   .prices {
     padding-top: 2.5rem;
   }
@@ -484,6 +449,20 @@ html.dark:has(.public-courses) {
     margin-top: 1rem;
     color: var(--soft);
     font-size: 0.75rem;
+  }
+  @media (min-width: 1100px) {
+    .detail-aside > dl,
+    .prices dl {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0 1.5rem;
+    }
+    .detail-aside > dl > div:nth-child(n + 5) {
+      grid-column: 1 / -1;
+    }
+    .registration-window dd {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
   .detail-state {
     margin-top: 3rem;
@@ -511,16 +490,6 @@ html.dark:has(.public-courses) {
     gap: 1.5rem;
   }
   @media (max-width: 860px) {
-    .course-header-inner {
-      flex-wrap: wrap;
-      padding: 1rem 0;
-      gap: 0.75rem 1rem;
-    }
-    .course-header nav {
-      order: 3;
-      width: 100%;
-      gap: 1.5rem;
-    }
     .detail-body {
       gap: 2rem;
     }
@@ -543,26 +512,34 @@ html.dark:has(.public-courses) {
     .detail-art {
       min-height: 15rem;
     }
-    .detail-art span {
-      font-size: 10rem;
-    }
   }
   @media (max-width: 400px) {
-    .course-header nav {
-      gap: 0.8rem;
-    }
-    .course-header nav a {
-      font-size: 0.7rem;
-    }
-    .course-brand span {
-      font-size: 0.56rem;
-    }
     .catalog-intro h1,
     .detail-heading h1 {
       font-size: 2.8rem;
     }
   }
   @media (prefers-reduced-motion: reduce) {
+    .catalog-list.motion-enhanced .catalog-poster.is-visible {
+      animation: none;
+    }
+    .poster-art img,
+    .course-artwork-fallback,
+    .course-artwork-fallback strong {
+      transition: none;
+    }
+    .catalog-poster a:is(:hover, :focus-visible) .poster-art img {
+      transform: scale(1.04);
+    }
+    .catalog-poster a:is(:hover, :focus-visible) .course-artwork-fallback {
+      background-position: 50% 20%;
+    }
+    .catalog-poster
+      a:is(:hover, :focus-visible)
+      .course-artwork-fallback
+      strong {
+      transform: none;
+    }
     a {
       scroll-behavior: auto;
     }

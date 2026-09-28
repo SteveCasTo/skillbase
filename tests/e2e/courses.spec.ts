@@ -21,21 +21,44 @@ async function fillCourseFields(page: Page, formatName: string): Promise<void> {
   await page.getByRole("combobox", { name: "Formato de curso" }).click();
   await page.getByRole("option", { name: new RegExp(formatName) }).click();
   await page.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
-  for (const [label, date, time] of [
-    ["Inicio de clases (Bolivia)", "01/03/2027", "18:30"],
-    ["Apertura de preinscripción", "01/01/2027", "08:00"],
-    ["Cierre de preinscripción", "20/02/2027", "18:00"],
+  for (const [label, date] of [
+    ["Apertura de preinscripción", "01/01/2027"],
+    ["Último día de preinscripción", "20/02/2027"],
   ] as const) {
-    await page.getByLabel(label, { exact: true }).fill(date);
-    await page
-      .getByRole("textbox", {
-        name: `Hora de ${label.toLowerCase()}`,
-        exact: true,
-      })
-      .fill(time);
+    await page.getByRole("textbox", { name: label, exact: true }).fill(date);
   }
+  await page
+    .getByRole("textbox", {
+      name: "Fecha de inicio de clases (Bolivia)",
+      exact: true,
+    })
+    .fill("01/03/2027");
+  await expect(
+    page.getByText("17/03/2027", { exact: false }).first(),
+  ).toBeVisible();
   await page.getByLabel("Nota mínima (0–100)").fill("70");
 }
+
+test("missing format is announced beside the selector and focuses it without an artwork error", async ({
+  page,
+  context,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app/cursos/nuevo");
+  const create = page.getByRole("button", { name: "Crear borrador" });
+  await expect(create).toBeEnabled();
+  await create.click();
+  const format = page.getByRole("combobox", { name: "Formato de curso" });
+  await expect(format).toBeFocused();
+  await expect(format).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("[data-format-error]")).toHaveText(
+    "Selecciona un formato de curso.",
+  );
+  await expect(page.locator(".artwork-create-error")).toBeHidden();
+  await format.click();
+  await page.getByRole("option").filter({ hasText: /BOB/ }).first().click();
+  await expect(page.locator("[data-format-error]")).toBeHidden();
+});
 
 test("admin crops a photo in the new-course form and can retry a failed upload without creating another draft", async ({
   page,
@@ -66,12 +89,54 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   await page.goto("/app/cursos/nuevo");
   await page.getByLabel("Nombre").fill(`Curso con foto ${Date.now()}`);
   await fillCourseFields(page, formatName);
+  const groups = page.locator("[data-initial-groups]");
+  await groups.getByRole("button", { name: "Añadir grupo" }).click();
+  await groups.getByRole("button", { name: "Añadir grupo" }).click();
+  const initialGroups = groups.locator("[data-initial-group]");
+  await expect(initialGroups).toHaveCount(2);
+  await initialGroups.nth(0).locator('[name="initialGroupTime"]').fill("16:00");
+  await initialGroups
+    .nth(0)
+    .locator('[name="initialGroupCapacity"]')
+    .fill("20");
+  await initialGroups.nth(1).locator('[name="initialGroupTime"]').fill("18:00");
+  await expect(
+    initialGroups.nth(0).locator("[data-initial-group-end]"),
+  ).toHaveText("Fin 17:30");
+  await expect(
+    initialGroups.nth(1).locator("[data-initial-group-end]"),
+  ).toHaveText("Fin 19:30");
+  const firstTime = await initialGroups
+    .nth(0)
+    .locator('[name="initialGroupTime"]')
+    .boundingBox();
+  const firstCapacity = await initialGroups
+    .nth(0)
+    .locator('[name="initialGroupCapacity"]')
+    .boundingBox();
+  if (page.viewportSize()!.width >= 640)
+    expect(firstTime!.y).toBeCloseTo(firstCapacity!.y, 0);
+  await initialGroups.nth(1).locator('[name="initialGroupTime"]').fill("17:00");
+  await expect(groups.locator("[data-initial-group-error]")).toContainText(
+    "no pueden solaparse",
+  );
+  await expect(
+    page.getByRole("button", { name: "Crear borrador" }),
+  ).toBeDisabled();
+  await initialGroups.nth(1).locator('[name="initialGroupTime"]').fill("18:00");
+  await expect(groups.locator("[data-initial-group-error]")).toBeHidden();
+  await initialGroups
+    .nth(1)
+    .locator('[name="initialGroupCapacity"]')
+    .fill("20");
   await expect(
     page.getByText(
       /13 sesiones de 90 min · 19\.5 h planificadas frente a 20 h configuradas/,
     ),
   ).toBeVisible();
-  await expect(page.getByText("17/03/2027 20:00")).toBeVisible();
+  await expect(
+    page.getByText("17/03/2027", { exact: false }).first(),
+  ).toBeVisible();
   const bytes = await page.evaluate(async () => {
     const canvas = new OffscreenCanvas(400, 250);
     const ctx = canvas.getContext("2d")!;
@@ -90,17 +155,82 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
     mimeType: "image/webp",
     buffer: Buffer.from(bytes),
   });
+  const cropDialog = page.getByRole("dialog", {
+    name: "Recortar foto del curso",
+  });
+  await expect(cropDialog).toBeVisible();
+  const cropFrame = cropDialog.locator("[data-crop-frame]");
+  const cropFrameBox = await cropFrame.boundingBox();
+  expect(cropFrameBox).not.toBeNull();
+  expect(cropFrameBox!.width / cropFrameBox!.height).toBeCloseTo(8 / 5, 1);
+  const cropImage = cropDialog.locator('img[draggable="false"]');
+  const initialImageBox = await cropImage.boundingBox();
+  expect(initialImageBox).not.toBeNull();
+  const contexts = cropDialog.getByRole("region", {
+    name: "Vistas previas públicas",
+  });
+  await expect(contexts.getByText("Destacado en escritorio")).toBeVisible();
+  const previewImage = contexts.locator("img").first();
+  const initialPreview = await previewImage.getAttribute("src");
+  expect(initialPreview).toMatch(/^blob:/);
+  await contexts.getByRole("button", { name: "Afiches" }).click();
+  await expect(contexts.getByText("Afiche ancho")).toBeVisible();
+  await expect(contexts.getByText("Afiche estrecho")).toBeVisible();
+  await contexts.getByRole("button", { name: "Móvil" }).click();
+  await expect(contexts.getByText("Destacado móvil")).toBeVisible();
+  await expect(contexts.getByText("Otro curso móvil")).toBeVisible();
+  await contexts.getByRole("button", { name: "Detalle" }).click();
+  await expect(contexts.getByText("Detalle en escritorio")).toBeVisible();
+  await expect(contexts.getByText("Detalle en móvil")).toBeVisible();
+  const [desktopDetail, mobileDetail] = await Promise.all([
+    contexts.locator(".artwork-context-first").boundingBox(),
+    contexts.locator(".artwork-context-second").boundingBox(),
+  ]);
+  expect(desktopDetail).not.toBeNull();
+  expect(mobileDetail).not.toBeNull();
+  expect(desktopDetail!.width).toBeGreaterThan(mobileDetail!.width);
+  expect(desktopDetail!.width / desktopDetail!.height).toBeCloseTo(1.15, 1);
+  const zoom = cropDialog.getByRole("slider", { name: "Zoom" });
+  await zoom.fill("1.5");
+  await expect
+    .poll(() => previewImage.getAttribute("src"))
+    .not.toBe(initialPreview);
+  await expect
+    .poll(async () => (await cropImage.boundingBox())?.width)
+    .toBeGreaterThan(initialImageBox!.width);
+  const beforeDrag = await cropImage.boundingBox();
+  expect(beforeDrag).not.toBeNull();
+  await cropFrame.dragTo(cropFrame, {
+    sourcePosition: { x: cropFrameBox!.width / 2, y: cropFrameBox!.height / 2 },
+    targetPosition: {
+      x: cropFrameBox!.width / 2 + 18,
+      y: cropFrameBox!.height / 2,
+    },
+  });
+  await expect
+    .poll(async () => (await cropImage.boundingBox())?.x)
+    .not.toBe(beforeDrag!.x);
+  await cropDialog.getByRole("button", { name: "Guardar recorte" }).click();
+  await expect(cropDialog).toBeHidden();
   await expect(
-    page.getByRole("img", { name: "Vista previa del encuadre del curso" }),
+    page.getByRole("img", { name: "Vista previa del recorte del curso" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Crear borrador" }).click();
+  await page.getByLabel("Seleccionar foto del curso").setInputFiles({
+    name: "replacement.webp",
+    mimeType: "image/webp",
+    buffer: Buffer.from(bytes),
+  });
+  await expect(cropDialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(cropDialog).toBeHidden();
   await expect(
-    page.getByRole("alert").filter({ hasText: "Confirma el recorte" }),
+    page.getByRole("img", { name: "Vista previa del recorte del curso" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Usar este recorte" }).click();
-  await expect(page.getByText("Foto lista para cargarse")).toBeVisible();
   await page
-    .getByLabel("Inicio de clases (Bolivia)", { exact: true })
+    .getByRole("textbox", {
+      name: "Fecha de inicio de clases (Bolivia)",
+      exact: true,
+    })
     .fill("06/03/2027");
   const create = page.getByRole("button", { name: "Crear borrador" });
   await expect(create).toBeDisabled();
@@ -121,9 +251,14 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   const invalidBody = await invalidResponse.json();
   expect(invalidBody.fieldErrors).toHaveProperty("startsAt");
   await expect(page.getByLabel("Nombre")).toHaveValue(/Curso con foto/);
-  await expect(page.getByText("Foto lista para cargarse")).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "Vista previa del recorte del curso" }),
+  ).toBeVisible();
   await page
-    .getByLabel("Inicio de clases (Bolivia)", { exact: true })
+    .getByRole("textbox", {
+      name: "Fecha de inicio de clases (Bolivia)",
+      exact: true,
+    })
     .fill("01/03/2027");
   let failed = false;
   await page.route("**/app/cursos/imagen", async (route) => {
@@ -144,14 +279,49 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
     .getByRole("link", { name: "Abrir borrador" })
     .getAttribute("href");
   expect(draftUrl).toMatch(/\/app\/cursos\/[0-9a-f-]+\/editar/);
-  await page.getByRole("button", { name: "Reintentar foto" }).click();
-  await expect(page).toHaveURL(/\/editar$/);
-  expect(page.url()).toContain(draftUrl!);
-  const key = await page.locator('input[name="artwork"]').inputValue();
+  await page.getByRole("button", { name: "Reintentar pendientes" }).click();
+  await expect(page).toHaveURL(/\/grupos(?:\?success=created)?$/);
+  await expect(page.locator("[data-group-id]")).toHaveCount(2);
+  await page.goto(draftUrl!);
+  const artwork = page.locator('input[name="artwork"]');
+  const key = await artwork.inputValue();
   expect(key).toMatch(/^courses\/[0-9a-f-]+\/[0-9a-f-]+\.webp$/);
+  // The editor and persisted photo must be present in the server response,
+  // rather than disappearing until the React islands finish loading.
+  const editHtml = await (await page.request.get(draftUrl!)).text();
+  expect(editHtml).toContain('id="contentMarkdown"');
+  expect(editHtml).toContain('data-course-image-editor="true"');
+  expect(editHtml).toContain("Foto actual del curso");
+  expect(editHtml).toContain(key);
   await expect(
     page.getByRole("img", { name: "Foto actual del curso" }),
   ).toBeVisible();
+  let uploads = 0;
+  await page.route("**/app/cursos/imagen", async (route) => {
+    uploads++;
+    await route.continue();
+  });
+  await page.getByLabel("Seleccionar foto del curso").setInputFiles({
+    name: "edited.webp",
+    mimeType: "image/webp",
+    buffer: Buffer.from(bytes),
+  });
+  await cropDialog.getByRole("button", { name: "Guardar recorte" }).click();
+  await expect(
+    page.getByRole("button", { name: "Guardar cambios" }),
+  ).toBeEnabled();
+  expect(uploads).toBe(0);
+  await page.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect.poll(() => uploads).toBe(1);
+  await expect(page.locator('input[name="artwork"]')).not.toHaveValue(key);
+  await expect(
+    page.getByRole("button", { name: "Reemplazar imagen" }),
+  ).toBeVisible();
+  const chooser = page.waitForEvent("filechooser");
+  await page
+    .getByRole("button", { name: "Elegir otra imagen del curso" })
+    .click();
+  expect((await chooser).isMultiple()).toBe(false);
   const editorBox = await page
     .locator("[data-course-image-editor]")
     .boundingBox();
@@ -160,9 +330,13 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   expect(nameBox).not.toBeNull();
   expect(editorBox!.x).toBeLessThan(nameBox!.x);
   await page.reload();
-  await expect(page.locator('input[name="artwork"]')).toHaveValue(key);
+  const finalKey = await page.locator('input[name="artwork"]').inputValue();
+  expect(finalKey).toMatch(/^courses\/.*\.webp$/);
   await expect(
     page.getByRole("img", { name: "Foto actual del curso" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Reemplazar imagen" }),
   ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileEditorBox = await page
@@ -183,9 +357,68 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   const storage = createClient(env.apiUrl, env.serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   }).storage;
-  const object = await storage.from("course-artwork").info(key);
+  const object = await storage.from("course-artwork").info(finalKey);
   expect(object.error).toBeNull();
-  await storage.from("course-artwork").remove([key]);
+  await storage.from("course-artwork").remove([key, finalKey]);
+});
+
+test("retries a persisted initial group after its POST response is lost and creates the remaining groups", async ({
+  page,
+  context,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  const formatName = `Formato retry grupo ${Date.now()}`;
+  await page.goto("/app/formatos");
+  await page.getByRole("link", { name: "Nuevo formato" }).click();
+  const format = page.getByRole("form", { name: "Crear formato" });
+  await format.getByLabel("Nombre").fill(formatName);
+  await format.getByLabel("Duración total (horas)").fill("20");
+  await format.getByLabel("Duración de sesión (minutos)").fill("90");
+  await format.getByLabel("Precio estudiante (BOB)").fill("80");
+  await format.getByLabel("Precio externo (BOB)").fill("100");
+  await format.getByRole("button", { name: "Crear formato" }).click();
+  await page.goto("/app/cursos/nuevo");
+  await page.getByLabel("Nombre").fill(`Curso retry grupo ${Date.now()}`);
+  await fillCourseFields(page, formatName);
+  const groups = page.locator("[data-initial-groups]");
+  await groups.getByRole("button", { name: "Añadir grupo" }).click();
+  await groups.getByRole("button", { name: "Añadir grupo" }).click();
+  const initialGroups = groups.locator("[data-initial-group]");
+  await initialGroups.nth(0).locator('[name="initialGroupTime"]').fill("16:00");
+  await initialGroups
+    .nth(0)
+    .locator('[name="initialGroupCapacity"]')
+    .fill("20");
+  await initialGroups.nth(1).locator('[name="initialGroupTime"]').fill("18:00");
+  await initialGroups
+    .nth(1)
+    .locator('[name="initialGroupCapacity"]')
+    .fill("20");
+
+  let lostResponse = false;
+  await page.route("**/app/cursos/*/grupos", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST" && !lostResponse) {
+      lostResponse = true;
+      await route.fetch();
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "Crear borrador" }).click();
+  await expect(
+    page.getByRole("button", { name: "Reintentar pendientes" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Reintentar pendientes" }).click();
+  await expect(page).toHaveURL(/\/grupos(?:\?success=created)?$/);
+  await expect(page.locator("[data-group-id]")).toHaveCount(2);
+  await expect(
+    page.locator("[data-group-id]").filter({ hasText: "16:00" }),
+  ).toHaveCount(1);
+  await expect(
+    page.locator("[data-group-id]").filter({ hasText: "18:00" }),
+  ).toHaveCount(1);
 });
 
 test("admin creates, validates, edits, publishes, withdraws and archives a course", async ({
@@ -223,7 +456,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   const create = page.getByRole("button", { name: "Crear borrador" });
   await expect(create).toBeDisabled();
   await page.getByLabel("Nombre").fill("Curso E2E conservación");
-  await expect(create).toBeDisabled();
+  await expect(create).toBeEnabled();
   await expect(page).toHaveURL(/\/app\/cursos\/nuevo$/);
   await expect(page.getByLabel("Nombre")).toHaveValue("Curso E2E conservación");
 
@@ -236,6 +469,48 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(create).toBeDisabled();
   await page.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
   await expect(create).toBeEnabled();
+  const startCalendar = page.getByRole("button", {
+    name: /Elegir fecha de fecha de inicio de clases/i,
+  });
+  await startCalendar.click();
+  const calendar = page.locator('[data-slot="calendar"]:visible');
+  for (let month = 0; month < 12; month++) {
+    if (
+      /marzo(?: de)? 2027/i.test(
+        await calendar.locator(".rdp-month_caption").innerText(),
+      )
+    )
+      break;
+    await calendar.locator(".rdp-button_next").click();
+  }
+  await expect(calendar.locator(".rdp-month_caption")).toContainText(
+    /marzo.*2027/i,
+  );
+  await expect(calendar.locator('[data-day="3/6/2027"]')).toBeDisabled();
+  await calendar.locator('[data-day="3/1/2027"]').click();
+  await expect(page.locator('[name="startDate"]')).toHaveValue("2027-03-01");
+  const registrationEndCalendar = page.getByRole("button", {
+    name: /Elegir fecha de último día de preinscripción/i,
+  });
+  await registrationEndCalendar.click();
+  const registrationCalendar = page.locator('[data-slot="calendar"]:visible');
+  for (let month = 0; month < 12; month++) {
+    if (
+      /marzo(?: de)? 2027/i.test(
+        await registrationCalendar.locator(".rdp-month_caption").innerText(),
+      )
+    )
+      break;
+    await registrationCalendar.locator(".rdp-button_next").click();
+  }
+  await expect(
+    registrationCalendar.locator('[data-day="3/1/2027"]'),
+  ).toBeDisabled();
+  await registrationCalendar.locator(".rdp-button_previous").click();
+  await registrationCalendar.locator('[data-day="2/20/2027"]').click();
+  await expect(page.locator('[name="registrationEndDate"]')).toHaveValue(
+    "2027-02-20",
+  );
   const grade = page.getByLabel("Nota mínima (0–100)");
   await grade.focus();
   await page.keyboard.press("End");
@@ -246,7 +521,8 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await grade.press("ControlOrMeta+A");
   await grade.press("ControlOrMeta+V");
   await expect(grade).toHaveValue("70");
-  const startDate = page.getByLabel("Inicio de clases (Bolivia)", {
+  const startDate = page.getByRole("textbox", {
+    name: "Fecha de inicio de clases (Bolivia)",
     exact: true,
   });
   await startDate.focus();
@@ -257,24 +533,6 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await startDate.press("ControlOrMeta+A");
   await startDate.press("ControlOrMeta+V");
   await expect(startDate).toHaveValue("01/03/2027");
-  const startTime = page.getByRole("textbox", {
-    name: "Hora de inicio de clases (bolivia)",
-  });
-  await startTime.focus();
-  await page.keyboard.press("End");
-  await page.keyboard.type("q");
-  await expect(startTime).toHaveValue("18:30");
-  await page.evaluate(() => navigator.clipboard.writeText("29:99"));
-  await startTime.press("ControlOrMeta+A");
-  await startTime.press("ControlOrMeta+V");
-  await expect(startTime).toHaveValue("18:30");
-  await startDate.fill("30/02/2027");
-  await expect(create).toBeDisabled();
-  await expect(startDate).toHaveValue("30/02/2027");
-  await expect(
-    page.getByText("Ingresa una fecha válida (DD/MM/AAAA).", { exact: true }),
-  ).toBeVisible();
-  await startDate.fill("01/03/2027");
   await expect(create).toBeEnabled();
   await startDate.fill("06/03/2027");
   await expect(create).toBeDisabled();
@@ -282,14 +540,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(create).toBeDisabled();
   await startDate.fill("01/03/2027");
   await expect(create).toBeEnabled();
-  const calendarTrigger = page.locator("#startsAt-calendar");
-  await calendarTrigger.click();
-  await expect(page.getByRole("grid")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(calendarTrigger).toBeFocused();
   await page.getByLabel("Instructor (opcional)").fill("Docente E2E");
   await expect(page.locator('input[name="schedule"]')).toHaveValue(
-    "Lunes a viernes, 18:30–20:00",
+    "Lunes a viernes · horario por grupo",
   );
   await page
     .getByLabel("Contenido del curso (Markdown, opcional)")
@@ -308,6 +561,13 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(page.locator("[data-sileo-toast]")).toContainText(
     "Borrador creado",
   );
+  const savedCourseEditUrl = page.url();
+  await page.goto("/app/cursos");
+  const savedCourseCard = page
+    .locator("article")
+    .filter({ hasText: "Curso E2E conservación" });
+  await expect(savedCourseCard).toBeVisible();
+  await page.goto(savedCourseEditUrl);
   const save = page.getByRole("button", { name: "Guardar cambios" });
   await expect(save).toBeDisabled();
   await page.getByLabel("Nombre").fill("Curso temporalmente inválido");
@@ -326,12 +586,13 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     (input as HTMLInputElement).value = "70";
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  const courseStart = page.getByLabel("Inicio de clases (Bolivia)", {
+  const courseStart = page.getByRole("textbox", {
+    name: "Fecha de inicio de clases (Bolivia)",
     exact: true,
   });
-  await courseStart.fill("30/02/2027");
+  await courseStart.fill("2027-03-06");
   await expect(save).toBeDisabled();
-  await courseStart.fill("01/03/2027");
+  await courseStart.fill("2027-03-01");
   await expect(save).toBeEnabled();
   await page.getByLabel("Nombre").fill("Curso E2E conservación");
   await expect(save).toBeDisabled();
@@ -384,19 +645,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await page.getByRole("combobox", { name: "Nivel" }).click();
   await page.getByRole("option", { name: "Medio" }).click();
   await expect(save).toBeDisabled();
-  await page
-    .getByRole("textbox", {
-      name: "Hora de inicio de clases (bolivia)",
-      exact: true,
-    })
-    .fill("19:30");
+  await courseStart.fill("2027-03-02");
   await expect(save).toBeEnabled();
-  await page
-    .getByRole("textbox", {
-      name: "Hora de inicio de clases (bolivia)",
-      exact: true,
-    })
-    .fill("18:30");
+  await courseStart.fill("2027-03-01");
   await expect(save).toBeDisabled();
   const markdown = page.getByLabel("Contenido del curso (Markdown, opcional)");
   await markdown.fill("## Temario\n- Unidad uno\nNota");
@@ -409,19 +660,34 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await markdown.fill("## Temario\n- Unidad uno");
   await expect(save).toBeDisabled();
   await expect(
-    page.getByLabel("Inicio de clases (Bolivia)", { exact: true }),
-  ).toHaveValue("01/03/2027");
+    page.getByRole("textbox", {
+      name: "Fecha de inicio de clases (Bolivia)",
+      exact: true,
+    }),
+  ).toHaveValue("2027-03-01");
   await expect(page.locator('input[name="startsAt"]')).toHaveValue(
-    "2027-03-01T18:30",
+    "2027-03-01T00:00",
   );
   await expect(
     page.getByLabel("Apertura de preinscripción", { exact: true }),
   ).toHaveValue("01/01/2027");
+  await expect(
+    page.getByRole("textbox", {
+      name: "Último día de preinscripción",
+      exact: true,
+    }),
+  ).toHaveValue("20/02/2027");
+  await expect(page.locator('[name="registrationStartDate"]')).toHaveValue(
+    "2027-01-01",
+  );
+  await expect(page.locator('[name="registrationEndDate"]')).toHaveValue(
+    "2027-02-20",
+  );
   await expect(page.getByLabel("Instructor (opcional)")).toHaveValue(
     "Docente E2E",
   );
   await expect(page.locator('input[name="schedule"]')).toHaveValue(
-    "Lunes a viernes, 18:30–20:00",
+    "Lunes a viernes · horario por grupo",
   );
   await page.locator('input[name="artwork"]').evaluate((input) => {
     (input as HTMLInputElement).value = "https://example.test/forged.webp";
@@ -432,6 +698,8 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(page.getByRole("alert").first()).toContainText(
     "imagen seleccionada",
   );
+  await expect(markdown).toBeVisible();
+  await expect(markdown).toHaveValue("## Temario\n- Unidad uno");
   await expect(page.getByLabel("Nombre")).toHaveValue("Curso E2E conservación");
   await expect(page.getByRole("combobox", { name: "Nivel" })).toContainText(
     "Medio",
@@ -469,7 +737,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     ),
   ).toBe(true);
   await expect(page.locator('input[name="schedule"]')).toHaveValue(
-    "Lunes a viernes, 18:30–20:00",
+    "Lunes a viernes · horario por grupo",
   );
   await expect(page.locator("[data-sileo-toast]")).toContainText(
     "Cambios guardados",

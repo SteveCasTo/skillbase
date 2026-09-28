@@ -1,5 +1,11 @@
 ---
 import ThemeToggle from "@/components/ThemeToggle.astro";
+
+interface Props {
+  onLanding?: boolean;
+}
+
+const { onLanding = true } = Astro.props;
 ---
 
 <a class="skip-link" href="#main-content">
@@ -12,9 +18,16 @@ import ThemeToggle from "@/components/ThemeToggle.astro";
       <span>Informática y Sistemas · FCyT · UMSS</span>
     </a>
     <nav class="primary-nav" aria-label="Navegación principal">
-      <a href="/cursos">Cursos</a>
-      <a href="#participar">Cómo participar</a>
-      <a href="#certificados">Certificados</a>
+      <a
+        href={onLanding ? "#cursos" : "/cursos"}
+        aria-current={
+          !onLanding && Astro.url.pathname === "/cursos" ? "page" : undefined
+        }
+      >
+        Cursos
+      </a>
+      <a href={onLanding ? "#participar" : "/#participar"}>Cómo participar</a>
+      <a href={onLanding ? "#certificados" : "/#certificados"}>Certificados</a>
     </nav>
     <div class="header-tools">
       <a class="team-access" href="/login">
@@ -24,3 +37,45 @@ import ThemeToggle from "@/components/ThemeToggle.astro";
     </div>
   </div>
 </header>
+
+<script>
+  const mobileViewport = window.matchMedia("(max-width: 639px)");
+  const siteHeader = document.querySelector<HTMLElement>(".site-header");
+  let lastScrollY = Math.max(window.scrollY, 0);
+  let scrollFrame = 0;
+
+  const showMobileHeader = () =>
+    siteHeader?.classList.remove("is-scroll-hidden");
+  const updateHeader = () => {
+    scrollFrame = 0;
+    if (!siteHeader) return;
+
+    const currentScrollY = Math.max(window.scrollY, 0);
+    siteHeader.classList.toggle("is-scrolled", currentScrollY > 24);
+
+    if (!mobileViewport.matches) {
+      showMobileHeader();
+      lastScrollY = currentScrollY;
+      return;
+    }
+    const delta = currentScrollY - lastScrollY;
+    if (currentScrollY < 96 || siteHeader.contains(document.activeElement)) {
+      showMobileHeader();
+    } else if (delta > 8) {
+      siteHeader.classList.add("is-scroll-hidden");
+    } else if (delta < -8) {
+      showMobileHeader();
+    }
+    if (Math.abs(delta) > 8) lastScrollY = currentScrollY;
+  };
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (!scrollFrame) scrollFrame = requestAnimationFrame(updateHeader);
+    },
+    { passive: true },
+  );
+  mobileViewport.addEventListener("change", updateHeader);
+  siteHeader?.addEventListener("focusin", showMobileHeader);
+  updateHeader();
+</script>

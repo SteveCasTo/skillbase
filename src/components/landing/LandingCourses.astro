@@ -38,12 +38,12 @@ const revealDelayBySlug = new Map(
 );
 ---
 
-<section id="cursos" class="courses" aria-labelledby="courses-title">
+<section class="courses" aria-labelledby="courses-title">
   <h2 id="courses-title" class="sr-only">
     Cursos publicados
   </h2>
   {featuredCourse ? (
-    <article class="featured-course">
+    <article id="cursos" class="featured-course">
       <a
         class="featured-course-link"
         href={`/cursos/${featuredCourse.slug}`}
@@ -89,7 +89,7 @@ const revealDelayBySlug = new Map(
       </a>
     </article>
   ) : couldNotLoadCourses ? (
-    <div class="empty-offer load-error" role="alert">
+    <div id="cursos" class="empty-offer load-error" role="alert">
       <div class="error-signal" aria-hidden="true">
         <span />
         <span />
@@ -108,7 +108,7 @@ const revealDelayBySlug = new Map(
       </div>
     </div>
   ) : (
-    <div class="empty-offer">
+    <div id="cursos" class="empty-offer">
       <p class="availability">
         <span aria-hidden="true" />
         Próxima oferta
