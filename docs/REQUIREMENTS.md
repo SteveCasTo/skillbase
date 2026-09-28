@@ -393,9 +393,9 @@ La landing pública debe ser la fuente web oficial para información vigente.
 
 La jerarquía pública aprobada es:
 
-- las tarjetas de landing muestran disponibilidad, título, descripción breve, inicio/fecha, nivel y duración;
+- las tarjetas de landing y catálogo no muestran rangos de fechas y conservan el nivel y la duración total en horas;
 - las tarjetas no muestran los dos precios detallados ni el horario detallado;
-- `/cursos/[slug]` contiene el horario exacto, las condiciones y los precios diferenciados.
+- `/cursos/[slug]` muestra inicio, fin y apertura/cierre de preinscripción como fechas civiles de Bolivia sin hora, además de condiciones y precios diferenciados; no muestra el horario informativo legado. Los horarios de grupos se consultan únicamente en administración.
 
 ## DOCUMENTOS
 
