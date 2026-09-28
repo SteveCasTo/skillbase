@@ -432,6 +432,24 @@ html.dark:has(.public-courses) {
   .course-markdown :where(ul, ol) {
     padding-inline-start: 1.5rem;
   }
+  .course-markdown ul {
+    list-style: disc;
+  }
+  .course-markdown ol {
+    list-style: decimal;
+  }
+  .course-markdown ul ul {
+    list-style: circle;
+  }
+  .course-markdown ul ul ul {
+    list-style: square;
+  }
+  .course-markdown ol ol {
+    list-style: lower-alpha;
+  }
+  .course-markdown ol ol ol {
+    list-style: lower-roman;
+  }
   .course-markdown li + li {
     margin-top: 0.35rem;
   }
