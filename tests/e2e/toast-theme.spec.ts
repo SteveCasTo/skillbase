@@ -66,3 +66,42 @@ test("private success toast uses semantic theme colors in light and dark modes",
     expect(surface.title).toBe(surface.foreground);
   }
 });
+
+test("private toast host persists across client-side navigation", async ({
+  context,
+  page,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app/formatos?success=created");
+
+  // Sileo only renders a viewport while it has an active toast.
+  await expect(page.locator("[data-sileo-toast]")).toContainText(
+    "Formato creado",
+  );
+
+  const viewport = page.locator("[data-sileo-viewport]");
+  await expect(viewport).toBeAttached();
+  await viewport.evaluate((element) => {
+    (window as typeof window & { toastViewport?: Element }).toastViewport =
+      element;
+  });
+
+  const coursesLink = page
+    .getByRole("navigation", { name: "Navegación privada" })
+    .getByRole("link", { name: "Cursos", exact: true });
+  await coursesLink.evaluate((link) => {
+    link.setAttribute("href", "/app/cursos?success=created");
+  });
+  await coursesLink.click();
+
+  await expect(page.locator("[data-sileo-toast]")).toContainText(
+    "Curso creado como borrador.",
+  );
+  expect(
+    await viewport.evaluate(
+      (element) =>
+        (window as typeof window & { toastViewport?: Element })
+          .toastViewport === element,
+    ),
+  ).toBe(true);
+});

@@ -54,7 +54,9 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
   });
   expect(invalidResponse.status()).toBe(422);
   await page.setContent(await invalidResponse.text());
-  const invalidCapacity = page.getByLabel("Capacidad");
+  const invalidCapacity = page
+    .getByRole("form", { name: "Nuevo grupo" })
+    .getByLabel("Capacidad");
   await expect(invalidCapacity).toHaveAttribute("aria-invalid", "true");
   await expect(invalidCapacity).toHaveAttribute(
     "aria-describedby",
@@ -64,7 +66,8 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
     "La capacidad debe ser un entero positivo",
   );
   await page.goto(`/app/cursos/${id}/grupos`);
-  const form = page.getByRole("form", { name: "Añadir grupo" });
+  const form = page.getByRole("form", { name: "Nuevo grupo" });
+  await page.locator("[data-new-fallback] summary").click();
   await form.getByLabel("Hora de inicio").fill("08:00");
   await form.getByLabel("Capacidad").fill("15");
   await form.getByRole("button", { name: "Crear grupo" }).click();
@@ -106,16 +109,16 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
     "2027-02-20T18:00",
   );
   await page.goto(`/app/cursos/${id}/grupos`);
-  await page.locator("[data-cancel-fallback] summary").click();
+  await page.locator("[data-action-fallback] summary").click();
   await expect(
-    page.getByRole("button", { name: "Sí, cancelar grupo" }),
+    page.getByRole("button", { name: "Sí, desactivar grupo" }),
   ).toBeVisible();
-  await page.locator("[data-cancel-fallback] summary").click();
+  await page.locator("[data-action-fallback] summary").click();
   await expect(
-    page.getByRole("button", { name: "Sí, cancelar grupo" }),
+    page.getByRole("button", { name: "Sí, desactivar grupo" }),
   ).toBeHidden();
-  await page.locator("[data-cancel-fallback] summary").click();
-  await page.getByRole("button", { name: "Sí, cancelar grupo" }).click();
+  await page.locator("[data-action-fallback] summary").click();
+  await page.getByRole("button", { name: "Sí, desactivar grupo" }).click();
   await expect(page).toHaveURL(/success=cancelled/);
-  await expect(page.getByText("Cancelado", { exact: true })).toBeVisible();
+  await expect(page.getByText("Inactivo", { exact: true })).toBeVisible();
 });

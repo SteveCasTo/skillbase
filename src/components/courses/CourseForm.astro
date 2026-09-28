@@ -201,25 +201,35 @@ const currentArtworkUrl = publicArtworkUrl(
             { value: "ADVANCED", label: "Avanzado" },
           ]}
         />
-        <CourseSelect
-          client:only="react"
-          name="courseTypeId"
-          label="Formato de curso"
-          value={values.courseTypeId ?? ""}
-          error={errors.courseTypeId ?? ""}
-          disabled={disabled || formats.length === 0}
-          placeholder="Selecciona un formato"
-          options={formats
-            .filter(
-              (format) => format.active || format.id === values.courseTypeId,
-            )
-            .map((format) => ({
-              value: format.id,
-              label: `${format.name} · ${format.totalHours} h · ${format.studentAmount} / ${format.externalAmount} BOB`,
-              disabled:
-                !format.active || (!courseId && format.sessionMinutes === null),
-            }))}
-        />
+        <div data-format-field>
+          <CourseSelect
+            client:only="react"
+            name="courseTypeId"
+            label="Formato de curso"
+            value={values.courseTypeId ?? ""}
+            error={errors.courseTypeId ?? ""}
+            disabled={disabled || formats.length === 0}
+            placeholder="Selecciona un formato"
+            options={formats
+              .filter(
+                (format) => format.active || format.id === values.courseTypeId,
+              )
+              .map((format) => ({
+                value: format.id,
+                label: `${format.name} · ${format.totalHours} h · ${format.studentAmount} / ${format.externalAmount} BOB`,
+                disabled:
+                  !format.active ||
+                  (!courseId && format.sessionMinutes === null),
+              }))}
+          />
+          <p
+            data-format-error
+            id="courseTypeId-client-error"
+            role="alert"
+            hidden
+            class="mt-1 text-sm text-destructive"
+          ></p>
+        </div>
         <noscript>
           <label class="text-sm font-medium">
             Nivel
@@ -549,13 +559,7 @@ const currentArtworkUrl = publicArtworkUrl(
           Grupos iniciales
         </h2>
         <p class="mt-2 text-sm text-muted-foreground">
-          Comparten las fechas del curso; cada uno tiene su horario y cupo. Al
-          crear el primero, las fechas y el formato quedan fijados en el
-          borrador.
-        </p>
-        <p class="mt-2 text-sm text-muted-foreground">
-          Las clases son de lunes a viernes. Los horarios de los grupos no deben
-          solaparse; los turnos consecutivos sí están permitidos.
+          Añade horarios y cupos para los grupos iniciales (opcional).
         </p>
         <div data-initial-group-list class="mt-5 flex flex-col gap-3"></div>
         <template data-initial-group-template>
@@ -564,19 +568,20 @@ const currentArtworkUrl = publicArtworkUrl(
             data-initial-group
           >
             <label class="min-w-0 text-sm font-medium">
-              Hora de inicio
+              <div class="flex min-h-5 items-baseline justify-between gap-2 whitespace-nowrap">
+                <span class="shrink-0">Hora de inicio</span>
+                <span
+                  class="min-w-0 truncate text-xs font-normal text-muted-foreground"
+                  data-initial-group-end
+                  aria-live="polite"
+                ></span>
+              </div>
               <input
                 class={control}
                 type="time"
                 name="initialGroupTime"
                 required
               />
-              <span
-                class="mt-1 block text-xs font-normal text-muted-foreground"
-                data-initial-group-end
-              >
-                Fin: selecciona formato y hora
-              </span>
             </label>
             <label class="min-w-0 text-sm font-medium">
               Capacidad (personas)
@@ -683,7 +688,6 @@ const currentArtworkUrl = publicArtworkUrl(
   import {
     acceptsCourseInput,
     draftFieldsReady,
-    requiredCourseFields,
     type CourseInputKind,
   } from "./course-input-filter";
   import { groupEndTime } from "./group-schedule-preview";
@@ -709,6 +713,31 @@ const currentArtworkUrl = publicArtworkUrl(
         const groupTemplate = form.querySelector<HTMLTemplateElement>(
           "[data-initial-group-template]",
         );
+        const formatError = form.querySelector<HTMLElement>(
+          "[data-format-error]",
+        );
+        const formatTrigger = () =>
+          form.querySelector<HTMLElement>("#courseTypeId-select");
+        const clearFormatError = () => {
+          if (!formatError || formatError.hidden) return;
+          formatError.hidden = true;
+          const trigger = formatTrigger();
+          trigger?.removeAttribute("aria-invalid");
+          trigger?.removeAttribute("aria-describedby");
+        };
+        const showFormatError = (message: string) => {
+          if (!formatError) return;
+          formatError.textContent = message;
+          formatError.hidden = false;
+          const trigger = formatTrigger();
+          trigger?.setAttribute("aria-invalid", "true");
+          trigger?.setAttribute("aria-describedby", formatError.id);
+          trigger?.scrollIntoView({ block: "center" });
+          trigger?.focus();
+        };
+        form.addEventListener("change", () => {
+          if (new FormData(form).get("courseTypeId")) clearFormatError();
+        });
         const updateGroupPreviews = () => {
           const formats = JSON.parse(form.dataset.groupFormats ?? "[]") as [
             string,
@@ -737,12 +766,10 @@ const currentArtworkUrl = publicArtworkUrl(
               const time = input.value;
               const end = groupEndTime(time, minutes);
               hint.textContent = end
-                ? `Fin calculado: ${end}`
+                ? `Fin ${end}`
                 : time
-                  ? "El grupo debe terminar el mismo día."
-                  : minutes === null
-                    ? "Fin: selecciona formato y hora"
-                    : "Fin: selecciona la hora";
+                  ? "No termina hoy"
+                  : "";
               if (time && !end)
                 issue = "Elige horarios que terminen el mismo día.";
               if (end) {
@@ -876,15 +903,9 @@ const currentArtworkUrl = publicArtworkUrl(
             const current = new FormData(form);
             if (
               !ready &&
-              !(
-                baseline
-                  ? fields
-                  : [
-                      ...requiredCourseFields,
-                      "registrationStartDate",
-                      "registrationEndDate",
-                    ]
-              ).every((name) => current.has(name))
+              (baseline
+                ? !fields.every((name) => current.has(name))
+                : !formatTrigger())
             )
               return;
             ready = true;
@@ -905,10 +926,14 @@ const currentArtworkUrl = publicArtworkUrl(
                   typeof entry[1] === "string",
               ),
             );
+            // The format determines the plan. Permit an attempt without it so
+            // the user gets a field-level error instead of an inert button.
+            const awaitingFormat = !baseline && !values.courseTypeId;
             const valid =
               form.checkValidity() && draftFieldsReady(values, !baseline);
             button.disabled =
-              saving || (baseline ? !changed || !valid : !valid);
+              saving ||
+              (baseline ? !changed || !valid : !awaitingFormat && !valid);
           };
           // FormData reads the controls' current values directly, including hidden
           // fields updated by React islands, so reconcile each change immediately.
@@ -933,6 +958,14 @@ const currentArtworkUrl = publicArtworkUrl(
           window.addEventListener("pageshow", sync);
         }
         form.addEventListener("submit", (event) => {
+          if (
+            !form.dataset.courseId &&
+            !new FormData(form).get("courseTypeId")
+          ) {
+            event.preventDefault();
+            showFormatError("Selecciona un formato de curso.");
+            return;
+          }
           if (!form.reportValidity()) {
             event.preventDefault();
             return;

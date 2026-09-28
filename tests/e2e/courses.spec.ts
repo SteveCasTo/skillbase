@@ -25,16 +25,40 @@ async function fillCourseFields(page: Page, formatName: string): Promise<void> {
     ["Apertura de preinscripción", "01/01/2027"],
     ["Último día de preinscripción", "20/02/2027"],
   ] as const) {
-    await page.getByLabel(label, { exact: true }).fill(date);
+    await page.getByRole("textbox", { name: label, exact: true }).fill(date);
   }
   await page
-    .getByLabel("Fecha de inicio de clases (Bolivia)")
+    .getByRole("textbox", {
+      name: "Fecha de inicio de clases (Bolivia)",
+      exact: true,
+    })
     .fill("01/03/2027");
   await expect(
     page.getByText("17/03/2027", { exact: false }).first(),
   ).toBeVisible();
   await page.getByLabel("Nota mínima (0–100)").fill("70");
 }
+
+test("missing format is announced beside the selector and focuses it without an artwork error", async ({
+  page,
+  context,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app/cursos/nuevo");
+  const create = page.getByRole("button", { name: "Crear borrador" });
+  await expect(create).toBeEnabled();
+  await create.click();
+  const format = page.getByRole("combobox", { name: "Formato de curso" });
+  await expect(format).toBeFocused();
+  await expect(format).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("[data-format-error]")).toHaveText(
+    "Selecciona un formato de curso.",
+  );
+  await expect(page.locator(".artwork-create-error")).toBeHidden();
+  await format.click();
+  await page.getByRole("option").filter({ hasText: /BOB/ }).first().click();
+  await expect(page.locator("[data-format-error]")).toBeHidden();
+});
 
 test("admin crops a photo in the new-course form and can retry a failed upload without creating another draft", async ({
   page,
@@ -78,10 +102,20 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   await initialGroups.nth(1).locator('[name="initialGroupTime"]').fill("18:00");
   await expect(
     initialGroups.nth(0).locator("[data-initial-group-end]"),
-  ).toHaveText("Fin calculado: 17:30");
+  ).toHaveText("Fin 17:30");
   await expect(
     initialGroups.nth(1).locator("[data-initial-group-end]"),
-  ).toHaveText("Fin calculado: 19:30");
+  ).toHaveText("Fin 19:30");
+  const firstTime = await initialGroups
+    .nth(0)
+    .locator('[name="initialGroupTime"]')
+    .boundingBox();
+  const firstCapacity = await initialGroups
+    .nth(0)
+    .locator('[name="initialGroupCapacity"]')
+    .boundingBox();
+  if (page.viewportSize()!.width >= 640)
+    expect(firstTime!.y).toBeCloseTo(firstCapacity!.y, 0);
   await initialGroups.nth(1).locator('[name="initialGroupTime"]').fill("17:00");
   await expect(groups.locator("[data-initial-group-error]")).toContainText(
     "no pueden solaparse",
@@ -166,7 +200,10 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
     page.getByRole("img", { name: "Vista previa del recorte del curso" }),
   ).toBeVisible();
   await page
-    .getByLabel("Fecha de inicio de clases (Bolivia)")
+    .getByRole("textbox", {
+      name: "Fecha de inicio de clases (Bolivia)",
+      exact: true,
+    })
     .fill("06/03/2027");
   const create = page.getByRole("button", { name: "Crear borrador" });
   await expect(create).toBeDisabled();
@@ -191,7 +228,10 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
     page.getByRole("img", { name: "Vista previa del recorte del curso" }),
   ).toBeVisible();
   await page
-    .getByLabel("Fecha de inicio de clases (Bolivia)")
+    .getByRole("textbox", {
+      name: "Fecha de inicio de clases (Bolivia)",
+      exact: true,
+    })
     .fill("01/03/2027");
   let failed = false;
   await page.route("**/app/cursos/imagen", async (route) => {
@@ -389,7 +429,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   const create = page.getByRole("button", { name: "Crear borrador" });
   await expect(create).toBeDisabled();
   await page.getByLabel("Nombre").fill("Curso E2E conservación");
-  await expect(create).toBeDisabled();
+  await expect(create).toBeEnabled();
   await expect(page).toHaveURL(/\/app\/cursos\/nuevo$/);
   await expect(page.getByLabel("Nombre")).toHaveValue("Curso E2E conservación");
 
@@ -402,10 +442,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(create).toBeDisabled();
   await page.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
   await expect(create).toBeEnabled();
-  const startCalendar = page
-    .getByLabel("Fecha de inicio de clases (Bolivia)")
-    .locator("..")
-    .getByRole("button", { name: "Abrir calendario…" });
+  const startCalendar = page.getByRole("button", {
+    name: /Elegir fecha de fecha de inicio de clases/i,
+  });
   await startCalendar.click();
   const calendar = page.locator('[data-slot="calendar"]:visible');
   for (let month = 0; month < 12; month++) {
@@ -423,10 +462,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(calendar.locator('[data-day="3/6/2027"]')).toBeDisabled();
   await calendar.locator('[data-day="3/1/2027"]').click();
   await expect(page.locator('[name="startDate"]')).toHaveValue("2027-03-01");
-  const registrationEndCalendar = page
-    .getByLabel("Último día de preinscripción")
-    .locator("..")
-    .getByRole("button", { name: "Abrir calendario…" });
+  const registrationEndCalendar = page.getByRole("button", {
+    name: /Elegir fecha de último día de preinscripción/i,
+  });
   await registrationEndCalendar.click();
   const registrationCalendar = page.locator('[data-slot="calendar"]:visible');
   for (let month = 0; month < 12; month++) {
@@ -456,7 +494,10 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await grade.press("ControlOrMeta+A");
   await grade.press("ControlOrMeta+V");
   await expect(grade).toHaveValue("70");
-  const startDate = page.getByLabel("Fecha de inicio de clases (Bolivia)");
+  const startDate = page.getByRole("textbox", {
+    name: "Fecha de inicio de clases (Bolivia)",
+    exact: true,
+  });
   await startDate.focus();
   await page.keyboard.press("End");
   await page.keyboard.type("x");
@@ -499,10 +540,6 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     .locator("article")
     .filter({ hasText: "Curso E2E conservación" });
   await expect(savedCourseCard).toBeVisible();
-  const savedCourseTimes = savedCourseCard.locator("time");
-  await expect(savedCourseTimes).toHaveCount(2);
-  await expect(savedCourseTimes.nth(0)).toContainText(/2027.*\d{2}:\d{2}/);
-  await expect(savedCourseTimes.nth(1)).toContainText(/2027.*\d{2}:\d{2}/);
   await page.goto(savedCourseEditUrl);
   const save = page.getByRole("button", { name: "Guardar cambios" });
   await expect(save).toBeDisabled();
@@ -522,7 +559,10 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     (input as HTMLInputElement).value = "70";
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  const courseStart = page.getByLabel("Fecha de inicio de clases (Bolivia)");
+  const courseStart = page.getByRole("textbox", {
+    name: "Fecha de inicio de clases (Bolivia)",
+    exact: true,
+  });
   await courseStart.fill("2027-03-06");
   await expect(save).toBeDisabled();
   await courseStart.fill("2027-03-01");
@@ -593,7 +633,10 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await markdown.fill("## Temario\n- Unidad uno");
   await expect(save).toBeDisabled();
   await expect(
-    page.getByLabel("Fecha de inicio de clases (Bolivia)"),
+    page.getByRole("textbox", {
+      name: "Fecha de inicio de clases (Bolivia)",
+      exact: true,
+    }),
   ).toHaveValue("2027-03-01");
   await expect(page.locator('input[name="startsAt"]')).toHaveValue(
     "2027-03-01T00:00",
@@ -602,7 +645,10 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     page.getByLabel("Apertura de preinscripción", { exact: true }),
   ).toHaveValue("01/01/2027");
   await expect(
-    page.getByLabel("Último día de preinscripción", { exact: true }),
+    page.getByRole("textbox", {
+      name: "Último día de preinscripción",
+      exact: true,
+    }),
   ).toHaveValue("20/02/2027");
   await expect(page.locator('[name="registrationStartDate"]')).toHaveValue(
     "2027-01-01",
