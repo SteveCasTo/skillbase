@@ -399,11 +399,6 @@ html.dark:has(.public-courses) {
     font-family: "Ubuntu Mono", monospace;
     font-size: 0.95em;
   }
-  .detail-note {
-    color: var(--soft);
-    font-size: 0.85rem;
-    line-height: 1.65;
-  }
   .detail-aside {
     align-self: start;
     padding: 2rem;

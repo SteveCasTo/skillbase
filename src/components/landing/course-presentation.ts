@@ -1,6 +1,5 @@
 import type {
   CourseLevel,
-  PublicCourseDto,
   RegistrationAvailability,
 } from "@/domain/courses/types";
 
@@ -18,13 +17,3 @@ export const availabilityLabels: Readonly<
   OPEN: "Preinscripción abierta",
   CLOSED: "Preinscripción cerrada",
 };
-
-export const landingDateFormatter = new Intl.DateTimeFormat("es-BO", {
-  day: "numeric",
-  month: "short",
-  timeZone: "America/La_Paz",
-});
-
-export function courseDateRange(course: PublicCourseDto): string {
-  return `${landingDateFormatter.format(course.startsAt)} — ${landingDateFormatter.format(course.endsAt)}`;
-}
