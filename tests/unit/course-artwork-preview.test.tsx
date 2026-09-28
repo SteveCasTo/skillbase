@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import CourseArtworkPreview from "../../src/components/courses/CourseArtworkPreview";
 
 describe("course artwork preview", () => {
-  it("renders the exported crop with labeled public contexts and an orientation disclaimer", () => {
+  it("renders the exported crop with labeled public contexts", () => {
     const html = renderToStaticMarkup(
       <CourseArtworkPreview src="blob:prepared-artwork" />,
     );
@@ -14,7 +14,7 @@ describe("course artwork preview", () => {
     expect(html).toContain('aria-pressed="true"');
     for (const label of ["Destacado", "Afiches", "Móvil", "Detalle"])
       expect(html).toContain(`>${label}</button>`);
-    expect(html).toContain("Vista orientativa");
+    expect(html).not.toContain("Vista orientativa");
   });
 
   it("does not show a stale crop while the preview is being regenerated", () => {

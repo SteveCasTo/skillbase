@@ -148,6 +148,14 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   await contexts.getByRole("button", { name: "Detalle" }).click();
   await expect(contexts.getByText("Detalle en escritorio")).toBeVisible();
   await expect(contexts.getByText("Detalle en móvil")).toBeVisible();
+  const [desktopDetail, mobileDetail] = await Promise.all([
+    contexts.locator(".artwork-context-first").boundingBox(),
+    contexts.locator(".artwork-context-second").boundingBox(),
+  ]);
+  expect(desktopDetail).not.toBeNull();
+  expect(mobileDetail).not.toBeNull();
+  expect(desktopDetail!.width).toBeGreaterThan(mobileDetail!.width);
+  expect(desktopDetail!.width / desktopDetail!.height).toBeCloseTo(1.15, 1);
   const zoom = cropDialog.getByRole("slider", { name: "Zoom" });
   await zoom.fill("1.5");
   await expect

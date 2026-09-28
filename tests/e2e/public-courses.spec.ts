@@ -196,6 +196,39 @@ test("published course is public end-to-end and withdrawal removes every public 
       "src",
       new RegExp(`/${courseId}/`),
     );
+    const content = page.locator(".detail-main");
+    const facts = page.getByRole("complementary", {
+      name: "Información del curso",
+    });
+    const [desktopContent, desktopFacts] = await Promise.all([
+      content.boundingBox(),
+      facts.boundingBox(),
+    ]);
+    expect(desktopContent).not.toBeNull();
+    expect(desktopFacts).not.toBeNull();
+    expect(desktopFacts!.x).toBeGreaterThan(desktopContent!.x);
+    expect(desktopFacts!.width / desktopContent!.width).toBeCloseTo(1, 1);
+    const startFact = facts.locator(":scope > dl > div").nth(0);
+    const endFact = facts.locator(":scope > dl > div").nth(1);
+    const [desktopStart, desktopEnd] = await Promise.all([
+      startFact.boundingBox(),
+      endFact.boundingBox(),
+    ]);
+    expect(desktopEnd!.x).toBeGreaterThan(desktopStart!.x);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const [mobileContent, mobileFacts] = await Promise.all([
+      content.boundingBox(),
+      facts.boundingBox(),
+    ]);
+    expect(mobileContent).not.toBeNull();
+    expect(mobileFacts).not.toBeNull();
+    expect(mobileFacts!.y).toBeGreaterThan(mobileContent!.y);
+    expect(mobileFacts!.width).toBeCloseTo(mobileContent!.width, 0);
+    const [mobileStart, mobileEnd] = await Promise.all([
+      startFact.boundingBox(),
+      endFact.boundingBox(),
+    ]);
+    expect(mobileEnd!.y).toBeGreaterThan(mobileStart!.y);
 
     // The upload really reached public Storage; remove it even when later assertions fail.
     await signInFixture(context, AUTH_FIXTURES.admin.email);

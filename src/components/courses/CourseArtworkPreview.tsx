@@ -87,10 +87,6 @@ export default function CourseArtworkPreview({ src }: Props) {
           </figure>
         )}
       </div>
-      <p className="artwork-context-note">
-        Vista orientativa: el espacio disponible varía según la pantalla, el
-        contenido y la posición del curso.
-      </p>
     </section>
   );
 }

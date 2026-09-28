@@ -9,8 +9,7 @@
   font-weight: 600;
 }
 
-.artwork-context-heading p,
-.artwork-context-note {
+.artwork-context-heading p {
   margin-top: 0.35rem;
   color: var(--muted-foreground);
   font-size: 0.8rem;
@@ -127,11 +126,11 @@
 }
 
 .artwork-context-detail .artwork-context-pair {
-  grid-template-columns: 0.8fr 1.2fr;
+  grid-template-columns: 1.2fr 0.8fr;
 }
 
 .artwork-context-detail .artwork-context-first {
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 1.15;
   border-radius: 0.5rem;
 }
 
