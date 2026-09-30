@@ -32,7 +32,9 @@ Producción.
 
 No desarrollar directamente sobre esta rama.
 
-### Convención sugerida
+### Ramas por categoría
+
+Crear ramas desde `development` según el tipo de cambio y mantener cada PR cohesivo:
 
 - `feature/...`
 - `fix/...`
@@ -44,16 +46,32 @@ No desarrollar directamente sobre esta rama.
 ## FLUJO
 
 ```text
-feature/*
+feature/* | fix/* | refactor/* | chore/* | docs/* | test/*
 → Pull Request
 → development
-→ validación
-→ Pull Request
+→ validación del milestone
+→ Pull Request de release
 → master
 → CI
 → migraciones
 → deploy
 ```
+
+Todos los cambios se integran mediante PR hacia `development`. La promoción a `master` se realiza únicamente mediante PR de release de un milestone validado, no por cada bloque individual ni con pendientes de gate ocultos. No desarrollar directamente en `master`.
+
+## ORQUESTACIÓN Y TRABAJO PARALELO
+
+El orquestador prioriza el uso de subagentes para bloques independientes y conserva la responsabilidad de coordinar dependencias, revisión e integración.
+
+1. Definir el alcance, los criterios de aceptación y las dependencias de cada bloque.
+2. Confirmar y estabilizar contratos compartidos (tipos, DTO, operaciones y errores) antes de paralelizar tareas dependientes. No repartir decisiones pendientes como si fueran contratos aprobados.
+3. Asignar ownership disjunto por archivos o módulos a cada subagente, con entregables y pruebas explícitos. Evitar escrituras simultáneas sobre los mismos archivos; cualquier cambio de ownership debe coordinarse.
+4. Implementar pruebas unitarias junto a la lógica de cada bloque e integración junto a persistencia y permisos. No posponer esta cobertura hasta el cierre.
+5. Añadir E2E cuando el flujo esté estabilizado, sin retrasar las pruebas unitarias ni usar E2E para sustituirlas.
+6. Revisar cada bloque antes de integrarlo y resolver conjuntamente los hallazgos entre el orquestador y los responsables afectados; volver a verificar tras las correcciones.
+7. Integrar mediante ramas y PR por categoría hacia `development`, y ejecutar el gate conjunto antes de preparar la release del milestone hacia `master`.
+
+Si los contratos o el ownership no permiten trabajo independiente, estabilizar primero ese bloque en lugar de forzar paralelismo. Cada entrega debe indicar archivos modificados, pruebas ejecutadas, resultados y pendientes, sin declarar verificaciones no realizadas.
 
 ## COMMITS
 
