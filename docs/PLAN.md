@@ -392,6 +392,7 @@ Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión f
 
 - [ ] Verificar permisos en servidor para cada operación administrativa y validar todas las entradas públicas.
 - [ ] Aplicar minimización de datos personales, protección frente a abuso y política de errores públicos sin filtraciones.
+- [ ] Implementar y probar el límite de body y el rate limiter persistente atómico de PostgreSQL conforme al contrato; configurar y validar origen de red confiable y secreto HMAC como gate para habilitar el POST en producción.
 - [ ] Definir política de conservación y anonimización de interesados, incluido el plazo; el cierre de disponibilidad no elimina registros y no se presume retención perpetua.
 - [ ] Crear fixtures sintéticos y deterministas; cubrir dominio con unitarias y persistencia/autorización con integración mientras se implementa cada bloque.
 - [ ] Añadir E2E después de estabilizar el flujo público/administrativo, cubriendo disponibilidad, duplicados, recuperación, permisos y accesibilidad sin acoplamiento visual innecesario.

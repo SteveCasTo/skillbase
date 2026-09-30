@@ -30,7 +30,7 @@ La exposición ya usa `groups.publishedAt`, el trigger de protección de `drizzl
 
 ## INPUT Y NORMALIZACIÓN
 
-Nombre propuesto de contrato compartible: `RegisterInterestInput`. Los campos HTML y JSON usan exactamente estos nombres camelCase:
+Nombre del contrato compartible: `RegisterInterestInput`. Los campos HTML y JSON usan exactamente estos nombres camelCase:
 
 ```ts
 type RegisterInterestInput = {
@@ -42,7 +42,7 @@ type RegisterInterestInput = {
 };
 ```
 
-`firstName` admite varios nombres y `lastName` varios apellidos; no separarlos por espacios ni imponer solo letras ASCII. Estos nombres pertenecen al nuevo agregado, no renombrarán `Participant`.
+`firstName` admite varios nombres y `lastName` varios apellidos; no separarlos por espacios ni imponer solo letras ASCII. Estos nombres pertenecen al nuevo agregado, no renombrarán `Participant`. En JSON, los campos requeridos `firstName`, `lastName` y `email` deben ser strings no nulos. `phone` y `preferredGroupId` pueden omitirse, ser `null` o ser strings; ningún otro campo acepta `null`. En formularios HTML el valor vacío de un campo opcional se normaliza a `null`.
 
 | Campo              | Regla del servidor                                                                  |
 | ------------------ | ----------------------------------------------------------------------------------- |
@@ -54,7 +54,7 @@ type RegisterInterestInput = {
 
 No eliminar puntos ni sufijos `+` del email, ni aplicar reglas específicas de proveedores. El email persistido es el normalizado; los demás datos son el snapshot de la primera solicitud. No inferir país del teléfono ni prometer que existe o fue verificado.
 
-El slug de la URL resuelve el curso en servidor; no aceptar `courseId`, estado, fechas, actor ni identificadores de participante en el input público. Rechazar campos desconocidos, valores no textuales, archivos y campos repetidos en formularios; JSON debe ser un objeto, no array. Si se aprueba honeypot, su campo técnico se procesa fuera de este input de dominio.
+El slug de la URL resuelve el curso en servidor; no aceptar `courseId`, estado, fechas, actor ni identificadores de participante en el input público. Rechazar campos desconocidos, valores no textuales distintos de los `null` opcionales permitidos arriba, archivos y campos repetidos en formularios; JSON debe ser un objeto, no array. Si se usa honeypot, su campo técnico se procesa fuera de este input de dominio.
 
 La validación de límites/sintaxis es pura y compartible; la comprobación relacional y temporal corresponde al repositorio. No usar `any` ni importar el schema Drizzle en componentes.
 
@@ -195,7 +195,7 @@ Generar revisiones con reloj DB, precisión 3 y avance monotónico mínimo de 1 
 
 Origen exacto mediante `requestHasExpectedOrigin` y `PUBLIC_SITE_URL` (también sin sesión pública), límites por campo, body limitado y deduplicación son obligatorios. Origin no es autenticación: un bot puede falsificarlo. **Honeypot y body limit solos no bastan** para prevenir spam razonablemente en un POST anónimo; tampoco un contador en memoria persiste entre instancias serverless. No se promete eliminar ataques distribuidos ni verificar la identidad del remitente.
 
-Baseline técnico propuesto para implementación, configurable y revisable con evidencia (no cuota comercial ni política legal):
+Baseline técnico requerido para implementación, configurable y revisable con evidencia. Los valores iniciales son parámetros técnicos revisables según tráfico y efectos de NAT compartido, no cuotas comerciales ni políticas legales; no requieren aprobación adicional de negocio:
 
 - Máximo **8 KiB** reales por body público, antes de parsear; rechazar `Content-Length` excedido y además contar bytes del stream, incluso sin header o con header falso. Aplicar también un límite explícito al pequeño POST administrativo. Abortar lectura excedida, no hacer primero `formData()`/`json()` ilimitados.
 - Limiter persistente PostgreSQL de ventanas fijas: **20 intentos/10 minutos por origen de red y curso**, más **100 intentos/hora por origen de red**. Configuración server-side con enteros positivos y defaults documentados; no usar email como clave ni distinguir nuevos/duplicados. Contar solicitudes antes de deduplicar.
@@ -203,7 +203,7 @@ Baseline técnico propuesto para implementación, configurable y revisable con e
 - Obtener IP solo de metadatos del adaptador/proxy confiable configurado en despliegue; no confiar en `X-Forwarded-For` arbitrario. Persistir HMAC con secreto exclusivamente servidor, no IP cruda; no registrar email/body. Si no hay origen fiable/configuración o falla el almacenamiento, responder 503 y no aceptar el registro (fail-closed).
 - Exceso responde 429 con `Retry-After` calculado desde las ventanas limitantes. Expirar/limpiar buckets técnicos mediante tarea acotada o limpieza oportunista indexada; no acumular identificadores de red indefinidamente. Este TTL técnico no define retención de datos personales del interesado.
 
-**Pendiente de confirmar durante implementación/despliegue:** valores definitivos según tráfico y NAT compartido, nombre de variables, fuente confiable de IP por plataforma y programación/TTL técnico de limpieza. La propuesta permite implementar y probar con defaults configurables sin paralizar todo el módulo; confirmar la fuente de red y secreto es gate para habilitar el POST en producción, no para comenzar dominio/repositorio/UI.
+Los límites indicados son defaults configurables que deben implementarse y probarse, y pueden ajustarse con evidencia de tráfico/NAT. El nombre de las variables y la programación/TTL de limpieza son decisiones de configuración de implementación, no requisitos de aprobación del usuario. La fuente confiable de IP disponible en la plataforma de despliegue y el secreto HMAC aún deben configurarse y validarse; son gate para habilitar el POST en producción, no para comenzar dominio/repositorio/UI. Este control persistente reduce abuso bajo los límites definidos, pero no promete bloquear todo ataque distribuido.
 
 Honeypot accesible (excluido de foco/lectores de pantalla) es defensa opcional adicional pendiente; si se aprueba, responde el mismo éxito neutro sin persistir. CAPTCHA, Redis, correo de verificación, listas de bloqueo y fingerprinting no se incorporan por defecto. Si se evidencia abuso que el baseline no controla, evaluar protección en el edge sin introducirla como requisito de negocio de Fase 3.
 

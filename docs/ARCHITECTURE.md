@@ -244,9 +244,10 @@ Ejemplos:
 - `/`
 - `/cursos`
 - `/cursos/[slug]`
-- `/preinscripcion/[slug]`
 - `/certificados/[code]`
 - `/login`
+
+El registro de interesados de Fase 3 se accede desde el detalle existente `/cursos/[slug]`; no se define una ruta pública independiente `/preinscripcion/[slug]`. La preinscripción presencial/pagada pertenece a Fase 5.
 
 ### Privadas
 
