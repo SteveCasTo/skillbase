@@ -613,9 +613,19 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     name: "Fecha de inicio de clases (Bolivia)",
     exact: true,
   });
-  await courseStart.fill("2027-03-06");
+  await expect(
+    page.getByRole("button", {
+      name: /Elegir fecha de fecha de inicio de clases/i,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: /Elegir fecha de apertura de preinscripción/i,
+    }),
+  ).toBeVisible();
+  await courseStart.fill("06/03/2027");
   await expect(save).toBeDisabled();
-  await courseStart.fill("2027-03-01");
+  await courseStart.fill("01/03/2027");
   await expect(save).toBeEnabled();
   await page.getByLabel("Nombre").fill("Curso E2E conservación");
   await expect(save).toBeDisabled();
@@ -668,9 +678,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await page.getByRole("combobox", { name: "Nivel" }).click();
   await page.getByRole("option", { name: "Medio" }).click();
   await expect(save).toBeDisabled();
-  await courseStart.fill("2027-03-02");
+  await courseStart.fill("02/03/2027");
   await expect(save).toBeEnabled();
-  await courseStart.fill("2027-03-01");
+  await courseStart.fill("01/03/2027");
   await expect(save).toBeDisabled();
   const markdown = page.getByLabel("Contenido del curso (Markdown, opcional)");
   await markdown.fill("## Temario\n- Unidad uno\nNota");
@@ -687,7 +697,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
       name: "Fecha de inicio de clases (Bolivia)",
       exact: true,
     }),
-  ).toHaveValue("2027-03-01");
+  ).toHaveValue("01/03/2027");
   await expect(page.locator('input[name="startsAt"]')).toHaveValue(
     "2027-03-01T00:00",
   );
