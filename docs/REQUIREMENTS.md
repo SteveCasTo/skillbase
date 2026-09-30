@@ -97,21 +97,25 @@ Los niveles iniciales son:
 
 ## PREINSCRIPCIÓN
 
+En Fase 3, el término funcional es **registro de interesado**: una manifestación de interés sin pago, asignación de cupo ni preinscripción presencial. No debe presentarse como preinscripción pagada ni como aceptación. La **preinscripción presencial**, que registra pago parcial o total y ocupa cupo, pertenece a Fase 5; puede iniciarse directamente o usar un interesado como prellenado editable. No se establece aquí cuándo o si pasa a inscripción definitiva. Cambios de grupo y devoluciones también pertenecen a Fase 5.
+
 ### RF-PRE-001
 
-Una persona debe poder preinscribirse a un curso publicado cuando la preinscripción esté habilitada.
+Una persona debe poder dejar sus datos como interesada desde el detalle público de un curso publicado. No se modifica ni se añade información a la landing para este flujo.
+
+Datos obligatorios: nombre, apellidos y email. Teléfono y preferencia de grupo son opcionales. Se permite una solicitud por curso y email normalizado. La disponibilidad comienza al publicarse el curso y termina con el cierre presencial configurado cuando existe una ventana; si no existe ventana, termina al inicio oficial del curso. El servidor valida disponibilidad y duplicados, y no acepta solicitudes para cursos retirados o archivados.
 
 ### RF-PRE-002
 
-Administración debe poder consultar preinscripciones.
+Administración debe poder consultar interesados y cancelar/reactivar registros, conservando su historial. Los estados son `ACTIVE` y `CANCELLED`.
 
 ### RF-PRE-003
 
-El sistema debe permitir utilizar la preinscripción para estimar demanda.
+El sistema debe mostrar métricas de interesados `ACTIVE` por curso y por preferencia de grupo. La preferencia se cuenta aparte de la asignación efectiva a un grupo; no expresa plazas disponibles u ocupadas (ADR-021).
 
 ### RF-PRE-004
 
-Una preinscripción no equivale a inscripción definitiva.
+Un registro de interesado no equivale a preinscripción presencial pagada, no ocupa cupo y no constituye aceptación de la persona. La transición posterior a inscripción definitiva está por definir.
 
 ## GRUPOS
 
@@ -148,11 +152,13 @@ Las sesiones afectadas por feriados deben poder reprogramarse.
 
 La reprogramación de sesiones individuales, las preinscripciones/inscripciones y los cambios de grupo de participantes quedan pendientes de sus módulos propios. No se crean ni asignan estudiantes automáticamente al abrir un segundo grupo.
 
-## INSCRIPCIÓN
+## PREINSCRIPCIÓN PRESENCIAL E INSCRIPCIÓN DEFINITIVA
+
+La preinscripción presencial de Fase 5 registra pago parcial o total y ocupa cupo. No se asume que sea ya una inscripción definitiva: la transición y sus condiciones requieren definición explícita.
 
 ### RF-ENR-001
 
-Administración debe poder convertir preinscripción en inscripción.
+Administración debe poder registrar la preinscripción presencial y gestionar la eventual transición a inscripción definitiva cuando se haya definido su regla.
 
 ### RF-ENR-002
 

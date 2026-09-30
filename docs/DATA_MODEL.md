@@ -125,6 +125,8 @@ La creación está disponible para cursos `DRAFT` o `PUBLISHED` con plan L–V y
 
 ### Participant
 
+La entidad representa a una persona incorporada al proceso administrativo de inscripción (Fase 5), no a quien únicamente dejó sus datos de interés en Fase 3. La necesidad y momento de persistir CI se confirmarán antes de incorporarlo.
+
 - id
 - names
 - lastNames
@@ -134,13 +136,13 @@ La creación está disponible para cursos `DRAFT` o `PUBLISHED` con plan L–V y
 - type
 - createdAt
 
-### PreRegistration
+### InterestRegistration (conceptual, Fase 3)
 
-- id
-- participantId
-- courseId
-- status
-- createdAt
+Representa un registro público autónomo, separado de `Participant` y de la preinscripción presencial. El contrato técnico está definido en [`INTEREST_REGISTRATION_CONTRACT.md`](INTEREST_REGISTRATION_CONTRACT.md); la entidad, schema, migraciones y persistencia aún no están implementados. El email declarado públicamente no se verifica como identidad y no puede usarse para sobrescribir o fusionar datos de una persona global. Los datos confirmados son nombre, apellidos y email obligatorios, con teléfono y preferencia de grupo opcionales. Se limita a uno por curso y email normalizado. El servidor valida la disponibilidad del curso: desde `PUBLISHED` hasta el cierre presencial cuando existe ventana, o hasta el inicio oficial si no existe; cursos retirados o archivados no se aceptan. No cobra, no ocupa cupo ni asigna grupo. Sus estados aprobados son `ACTIVE` y `CANCELLED`; Administración puede cancelar/reactivar conservando historial. Las métricas cuentan registros activos por curso y preferencia de grupo; esta preferencia no implica asignación ni plazas. El cierre de disponibilidad detiene nuevas solicitudes, no elimina registros. Política de retención, plazo y anonimización quedan pendientes; no se asume conservación perpetua.
+
+### PreRegistration (presencial, Fase 5)
+
+En este proyecto el término se refiere a la preinscripción administrativa presencial que registra pago parcial o total y ocupa cupo. Puede iniciarse directamente o prellenarse desde un interesado de forma editable. La relación con ese registro debe ser explícita y trazable; no debe inferirse identidad global, pago ni equivalencia entre interesado y persona participante. Su modelo persistido y campos aún están por definir; la lista histórica de `Participant`/`PreRegistration` no debe interpretarse como contrato vigente. Esta entidad no implica por sí misma una transición a inscripción definitiva.
 
 ### Enrollment
 

@@ -126,7 +126,7 @@ La fase se divide en dos entregas consecutivas. La capa visual de la landing se 
 - La disponibilidad para preinscripción se deriva de su ventana de fechas y no constituye un estado editorial.
 - Fase 2A configura únicamente la nota mínima de aprobación. El porcentaje de asistencia se pospone hasta confirmar la regla académica.
 - Los cursos no se eliminan físicamente desde la interfaz: pueden retirarse o archivarse.
-- Fase 2 no implementa participantes, preinscripciones, grupos, inscripciones, descuentos aplicados, pagos, sesiones ni elegibilidad académica.
+- El alcance original de Fase 2 no implementaba participantes, preinscripciones, grupos, inscripciones, descuentos aplicados, pagos, sesiones ni elegibilidad académica. La gestión de grupos se anticipó y quedó implementada parcialmente dentro del alcance que el plan ubicaba originalmente en Fase 4; no implica que Fase 3 esté implementada.
 
 ### FASE 2A — GESTIÓN DE CURSOS
 
@@ -331,22 +331,94 @@ La landing presenta el sistema, el catálogo muestra automáticamente los cursos
 
 Administración crea y publica un curso; este aparece automáticamente en una experiencia pública completa sin exponer borradores ni información administrativa.
 
-## FASE 3 — PREINSCRIPCIÓN
+## GATE PREVIO A FASE 3 — EXPERIENCIA PRIVADA
+
+Antes de implementar el registro público de interesados, corregir y verificar el flujo existente de `/app`. Este checklist expresa trabajo pendiente, no resultados verificados:
+
+- [ ] Incorporar skeletons reales durante las cargas estructurales de `/app`, vinculados al estado de carga y no a una demora decorativa.
+- [ ] Usar Sileo para feedback transitorio de todas las mutaciones, con estados pending, success y error, sin sustituir los errores junto a los campos.
+- [ ] Evitar recargar la página o rerenderizar la vista completa por cada cambio de campo, cambio de estado o eliminación; actualizar únicamente el estado y contenido afectados, conservando foco y valores.
+- [ ] Cerrar las confirmaciones al aceptar; la request continúa con feedback pending/success/error independiente del diálogo.
+- [ ] Prevenir envíos y acciones duplicados mientras la operación está pendiente; permitir recuperar errores y reintentar sin perder datos ni dejar controles bloqueados.
+- [ ] Ubicar el toggle de tema en el sidebar entre el control de colapso y logout; ocultarlo cuando el rail está cerrado y mantener su acceso en la navegación expandida y móvil.
+- [ ] Verificar estos comportamientos en las mutaciones existentes, incluidos formularios, cambios de estado y eliminaciones permitidas, con pruebas de regresión, responsive y teclado.
+- [ ] Revisar el bloque, corregir los hallazgos y registrar evidencia antes de abrir la implementación de Fase 3.
+
+Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión final del gate de Fase 2B) siguen pendientes según su registro anterior. Este plan no los revalida ni declara cerrado ese gate.
+
+## FASE 3 — REGISTRO DE INTERESADOS (SIN PAGO)
 
 ### Objetivos
 
-- Formulario público.
+- Formulario público de registro de interesados en el detalle del curso.
 - Validaciones.
 - Prevención razonable de duplicados.
 - Listado administrativo.
 - Métricas de demanda.
-- Estados de preinscripción.
+- Estados `ACTIVE`/`CANCELLED`, con cancelación/reactivación administrativa y métricas de activos aprobados (ADR-021); su implementación sigue pendiente.
+
+### Checklist de definición y contratos
+
+- [x] Confirmar el alcance de Fase 3 como registro de **interesados**, no preinscripción pagada ni inscripción definitiva. Las reglas aprobadas están en `docs/REQUIREMENTS.md`.
+- [x] Confirmar campos y elegibilidad: nombre, apellidos y email obligatorios; teléfono y preferencia de grupo opcionales. Público limitado al detalle de curso existente; no añadir ni cambiar información de la landing.
+- [x] Confirmar duplicados y disponibilidad: una solicitud por curso/email normalizado; validación autoritativa server-side y sin aceptar para cursos retirados/archivados. Se puede solicitar desde `PUBLISHED` hasta cierre presencial si existe ventana, o hasta el inicio oficial si no existe.
+- [x] Confirmar estados `ACTIVE`/`CANCELLED`, cancelación/reactivación administrativa conservando historial y métricas de activos por curso/preferencia; la preferencia no es asignación de grupo ni dato de plazas (ADR-021).
+- [x] Definir el contrato técnico de Fase 3 para entrada/salida, errores, DTO, operaciones, persistencia y pruebas en [`docs/INTEREST_REGISTRATION_CONTRACT.md`](INTEREST_REGISTRATION_CONTRACT.md). Contrato aprobado no significa implementación realizada.
+
+### Checklist de datos, dominio y persistencia
+
+- [ ] Implementar el registro de interesado como entidad autónoma, separada de `Participant` y de la preinscripción presencial; no usar email público no verificado para modificar identidad global ni crear entidades pagadas en Fase 3.
+- [ ] La relación explícita y trazable entre el interesado y una preinscripción presencial es dependencia de Fase 5; no bloquea el cierre de Fase 3. Allí se implementará junto al prellenado editable; el registro presencial directo seguirá disponible.
+- [x] Especificar relaciones, restricciones e índices del agregado autónomo en el contrato técnico; implementarlos y verificarlos sigue pendiente.
+- [ ] Implementar validaciones y reglas de dominio independientes de HTTP/UI, con pruebas unitarias junto a cada regla.
+- [ ] Implementar casos de uso y repositorio, con escrituras transaccionales y prevención de duplicados conforme a la política confirmada.
+- [ ] Generar y verificar migración reproducible, constraints y comportamiento ante concurrencia, errores y reintentos mediante integración.
+
+### Checklist de interfaz pública
+
+- [ ] Implementar formulario público y acceso desde la oferta elegible según los contratos confirmados.
+- [ ] Incorporar validación server-side, errores junto a los campos, conservación de valores y prevención de envíos duplicados.
+- [ ] Mostrar loading, empty, pending, success y error; usar Sileo para feedback transitorio de mutaciones y skeletons cuando exista carga estructural.
+- [ ] Validar responsive, teclado y foco; actualizar únicamente el contenido afectado sin recargar la vista completa.
+
+### Checklist de administración y métricas
+
+- [ ] Implementar listado administrativo de interesados y operaciones según estados y permisos confirmados.
+- [ ] Implementar métricas de interesados activos por curso y preferencia de grupo, sin equiparar preferencia con grupo asignado o plazas/cupos.
+- [ ] Implementar métricas sobre datos persistidos, con estados vacíos/error y sin exponer datos personales en la experiencia pública.
+- [ ] Aplicar el patrón de mutaciones del gate previo: confirmación que cierra al aceptar, feedback independiente y recuperación de errores.
+
+### Checklist de seguridad, pruebas y documentación
+
+- [ ] Verificar permisos en servidor para cada operación administrativa y validar todas las entradas públicas.
+- [ ] Aplicar minimización de datos personales, protección frente a abuso y política de errores públicos sin filtraciones.
+- [ ] Implementar y probar el límite de body y el rate limiter persistente atómico de PostgreSQL conforme al contrato; configurar y validar origen de red confiable y secreto HMAC como gate para habilitar el POST en producción.
+- [ ] Definir política de conservación y anonimización de interesados, incluido el plazo; el cierre de disponibilidad no elimina registros y no se presume retención perpetua.
+- [ ] Crear fixtures sintéticos y deterministas; cubrir dominio con unitarias y persistencia/autorización con integración mientras se implementa cada bloque.
+- [ ] Añadir E2E después de estabilizar el flujo público/administrativo, cubriendo disponibilidad, duplicados, recuperación, permisos y accesibilidad sin acoplamiento visual innecesario.
+- [ ] Actualizar requisitos, contratos, modelo de datos, seguridad, testing y documentación afectada con las decisiones realmente implementadas.
+
+### Checklist de PR y gate de cierre
+
+- [ ] Completar revisión por bloque y corrección conjunta de hallazgos antes de integrar los bloques dependientes.
+- [ ] Preparar PR por categoría hacia `development`, con alcance, evidencia y pendientes explícitos.
+- [ ] Ejecutar formatter, lint, typecheck, unitarias, integración, E2E y build correspondientes; demostrar el flujo completo y revisar documentación.
+- [ ] Registrar el estado real de validaciones locales y remotas, sin marcar como verificados resultados no ejecutados.
+- [ ] Cerrar el milestone solo con contratos confirmados, flujo demostrado y gate revisado; promover a `master` mediante PR de release únicamente después de validar el milestone.
+
+### Baseline verificado de calidad
+
+En el baseline verificado para esta actualización: lint exitoso; 93 pruebas unitarias y 50 de integración exitosas; 62 E2E ejecutadas; typecheck con 0 errores y 41 hints; build exitoso. Durante E2E se observó un hydration mismatch relacionado con Sileo; su corrección está activa en otra rama y este baseline no cierra el gate de Fase 3. El formatter global solo reportó un aviso sobre `opencode.json`, ajeno a estos cambios; no modificar ese archivo.
 
 ### Resultado demostrable
 
-Una persona se preinscribe y administración ve la demanda acumulada.
+Una persona deja datos como interesada sin pagar ni ocupar cupo; administración puede consultar la demanda. No implica aceptación ni inscripción.
 
 ## FASE 4 — GRUPOS
+
+### Estado y dependencias
+
+Parte del alcance de Fase 4 fue anticipada: la gestión de grupos indicada como implementada abajo ya figura en el plan. No implica el cierre completo de Fase 4 ni la implementación de Fase 3. En Fase 3 el interesado puede expresar una preferencia de grupo; cualquier asignación efectiva a un grupo corresponde a Fase 5. Las sesiones conservan sus dependencias posteriores.
 
 ### Objetivos
 
@@ -356,17 +428,20 @@ Una persona se preinscribe y administración ve la demanda acumulada.
 - [x] Permitir grupos válidos también en cursos borrador; eliminar solo grupos nunca publicados y desactivar/reactivar los que ya tuvieron exposición pública, con historial protegido.
 - Asignar instructor real cuando exista el módulo de asignaciones; mientras tanto se conserva el instructor textual del curso.
 - Gestionar reemplazo por feriados cuando existan sesiones y calendario operativo.
-- Vincular preinscritos e inscritos a grupos cuando estén disponibles esos módulos.
+- Permitir expresar preferencia de grupo en Fase 3; asignar inscritos a grupos en Fase 5, sin tratar la preferencia como asignación.
 
 ### Resultado demostrable
 
 Administración transforma demanda en grupos operativos.
 
-## FASE 5 — INSCRIPCIÓN ADMINISTRATIVA
+## FASE 5 — PREINSCRIPCIÓN PRESENCIAL Y GESTIÓN ADMINISTRATIVA
 
 ### Objetivos
 
-- Convertir preinscripción en inscripción.
+- Registrar presencialmente a una persona como preinscrita, con pago parcial o total y ocupación de cupo; permitir registro directo o prellenar desde un interesado con datos editables.
+- Diseñar el vínculo de origen con el interesado como explícito y trazable, sin inferir identidad global ni pago desde el registro público.
+- No denominar este registro inscripción definitiva sin una regla posterior que confirme esa transición.
+- Completar en esta fase los datos administrativos pendientes, incluido CI cuando se confirme su necesidad.
 - Registrar tipo de participante.
 - Registrar precio aplicado.
 - Aplicar descuentos.
@@ -374,11 +449,14 @@ Administración transforma demanda en grupos operativos.
 - Registrar boleta/valorado si corresponde.
 - Revertir inscripciones.
 - Gestionar devolución por cancelación de grupo.
+- Gestionar cambios de grupo y devoluciones en esta fase; no duplicar estas operaciones en Fase 3.
 - Generar listados administrativos.
+
+El registro público de interesados de Fase 3 no cobra ni ocupa cupo. La preinscripción presencial y pagada pertenece a esta fase; reglas de dinero —precio aplicado, descuentos, pagos, documentos/boleta y devoluciones— permanecen en su alcance y sus detalles pendientes de definición no se adelantan aquí.
 
 ### Resultado demostrable
 
-Administración puede cerrar una lista real de participantes inscritos.
+Administración puede mantener la lista de preinscripciones presenciales con pagos parciales o totales y cupos ocupados. Su eventual paso a inscripción definitiva requiere una regla posterior.
 
 ## FASE 6 — SESIONES Y ASISTENCIA
 
