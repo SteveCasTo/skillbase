@@ -71,6 +71,6 @@ const {
   </head>
   <body>
     <slot />
-    {showToasts && <SileoHost client:load />}
+    {showToasts && <SileoHost client:load transition:persist />}
   </body>
 </html>

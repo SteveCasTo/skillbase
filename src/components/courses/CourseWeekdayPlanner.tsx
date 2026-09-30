@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { CourseFormat } from "@/domain/courses/formats";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
-import { planWeekdaySchedule } from "@/domain/courses/weekday-schedule";
+import {
+  GROUP_SCHEDULE,
+  planCourseDates,
+  planWeekdaySchedule,
+} from "@/domain/courses/weekday-schedule";
 import CourseDateTimePicker from "./CourseDateTimePicker";
+import CourseDatePicker from "./CourseDatePicker";
 
 interface Props {
   formats: readonly Pick<
@@ -26,13 +31,18 @@ export default function CourseWeekdayPlanner({
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const [start, setStart] = useState(startsAt);
+  const [startDate, setStartDate] = useState(startsAt.slice(0, 10));
   const [formatId, setFormatId] = useState("");
+  // Older planned courses still have an hourly course schedule. Keep their
+  // persisted instants on edit rather than silently converting grouped courses.
+  const oldHourlyPlan =
+    !newCourse && Boolean(startsAt) && !startsAt.endsWith("T00:00");
   useEffect(() => {
     const form = container.current?.closest("form");
     if (!form) return;
     const sync = () => {
       const data = new FormData(form);
-      setStart(String(data.get("startsAt") ?? ""));
+      if (oldHourlyPlan) setStart(String(data.get("startsAt") ?? ""));
       setFormatId(String(data.get("courseTypeId") ?? ""));
     };
     sync();
@@ -42,53 +52,101 @@ export default function CourseWeekdayPlanner({
       form.removeEventListener("change", sync);
       form.removeEventListener("course-form-change", sync);
     };
-  }, []);
+  }, [oldHourlyPlan]);
   const format = formats.find((item) => item.id === formatId);
   let plan: ReturnType<typeof planWeekdaySchedule> | null = null;
+  let dates: ReturnType<typeof planCourseDates> | null = null;
   let problem = "";
-  if (start && format?.sessionMinutes != null) {
+  if (!oldHourlyPlan && startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    const weekday = new Date(`${startDate}T00:00:00Z`).getUTCDay();
+    if (weekday === 0 || weekday === 6)
+      problem = "Selecciona una fecha de lunes a viernes.";
+  }
+  if (
+    !problem &&
+    (oldHourlyPlan ? start : startDate) &&
+    format?.sessionMinutes != null
+  ) {
     try {
-      plan = planWeekdaySchedule({
-        startsAt: start,
-        weekdaysMask: 31,
-        totalHours: format.totalHours,
-        sessionMinutes: format.sessionMinutes,
-      });
+      if (oldHourlyPlan)
+        plan = planWeekdaySchedule({
+          startsAt: start,
+          weekdaysMask: 31,
+          totalHours: format.totalHours,
+          sessionMinutes: format.sessionMinutes,
+        });
+      else
+        dates = planCourseDates({
+          startDate,
+          weekdaysMask: 31,
+          totalHours: format.totalHours,
+          sessionMinutes: format.sessionMinutes,
+        });
     } catch {
-      problem =
-        "Elige un inicio de lunes a viernes que permita terminar la clase el mismo día.";
+      problem = "Selecciona una fecha de lunes a viernes válida.";
     }
   }
-  const end = plan ? instantToBoliviaCivil(plan.endsAt) : "";
-  const schedule = plan
-    ? `Lunes a viernes, ${start.slice(11)}–${plan.endTime}`
-    : "";
+  const end = plan
+    ? instantToBoliviaCivil(plan.endsAt)
+    : dates
+      ? instantToBoliviaCivil(dates.endsAt)
+      : "";
+  const courseStart = dates ? instantToBoliviaCivil(dates.startsAt) : "";
+  const schedule =
+    oldHourlyPlan && plan
+      ? `Lunes a viernes, ${start.slice(11)}–${plan.endTime}`
+      : dates
+        ? GROUP_SCHEDULE
+        : "";
+  const sessionCount = plan?.sessionCount ?? dates?.sessionCount;
+  const plannedMinutes = plan?.plannedMinutes ?? dates?.plannedMinutes;
   useEffect(() => {
     container.current?.dispatchEvent(
       new Event("course-form-change", { bubbles: true }),
     );
-  }, [end, schedule]);
+  }, [end, schedule, courseStart]);
   return (
     <div ref={container} className="contents">
-      <CourseDateTimePicker
-        name="startsAt"
-        label="Inicio de clases (Bolivia)"
-        value={startsAt}
-        required
-        disabled={disabled ?? false}
-        error={error ?? ""}
-        weekdaysOnly
-        futureOnly={newCourse}
-      />
+      {oldHourlyPlan ? (
+        <CourseDateTimePicker
+          name="startsAt"
+          label="Inicio de clases (Bolivia)"
+          value={startsAt}
+          required
+          disabled={disabled ?? false}
+          error={error ?? ""}
+          weekdaysOnly
+          futureOnly={newCourse}
+        />
+      ) : (
+        <div className="min-w-0">
+          <CourseDatePicker
+            name="startDate"
+            label="Fecha de inicio de clases (Bolivia)"
+            value={startsAt.slice(0, 10)}
+            onDateChange={setStartDate}
+            futureOnly={newCourse}
+            required
+            disabled={disabled ?? false}
+            error={error || problem}
+          />
+          <input
+            type="hidden"
+            name="startsAt"
+            value={courseStart}
+            disabled={disabled}
+          />
+        </div>
+      )}
       <div className="flex min-w-0 flex-col gap-2 text-sm">
-        <span className="font-medium">Finalización calculada</span>
+        <span className="font-medium">Fecha de finalización calculada</span>
         <output
           className="bg-secondary flex min-h-11 items-center rounded-lg border px-3 py-2 tabular-nums"
           aria-live="polite"
         >
           {end
-            ? `${end.slice(8, 10)}/${end.slice(5, 7)}/${end.slice(0, 4)} ${end.slice(11)}`
-            : "Selecciona formato, fecha y hora de inicio"}
+            ? `${startDate.slice(8, 10)}/${startDate.slice(5, 7)}/${startDate.slice(0, 4)} – ${end.slice(8, 10)}/${end.slice(5, 7)}/${end.slice(0, 4)}${oldHourlyPlan ? ` ${end.slice(11)}` : ""}`
+            : "Selecciona formato y fecha de inicio"}
         </output>
         <input
           type="hidden"
@@ -96,7 +154,7 @@ export default function CourseWeekdayPlanner({
           value={end || (disabled ? endsAt : "")}
           disabled={disabled}
         />
-        {problem && (
+        {oldHourlyPlan && problem && (
           <p role="alert" className="text-destructive">
             {problem}
           </p>
@@ -105,9 +163,9 @@ export default function CourseWeekdayPlanner({
       <div className="text-sm lg:col-span-2">
         <p className="font-medium">Clases de lunes a viernes (sin feriados)</p>
         <p className="text-muted-foreground mt-1" aria-live="polite">
-          {plan && format
-            ? `${plan.sessionCount} sesiones de ${format.sessionMinutes} min · ${plan.plannedMinutes / 60} h planificadas${plan.plannedMinutes !== format.totalHours * 60 ? ` frente a ${format.totalHours} h configuradas` : ""}. Horario: ${schedule}.`
-            : "El horario se calcula al seleccionar el formato y el inicio."}
+          {sessionCount && format && plannedMinutes != null
+            ? `${sessionCount} sesiones de ${format.sessionMinutes} min · ${plannedMinutes / 60} h planificadas${plannedMinutes !== format.totalHours * 60 ? ` frente a ${format.totalHours} h configuradas` : ""}. ${oldHourlyPlan ? `Horario: ${schedule}.` : "Cada grupo define su propia hora y capacidad."}`
+            : "Selecciona formato y fecha para calcular los días de clases."}
         </p>
         <input
           type="hidden"

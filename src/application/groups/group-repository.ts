@@ -21,4 +21,6 @@ export interface GroupRepository {
     revision: Date,
   ): Promise<Group>;
   cancel(id: string, actorId: string, revision: Date): Promise<Group>;
+  reactivate(id: string, actorId: string, revision: Date): Promise<Group>;
+  delete(id: string, actorId: string, revision: Date): Promise<void>;
 }

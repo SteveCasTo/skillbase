@@ -19,6 +19,52 @@ describe("course Markdown", () => {
     });
   });
 
+  test("preserves nested unordered and ordered lists", () => {
+    const unordered = parseCourseMarkdown(
+      "- **Unidad segura**\n  - Unidad anidada",
+    )[0]!;
+    expect(unordered.children?.[0]!.children?.[0]!.type).toBe("strong");
+    expect(unordered.children?.[0]!.children?.[1]).toMatchObject({
+      type: "unordered-list",
+      children: [
+        {
+          type: "list-item",
+          children: [{ type: "text", value: "Unidad anidada" }],
+        },
+      ],
+    });
+
+    const ordered = parseCourseMarkdown("1. Primero\n   1. Subprimero")[0]!;
+    expect(ordered).toMatchObject({
+      type: "ordered-list",
+      children: [
+        {
+          type: "list-item",
+          children: [
+            { type: "text", value: "Primero" },
+            {
+              type: "ordered-list",
+              children: [{ type: "list-item" }],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  test("bounds nested list depth", () => {
+    const markdown = Array.from(
+      { length: 12 },
+      (_, depth) => `${"  ".repeat(depth)}- item ${depth}`,
+    ).join("\n");
+    const nodes = parseCourseMarkdown(markdown);
+    const listDepth = (node: (typeof nodes)[number]): number =>
+      node.type === "unordered-list"
+        ? 1 + Math.max(0, ...node.children!.map(listDepth))
+        : Math.max(0, ...(node.children ?? []).map(listDepth));
+    expect(Math.max(...nodes.map(listDepth))).toBeLessThanOrEqual(9);
+  });
+
   test("keeps raw HTML as inert text and removes unsafe link destinations", () => {
     const nodes = parseCourseMarkdown(
       '<img src=x onerror="alert(1)"> [ejecutar](javascript:alert(1))',

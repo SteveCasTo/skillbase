@@ -1,0 +1,21 @@
+---
+import "./course-artwork-fallback.css";
+
+interface Props {
+  name: string;
+}
+
+const { name } = Astro.props;
+const initials = name
+  .split(/\s+/)
+  .filter((word) => word.length > 2)
+  .slice(0, 2)
+  .map((word) => word[0]?.toLocaleUpperCase("es-BO") ?? "")
+  .join("");
+---
+
+<div class="course-artwork-fallback" aria-hidden="true">
+  <span class="fallback-rule" />
+  <strong>{initials || "CA"}</strong>
+  <span class="fallback-caption">Cota Activa · curso</span>
+</div>

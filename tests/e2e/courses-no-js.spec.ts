@@ -25,10 +25,10 @@ test("new courses preserve values and can be corrected after server validation w
   const course = page.locator("form.course-form");
   const courseName = `Curso sin JavaScript ${Date.now()}`;
   const uniqueFields = [
-    "startsAt",
-    "endsAt",
-    "registrationStartAt",
-    "registrationEndAt",
+    "startDate",
+    "endDate",
+    "registrationStartDate",
+    "registrationEndDate",
     "contentMarkdown",
     "schedule",
   ];
@@ -39,20 +39,26 @@ test("new courses preserve values and can be corrected after server validation w
   await course
     .getByLabel("Descripción")
     .fill("Contenido para probar la recuperación tras validar en servidor.");
-  await course.getByLabel("Nivel").selectOption("INTERMEDIATE");
+  await course.locator('select[name="level"]').selectOption("INTERMEDIATE");
   await course
     .getByLabel("Formato de curso")
     .selectOption({ label: formatName });
-  await course
-    .getByLabel(/Horario calculado/)
-    .fill("Lunes a viernes, 18:30–20:00");
   await course.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
   await course
-    .getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)", { exact: true })
-    .fill("2027-03-01T18:30");
+    .getByLabel("Contenido del curso (Markdown, opcional)")
+    .fill("## Temario visible sin JavaScript");
   await course
-    .getByLabel("Finalización del curso (AAAA-MM-DDTHH:mm)", { exact: true })
-    .fill("2027-03-22T20:00");
+    .getByLabel("Fecha de inicio de clases (Bolivia)", { exact: true })
+    .fill("2027-03-01");
+  await course
+    .getByLabel("Fecha de finalización (Bolivia)", { exact: true })
+    .fill("2027-03-22");
+  await course
+    .getByLabel("Apertura de preinscripción (Bolivia)")
+    .fill("2027-01-01");
+  await course
+    .getByLabel("Último día de preinscripción (Bolivia)")
+    .fill("2027-02-20");
   expect(
     await course.evaluate((form: HTMLFormElement, names: string[]) => {
       const data = new FormData(form);
@@ -82,22 +88,33 @@ test("new courses preserve values and can be corrected after server validation w
   await expect(course.getByLabel("Descripción")).toHaveValue(
     "Contenido para probar la recuperación tras validar en servidor.",
   );
-  await expect(course.getByLabel("Nivel")).toHaveValue("INTERMEDIATE");
+  const markdown = course.getByLabel(
+    "Contenido del curso (Markdown, opcional)",
+  );
+  await expect(markdown).toBeVisible();
+  await expect(markdown).toHaveValue("## Temario visible sin JavaScript");
+  await expect(course.locator('select[name="level"]')).toHaveValue(
+    "INTERMEDIATE",
+  );
   await expect(course.getByLabel("Formato de curso")).toHaveValue(
     selectedFormat,
   );
-  await expect(course.getByLabel(/Horario calculado/)).toHaveValue(
-    "Lunes a viernes, 18:30–20:00",
+  await expect(
+    course.getByLabel("Fecha de inicio de clases (Bolivia)", { exact: true }),
+  ).toHaveValue("2027-03-01");
+  await expect(
+    course.getByLabel("Fecha de finalización (Bolivia)", { exact: true }),
+  ).toHaveValue("2027-03-22");
+  await expect(course.locator('[name="schedule"]')).toHaveValue(
+    "Lunes a viernes · horario por grupo",
   );
-  await expect(
-    course.getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)", { exact: true }),
-  ).toHaveValue("2027-03-01T18:30");
-  await expect(
-    course.getByLabel("Finalización del curso (AAAA-MM-DDTHH:mm)", {
-      exact: true,
-    }),
-  ).toHaveValue("2027-03-22T20:00");
   await expect(course.getByLabel("Nota mínima (0–100)")).toHaveValue("101");
+  await expect(course.locator('[name="registrationStartDate"]')).toHaveValue(
+    "2027-01-01",
+  );
+  await expect(course.locator('[name="registrationEndDate"]')).toHaveValue(
+    "2027-02-20",
+  );
 
   await course.getByLabel("Nota mínima (0–100)").fill("70");
   await course.getByRole("button", { name: "Crear borrador" }).click();
@@ -105,6 +122,8 @@ test("new courses preserve values and can be corrected after server validation w
     /\/app\/cursos\/[0-9a-f-]+\/editar\?success=created/,
   );
   await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
+  await expect(markdown).toBeVisible();
+  await expect(markdown).toHaveValue("## Temario visible sin JavaScript");
   await page.locator('[data-confirm-fallback="publish"] summary').click();
   await expect(
     page.getByRole("button", { name: "Confirmar publicación" }),

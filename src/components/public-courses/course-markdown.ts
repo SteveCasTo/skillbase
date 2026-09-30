@@ -139,18 +139,9 @@ export function parseCourseMarkdown(markdown: string): MarkdownNode[] {
 
     const listItem = /^(\s*)([-+*]|\d+[.)])\s+(.+)$/.exec(lines[index]!);
     if (listItem) {
-      const ordered = /^\d/.test(listItem[2]!);
-      const items: MarkdownNode[] = [];
-      while (index < lines.length) {
-        const item = /^(\s*)([-+*]|\d+[.)])\s+(.+)$/.exec(lines[index]!);
-        if (!item || /^\d/.test(item[2]!) !== ordered) break;
-        items.push({ type: "list-item", children: parseInline(item[3]!) });
-        index++;
-      }
-      blocks.push({
-        type: ordered ? "ordered-list" : "unordered-list",
-        children: items,
-      });
+      const parsed = parseList(lines, index, 0);
+      blocks.push(parsed.node);
+      index = parsed.nextIndex;
       continue;
     }
 
@@ -175,4 +166,46 @@ export function parseCourseMarkdown(markdown: string): MarkdownNode[] {
   }
 
   return blocks;
+}
+
+const listPattern = /^(\s*)([-+*]|\d+[.)])\s+(.+)$/;
+const maxListDepth = 8;
+
+function parseList(
+  lines: string[],
+  start: number,
+  depth: number,
+): { node: MarkdownNode; nextIndex: number } {
+  const first = listPattern.exec(lines[start]!);
+  const baseIndent = first![1]!.length;
+  const ordered = /^\d/.test(first![2]!);
+  const items: MarkdownNode[] = [];
+  let index = start;
+
+  while (index < lines.length) {
+    const item = listPattern.exec(lines[index]!);
+    if (!item) break;
+    const indent = item[1]!.length;
+    if (indent < baseIndent) break;
+    if (indent > baseIndent) {
+      if (depth < maxListDepth && items.length) {
+        const nested = parseList(lines, index, depth + 1);
+        items[items.length - 1]!.children!.push(nested.node);
+        index = nested.nextIndex;
+        continue;
+      }
+      break;
+    }
+    if (/^\d/.test(item[2]!) !== ordered) break;
+    items.push({ type: "list-item", children: parseInline(item[3]!) });
+    index++;
+  }
+
+  return {
+    node: {
+      type: ordered ? "ordered-list" : "unordered-list",
+      children: items,
+    },
+    nextIndex: index,
+  };
 }

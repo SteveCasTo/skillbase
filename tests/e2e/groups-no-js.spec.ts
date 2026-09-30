@@ -35,6 +35,8 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
       conditions: "Cupo limitado.",
       startsAt: "2027-03-01T08:00",
       endsAt: "2027-03-17T09:30",
+      registrationStartAt: "2027-01-01T08:00",
+      registrationEndAt: "2027-02-20T18:00",
       weekdays: "1,2,3,4,5",
       minimumGrade: "70",
     },
@@ -52,7 +54,9 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
   });
   expect(invalidResponse.status()).toBe(422);
   await page.setContent(await invalidResponse.text());
-  const invalidCapacity = page.getByLabel("Capacidad");
+  const invalidCapacity = page
+    .getByRole("form", { name: "Nuevo grupo" })
+    .getByLabel("Capacidad");
   await expect(invalidCapacity).toHaveAttribute("aria-invalid", "true");
   await expect(invalidCapacity).toHaveAttribute(
     "aria-describedby",
@@ -62,21 +66,78 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
     "La capacidad debe ser un entero positivo",
   );
   await page.goto(`/app/cursos/${id}/grupos`);
-  const form = page.getByRole("form", { name: "Añadir grupo" });
+  const form = page.getByRole("form", { name: "Nuevo grupo" });
+  await page.locator("[data-new-fallback] summary").click();
   await form.getByLabel("Hora de inicio").fill("08:00");
   await form.getByLabel("Capacidad").fill("15");
   await form.getByRole("button", { name: "Crear grupo" }).click();
   await expect(page).toHaveURL(/success=created/);
-  await page.locator("[data-cancel-fallback] summary").click();
+  const capacityEditor = page.locator('[data-group-field="capacity"] details');
+  await capacityEditor.locator("summary").click();
   await expect(
-    page.getByRole("button", { name: "Sí, cancelar grupo" }),
+    capacityEditor.getByRole("form", { name: "Cambiar capacidad del grupo 1" }),
   ).toBeVisible();
-  await page.locator("[data-cancel-fallback] summary").click();
+  await capacityEditor.getByLabel("Nueva capacidad").fill("18");
+  await capacityEditor.getByRole("link", { name: /Cancelar edición/ }).click();
+  await expect(page.locator('[data-group-field="capacity"]')).toContainText(
+    "15",
+  );
+  await capacityEditor.locator("summary").click();
+  await capacityEditor.getByLabel("Nueva capacidad").fill("18");
+  await capacityEditor
+    .getByRole("button", { name: "Guardar capacidad del grupo 1" })
+    .click();
+  await expect(page).toHaveURL(/success=capacity/);
+  await expect(page.locator('[data-group-field="capacity"]')).toContainText(
+    "18",
+  );
+  await page.goto(`/app/cursos/${id}/editar`);
+  await expect(page.getByLabel("Horario planificado histórico")).toHaveValue(
+    "Lunes a viernes, 08:00–09:30",
+  );
   await expect(
-    page.getByRole("button", { name: "Sí, cancelar grupo" }),
+    page.getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)"),
+  ).toHaveValue("2027-03-01T08:00");
+  await expect(page.locator('[name="registrationStartDate"]')).toHaveCount(0);
+  await expect(page.locator('[name="registrationEndDate"]')).toHaveCount(0);
+  await expect(page.locator('[name="registrationStartAt"]')).toHaveValue(
+    "2027-01-01T08:00",
+  );
+  await expect(page.locator('[name="registrationEndAt"]')).toHaveValue(
+    "2027-02-20T18:00",
+  );
+  await page
+    .getByLabel("Descripción")
+    .fill("Curso histórico con grupo editado sin JavaScript.");
+  await page.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(page).toHaveURL(/success=updated/);
+  await page.goto(`/app/cursos/${id}/editar`);
+  await expect(page.getByLabel("Descripción")).toHaveValue(
+    "Curso histórico con grupo editado sin JavaScript.",
+  );
+  await expect(page.getByLabel("Horario planificado histórico")).toHaveValue(
+    "Lunes a viernes, 08:00–09:30",
+  );
+  await expect(
+    page.getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)"),
+  ).toHaveValue("2027-03-01T08:00");
+  await expect(page.locator('[name="registrationStartAt"]')).toHaveValue(
+    "2027-01-01T08:00",
+  );
+  await expect(page.locator('[name="registrationEndAt"]')).toHaveValue(
+    "2027-02-20T18:00",
+  );
+  await page.goto(`/app/cursos/${id}/grupos`);
+  await page.locator("[data-action-fallback] summary").click();
+  await expect(
+    page.getByRole("button", { name: "Sí, desactivar grupo" }),
+  ).toBeVisible();
+  await page.locator("[data-action-fallback] summary").click();
+  await expect(
+    page.getByRole("button", { name: "Sí, desactivar grupo" }),
   ).toBeHidden();
-  await page.locator("[data-cancel-fallback] summary").click();
-  await page.getByRole("button", { name: "Sí, cancelar grupo" }).click();
+  await page.locator("[data-action-fallback] summary").click();
+  await page.getByRole("button", { name: "Sí, desactivar grupo" }).click();
   await expect(page).toHaveURL(/success=cancelled/);
-  await expect(page.getByText("Cancelado", { exact: true })).toBeVisible();
+  await expect(page.getByText("Inactivo", { exact: true })).toBeVisible();
 });

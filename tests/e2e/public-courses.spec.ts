@@ -43,22 +43,21 @@ test("published course is public end-to-end and withdrawal removes every public 
     await page
       .getByLabel("Contenido del curso (Markdown, opcional)")
       .fill(
-        "## Temario público\n- **Unidad segura**\n\n> Nota del curso\n\n```ts\nconst ejemplo = 1;\n```\n\n---\n\n[Guía válida](https://example.com/guia)\n[Enlace inseguro](javascript:alert(1))\n<script>alert(2)</script>",
+        "## Temario público\n- **Unidad segura**\n  - Unidad anidada\n\n> Nota del curso\n\n```ts\nconst ejemplo = 1;\n```\n\n---\n\n[Guía válida](https://example.com/guia)\n[Enlace inseguro](javascript:alert(1))\n<script>alert(2)</script>",
       );
     await page.getByLabel("Condiciones").fill("Inscripción sujeta a cupo.");
-    for (const [label, date, time] of [
-      ["Inicio de clases (Bolivia)", "01/03/2027", "18:30"],
-      ["Apertura de preinscripción", "01/01/2027", "08:00"],
-      ["Cierre de preinscripción", "20/02/2027", "18:00"],
+    for (const [label, date] of [
+      ["Apertura de preinscripción", "01/01/2027"],
+      ["Último día de preinscripción", "20/02/2027"],
     ] as const) {
-      await page.getByLabel(label, { exact: true }).fill(date);
-      await page
-        .getByRole("textbox", {
-          name: `Hora de ${label.toLowerCase()}`,
-          exact: true,
-        })
-        .fill(time);
+      await page.getByRole("textbox", { name: label, exact: true }).fill(date);
     }
+    await page
+      .getByRole("textbox", {
+        name: "Fecha de inicio de clases (Bolivia)",
+        exact: true,
+      })
+      .fill("01/03/2027");
     await page.getByLabel("Nota mínima (0–100)").fill("70");
     await page.getByRole("button", { name: "Crear borrador" }).click();
     await expect(page).toHaveURL(/\/app\/cursos\/[^/]+\/editar$/);
@@ -68,7 +67,7 @@ test("published course is public end-to-end and withdrawal removes every public 
     courseId = new URL(page.url()).pathname.split("/").at(-2);
     expect(courseId).toMatch(/^[0-9a-f-]{36}$/i);
 
-    // Generate a valid 400×250 WebP in Chromium; the editor then crops and uploads it.
+    // Generate a valid 400×250 WebP in Chromium; saving the form uploads the crop.
     const webpBytes = await page.evaluate(async () => {
       const canvas = new OffscreenCanvas(400, 250);
       const drawing = canvas.getContext("2d");
@@ -94,20 +93,18 @@ test("published course is public end-to-end and withdrawal removes every public 
       mimeType: "image/webp",
       buffer: Buffer.from(webpBytes),
     });
-    await expect(
-      page.getByRole("img", { name: "Vista previa del encuadre del curso" }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Subir foto recortada" }).click();
-    await expect(
-      page.getByRole("status").filter({ hasText: "Foto cargada" }),
-    ).toContainText("aún no está guardada");
-    artworkKey = await page.locator('input[name="artwork"]').inputValue();
-    expect(artworkKey).toMatch(
-      new RegExp(`^courses/${courseId}/[0-9a-f-]+\\.webp$`, "i"),
-    );
+    await page
+      .getByRole("dialog", { name: "Recortar foto del curso" })
+      .getByRole("button", { name: "Guardar recorte" })
+      .click();
+    await expect(page.locator('input[name="artwork"]')).toHaveValue("");
     await page.getByRole("button", { name: "Guardar cambios" }).click();
     await expect(page.locator("[data-sileo-toast]")).toContainText(
       "Cambios guardados",
+    );
+    artworkKey = await page.locator('input[name="artwork"]').inputValue();
+    expect(artworkKey).toMatch(
+      new RegExp(`^courses/${courseId}/[0-9a-f-]+\\.webp$`, "i"),
     );
     await expect(
       page.getByRole("button", { name: "Guardar cambios" }),
@@ -130,17 +127,41 @@ test("published course is public end-to-end and withdrawal removes every public 
       name: new RegExp(courseName),
     });
     await expect(landingCourse).toBeVisible();
+    await expect(landingCourse).not.toContainText(/marzo|febrero|fechas/i);
+    await expect(landingCourse).toContainText("20 horas");
     await expect(landingCourse.locator("img")).toHaveAttribute(
       "src",
       new RegExp(`/${courseId}/`),
     );
 
     await page.goto("/cursos");
+    await expect(
+      page
+        .getByRole("navigation", { name: "Navegación principal" })
+        .getByRole("link", { name: "Cursos" }),
+    ).toHaveAttribute("href", "/cursos");
+    await expect(page.locator(".back-link")).toHaveCount(0);
+    await expect(page.locator(".catalog-intro h1")).toHaveCSS(
+      "max-width",
+      "none",
+    );
+    await expect(page.locator(".catalog-intro > p")).toHaveCSS(
+      "max-width",
+      "none",
+    );
     const catalogCourse = page.getByRole("link", {
       name: `Ver curso: ${courseName}`,
     });
     await expect(catalogCourse).toBeVisible();
+    await expect(catalogCourse).not.toContainText(/marzo|febrero|fechas/i);
+    await expect(catalogCourse).toContainText("20 horas");
+    await expect(catalogCourse.locator("..")).toHaveClass(/is-visible/);
+    await expect(catalogCourse.locator("..")).toHaveCSS(
+      "animation-name",
+      "row-acquires-signal",
+    );
     const catalogImage = catalogCourse.locator("img");
+    await expect(catalogImage).toHaveCSS("object-fit", "cover");
     await expect(catalogImage).toHaveAttribute(
       "src",
       new RegExp(`/${courseId}/`),
@@ -152,16 +173,30 @@ test("published course is public end-to-end and withdrawal removes every public 
     expect(imageResponse.headers()["content-type"]).toContain("image/webp");
     detailUrl = (await catalogCourse.getAttribute("href")) ?? undefined;
     await catalogCourse.click();
+    await expect(page.locator(".back-link")).toHaveCount(0);
+    const registration = page.locator(".registration-window");
+    await expect(registration).toContainText("Abre");
+    await expect(registration).toContainText("Cierra");
+    await expect(registration).not.toContainText(/a las|p\. m\.|a\. m\./i);
+    await expect(registration).toContainText("1 de enero de 2027");
+    await expect(registration).toContainText("20 de febrero de 2027");
+    await expect(registration).not.toContainText(/\b\d{1,2}:\d{2}\b/);
+    await expect(page.getByRole("heading", { name: "Horario" })).toHaveCount(0);
 
     await expect(
       page.getByRole("heading", { level: 1, name: courseName }),
     ).toBeVisible();
     await expect(
       page.locator("dt").filter({ hasText: "Inicio" }).locator("+ dd"),
-    ).toContainText(/1.*marzo.*2027/i);
+    ).toHaveText("1 de marzo de 2027");
     await expect(
       page.locator("dt").filter({ hasText: "Finalización" }).locator("+ dd"),
-    ).toContainText(/17.*marzo.*2027/i);
+    ).toHaveText("17 de marzo de 2027");
+    await expect(
+      page
+        .getByRole("complementary", { name: "Información del curso" })
+        .getByText("20 horas"),
+    ).toBeVisible();
     await expect(
       page.getByText("Docente público E2E", { exact: true }),
     ).toBeVisible();
@@ -171,6 +206,14 @@ test("published course is public end-to-end and withdrawal removes every public 
     await expect(
       page.getByText("Unidad segura", { exact: true }),
     ).toBeVisible();
+    await expect(page.locator(".course-markdown > ul")).toHaveCSS(
+      "list-style-type",
+      "disc",
+    );
+    await expect(page.locator(".course-markdown > ul ul")).toHaveCSS(
+      "list-style-type",
+      "circle",
+    );
     await expect(page.locator(".course-markdown strong")).toHaveText(
       "Unidad segura",
     );
@@ -194,6 +237,39 @@ test("published course is public end-to-end and withdrawal removes every public 
       "src",
       new RegExp(`/${courseId}/`),
     );
+    const content = page.locator(".detail-main");
+    const facts = page.getByRole("complementary", {
+      name: "Información del curso",
+    });
+    const [desktopContent, desktopFacts] = await Promise.all([
+      content.boundingBox(),
+      facts.boundingBox(),
+    ]);
+    expect(desktopContent).not.toBeNull();
+    expect(desktopFacts).not.toBeNull();
+    expect(desktopFacts!.x).toBeGreaterThan(desktopContent!.x);
+    expect(desktopFacts!.width / desktopContent!.width).toBeCloseTo(1, 1);
+    const startFact = facts.locator(":scope > dl > div").nth(0);
+    const endFact = facts.locator(":scope > dl > div").nth(1);
+    const [desktopStart, desktopEnd] = await Promise.all([
+      startFact.boundingBox(),
+      endFact.boundingBox(),
+    ]);
+    expect(desktopEnd!.x).toBeGreaterThan(desktopStart!.x);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const [mobileContent, mobileFacts] = await Promise.all([
+      content.boundingBox(),
+      facts.boundingBox(),
+    ]);
+    expect(mobileContent).not.toBeNull();
+    expect(mobileFacts).not.toBeNull();
+    expect(mobileFacts!.y).toBeGreaterThan(mobileContent!.y);
+    expect(mobileFacts!.width).toBeCloseTo(mobileContent!.width, 0);
+    const [mobileStart, mobileEnd] = await Promise.all([
+      startFact.boundingBox(),
+      endFact.boundingBox(),
+    ]);
+    expect(mobileEnd!.y).toBeGreaterThan(mobileStart!.y);
 
     // The upload really reached public Storage; remove it even when later assertions fail.
     await signInFixture(context, AUTH_FIXTURES.admin.email);
@@ -268,7 +344,7 @@ test("public catalog and detail are available without a session, with useful emp
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
       name?.replace("Ver curso: ", "") ?? "",
     );
-    await expect(page.getByRole("heading", { name: "Horario" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Horario" })).toHaveCount(0);
     await expect(
       page.getByRole("heading", { name: "Condiciones" }),
     ).toBeVisible();
@@ -297,8 +373,10 @@ test("unknown slug uses the same public 404 without exposing private data", asyn
     page.getByRole("heading", { name: "Curso no encontrado." }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Ver todos los cursos" }),
-  ).toBeVisible();
+    page
+      .getByRole("navigation", { name: "Navegación de pie de página" })
+      .getByRole("link", { name: "Cursos" }),
+  ).toHaveAttribute("href", "/cursos");
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
     "content",
     "noindex,nofollow",

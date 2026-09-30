@@ -66,16 +66,16 @@ Los niveles iniciales son:
 - El curso nace como `DRAFT`, puede publicarse, retirarse de `PUBLISHED` a `DRAFT` y archivarse sin borrado físico. `ARCHIVED` es terminal en esta fase.
 - El slug se deriva del nombre al crear, es único y permanece inmutable aunque cambie el nombre.
 - Un curso publicado puede editar su información pública y precios; cada cambio queda auditado.
-- Nombre, descripción, nivel, formato, horario informativo, condiciones, fechas públicas y nota mínima son obligatorios. El formato aporta duración positiva y precios `STUDENT`/`EXTERNAL` en `BOB`.
+- Nombre, descripción, nivel, formato, condiciones, fechas públicas y nota mínima son obligatorios. El horario diario pertenece a cada grupo; el formato aporta duración positiva y precios `STUDENT`/`EXTERNAL` en `BOB`.
 - La nota mínima admite enteros de 0 a 100. No se configura aún asistencia mínima ni se calculan resultados académicos.
-- La ventana de preinscripción es opcional como conjunto: apertura y cierre deben estar ambos ausentes o ambos presentes, con apertura anterior al cierre. Su disponibilidad es derivada.
-- Los campos `datetime-local` se interpretan como tiempo civil de Bolivia (`America/La_Paz`, UTC-04 sin DST), validan exactamente `YYYY-MM-DDTHH:mm` y conservan la misma hora visible después de persistir y reeditar.
+- La ventana de preinscripción es opcional como conjunto: apertura y último día deben estar ambos ausentes o ambos presentes. En cursos nuevos se ingresan fechas civiles de Bolivia (`YYYY-MM-DD`): abre a las 00:00 del día de apertura y permanece abierta durante todo el último día, cerrando a las 00:00 del día siguiente (límite exclusivo). El último día debe ser anterior al inicio de clases. Los cursos heredados conservan sus instantes precisos de apertura y cierre al editarse.
+- Los campos de fecha/hora se interpretan como tiempo civil de Bolivia (`America/La_Paz`, UTC-04 sin DST). Las fechas comunes de cursos nuevos se ingresan como fecha civil (`YYYY-MM-DD`); los campos heredados de fecha/hora conservan la hora visible al reeditar.
 - Una edición debe incluir la revisión observada del curso. Si otra operación cambió el agregado, el guardado obsoleto se rechaza sin sobrescribir y permite revisar/reintentar.
 - Todo monto se expresa como decimal de dos posiciones en moneda `BOB`; no se usan valores de punto flotante.
 - Solo un usuario interno activo con rol `ADMIN` puede crear, modificar o cambiar el estado de un curso.
 - La publicación exige un formato activo/revisión válida con exactamente los precios `STUDENT` y `EXTERNAL` aplicables, ambos en `BOB`.
 - El contrato público devuelve exclusivamente cursos `PUBLISHED` y no expone identificadores, estado, nota mínima ni timestamps administrativos; catálogo y detalle están implementados por SSR.
-- El campo `schedule` sigue siendo texto informativo. Las ofertas nuevas planificadas lo generan a partir de lunes a viernes y la duración de sesión del formato; los cursos anteriores conservan su horario textual y todavía no hay sesiones operativas de grupos.
+- El campo `schedule` sigue siendo texto informativo de compatibilidad. Los cursos nuevos indican que el horario depende del grupo, y los cursos anteriores conservan su horario textual o el plan horario histórico. Todavía no hay sesiones operativas de grupos.
 - El contenido opcional Markdown se presenta sin HTML crudo y se filtran protocolos de enlaces no permitidos. Instructor se almacena como texto provisional, no como asignación de identidad.
 - Se puede seleccionar como destacado, con máximo uno entre cursos publicados; si no se designa uno, landing y catálogo usan fallback determinista.
 
@@ -88,10 +88,11 @@ Los niveles iniciales son:
 - La migración asigna a cursos existentes formatos/revisiones construidos con sus valores históricos exactos.
 - Los formatos de 20 h (80/100 Bs) y 30 h (120/150 Bs) los crea el seed local como defaults editables de desarrollo, no como precios universales.
 - Cada nueva revisión de formato registra también la duración de sesión en minutos. Los ejemplos 20 h/90 min y 30 h/150 min se configuran explícitamente; revisiones históricas sin esa información permanecen sin resolver, salvo coincidencias exactas con los ejemplos conocidos.
-- Los cursos nuevos con formato configurado se programan de lunes a viernes: se indica el inicio civil de Bolivia y el fin diario y la última fecha se derivan de sesiones completas, redondeando la cantidad al entero más cercano. Así, 20 h/90 min implica 13 sesiones y 19,5 h planificadas; 30 h/150 min implica 12 sesiones y 30 h. Se distinguen duración nominal y horas efectivamente planificadas. Feriados y recuperaciones quedan pendientes del calendario operativo de grupos.
+- Los cursos nuevos con formato configurado se programan de lunes a viernes: se indica la fecha civil inicial de Bolivia y se calcula la última fecha a partir de sesiones completas, redondeando la cantidad al entero más cercano. Así, 20 h/90 min implica 13 sesiones y 19,5 h planificadas; 30 h/150 min implica 12 sesiones y 30 h. El curso comparte fechas y días; cada grupo define su hora de inicio y el fin diario se deriva de la duración de sesión. La fecha final es calculada y no editable. Los horarios de grupos del mismo curso no se solapan (los turnos contiguos sí se permiten), y la interfaz previsualiza el fin según el formato. No se desplazan automáticamente las fechas por feriados: su calendario y las recuperaciones quedan pendientes del calendario operativo de grupos.
 - El inicio de un curso nuevo planificado no puede ser pasado ni caer en fin de semana, el fin se valida contra el plan y la preinscripción opcional debe cerrar antes del inicio de clases. Las ofertas históricas sin planificación estructurada mantienen sus fechas y horario informativo originales.
+- En cursos nuevos con planificación L–V, la fecha inicial debe ser futura y hábil; las fechas/horas de calendario heredadas impiden fines de semana y fechas pasadas cuando corresponde. La preinscripción exige apertura y cierre juntos, con cierre posterior a apertura y ambos previos al inicio del curso; al editar ofertas históricas se conservan las horas civiles.
 - El upload de artwork opcional se limita a administradores autorizados, y al faltar imagen se conserva fallback gráfico Cota Activa.
-- Con JavaScript, el administrador puede seleccionar y recortar artwork en el alta. Al crear se persiste primero el borrador, luego se sube WebP mediante el endpoint autorizado y se asocia con una edición que usa revisión optimista. Si falla la carga, el borrador permanece y se ofrece reintentar o abrir su edición. Sin JavaScript se puede crear sin foto y añadirla después desde edición.
+- Con JavaScript, el administrador recorta la foto en una ventana emergente: el área que quedará visible se muestra normal y el exterior oscurecido. «Guardar recorte» prepara una vista previa WebP; solo al guardar el formulario se sube mediante el endpoint autorizado. Al crear se persiste primero el borrador y después se asocia la imagen con revisión optimista; al editar, la carga y asociación ocurren al pulsar «Guardar cambios». Si falla el proceso después de crear el borrador se puede reintentar sin duplicarlo o abrir su edición. Sin JavaScript se puede crear sin foto.
 - El descuento del 50 % para auxiliares no está implementado: no existe elegibilidad validada ni tercer precio; permanece para fases de inscripción/descuentos posteriores.
 
 ## PREINSCRIPCIÓN
@@ -124,10 +125,12 @@ Cada grupo debe permitir configurar:
 
 - capacidad máxima positiva propia (sin mínimo automático);
 - hora de inicio de clase y fin calculado según la revisión del formato;
-- fechas y días L–V heredados del curso publicado;
+- fechas y días L–V heredados del curso (en borrador o publicado);
 - estado.
 
 El instructor sigue siendo un dato global del curso hasta que exista asignación real de usuarios instructores. Solo los grupos **del mismo curso** no pueden solapar horarios; los extremos contiguos son válidos. El cupo de un grupo no impide que administración decida impartirlo con menos participantes.
+
+Durante el alta pueden configurarse cero o varios grupos en un mismo formulario. Primero se guarda el borrador y luego se crean sus grupos; ante un fallo parcial se muestra el enlace al borrador y se reintentan únicamente los pasos pendientes. También pueden añadirse grupos en la pestaña «Grupos» mientras el curso sea `DRAFT` o `PUBLISHED`, nunca `ARCHIVED`, siempre que disponga de calendario L–V y duración de sesión conocida. La existencia de grupos fija las fechas del curso y su revisión de formato. Un grupo que nunca fue publicado puede eliminarse; después de su primera publicación se conserva y solo puede desactivarse/cancelarse o reactivarse.
 
 ### RF-GRP-003
 
@@ -390,9 +393,9 @@ La landing pública debe ser la fuente web oficial para información vigente.
 
 La jerarquía pública aprobada es:
 
-- las tarjetas de landing muestran disponibilidad, título, descripción breve, inicio/fecha, nivel y duración;
+- las tarjetas de landing y catálogo no muestran rangos de fechas y conservan el nivel y la duración total en horas;
 - las tarjetas no muestran los dos precios detallados ni el horario detallado;
-- `/cursos/[slug]` contiene el horario exacto, las condiciones y los precios diferenciados.
+- `/cursos/[slug]` muestra inicio, fin y apertura/cierre de preinscripción como fechas civiles de Bolivia sin hora, además de condiciones y precios diferenciados; no muestra el horario informativo legado. Los horarios de grupos se consultan únicamente en administración.
 
 ## DOCUMENTOS
 

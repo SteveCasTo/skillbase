@@ -40,6 +40,52 @@ function localDate(date: Date) {
   return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
 }
 
+function dateKey(date: Date) {
+  return `${date.getFullYear().toString().padStart(4, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+// Historical courses store civil instants, not inclusive registration days.
+// A registration may open and close on the same day if its times are ordered.
+export function dateTimeUnavailable(
+  name: string,
+  day: Date,
+  time: string,
+  bounds: { start: string; registrationStart: string; registrationEnd: string },
+  today: string,
+  weekdaysOnly: boolean,
+  futureOnly: boolean,
+) {
+  const key = dateKey(day);
+  if (
+    (weekdaysOnly && (day.getDay() === 0 || day.getDay() === 6)) ||
+    (futureOnly && key < today)
+  )
+    return true;
+  if (name !== "registrationStartAt" && name !== "registrationEndAt")
+    return false;
+  const instant = `${key}T${time}`;
+  if (
+    bounds.start &&
+    validTime(time) &&
+    (name === "registrationStartAt"
+      ? instant >= bounds.start
+      : instant > bounds.start)
+  )
+    return true;
+  // With no time selected, reject only dates on the wrong side of a boundary.
+  // Keep same-day choices available so the user can enter a valid hour.
+  if (bounds.start && key > bounds.start.slice(0, 10)) return true;
+  if (name === "registrationStartAt" && bounds.registrationEnd) {
+    if (key > bounds.registrationEnd.slice(0, 10)) return true;
+    if (validTime(time) && instant >= bounds.registrationEnd) return true;
+  }
+  if (name === "registrationEndAt" && bounds.registrationStart) {
+    if (key < bounds.registrationStart.slice(0, 10)) return true;
+    if (validTime(time) && instant <= bounds.registrationStart) return true;
+  }
+  return false;
+}
+
 export default function CourseDateTimePicker({
   name,
   label,
@@ -58,6 +104,7 @@ export default function CourseDateTimePicker({
   const [open, setOpen] = useState(false);
   const [bounds, setBounds] = useState({
     start: "",
+    registrationStart: "",
     registrationEnd: "",
   });
   const field = useRef<HTMLInputElement>(null);
@@ -69,6 +116,7 @@ export default function CourseDateTimePicker({
       const data = new FormData(form);
       setBounds({
         start: String(data.get("startsAt") ?? ""),
+        registrationStart: String(data.get("registrationStartAt") ?? ""),
         registrationEnd: String(data.get("registrationEndAt") ?? ""),
       });
     };
@@ -90,25 +138,29 @@ export default function CourseDateTimePicker({
   const part = (name: "year" | "month" | "day") =>
     parts.find((item) => item.type === name)?.value ?? "";
   const today = `${part("year")}-${part("month")}-${part("day")}`;
-  const dateKey = selected
-    ? `${selected.getFullYear().toString().padStart(4, "0")}-${String(selected.getMonth() + 1).padStart(2, "0")}-${String(selected.getDate()).padStart(2, "0")}`
-    : "";
   const blocked = Boolean(
     selected &&
-    ((weekdaysOnly && (selected.getDay() === 0 || selected.getDay() === 6)) ||
-      (futureOnly && dateKey < today)),
+    dateTimeUnavailable(
+      name,
+      selected,
+      time,
+      bounds,
+      today,
+      weekdaysOnly,
+      futureOnly,
+    ),
   );
   const problem =
     date && !selected
       ? "Ingresa una fecha válida (DD/MM/AAAA)."
       : blocked
-        ? "Selecciona un día hábil que no haya pasado."
+        ? "Selecciona una fecha y hora dentro del plazo permitido."
         : time && !validTime(time)
           ? "Ingresa una hora válida (HH:mm)."
           : "";
   const combined =
     selected && !blocked && validTime(time)
-      ? `${selected.getFullYear().toString().padStart(4, "0")}-${String(selected.getMonth() + 1).padStart(2, "0")}-${String(selected.getDate()).padStart(2, "0")}T${time}`
+      ? `${dateKey(selected)}T${time}`
       : !match && date === value && !time
         ? value
         : "";
@@ -147,7 +199,7 @@ export default function CourseDateTimePicker({
       <label htmlFor={`${name}-date`} className="text-sm font-medium">
         {label}
       </label>
-      <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
         <Input
           ref={dateField}
           id={`${name}-date`}
@@ -160,7 +212,7 @@ export default function CourseDateTimePicker({
           required={required}
           aria-invalid={Boolean(fieldError)}
           aria-describedby={fieldError ? `${name}-error` : undefined}
-          className="h-11 min-w-0 flex-1 px-1 text-center text-xs tabular-nums sm:px-2 sm:text-sm"
+          className="h-11 min-w-0 flex-1 basis-1/2 tabular-nums sm:basis-0"
           onChange={(event) => {
             setDate(nextCourseInput("date", date, event.target.value));
             event.target.setCustomValidity("");
@@ -190,18 +242,15 @@ export default function CourseDateTimePicker({
               locale={es}
               selected={selected}
               disabled={(day) =>
-                (weekdaysOnly && (day.getDay() === 0 || day.getDay() === 6)) ||
-                (futureOnly &&
-                  `${day.getFullYear().toString().padStart(4, "0")}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}` <
-                    today) ||
-                (name === "registrationEndAt" &&
-                  Boolean(bounds.start) &&
-                  `${day.getFullYear().toString().padStart(4, "0")}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}` >
-                    bounds.start.slice(0, 10)) ||
-                (name === "registrationStartAt" &&
-                  Boolean(bounds.registrationEnd) &&
-                  `${day.getFullYear().toString().padStart(4, "0")}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}` >
-                    bounds.registrationEnd.slice(0, 10))
+                dateTimeUnavailable(
+                  name,
+                  day,
+                  "",
+                  bounds,
+                  today,
+                  weekdaysOnly,
+                  futureOnly,
+                )
               }
               onSelect={(next) => {
                 if (next) {
@@ -221,6 +270,7 @@ export default function CourseDateTimePicker({
           value={time}
           disabled={disabled}
           invalid={Boolean(fieldError)}
+          {...(fieldError ? { errorId: `${name}-error` } : {})}
           onChange={(next) => {
             setTime(next);
             dateField.current?.setCustomValidity("");

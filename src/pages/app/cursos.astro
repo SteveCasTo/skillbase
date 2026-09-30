@@ -188,6 +188,7 @@ const levelLabel = {
   <script>
     import { sileo } from "sileo";
     document.addEventListener("astro:page-load", () => {
+      if (window.location.pathname !== "/app/cursos") return;
       const success = new URLSearchParams(window.location.search).get(
         "success",
       );

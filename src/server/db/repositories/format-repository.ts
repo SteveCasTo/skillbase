@@ -4,7 +4,11 @@ import type { FormatRepository } from "@/application/courses/format-repository";
 import type { CourseFormat, FormatValues } from "@/domain/courses/formats";
 import { CourseDomainError } from "@/domain/courses/errors";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
-import { planWeekdaySchedule } from "@/domain/courses/weekday-schedule";
+import {
+  GROUP_SCHEDULE,
+  planCourseDates,
+  planWeekdaySchedule,
+} from "@/domain/courses/weekday-schedule";
 import * as schema from "@/server/db/schema";
 import { CourseInfrastructureError } from "./course-infrastructure-error";
 
@@ -268,44 +272,61 @@ export class DrizzleFormatRepository implements FormatRepository {
           })
           .returning();
         if (!revision) throw new Error("Format revision insert failed");
-        const structuredDrafts = await tx
+        const drafts = await tx
           .select()
           .from(schema.courses)
           .where(
-            sql`${schema.courses.status} = 'DRAFT' and ${schema.courses.weekdaysMask} is not null and ${schema.courses.courseTypeRevisionId} in (select id from course_type_revisions where course_type_id = ${id}) and not exists (select 1 from groups where course_id = ${schema.courses.id})`,
-          );
-        if (structuredDrafts.length && revision.sessionMinutes === null)
-          throw new CourseDomainError(
-            "VALIDATION_FAILED",
-            "No se puede quitar la duración de sesión de un formato con cursos planificados.",
-          );
-        for (const draft of structuredDrafts) {
-          if (draft.weekdaysMask === null || revision.sessionMinutes === null)
-            continue;
-          const planned = planWeekdaySchedule({
-            startsAt: instantToBoliviaCivil(draft.startsAt),
-            weekdaysMask: draft.weekdaysMask,
-            totalHours: revision.totalHours,
-            sessionMinutes: revision.sessionMinutes,
-          });
+            sql`${schema.courses.status} = 'DRAFT' and ${schema.courses.courseTypeRevisionId} in (select id from course_type_revisions where course_type_id = ${id})`,
+          )
+          .for("update");
+        for (const draft of drafts) {
+          // A first group may have committed while we waited for the row lock.
+          // Recheck in a new statement with the lock held before moving its plan.
+          const [group] = await tx
+            .select({ id: schema.groups.id })
+            .from(schema.groups)
+            .where(eq(schema.groups.courseId, draft.id))
+            .limit(1);
+          if (group) continue;
+          if (draft.weekdaysMask !== null && revision.sessionMinutes === null)
+            throw new CourseDomainError(
+              "VALIDATION_FAILED",
+              "No se puede quitar la duración de sesión de un formato con cursos planificados.",
+            );
+          const civilStart = instantToBoliviaCivil(draft.startsAt);
+          const dateOnly = draft.schedule === GROUP_SCHEDULE;
+          const planned =
+            draft.weekdaysMask !== null && revision.sessionMinutes !== null
+              ? dateOnly
+                ? planCourseDates({
+                    startDate: civilStart.slice(0, 10),
+                    weekdaysMask: draft.weekdaysMask,
+                    totalHours: revision.totalHours,
+                    sessionMinutes: revision.sessionMinutes,
+                  })
+                : planWeekdaySchedule({
+                    startsAt: civilStart,
+                    weekdaysMask: draft.weekdaysMask,
+                    totalHours: revision.totalHours,
+                    sessionMinutes: revision.sessionMinutes,
+                  })
+              : null;
           await tx
             .update(schema.courses)
             .set({
-              endsAt: planned.endsAt,
-              schedule: `Lunes a viernes, ${instantToBoliviaCivil(draft.startsAt).slice(11)}–${planned.endTime}`,
+              ...(planned
+                ? {
+                    endsAt: planned.endsAt,
+                    schedule: dateOnly
+                      ? GROUP_SCHEDULE
+                      : `Lunes a viernes, ${civilStart.slice(11)}–${"endTime" in planned ? planned.endTime : ""}`,
+                  }
+                : {}),
+              courseTypeRevisionId: revision.id,
+              updatedAt: sql`date_trunc('milliseconds', greatest(now(), ${schema.courses.updatedAt}) + interval '1 millisecond')`,
             })
             .where(eq(schema.courses.id, draft.id));
         }
-        // Drafts follow the current revision; preserve optimistic editing by bumping their version.
-        await tx
-          .update(schema.courses)
-          .set({
-            courseTypeRevisionId: revision.id,
-            updatedAt: sql`date_trunc('milliseconds', greatest(now(), ${schema.courses.updatedAt}) + interval '1 millisecond')`,
-          })
-          .where(
-            sql`${schema.courses.status} = 'DRAFT' and ${schema.courses.courseTypeRevisionId} in (select id from course_type_revisions where course_type_id = ${id}) and not exists (select 1 from groups where course_id = ${schema.courses.id})`,
-          );
         await tx
           .update(schema.courseTypes)
           .set({

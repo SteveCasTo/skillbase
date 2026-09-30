@@ -16,6 +16,34 @@ export function weekdayMask(days: readonly number[]): number {
   return days.reduce((mask, day) => mask | (1 << (day - 1)), 0);
 }
 
+/** Planned courses own civil dates; daily class hours belong exclusively to groups. */
+export const GROUP_SCHEDULE = "Lunes a viernes · horario por grupo";
+export const COURSE_DATE_START_TIME = "00:00";
+export const COURSE_DATE_END_TIME = "23:59";
+
+export function planCourseDates(input: {
+  startDate: string;
+  weekdaysMask: number;
+  totalHours: number;
+  sessionMinutes: number;
+}) {
+  const plan = planWeekdaySchedule({
+    startsAt: `${input.startDate}T${COURSE_DATE_START_TIME}`,
+    weekdaysMask: input.weekdaysMask,
+    totalHours: input.totalHours,
+    sessionMinutes: input.sessionMinutes,
+  });
+  const lastDate = instantToBoliviaCivil(plan.endsAt).slice(0, 10);
+  return {
+    startsAt: boliviaCivilToInstant(
+      `${input.startDate}T${COURSE_DATE_START_TIME}`,
+    ),
+    endsAt: boliviaCivilToInstant(`${lastDate}T${COURSE_DATE_END_TIME}`),
+    sessionCount: plan.sessionCount,
+    plannedMinutes: plan.plannedMinutes,
+  };
+}
+
 export function planWeekdaySchedule(input: {
   startsAt: string;
   weekdaysMask: number;

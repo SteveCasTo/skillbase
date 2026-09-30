@@ -161,9 +161,12 @@ html.dark:has(.landing.warm-preview) {
     );
   }
 
-  #cursos,
   #certificados {
     scroll-margin-top: 6.5rem;
+  }
+
+  #cursos {
+    scroll-margin-top: 6rem;
   }
 
   #participar {
@@ -1820,8 +1823,7 @@ html.dark:has(.landing.warm-preview) {
     isolation: isolate;
   }
 
-  .course-artwork img,
-  .course-artwork-fallback {
+  .course-artwork img {
     display: block;
     width: 100%;
     height: 100%;
@@ -1839,52 +1841,6 @@ html.dark:has(.landing.warm-preview) {
 
   .course-artwork.is-featured-artwork img {
     object-position: 50% 50%;
-  }
-
-  .course-artwork-fallback {
-    position: relative;
-    display: grid;
-    min-height: 17rem;
-    align-content: end;
-    padding: clamp(1.25rem, 3vw, 2.5rem);
-    color: var(--on-deep);
-    background-color: var(--deep);
-    background-image: url("data:image/svg+xml,%3Csvg width='760' height='520' viewBox='0 0 760 520' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%2366b9e5' stroke-opacity='.3'%3E%3Cpath d='M-70 85C66 8 195 18 300 86s241 82 530-16'/%3E%3Cpath d='M-82 124C64 46 191 56 294 122s242 79 548-11'/%3E%3Cpath d='M-91 166C68 84 184 95 286 158s251 77 570-8'/%3E%3Cpath d='M-101 211C65 124 178 136 280 197s256 75 590-5'/%3E%3Cpath d='M-117 259C60 168 173 180 272 240s263 72 612-3'/%3E%3Cpath d='M-130 309C56 216 168 229 266 286s271 68 630 2'/%3E%3C/g%3E%3C/svg%3E");
-    background-position: 50% 20%;
-    background-size: cover;
-    transition: background-position 700ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .fallback-rule {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: clamp(1.25rem, 3vw, 2.5rem);
-    width: 1px;
-    background: var(--signal);
-  }
-
-  .course-artwork-fallback strong {
-    position: relative;
-    z-index: 1;
-    padding-left: 1rem;
-    font-family: "Alef", var(--font-sans);
-    font-size: clamp(3.2rem, 7vw, 6.4rem);
-    line-height: 0.85;
-    letter-spacing: -0.06em;
-    transition: transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .fallback-caption {
-    position: relative;
-    z-index: 1;
-    margin-top: 1.25rem;
-    padding-left: 1rem;
-    color: color-mix(in srgb, var(--on-deep) 78%, transparent);
-    font-size: var(--type-metadata);
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .featured-course-copy {
@@ -1928,7 +1884,7 @@ html.dark:has(.landing.warm-preview) {
   .course-summary,
   .poster-facts {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
   }
 

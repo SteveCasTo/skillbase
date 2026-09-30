@@ -23,6 +23,7 @@ try {
 const featured =
   courses.find((course) => course.featured === true) ?? courses[0];
 const remaining = courses.filter((course) => course.slug !== featured?.slug);
+const revealStepMs = Math.min(140, 1800 / Math.max(courses.length - 1, 1));
 ---
 
 <CourseShell
@@ -31,9 +32,6 @@ const remaining = courses.filter((course) => course.slug !== featured?.slug);
   noindex={loadError}
 >
   <div class="catalog-intro">
-    <a class="back-link" href="/">
-      ← Volver al inicio
-    </a>
     <h1>Cursos para seguir aprendiendo.</h1>
     <p>
       Consulta las convocatorias publicadas y revisa fechas, requisitos y
@@ -61,8 +59,11 @@ const remaining = courses.filter((course) => course.slug !== featured?.slug);
       <CoursePoster course={featured} prominent />
       {remaining.length > 0 && (
         <div class="catalog-grid">
-          {remaining.map((course) => (
-            <CoursePoster {course} />
+          {remaining.map((course, index) => (
+            <CoursePoster
+              {course}
+              revealDelay={Math.round((index + 1) * revealStepMs)}
+            />
           ))}
         </div>
       )}
@@ -76,7 +77,29 @@ const remaining = courses.filter((course) => course.slug !== featured?.slug);
         Por ahora no hay cursos publicados. Vuelve a consultar esta página para
         conocer las próximas convocatorias.
       </p>
-      <a href="/">Volver al inicio</a>
     </section>
   )}
 </CourseShell>
+
+<script>
+  const list = document.querySelector<HTMLElement>(".catalog-list");
+  if (
+    list &&
+    !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
+    "IntersectionObserver" in window
+  ) {
+    list.classList.add("motion-enhanced");
+    const observer = new IntersectionObserver(
+      (entries, instance) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.classList.add("is-visible");
+          instance.unobserve(entry.target);
+        }
+      },
+      { rootMargin: "0px 0px -8%", threshold: 0.01 },
+    );
+    for (const poster of list.querySelectorAll(".catalog-poster"))
+      observer.observe(poster);
+  }
+</script>

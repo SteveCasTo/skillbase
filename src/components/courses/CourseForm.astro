@@ -4,9 +4,11 @@ import type { CourseFormat } from "@/domain/courses/formats";
 import CourseSelect from "./CourseSelect";
 import CourseImageEditor from "./CourseImageEditor";
 import CourseDateTimePicker from "./CourseDateTimePicker";
+import CourseDatePicker from "./CourseDatePicker";
 import CourseSchedulePicker from "./CourseSchedulePicker";
 import CourseWeekdayPlanner from "./CourseWeekdayPlanner";
 import CourseMarkdownEditor from "./CourseMarkdownEditor";
+import { GROUP_SCHEDULE } from "@/domain/courses/weekday-schedule";
 import { publicArtworkUrl } from "@/server/courses/artwork";
 
 interface Props {
@@ -40,6 +42,12 @@ const control =
   "mt-2 min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";
 const area = `${control} min-h-28 resize-y`;
 const errorId = (name: string) => (errors[name] ? `${name}-error` : undefined);
+const legacy = Boolean(courseId && !baseline?.weekdays);
+const historicalHourlyPlan = Boolean(
+  courseId && baseline?.weekdays && !baseline.startsAt?.endsWith("T00:00"),
+);
+const dateOnlyRegistration =
+  !courseId || baseline?.registrationStartDate !== undefined;
 const trackedFields = [
   "name",
   "description",
@@ -51,8 +59,9 @@ const trackedFields = [
   "conditions",
   "startsAt",
   "endsAt",
-  "registrationStartAt",
-  "registrationEndAt",
+  ...(dateOnlyRegistration
+    ? (["registrationStartDate", "registrationEndDate"] as const)
+    : (["registrationStartAt", "registrationEndAt"] as const)),
   "minimumGrade",
   "artwork",
 ] as const;
@@ -66,7 +75,6 @@ const currentArtworkUrl = publicArtworkUrl(
   displayedArtwork,
   import.meta.env.PUBLIC_SUPABASE_URL,
 );
-const legacy = Boolean(courseId && !baseline?.weekdays);
 ---
 
 <form
@@ -74,6 +82,9 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
   class="course-form flex flex-col gap-8"
   data-course-id={courseId}
   data-baseline={baseline ? JSON.stringify(initialValues) : undefined}
+  data-group-formats={JSON.stringify(
+    formats.map(({ id, sessionMinutes }) => [id, sessionMinutes]),
+  )}
   novalidate
 >
   {intent && <input type="hidden" name="intent" value={intent} />}
@@ -93,15 +104,15 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
       aria-live="polite"
     >
       <p>
-        El borrador ya se creó, pero la foto no quedó guardada. Puedes
-        reintentar o abrir el borrador para subirla desde allí.
+        El borrador ya se creó, pero faltan cambios por guardar. Puedes
+        reintentar o abrirlo para continuar.
       </p>
       <div class="mt-3 flex flex-wrap gap-3">
         <button
           type="button"
           class="retry-artwork min-h-11 rounded-lg border px-4 font-medium"
         >
-          Reintentar foto
+          Reintentar pendientes
         </button>
         <a
           class="draft-link inline-flex min-h-11 items-center rounded-lg border px-4 font-medium"
@@ -128,7 +139,7 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
       <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.4fr)] lg:items-start">
         {!disabled && (
           <CourseImageEditor
-            client:only="react"
+            client:load
             {...(courseId ? { courseId } : {})}
             currentArtwork={displayedArtwork ?? null}
             currentArtworkUrl={currentArtworkUrl}
@@ -190,25 +201,35 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
             { value: "ADVANCED", label: "Avanzado" },
           ]}
         />
-        <CourseSelect
-          client:only="react"
-          name="courseTypeId"
-          label="Formato de curso"
-          value={values.courseTypeId ?? ""}
-          error={errors.courseTypeId ?? ""}
-          disabled={disabled || formats.length === 0}
-          placeholder="Selecciona un formato"
-          options={formats
-            .filter(
-              (format) => format.active || format.id === values.courseTypeId,
-            )
-            .map((format) => ({
-              value: format.id,
-              label: `${format.name} · ${format.totalHours} h · ${format.studentAmount} / ${format.externalAmount} BOB`,
-              disabled:
-                !format.active || (!courseId && format.sessionMinutes === null),
-            }))}
-        />
+        <div data-format-field>
+          <CourseSelect
+            client:only="react"
+            name="courseTypeId"
+            label="Formato de curso"
+            value={values.courseTypeId ?? ""}
+            error={errors.courseTypeId ?? ""}
+            disabled={disabled || formats.length === 0}
+            placeholder="Selecciona un formato"
+            options={formats
+              .filter(
+                (format) => format.active || format.id === values.courseTypeId,
+              )
+              .map((format) => ({
+                value: format.id,
+                label: `${format.name} · ${format.totalHours} h · ${format.studentAmount} / ${format.externalAmount} BOB`,
+                disabled:
+                  !format.active ||
+                  (!courseId && format.sessionMinutes === null),
+              }))}
+          />
+          <p
+            data-format-error
+            id="courseTypeId-client-error"
+            role="alert"
+            hidden
+            class="mt-1 text-sm text-destructive"
+          ></p>
+        </div>
         <noscript>
           <label class="text-sm font-medium">
             Nivel
@@ -278,22 +299,12 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
             Contenido del curso (Markdown, opcional)
           </label>
           <CourseMarkdownEditor
-            client:only="react"
+            client:load
             value={values.contentMarkdown ?? ""}
             error={errors.contentMarkdown ?? ""}
             disabled={disabled}
             describedBy="contentMarkdown-help"
           />
-          <noscript>
-            <textarea
-              class={area}
-              id="contentMarkdown"
-              name="contentMarkdown"
-              data-course-input="multiline"
-              rows="9"
-              disabled={disabled}
-            >{values.contentMarkdown ?? ""}</textarea>
-          </noscript>
           <span class="mt-1 block text-xs text-muted-foreground">
             <span id="contentMarkdown-help">
               Usa encabezados con ## y listas con -; el texto se publicará junto
@@ -310,20 +321,31 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
           />
         )}
         <noscript>
-          <label class="sm:col-span-2">
-            {legacy
-              ? "Horario informativo legado"
-              : "Horario calculado (lunes a viernes, HH:mm–HH:mm)"}
-            <input
-              class={control}
-              name="schedule"
-              data-course-input="text"
-              value={values.schedule ?? ""}
-              required
-              disabled={disabled}
-            />
-          </label>
-          {!legacy && <input type="hidden" name="weekdays" value="1,2,3,4,5" />}
+          {legacy || historicalHourlyPlan ? (
+            <>
+              <label class="sm:col-span-2">
+                {legacy
+                  ? "Horario informativo legado"
+                  : "Horario planificado histórico"}
+                <input
+                  class={control}
+                  name="schedule"
+                  data-course-input="text"
+                  value={values.schedule ?? ""}
+                  required
+                  disabled={disabled}
+                />
+              </label>
+              {historicalHourlyPlan && (
+                <input type="hidden" name="weekdays" value="1,2,3,4,5" />
+              )}
+            </>
+          ) : (
+            <>
+              <input type="hidden" name="schedule" value={GROUP_SCHEDULE} />
+              <input type="hidden" name="weekdays" value="1,2,3,4,5" />
+            </>
+          )}
         </noscript>
         <label class="sm:col-span-2">
           <span class="text-sm font-medium">Condiciones</span>
@@ -382,41 +404,143 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
             )}
             startsAt={values.startsAt ?? ""}
             endsAt={values.endsAt ?? ""}
-            error={errors.startsAt ?? errors.endsAt ?? errors.weekdays ?? ""}
+            error={
+              errors.startDate ??
+              errors.startsAt ??
+              errors.endsAt ??
+              errors.weekdays ??
+              ""
+            }
             disabled={disabled}
           />
         )}
-        {[
-          { name: "registrationStartAt", label: "Apertura de preinscripción" },
-          { name: "registrationEndAt", label: "Cierre de preinscripción" },
-        ].map(({ name, label }) => (
-          <CourseDateTimePicker
-            client:only="react"
-            name={name}
-            label={label}
-            value={values[name] ?? ""}
-            required={false}
-            disabled={disabled}
-            error={errors[name] ?? ""}
-          />
-        ))}
+        {dateOnlyRegistration
+          ? (
+              [
+                {
+                  name: "registrationStartDate",
+                  label: "Apertura de preinscripción",
+                },
+                {
+                  name: "registrationEndDate",
+                  label: "Último día de preinscripción",
+                },
+              ] as const
+            ).map(({ name, label }) => (
+              <CourseDatePicker
+                client:only="react"
+                name={name}
+                label={label}
+                value={values[name] ?? ""}
+                disabled={disabled}
+                error={
+                  errors[name] ??
+                  errors[
+                    name === "registrationStartDate"
+                      ? "registrationStartAt"
+                      : "registrationEndAt"
+                  ] ??
+                  ""
+                }
+              />
+            ))
+          : (
+              [
+                {
+                  name: "registrationStartAt",
+                  label: "Apertura de preinscripción",
+                },
+                {
+                  name: "registrationEndAt",
+                  label: "Cierre de preinscripción",
+                },
+              ] as const
+            ).map(({ name, label }) => (
+              <CourseDateTimePicker
+                client:only="react"
+                name={name}
+                label={label}
+                value={values[name] ?? ""}
+                required={false}
+                disabled={disabled}
+                error={errors[name] ?? ""}
+              />
+            ))}
+        {dateOnlyRegistration && (
+          <p class="text-xs text-muted-foreground lg:col-span-2">
+            El plazo incluye todo el día de cierre en Bolivia. Completa ambas
+            fechas o deja ambas vacías; el cierre debe ser anterior al inicio de
+            clases.
+          </p>
+        )}
         <noscript>
-          {[
-            { name: "startsAt", label: "Inicio del curso" },
-            { name: "endsAt", label: "Finalización del curso" },
-            {
-              name: "registrationStartAt",
-              label: "Apertura de preinscripción",
-            },
-            { name: "registrationEndAt", label: "Cierre de preinscripción" },
-          ].map(({ name, label }) => (
+          {legacy || historicalHourlyPlan
+            ? [
+                { name: "startsAt", label: "Inicio del curso" },
+                { name: "endsAt", label: "Finalización del curso" },
+              ].map(({ name, label }) => (
+                <label class="text-sm font-medium">
+                  {label} (AAAA-MM-DDTHH:mm)
+                  <input
+                    class={control}
+                    name={name}
+                    value={values[name] ?? ""}
+                    required
+                    disabled={disabled}
+                  />
+                </label>
+              ))
+            : [
+                { name: "startDate", label: "Fecha de inicio de clases" },
+                { name: "endDate", label: "Fecha de finalización" },
+              ].map(({ name, label }) => (
+                <label class="text-sm font-medium">
+                  {label} (Bolivia)
+                  <input
+                    class={control}
+                    type="date"
+                    name={name}
+                    value={
+                      values[name] ??
+                      values[
+                        name === "startDate" ? "startsAt" : "endsAt"
+                      ]?.slice(0, 10) ??
+                      ""
+                    }
+                    required
+                    disabled={disabled}
+                  />
+                </label>
+              ))}
+          {(dateOnlyRegistration
+            ? ([
+                {
+                  name: "registrationStartDate",
+                  label: "Apertura de preinscripción",
+                },
+                {
+                  name: "registrationEndDate",
+                  label: "Último día de preinscripción",
+                },
+              ] as const)
+            : ([
+                {
+                  name: "registrationStartAt",
+                  label: "Apertura de preinscripción",
+                },
+                {
+                  name: "registrationEndAt",
+                  label: "Cierre de preinscripción",
+                },
+              ] as const)
+          ).map(({ name, label }) => (
             <label class="text-sm font-medium">
-              {label} (AAAA-MM-DDTHH:mm)
+              {label} ({dateOnlyRegistration ? "Bolivia" : "AAAA-MM-DDTHH:mm"})
               <input
                 class={control}
+                type={dateOnlyRegistration ? "date" : "text"}
                 name={name}
                 value={values[name] ?? ""}
-                required={name === "startsAt" || name === "endsAt"}
                 disabled={disabled}
               />
             </label>
@@ -424,6 +548,82 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
         </noscript>
       </div>
     </section>
+
+    {!courseId && !disabled && (
+      <section
+        class="rounded-xl border bg-card p-5 shadow-xs sm:p-7"
+        aria-labelledby="initial-groups-title"
+        data-initial-groups
+      >
+        <h2 id="initial-groups-title" class="text-xl font-semibold">
+          Grupos iniciales
+        </h2>
+        <p class="mt-2 text-sm text-muted-foreground">
+          Añade horarios y cupos para los grupos iniciales (opcional).
+        </p>
+        <div data-initial-group-list class="mt-5 flex flex-col gap-3"></div>
+        <template data-initial-group-template>
+          <div
+            class="grid gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
+            data-initial-group
+          >
+            <label class="min-w-0 text-sm font-medium">
+              <div class="flex min-h-5 items-baseline justify-between gap-2 whitespace-nowrap">
+                <span class="shrink-0">Hora de inicio</span>
+                <span
+                  class="min-w-0 truncate text-xs font-normal text-muted-foreground"
+                  data-initial-group-end
+                  aria-live="polite"
+                ></span>
+              </div>
+              <input
+                class={control}
+                type="time"
+                name="initialGroupTime"
+                required
+              />
+            </label>
+            <label class="min-w-0 text-sm font-medium">
+              Capacidad (personas)
+              <input
+                class={control}
+                type="number"
+                name="initialGroupCapacity"
+                min="1"
+                max="2147483647"
+                step="1"
+                required
+              />
+            </label>
+            <button
+              type="button"
+              class="min-h-11 rounded-lg border px-4 text-sm font-medium hover:bg-secondary"
+              data-remove-initial-group
+            >
+              Quitar
+            </button>
+          </div>
+        </template>
+        <button
+          type="button"
+          class="mt-4 min-h-11 rounded-lg border px-4 text-sm font-medium hover:bg-secondary"
+          data-add-initial-group
+        >
+          Añadir grupo
+        </button>
+        <p
+          data-initial-group-error
+          role="alert"
+          hidden
+          class="mt-3 text-sm text-destructive"
+        ></p>
+        <noscript>
+          <p class="mt-2 text-sm text-muted-foreground">
+            Podrás añadir grupos después de crear el borrador.
+          </p>
+        </noscript>
+      </section>
+    )}
 
     <section
       class="rounded-xl border bg-card p-5 shadow-xs sm:p-7"
@@ -433,10 +633,13 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
         Aprobación
       </h2>
       <div class="mt-6 grid gap-5 sm:grid-cols-3">
-        <label>
-          <span class="text-sm font-medium">Nota mínima (0–100)</span>
+        <div>
+          <label for="minimumGrade" class="text-sm font-medium">
+            Nota mínima (0–100)
+          </label>
           <input
             class={control}
+            id="minimumGrade"
             name="minimumGrade"
             type="text"
             inputmode="numeric"
@@ -454,7 +657,7 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
               {errors.minimumGrade}
             </span>
           )}
-        </label>
+        </div>
       </div>
     </section>
   </fieldset>
@@ -479,16 +682,15 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
 <script>
   import {
     createCourseWithArtwork,
-    formError,
     isError,
-    openCreatedCourse,
+    type InitialGroup,
   } from "./createCourseWithArtwork";
   import {
     acceptsCourseInput,
     draftFieldsReady,
-    requiredCourseFields,
     type CourseInputKind,
   } from "./course-input-filter";
+  import { groupEndTime } from "./group-schedule-preview";
   document.addEventListener("astro:page-load", () => {
     let preparedImage: File | null = null;
     let imageSelected = false;
@@ -497,25 +699,126 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
     });
     window.addEventListener("course-artwork-prepared", (event) => {
       preparedImage = (event as CustomEvent<File | null>).detail;
-    });
-    window.addEventListener("course-artwork-uploaded", (event) => {
-      const detail = (event as CustomEvent<{ courseId: string; key: string }>)
-        .detail;
-      const form = document.querySelector<HTMLFormElement>(
-        `.course-form[data-course-id="${detail.courseId}"]`,
-      );
-      const artwork = form?.querySelector<HTMLInputElement>(
-        'input[name="artwork"]',
-      );
-      if (artwork) {
-        artwork.value = detail.key;
-        artwork.dispatchEvent(new Event("change", { bubbles: true }));
-      }
+      document
+        .querySelector<HTMLFormElement>(".course-form")
+        ?.dispatchEvent(new Event("course-form-change"));
     });
     document
       .querySelectorAll<HTMLFormElement>(".course-form")
       .forEach((form) => {
         const button = form.querySelector<HTMLButtonElement>(".submit-button");
+        const groupList = form.querySelector<HTMLElement>(
+          "[data-initial-group-list]",
+        );
+        const groupTemplate = form.querySelector<HTMLTemplateElement>(
+          "[data-initial-group-template]",
+        );
+        const formatError = form.querySelector<HTMLElement>(
+          "[data-format-error]",
+        );
+        const formatTrigger = () =>
+          form.querySelector<HTMLElement>("#courseTypeId-select");
+        const clearFormatError = () => {
+          if (!formatError || formatError.hidden) return;
+          formatError.hidden = true;
+          const trigger = formatTrigger();
+          trigger?.removeAttribute("aria-invalid");
+          trigger?.removeAttribute("aria-describedby");
+        };
+        const showFormatError = (message: string) => {
+          if (!formatError) return;
+          formatError.textContent = message;
+          formatError.hidden = false;
+          const trigger = formatTrigger();
+          trigger?.setAttribute("aria-invalid", "true");
+          trigger?.setAttribute("aria-describedby", formatError.id);
+          trigger?.scrollIntoView({ block: "center" });
+          trigger?.focus();
+        };
+        form.addEventListener("change", () => {
+          if (new FormData(form).get("courseTypeId")) clearFormatError();
+        });
+        const updateGroupPreviews = () => {
+          const formats = JSON.parse(form.dataset.groupFormats ?? "[]") as [
+            string,
+            number | null,
+          ][];
+          const minutes =
+            formats.find(
+              ([id]) => id === String(new FormData(form).get("courseTypeId")),
+            )?.[1] ?? null;
+          const intervals: [number, number][] = [];
+          let issue = "";
+          groupList
+            ?.querySelectorAll<HTMLElement>("[data-initial-group]")
+            .forEach((row, index) => {
+              const input = row.querySelector<HTMLInputElement>(
+                '[name="initialGroupTime"]',
+              );
+              const hint = row.querySelector<HTMLElement>(
+                "[data-initial-group-end]",
+              );
+              if (!input || !hint) return;
+              input.setAttribute(
+                "aria-label",
+                `Hora de inicio del grupo ${index + 1}`,
+              );
+              const time = input.value;
+              const end = groupEndTime(time, minutes);
+              hint.textContent = end
+                ? `Fin ${end}`
+                : time
+                  ? "No termina hoy"
+                  : "";
+              if (time && !end)
+                issue = "Elige horarios que terminen el mismo día.";
+              if (end) {
+                const [hour, minute] = time.split(":").map(Number);
+                const start = hour! * 60 + minute!;
+                const finish = start + minutes!;
+                if (
+                  intervals.some(
+                    ([otherStart, otherEnd]) =>
+                      start < otherEnd && otherStart < finish,
+                  )
+                )
+                  issue = "Los horarios de los grupos no pueden solaparse.";
+                intervals.push([start, finish]);
+              }
+            });
+          const warning = form.querySelector<HTMLElement>(
+            "[data-initial-group-error]",
+          );
+          if (warning) {
+            warning.textContent = issue;
+            warning.hidden = !issue;
+          }
+        };
+        form.addEventListener("input", updateGroupPreviews);
+        form.addEventListener("change", updateGroupPreviews);
+        form.addEventListener("course-form-change", updateGroupPreviews);
+        form
+          .querySelector<HTMLButtonElement>("[data-add-initial-group]")
+          ?.addEventListener("click", () => {
+            if (!groupList || !groupTemplate) return;
+            const row = groupTemplate.content.cloneNode(true);
+            groupList.append(row);
+            groupList.lastElementChild
+              ?.querySelector<HTMLInputElement>(
+                'input[name="initialGroupTime"]',
+              )
+              ?.focus();
+            form.dispatchEvent(new Event("course-form-change"));
+          });
+        groupList?.addEventListener("click", (event) => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          target
+            .closest("[data-remove-initial-group]")
+            ?.closest("[data-initial-group]")
+            ?.remove();
+          form.dispatchEvent(new Event("course-form-change"));
+        });
         // Capture edits before React's delegated change handlers see them. Invalid
         // paste/drop/IME commits are reverted as a whole, never sanitized into a
         // different value that might inadvertently be submitted.
@@ -586,30 +889,30 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
           ? JSON.parse(form.dataset.baseline)
           : null;
         let saving = false;
+        let pendingArtworkKey: string | null = null;
+        window.addEventListener("course-artwork-prepared", () => {
+          pendingArtworkKey = null;
+        });
         if (button && !button.disabled) {
           // The SSR button stays usable without JavaScript. Once JS runs, wait for
           // all form-associated islands before comparing against persisted values.
           button.disabled = true;
+          form.dataset.validationInitialized = "true";
           let ready = false;
           const fields = baseline ? Object.keys(baseline) : [];
           const sync = () => {
             const current = new FormData(form);
             if (
               !ready &&
-              !(
-                baseline
-                  ? fields
-                  : [
-                      ...requiredCourseFields,
-                      "registrationStartAt",
-                      "registrationEndAt",
-                    ]
-              ).every((name) => current.has(name))
+              (baseline
+                ? !fields.every((name) => current.has(name))
+                : !formatTrigger())
             )
               return;
             ready = true;
             const changed = baseline
-              ? !fields.every((name) => {
+              ? Boolean(preparedImage) ||
+                !fields.every((name) => {
                   const values = current.getAll(name);
                   return (
                     values.length === 1 &&
@@ -624,10 +927,15 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
                   typeof entry[1] === "string",
               ),
             );
+            // Keep an untouched draft disabled, but once named permit an
+            // attempt without a format to show its field-level error.
+            const awaitingFormat =
+              !baseline && !values.courseTypeId && Boolean(values.name?.trim());
             const valid =
               form.checkValidity() && draftFieldsReady(values, !baseline);
             button.disabled =
-              saving || (baseline ? !changed || !valid : !valid);
+              saving ||
+              (baseline ? !changed || !valid : !awaitingFormat && !valid);
           };
           // FormData reads the controls' current values directly, including hidden
           // fields updated by React islands, so reconcile each change immediately.
@@ -652,6 +960,14 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
           window.addEventListener("pageshow", sync);
         }
         form.addEventListener("submit", (event) => {
+          if (
+            !form.dataset.courseId &&
+            !new FormData(form).get("courseTypeId")
+          ) {
+            event.preventDefault();
+            showFormatError("Selecciona un formato de curso.");
+            return;
+          }
           if (!form.reportValidity()) {
             event.preventDefault();
             return;
@@ -668,13 +984,62 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
             if (!error || !recovery || !retry || !link) return;
             if (imageSelected && !preparedImage) {
               error.textContent =
-                "Confirma el recorte con “Usar este recorte” antes de crear el borrador.";
+                "Confirma el recorte con “Guardar recorte” antes de crear el borrador.";
               error.classList.remove("hidden");
               error.scrollIntoView({ block: "center" });
               return;
             }
             const fields = new FormData(form);
             const image = preparedImage;
+            const times = fields.getAll("initialGroupTime");
+            const capacities = fields.getAll("initialGroupCapacity");
+            const groups: InitialGroup[] = times.map((time, index) => ({
+              startTime: String(time),
+              capacity: Number(capacities[index]),
+            }));
+            const formats = JSON.parse(form.dataset.groupFormats ?? "[]") as [
+              string,
+              number | null,
+            ][];
+            const minutes = formats.find(
+              ([id]) => id === String(fields.get("courseTypeId")),
+            )?.[1];
+            const intervals: [number, number][] = [];
+            let groupIssue = "";
+            for (const group of groups) {
+              const [hour, minute] = group.startTime.split(":").map(Number);
+              const start = hour! * 60 + minute!;
+              if (
+                !/^([01]\d|2[0-3]):[0-5]\d$/.test(group.startTime) ||
+                minutes == null ||
+                start + minutes >= 1440
+              ) {
+                groupIssue = "Elige horarios que terminen el mismo día.";
+                break;
+              }
+              if (
+                intervals.some(
+                  ([otherStart, otherEnd]) =>
+                    start < otherEnd && otherStart < start + minutes,
+                )
+              ) {
+                groupIssue = "Los horarios de los grupos no pueden solaparse.";
+                break;
+              }
+              intervals.push([start, start + minutes]);
+            }
+            const groupError = form.querySelector<HTMLElement>(
+              "[data-initial-group-error]",
+            );
+            if (groupIssue) {
+              if (groupError) {
+                groupError.textContent = groupIssue;
+                groupError.hidden = false;
+                groupError.scrollIntoView({ block: "center" });
+              }
+              return;
+            }
+            if (groupError) groupError.hidden = true;
             if (button) {
               button.disabled = true;
               button.querySelector(".submit-label")?.classList.add("hidden");
@@ -702,61 +1067,34 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
                   ?.classList.add("hidden");
               }
             };
-            if (!imageSelected || !image) {
-              void (async () => {
-                const response = await fetch("/app/cursos/nuevo", {
-                  method: "POST",
-                  body: fields,
-                  credentials: "same-origin",
-                  headers: { Accept: "application/json" },
-                });
-                if (
-                  response.redirected ||
-                  !response.headers
-                    .get("content-type")
-                    ?.includes("application/json")
-                )
-                  throw new Error(
-                    "La sesión cambió. Recarga la página e inténtalo de nuevo.",
-                  );
-                const result: unknown = await response.json();
-                if (
-                  !response.ok ||
-                  !result ||
-                  typeof result !== "object" ||
-                  !("id" in result) ||
-                  typeof result.id !== "string"
-                )
-                  throw new Error(
-                    isError(result)
-                      ? formError(result)
-                      : "No se pudo crear el borrador.",
-                  );
+            void createCourseWithArtwork(
+              fields,
+              image,
+              groups,
+              (url, attach) => {
                 draftExists = true;
-                link.href = `/app/cursos/${result.id}/editar`;
-                retry.hidden = true;
-                await openCreatedCourse(result.id, "created");
-              })().catch(showError);
-              return;
-            }
-            void createCourseWithArtwork(fields, image, (url, attach) => {
-              draftExists = true;
-              link.href = url;
-              retry.onclick = () => {
-                retry.disabled = true;
-                error.classList.add("hidden");
-                void attach()
-                  .catch(showError)
-                  .finally(() => {
-                    retry.disabled = false;
-                  });
-              };
-            }).catch(showError);
+                link.href = url;
+                retry.textContent = groups.length
+                  ? "Reintentar pendientes"
+                  : "Reintentar foto";
+                retry.hidden = !image && !groups.length;
+                retry.onclick = () => {
+                  retry.disabled = true;
+                  error.classList.add("hidden");
+                  void attach()
+                    .catch(showError)
+                    .finally(() => {
+                      retry.disabled = false;
+                    });
+                };
+              },
+            ).catch(showError);
             return;
           }
           if (form.dataset.courseId) {
             event.preventDefault();
             if (!button || saving) return;
+            if (imageSelected && !preparedImage) return;
             saving = true;
             button.disabled = true;
             button.setAttribute("aria-busy", "true");
@@ -773,10 +1111,45 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
               .forEach((item) => item.removeAttribute("aria-invalid"));
             void (async () => {
               try {
+                const fields = new FormData(form);
+                if (preparedImage) {
+                  if (!pendingArtworkKey) {
+                    const upload = new FormData();
+                    upload.set("courseId", form.dataset.courseId!);
+                    upload.set("image", preparedImage);
+                    const uploaded = await fetch("/app/cursos/imagen", {
+                      method: "POST",
+                      body: upload,
+                      credentials: "same-origin",
+                    });
+                    if (
+                      uploaded.redirected ||
+                      !uploaded.headers
+                        .get("content-type")
+                        ?.includes("application/json")
+                    )
+                      throw new Error("La sesión cambió. Recarga la página.");
+                    const result: unknown = await uploaded.json();
+                    if (
+                      !uploaded.ok ||
+                      !result ||
+                      typeof result !== "object" ||
+                      !("artwork" in result) ||
+                      typeof result.artwork !== "string"
+                    )
+                      throw new Error(
+                        isError(result)
+                          ? result.error
+                          : "No se pudo subir la foto.",
+                      );
+                    pendingArtworkKey = result.artwork;
+                  }
+                  fields.set("artwork", pendingArtworkKey);
+                }
                 const response = await fetch(window.location.pathname, {
                   method: "POST",
                   headers: { Accept: "application/json" },
-                  body: new FormData(form),
+                  body: fields,
                 });
                 if (
                   response.redirected ||
@@ -824,6 +1197,19 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
                 form.querySelector<HTMLInputElement>(
                   'input[name="revision"]',
                 )!.value = result.revision;
+                if (pendingArtworkKey) {
+                  form.querySelector<HTMLInputElement>(
+                    'input[name="artwork"]',
+                  )!.value = pendingArtworkKey;
+                  window.dispatchEvent(
+                    new CustomEvent("course-artwork-saved", {
+                      detail: pendingArtworkKey,
+                    }),
+                  );
+                  preparedImage = null;
+                  imageSelected = false;
+                  pendingArtworkKey = null;
+                }
                 baseline = Object.fromEntries(
                   [...new FormData(form)].filter(
                     (entry): entry is [string, string] =>
@@ -845,10 +1231,12 @@ const legacy = Boolean(courseId && !baseline?.weekdays);
                   title: "Cambios guardados correctamente.",
                   duration: 6000,
                 });
-              } catch {
+              } catch (caught) {
                 if (error) {
                   error.textContent =
-                    "No se pudieron guardar los cambios. Inténtalo nuevamente.";
+                    caught instanceof Error
+                      ? caught.message
+                      : "No se pudieron guardar los cambios. Inténtalo nuevamente.";
                   error.hidden = false;
                   error.scrollIntoView({ block: "center" });
                 }

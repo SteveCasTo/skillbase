@@ -353,6 +353,7 @@ Una persona se preinscribe y administración ve la demanda acumulada.
 - [x] Crear y administrar grupos con cupo máximo propio, sin mínimo obligatorio.
 - [x] Definir horario L–V independiente por grupo, sin solapamiento dentro del curso.
 - [x] Gestionar cancelación conservando historial y permitir grupos adicionales.
+- [x] Permitir grupos válidos también en cursos borrador; eliminar solo grupos nunca publicados y desactivar/reactivar los que ya tuvieron exposición pública, con historial protegido.
 - Asignar instructor real cuando exista el módulo de asignaciones; mientras tanto se conserva el instructor textual del curso.
 - Gestionar reemplazo por feriados cuando existan sesiones y calendario operativo.
 - Vincular preinscritos e inscritos a grupos cuando estén disponibles esos módulos.

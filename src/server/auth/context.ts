@@ -4,6 +4,7 @@ import { resolveActiveUser } from "@/application/auth/authorize";
 import type { AuthUserRepository } from "@/application/auth/user-repository";
 import { AuthorizationError } from "@/domain/auth/errors";
 import type { InternalUser } from "@/domain/auth/types";
+import { traceSlowOperation } from "@/server/observability/slow-operation";
 
 import type { RequestSupabaseClient } from "./supabase";
 
@@ -17,11 +18,16 @@ export async function loadRequestAuthContext(
   supabase: RequestSupabaseClient,
   repository: AuthUserRepository,
 ): Promise<RequestAuthContext> {
-  const { data, error } = await supabase.auth.getUser();
+  const { data, error } = await traceSlowOperation("auth.getUser", () =>
+    supabase.auth.getUser(),
+  );
   if (error || !data.user)
     return { authUser: null, internalUser: null, error: null };
   try {
-    const internalUser = await resolveActiveUser(repository, data.user.id);
+    const internalUser = await traceSlowOperation(
+      "auth.resolveActiveUser",
+      () => resolveActiveUser(repository, data.user.id),
+    );
     return { authUser: data.user, internalUser, error: null };
   } catch (caught) {
     if (caught instanceof AuthorizationError)

@@ -3,7 +3,11 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { CourseRepository } from "@/application/courses/course-repository";
 import { CourseDomainError } from "@/domain/courses/errors";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
-import { planWeekdaySchedule } from "@/domain/courses/weekday-schedule";
+import {
+  GROUP_SCHEDULE,
+  planCourseDates,
+  planWeekdaySchedule,
+} from "@/domain/courses/weekday-schedule";
 import {
   assertTransition,
   normalizeSlug,
@@ -17,6 +21,7 @@ import type {
   PublicCourseDto,
 } from "@/domain/courses/types";
 import * as schema from "@/server/db/schema";
+import { traceSlowOperation } from "@/server/observability/slow-operation";
 import { CourseInfrastructureError } from "./course-infrastructure-error";
 
 type Database = PostgresJsDatabase<typeof schema>;
@@ -29,7 +34,7 @@ async function persistence<T>(
   work: () => Promise<T>,
 ): Promise<T> {
   try {
-    return await work();
+    return await traceSlowOperation(`courses.${operation}`, work);
   } catch (error) {
     if (error instanceof CourseDomainError) throw error;
     throw new CourseInfrastructureError(
@@ -183,6 +188,24 @@ function assertSchedule(input: CourseData, revision: Revision): void {
       "El formato no tiene duración de sesión resuelta.",
       { courseTypeId: "Configura la duración de sesión del formato." },
     );
+  if (input.schedule === GROUP_SCHEDULE) {
+    const planned = planCourseDates({
+      startDate: instantToBoliviaCivil(input.startsAt).slice(0, 10),
+      weekdaysMask: input.weekdaysMask,
+      totalHours: revision.totalHours,
+      sessionMinutes: revision.sessionMinutes,
+    });
+    if (
+      input.startsAt.getTime() !== planned.startsAt.getTime() ||
+      input.endsAt.getTime() !== planned.endsAt.getTime()
+    )
+      throw new CourseDomainError(
+        "VALIDATION_FAILED",
+        "Las fechas no coinciden con el plan del curso.",
+        { endsAt: "Usa las fechas calculadas." },
+      );
+    return;
+  }
   const planned = planWeekdaySchedule({
     startsAt: instantToBoliviaCivil(input.startsAt),
     weekdaysMask: input.weekdaysMask,
@@ -443,6 +466,17 @@ export class DrizzleCourseRepository implements CourseRepository {
           .where(eq(schema.courses.id, id))
           .returning();
         if (!row) throw new Error("Transition failed");
+        if (next === "PUBLISHED")
+          await tx
+            .update(schema.groups)
+            .set({ publishedAt: new Date() })
+            .where(
+              and(
+                eq(schema.groups.courseId, id),
+                eq(schema.groups.status, "PLANNED"),
+                sql`${schema.groups.publishedAt} is null`,
+              ),
+            );
         await tx.insert(schema.auditEvents).values({
           actorId,
           entityType: "COURSE",

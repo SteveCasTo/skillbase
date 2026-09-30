@@ -137,6 +137,10 @@ Como mínimo:
 
 Agregar herramientas externas únicamente cuando exista beneficio claro.
 
+Las lecturas de cursos y los pasos de autenticación registran un aviso `[slow-operation]` cuando permanecen pendientes más de 5 segundos, y otro al terminar. El middleware mide el render SSR por ruta normalizada (sin IDs, slugs, credenciales ni datos personales). Ante un 504, buscar el aviso previo en los logs de la misma invocación de Vercel para distinguir Auth, persistencia y render; este diagnóstico no cancela solicitudes ni sustituye límites de tiempo en las dependencias.
+
+Las trazas posteriores confirmaron que el preflight de conexión introducido en la primera mitigación no bastaba: las solicitudes seguían pendientes en lecturas PostgreSQL hasta el 504 de 300 segundos, mientras el servidor PostgreSQL no ejecutaba consultas largas. El cliente PostgreSQL del runtime ahora vive solo durante una petición y se cierra al terminar; no se reutilizan sockets entre activaciones de la función. Las peticiones GET con acceso a base cierran la conexión tras 15 segundos para que una lectura colgada falle en lugar de ocupar la función 300 segundos. El cliente limita el pipelining a una consulta para el pooler transaccional. La ejecución de consultas es aislada por petición; las escrituras no se reintentan automáticamente para evitar duplicaciones.
+
 ## PIPELINE IMPLEMENTADO
 
 `.github/workflows/ci.yml` se ejecuta únicamente en:
@@ -150,7 +154,25 @@ El job `integration-e2e` instala Chromium y ejecuta los runners aislados. `test:
 
 El proyecto cloud Supabase `SkillBase` (`fvzxqlezdrlzykyoevub`) y el proyecto Vercel `stevecasto-projects/skillbase` están enlazados. El dominio de producción es `https://skillbase-alpha.vercel.app`; `skillbase.vercel.app` no está disponible porque pertenece a otra cuenta.
 
-Por petición explícita se cargaron manualmente en producción los dos formatos de ejemplo de 20 y 30 horas (80/100 y 120/150 BOB) y los cinco cursos sintéticos de `seed-demo`, todos en estado `DRAFT` y sin destacado. El formato local adicional `Promedio` no se cargó. Esta carga puntual no forma parte de las migraciones ni del despliegue automático; los ejemplos no constituyen oferta académica aprobada y solo pueden mostrarse públicamente mediante publicación administrativa posterior.
+Por petición explícita se cargaron manualmente en producción los dos formatos de ejemplo de 20 y 30 horas (80/100 y 120/150 BOB) y los cinco cursos sintéticos de `seed-demo`. El formato local adicional `Promedio` no se cargó. Esta carga puntual no forma parte de las migraciones ni del despliegue automático. Cuatro demos están publicados y `demo-gestion-de-proyectos` permanece en borrador; su estado editorial no se cambia durante la reconciliación.
+
+### Reconciliación manual de los cinco demos cloud
+
+La herramienta `scripts/reconcile-production-demo-courses.ts` es independiente del reconciliador **solo local**. No forma parte de CI ni de migraciones. Usa exclusivamente `supabase db query --linked --project-ref fvzxqlezdrlzykyoevub`; exige que el proyecto enlazado coincida y nunca usa `DATABASE_URL`. Primero ejecutar **solo lectura**:
+
+```text
+bun scripts/reconcile-production-demo-courses.ts
+```
+
+La salida enumera los campos/fechas anteriores y propuestos, los grupos, el hash SHA-256 y la ruta de un snapshot completo (cursos, revisiones, grupos y auditoría pertinente) bajo el directorio privado del usuario **fuera del repositorio**. Guardar ese archivo, revisar los cambios manualmente y comprobar que la migración 0009 está aplicada. Los eventos de edición de calendario existentes requieren aceptación específica; no asumir que los demos publicados reflejan una oferta aprobada. Solo si el responsable autoriza expresamente la sustitución de las fechas editadas y confirma el usuario interno `ACTIVE`/`ADMIN`, usar:
+
+```text
+bun scripts/reconcile-production-demo-courses.ts --apply --confirm-project-ref fvzxqlezdrlzykyoevub --actor-id UUID --snapshot "RUTA_ABSOLUTA_DEL_SNAPSHOT" --expected-snapshot-hash SHA256 --accept-edited-calendars
+```
+
+Omitir `--accept-edited-calendars` cuando no hay ediciones de calendario auditadas. La aplicación revalida el snapshot bajo locks en una única operación SQL atómica; cualquier cambio posterior o grupo inesperado impide escribir. Si ya se aplicó el mismo snapshot, repetir **el mismo comando apply** responde sin nuevas escrituras/auditorías. Verificar el resultado mediante las vistas administrativas; el comando preview está pensado para el estado previo y rechaza grupos existentes. Ante error o discrepancia, no repetir con un hash anterior: investigar primero y crear un preview nuevo solo si los grupos continúan ausentes. No pegar el snapshot ni la salida de la CLI en tickets o logs públicos; el backup local no equivale al backup/PITR gestionado de producción.
+
+El 28 de septiembre de 2026 se aplicó esta reconciliación a los cinco demos cloud después del despliegue del PR #100. El snapshot privado previo permanece fuera del repositorio. Se comprobaron cinco calendarios L–V, seis grupos (cinco marcados como publicados y uno de borrador), la conservación de todos los demás campos de curso, revisiones de formato y eventos de auditoría anteriores, y las cuatro fichas públicas sin horas ni horario heredado. La cartelera pública tampoco muestra fechas; las fechas se consultan en cada ficha.
 
 El job `deploy` se ejecuta únicamente en pushes a `master`, y su condición requiere éxito explícito de `quality` e `integration-e2e`. Aplica migraciones Drizzle y despliega el output preconstruido con Vercel CLI. La integración Git automática de Vercel está desconectada para impedir despliegues paralelos que omitan estos gates.
 

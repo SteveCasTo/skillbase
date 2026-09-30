@@ -45,110 +45,108 @@ async function publishedCourse(page: Page, context: BrowserContext) {
   return { edit, path: `/app/cursos/${id}/grupos` };
 }
 
-test("admin manages group hours, capacity and cancellation without a document reload", async ({
+test("admin creates and edits groups in place, validates conflicts, and deletes an unpublished group", async ({
   page,
   context,
 }) => {
   const { edit, path } = await publishedCourse(page, context);
+  await page.request.post(edit, { headers, form: { intent: "withdraw" } });
   await page.goto(edit);
-  await page.getByRole("link", { name: "Grupos" }).click();
+  await page.getByRole("link", { name: "Grupos", exact: true }).click();
   await expect(page).toHaveURL(path);
-  await expect(
-    page
-      .getByRole("navigation", { name: "Secciones del curso" })
-      .getByRole("link", { name: "Grupos" }),
-  ).toHaveAttribute("aria-current", "page");
-  await expect(
-    page
-      .getByRole("navigation", { name: "Ruta de navegación" })
-      .getByText("Grupos"),
-  ).toHaveAttribute("aria-current", "page");
-  await expect(page.getByText(/1 de marzo de 2027/)).toBeVisible();
   await page.evaluate(() => {
     (window as Window & { groupMarker?: number }).groupMarker = 1;
   });
-  const create = page.getByRole("form", { name: "Añadir grupo" });
-  await create.getByLabel("Hora de inicio").fill("08:00");
-  await create.getByLabel("Capacidad").fill("15");
-  await create.getByRole("button", { name: "Crear grupo" }).click();
-  await expect(page.getByText("08:00–09:30 · Capacidad: 15")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Nuevo grupo" })).toBeVisible();
+  await expect(page.locator("header [data-new-trigger]")).toBeVisible();
+  await expect(page.getByRole("form", { name: "Nuevo grupo" })).toBeHidden();
+  await page.getByRole("button", { name: "Nuevo grupo" }).click();
+  const dialog = page.getByRole("dialog", { name: "Nuevo grupo" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Hora de inicio").fill("08:00");
+  await dialog.getByLabel("Capacidad").fill("15");
+  await dialog.getByRole("button", { name: "Crear grupo" }).click();
+  const group = page.locator("[data-group-id]").first();
+  await expect(group).toContainText("08:00–09:30");
+  await expect(group).not.toContainText("Planificado");
+  await expect(group).toContainText("15");
   expect(
     await page.evaluate(
       () => (window as Window & { groupMarker?: number }).groupMarker,
     ),
   ).toBe(1);
-  const conflict = await page.request.post(path, {
-    headers,
-    form: { intent: "create", startTime: "09:00", capacity: "10" },
-  });
-  expect(conflict.status()).toBe(409);
-  await expect(page.getByText("08:00–09:30 · Capacidad: 15")).toBeVisible();
-  await create.getByLabel("Hora de inicio").fill("09:00");
-  await create.getByLabel("Capacidad").fill("7");
-  await create.getByRole("button", { name: "Crear grupo" }).click();
-  await expect(page.getByRole("alert")).toContainText(
+  await page.getByRole("button", { name: "Nuevo grupo" }).click();
+  await dialog.getByLabel("Hora de inicio").fill("09:00");
+  await expect(dialog.locator("[data-group-end]")).toContainText("se solapa");
+  await dialog.getByLabel("Capacidad").fill("7");
+  await dialog.getByRole("button", { name: "Crear grupo" }).click();
+  await expect(dialog.locator("#dialog-time-error")).toContainText(
     "Otro grupo del curso ocupa ese horario",
   );
-  const conflictingTime = create.getByLabel("Hora de inicio");
-  await expect(conflictingTime).toHaveAttribute("aria-invalid", "true");
-  await expect(conflictingTime).toHaveAttribute(
-    "aria-describedby",
-    "new-time-error",
+  await expect(dialog.getByLabel("Hora de inicio")).toHaveAttribute(
+    "aria-invalid",
+    "true",
   );
-  await expect(page.locator("#new-time-error")).toContainText(
-    "Otro grupo del curso ocupa ese horario",
+  await dialog.getByRole("button", { name: "Cancelar" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("button", { name: "Nuevo grupo" })).toBeFocused();
+  const capacityTrigger = group.locator(
+    '[data-group-field="capacity"] summary',
   );
-  await expect(create.getByLabel("Hora de inicio")).toHaveValue("09:00");
-  await expect(create.getByLabel("Capacidad")).toHaveValue("7");
-  const adjacent = await page.request.post(path, {
-    headers,
-    form: { intent: "create", startTime: "09:30", capacity: "10" },
-  });
-  expect(adjacent.status()).toBe(200);
-  const capacityForm = page.getByRole("form", {
+  const scheduleTrigger = group.locator(
+    '[data-group-field="schedule"] summary',
+  );
+  await expect(capacityTrigger).toHaveAttribute(
+    "aria-label",
+    "Editar capacidad del grupo 1",
+  );
+  await expect(capacityTrigger.locator("svg")).toBeVisible();
+  await expect(capacityTrigger).not.toContainText("Editar capacidad");
+  await capacityTrigger.click();
+  const capacity = group.getByRole("form", {
     name: "Cambiar capacidad del grupo 1",
   });
-  const staleRevision = await capacityForm
-    .locator('[name="revision"]')
-    .inputValue();
-  await capacityForm.getByLabel("Nueva capacidad").fill("20");
-  await capacityForm.getByRole("button", { name: "Guardar capacidad" }).click();
-  await expect(page.getByText("08:00–09:30 · Capacidad: 20")).toBeVisible();
-  const groupId = await page
-    .locator("[data-group-id]")
-    .first()
-    .getAttribute("data-group-id");
-  const stale = await page.request.post(path, {
-    headers,
-    form: {
-      intent: "capacity",
-      groupId: groupId!,
-      revision: staleRevision,
-      capacity: "30",
-    },
-  });
-  expect(stale.status()).toBe(409);
-  await capacityForm
-    .locator('[name="revision"]')
-    .evaluate((input: HTMLInputElement, revision) => {
-      input.value = revision;
-    }, staleRevision);
-  await capacityForm.getByLabel("Nueva capacidad").fill("25");
-  await capacityForm.getByRole("button", { name: "Guardar capacidad" }).click();
-  await expect(page.getByRole("alert")).toContainText(
-    "Recargar datos actuales",
-  );
-  await page.getByRole("button", { name: "Recargar datos actuales" }).click();
-  await expect(page.getByText("08:00–09:30 · Capacidad: 20")).toBeVisible();
-  await page
-    .getByRole("form", { name: "Cambiar horario del grupo 1" })
-    .getByLabel("Nueva hora de inicio")
-    .fill("07:30");
-  await page
-    .getByRole("form", { name: "Cambiar horario del grupo 1" })
-    .getByRole("button", { name: "Guardar horario" })
+  await expect(capacity).toBeVisible();
+  await expect(group.getByText("15", { exact: true })).toBeHidden();
+  await capacity.getByLabel("Nueva capacidad").fill("20");
+  await capacity.getByRole("button", { name: /Cancelar edición/ }).click();
+  await expect(group.getByText("15", { exact: true })).toBeVisible();
+  await expect(capacityTrigger).toBeFocused();
+  await capacityTrigger.click();
+  await capacity.getByLabel("Nueva capacidad").fill("20");
+  await capacity
+    .getByRole("button", { name: "Guardar capacidad del grupo 1" })
     .click();
-  await expect(page.getByText("07:30–09:00 · Capacidad: 20")).toBeVisible();
+  await expect(group).toContainText("20");
+  await scheduleTrigger.click();
+  const schedule = group.getByRole("form", {
+    name: "Cambiar horario del grupo 1",
+  });
+  await schedule.getByLabel("Hora de inicio").fill("07:30");
+  await expect(group.getByText("08:00–09:30", { exact: true })).toBeHidden();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await schedule
+      .getByLabel("Hora de inicio")
+      .evaluate((input) => input.getBoundingClientRect().width),
+  ).toBeGreaterThanOrEqual(90);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await page.setViewportSize({ width: 768, height: 900 });
+  expect(
+    await schedule
+      .getByLabel("Hora de inicio")
+      .evaluate((input) => input.getBoundingClientRect().width),
+  ).toBeGreaterThanOrEqual(90);
+  await schedule
+    .getByRole("button", { name: "Guardar horario del grupo 1" })
+    .click();
+  await expect(group).toContainText("07:30–09:00");
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
@@ -157,114 +155,47 @@ test("admin manages group hours, capacity and cancellation without a document re
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
-  await page
-    .locator("[data-group-id]")
-    .first()
-    .getByRole("button", { name: "Cancelar grupo" })
-    .click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await group.getByRole("button", { name: "Eliminar grupo 1" }).click();
+  const confirm = page.getByRole("alertdialog");
+  await expect(confirm).toContainText("No se puede deshacer");
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toBeHidden();
   await expect(
-    page
-      .locator("[data-group-id]")
-      .first()
-      .getByRole("button", { name: "Cancelar grupo" }),
+    group.getByRole("button", { name: "Eliminar grupo 1" }),
   ).toBeFocused();
-  await page
-    .locator("[data-group-id]")
-    .first()
-    .getByRole("button", { name: "Cancelar grupo" })
-    .click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Sí, cancelar grupo" })
-    .click();
-  await expect(page.locator("[data-group-id]").first()).toContainText(
-    "Cancelado",
-  );
-  await expect(page.getByText("07:30–09:00 · Capacidad: 20")).toBeVisible();
+  await group.getByRole("button", { name: "Eliminar grupo 1" }).click();
+  await confirm.getByRole("button", { name: "Sí, eliminar grupo" }).click();
+  await expect(page.locator("[data-group-id]")).toHaveCount(0);
 });
 
-test("planned groups remain cancellable after course withdrawal and archive", async ({
+test("published groups retain history when deactivated and can reactivate", async ({
   page,
   context,
 }) => {
-  const { edit, path } = await publishedCourse(page, context);
-  const requestHeaders = { ...headers, Accept: "application/json" };
+  const { path } = await publishedCourse(page, context);
   const first = await page.request.post(path, {
-    headers: requestHeaders,
+    headers,
     form: { intent: "create", startTime: "08:00", capacity: "10" },
   });
   expect(first.status()).toBe(200);
-  const second = await page.request.post(path, {
-    headers: requestHeaders,
-    form: { intent: "create", startTime: "09:30", capacity: "10" },
-  });
-  expect(second.status()).toBe(200);
-
-  expect(
-    (
-      await page.request.post(edit, {
-        headers: requestHeaders,
-        form: { intent: "withdraw" },
-      })
-    ).status(),
-  ).toBe(200);
   await page.goto(path);
-  await expect(page.getByRole("form", { name: "Añadir grupo" })).toHaveCount(0);
-  const groups = page.locator("[data-group-id]");
+  const group = page.locator("[data-group-id]").first();
   await expect(
-    groups.nth(0).getByRole("button", { name: "Cancelar grupo" }),
-  ).toBeVisible();
-  await expect(
-    groups.nth(0).getByRole("button", { name: "Guardar horario" }),
+    group.getByRole("button", { name: "Eliminar grupo 1" }),
   ).toHaveCount(0);
-  await groups.nth(0).getByRole("button", { name: "Cancelar grupo" }).click();
+  await group.getByRole("button", { name: "Desactivar grupo 1" }).click();
   await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Sí, cancelar grupo" })
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Sí, desactivar grupo" })
     .click();
-  await expect(groups.nth(0)).toContainText("Cancelado");
-  expect(
-    (
-      await page.request.post(path, {
-        headers: requestHeaders,
-        form: { intent: "create", startTime: "11:00", capacity: "10" },
-      })
-    ).status(),
-  ).toBe(409);
-
-  expect(
-    (
-      await page.request.post(edit, {
-        headers: requestHeaders,
-        form: { intent: "archive" },
-      })
-    ).status(),
-  ).toBe(200);
-  await page.goto(path);
-  await groups.nth(1).getByRole("button", { name: "Cancelar grupo" }).click();
+  await expect(group).toContainText("Inactivo");
+  await group.getByRole("button", { name: "Reactivar grupo 1" }).click();
   await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Sí, cancelar grupo" })
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Sí, reactivar grupo" })
     .click();
-  await expect(groups.nth(1)).toContainText("Cancelado");
-  expect(
-    (
-      await page.request.post(path, {
-        headers: requestHeaders,
-        form: {
-          intent: "schedule",
-          groupId: (await groups.nth(1).getAttribute("data-group-id"))!,
-          revision: new Date().toISOString(),
-          startTime: "10:00",
-        },
-      })
-    ).status(),
-  ).toBe(409);
+  await expect(group).not.toContainText("Planificado");
+  await expect(group).not.toContainText("Inactivo");
 });
-
 test("groups are admin-only, validate origin, course and revision, and fit mobile", async ({
   page,
   context,
