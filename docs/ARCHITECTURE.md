@@ -172,6 +172,7 @@ Módulos iniciales:
 - Users
 - Courses
 - Groups
+- InterestRegistrations
 - Participants
 - PreRegistrations
 - Enrollments
@@ -187,6 +188,8 @@ Módulos iniciales:
 No es obligatorio que cada módulo sea un package independiente.
 
 El objetivo es separación lógica.
+
+Fase 3 introduce conceptualmente `InterestRegistrations` como agregado autónomo: no es `Participant` ni `PreRegistration`, y el email público no verificado no puede actualizar una identidad global. La preinscripción presencial/pagada permanece en Fase 5. El contrato técnico acordado (todavía no implementado) está en [`docs/INTEREST_REGISTRATION_CONTRACT.md`](INTEREST_REGISTRATION_CONTRACT.md); sus límites de dominio, persistencia y HTTP deben mantenerse separados al implementarlo.
 
 ## ESTRUCTURA DE REFERENCIA
 

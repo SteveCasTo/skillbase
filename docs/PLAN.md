@@ -363,13 +363,13 @@ Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión f
 - [x] Confirmar campos y elegibilidad: nombre, apellidos y email obligatorios; teléfono y preferencia de grupo opcionales. Público limitado al detalle de curso existente; no añadir ni cambiar información de la landing.
 - [x] Confirmar duplicados y disponibilidad: una solicitud por curso/email normalizado; validación autoritativa server-side y sin aceptar para cursos retirados/archivados. Se puede solicitar desde `PUBLISHED` hasta cierre presencial si existe ventana, o hasta el inicio oficial si no existe.
 - [x] Confirmar estados `ACTIVE`/`CANCELLED`, cancelación/reactivación administrativa conservando historial y métricas de activos por curso/preferencia; la preferencia no es asignación de grupo ni dato de plazas (ADR-021).
-- [ ] Estabilizar contratos de entrada/salida, errores, DTO públicos/administrativos y operaciones por módulo antes de repartir implementación en paralelo.
+- [x] Definir el contrato técnico de Fase 3 para entrada/salida, errores, DTO, operaciones, persistencia y pruebas en [`docs/INTEREST_REGISTRATION_CONTRACT.md`](INTEREST_REGISTRATION_CONTRACT.md). Contrato aprobado no significa implementación realizada.
 
 ### Checklist de datos, dominio y persistencia
 
-- [ ] Diseñar y persistir el registro de interesado como entidad autónoma, separada de `Participant` y de la preinscripción presencial; no usar email público no verificado para modificar identidad global.
-- [ ] Definir un vínculo explícito y trazable cuando una preinscripción presencial use datos de un interesado; conservar edición y permitir registro presencial directo sin interesado previo.
-- [ ] Definir relaciones, restricciones e índices sin confundir interesado con participante inscrito ni anticipar campos de pago/documentación.
+- [ ] Implementar el registro de interesado como entidad autónoma, separada de `Participant` y de la preinscripción presencial; no usar email público no verificado para modificar identidad global ni crear entidades pagadas en Fase 3.
+- [ ] La relación explícita y trazable entre el interesado y una preinscripción presencial es dependencia de Fase 5; no bloquea el cierre de Fase 3. Allí se implementará junto al prellenado editable; el registro presencial directo seguirá disponible.
+- [x] Especificar relaciones, restricciones e índices del agregado autónomo en el contrato técnico; implementarlos y verificarlos sigue pendiente.
 - [ ] Implementar validaciones y reglas de dominio independientes de HTTP/UI, con pruebas unitarias junto a cada regla.
 - [ ] Implementar casos de uso y repositorio, con escrituras transaccionales y prevención de duplicados conforme a la política confirmada.
 - [ ] Generar y verificar migración reproducible, constraints y comportamiento ante concurrencia, errores y reintentos mediante integración.
@@ -404,6 +404,10 @@ Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión f
 - [ ] Ejecutar formatter, lint, typecheck, unitarias, integración, E2E y build correspondientes; demostrar el flujo completo y revisar documentación.
 - [ ] Registrar el estado real de validaciones locales y remotas, sin marcar como verificados resultados no ejecutados.
 - [ ] Cerrar el milestone solo con contratos confirmados, flujo demostrado y gate revisado; promover a `master` mediante PR de release únicamente después de validar el milestone.
+
+### Baseline verificado de calidad
+
+En el baseline verificado para esta actualización: lint exitoso; 93 pruebas unitarias y 50 de integración exitosas; 62 E2E ejecutadas; typecheck con 0 errores y 41 hints; build exitoso. Durante E2E se observó un hydration mismatch relacionado con Sileo; su corrección está activa en otra rama y este baseline no cierra el gate de Fase 3. El formatter global solo reportó un aviso sobre `opencode.json`, ajeno a estos cambios; no modificar ese archivo.
 
 ### Resultado demostrable
 
