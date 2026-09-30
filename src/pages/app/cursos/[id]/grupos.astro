@@ -262,12 +262,24 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
     </section>
   ) : (
     <>
-      <header>
-        <CourseBreadcrumbs current="Grupos" />
-        <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
-          Grupos
-        </h1>
-        <p class="mt-2 text-sm text-muted-foreground">{course.name}</p>
+      <header class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <CourseBreadcrumbs current="Grupos" />
+          <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
+            Grupos
+          </h1>
+          <p class="mt-2 text-sm text-muted-foreground">{course.name}</p>
+        </div>
+        {canCreate && (
+          <button
+            type="button"
+            data-new-trigger
+            hidden
+            class="inline-flex min-h-11 items-center self-start rounded-lg border px-3 text-sm font-semibold hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring lg:self-auto"
+          >
+            Nuevo grupo
+          </button>
+        )}
       </header>
       <CourseTabs id={course.id} active="groups" />
       {successMessage && (
