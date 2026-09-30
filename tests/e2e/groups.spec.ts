@@ -51,11 +51,14 @@ test("admin creates and edits groups in place, validates conflicts, and deletes 
 }) => {
   const { edit, path } = await publishedCourse(page, context);
   await page.request.post(edit, { headers, form: { intent: "withdraw" } });
-  await page.goto(path);
+  await page.goto(edit);
+  await page.getByRole("link", { name: "Grupos", exact: true }).click();
+  await expect(page).toHaveURL(path);
   await page.evaluate(() => {
     (window as Window & { groupMarker?: number }).groupMarker = 1;
   });
   await expect(page.getByRole("button", { name: "Nuevo grupo" })).toBeVisible();
+  await expect(page.locator("header [data-new-trigger]")).toBeVisible();
   await expect(page.getByRole("form", { name: "Nuevo grupo" })).toBeHidden();
   await page.getByRole("button", { name: "Nuevo grupo" }).click();
   const dialog = page.getByRole("dialog", { name: "Nuevo grupo" });
@@ -65,6 +68,7 @@ test("admin creates and edits groups in place, validates conflicts, and deletes 
   await dialog.getByRole("button", { name: "Crear grupo" }).click();
   const group = page.locator("[data-group-id]").first();
   await expect(group).toContainText("08:00–09:30");
+  await expect(group).not.toContainText("Planificado");
   await expect(group).toContainText("15");
   expect(
     await page.evaluate(
@@ -86,29 +90,62 @@ test("admin creates and edits groups in place, validates conflicts, and deletes 
   await dialog.getByRole("button", { name: "Cancelar" }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("button", { name: "Nuevo grupo" })).toBeFocused();
-  await group
-    .getByRole("button", { name: "Editar capacidad del grupo 1" })
-    .click();
+  const capacityTrigger = group.locator(
+    '[data-group-field="capacity"] summary',
+  );
+  const scheduleTrigger = group.locator(
+    '[data-group-field="schedule"] summary',
+  );
+  await expect(capacityTrigger).toHaveAttribute(
+    "aria-label",
+    "Editar capacidad del grupo 1",
+  );
+  await expect(capacityTrigger.locator("svg")).toBeVisible();
+  await expect(capacityTrigger).not.toContainText("Editar capacidad");
+  await capacityTrigger.click();
   const capacity = group.getByRole("form", {
     name: "Cambiar capacidad del grupo 1",
   });
-  await capacity.getByLabel("Capacidad").fill("20");
-  await capacity.getByRole("button", { name: "Cancelar" }).click();
-  await expect(group).toContainText("15");
-  await group
-    .getByRole("button", { name: "Editar capacidad del grupo 1" })
+  await expect(capacity).toBeVisible();
+  await expect(group.getByText("15", { exact: true })).toBeHidden();
+  await capacity.getByLabel("Nueva capacidad").fill("20");
+  await capacity.getByRole("button", { name: /Cancelar edición/ }).click();
+  await expect(group.getByText("15", { exact: true })).toBeVisible();
+  await expect(capacityTrigger).toBeFocused();
+  await capacityTrigger.click();
+  await capacity.getByLabel("Nueva capacidad").fill("20");
+  await capacity
+    .getByRole("button", { name: "Guardar capacidad del grupo 1" })
     .click();
-  await capacity.getByLabel("Capacidad").fill("20");
-  await capacity.getByRole("button", { name: "Guardar" }).click();
   await expect(group).toContainText("20");
-  await group
-    .getByRole("button", { name: "Editar horario del grupo 1" })
-    .click();
+  await scheduleTrigger.click();
   const schedule = group.getByRole("form", {
     name: "Cambiar horario del grupo 1",
   });
   await schedule.getByLabel("Hora de inicio").fill("07:30");
-  await schedule.getByRole("button", { name: "Guardar" }).click();
+  await expect(group.getByText("08:00–09:30", { exact: true })).toBeHidden();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await schedule
+      .getByLabel("Hora de inicio")
+      .evaluate((input) => input.getBoundingClientRect().width),
+  ).toBeGreaterThanOrEqual(90);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await page.setViewportSize({ width: 768, height: 900 });
+  expect(
+    await schedule
+      .getByLabel("Hora de inicio")
+      .evaluate((input) => input.getBoundingClientRect().width),
+  ).toBeGreaterThanOrEqual(90);
+  await schedule
+    .getByRole("button", { name: "Guardar horario del grupo 1" })
+    .click();
   await expect(group).toContainText("07:30–09:00");
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
@@ -156,7 +193,8 @@ test("published groups retain history when deactivated and can reactivate", asyn
     .getByRole("alertdialog")
     .getByRole("button", { name: "Sí, reactivar grupo" })
     .click();
-  await expect(group).toContainText("Planificado");
+  await expect(group).not.toContainText("Planificado");
+  await expect(group).not.toContainText("Inactivo");
 });
 test("groups are admin-only, validate origin, course and revision, and fit mobile", async ({
   page,

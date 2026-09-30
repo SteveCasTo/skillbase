@@ -2,9 +2,10 @@ import { navigate } from "astro:transitions/client";
 import { sileo } from "sileo";
 import { groupEndTime } from "./group-schedule-preview";
 
-document.addEventListener("astro:page-load", () => {
+function initializeGroupManagement() {
   const error = document.querySelector<HTMLElement>("[data-group-error]");
-  if (!error) return;
+  if (!error || error.dataset.groupInitialized) return;
+  error.dataset.groupInitialized = "true";
   document
     .querySelector<HTMLButtonElement>("[data-reload-page]")
     ?.addEventListener("click", () => location.reload());
@@ -94,23 +95,18 @@ document.addEventListener("astro:page-load", () => {
   document
     .querySelectorAll<HTMLElement>("[data-group-field]")
     .forEach((field) => {
-      const trigger = field.querySelector<HTMLButtonElement>(
-        "[data-edit-trigger]",
-      );
       const details = field.querySelector<HTMLDetailsElement>(
         "[data-edit-fallback]",
       );
-      if (!trigger || !details) return;
-      const summary = details.querySelector<HTMLElement>("summary")!;
+      if (!details) return;
       const cancel =
         details.querySelector<HTMLButtonElement>("[data-edit-cancel]")!;
-      summary.hidden = true;
-      trigger.hidden = false;
       cancel.hidden = false;
+      details.querySelector<HTMLElement>("[data-cancel-fallback]")!.hidden =
+        true;
       const close = () => {
         details.open = false;
-        trigger.hidden = false;
-        trigger.focus();
+        details.querySelector<HTMLElement>("summary")?.focus();
         details.querySelector<HTMLFormElement>("form")?.reset();
         details
           .querySelectorAll<HTMLElement>("[data-field-error]")
@@ -122,12 +118,11 @@ document.addEventListener("astro:page-load", () => {
             node.removeAttribute("aria-describedby");
           });
       };
-      trigger.addEventListener("click", () => {
-        details.open = true;
-        trigger.hidden = true;
-        details
-          .querySelector<HTMLInputElement>('input:not([type="hidden"])')
-          ?.focus();
+      details.addEventListener("toggle", () => {
+        if (details.open)
+          details
+            .querySelector<HTMLInputElement>('input:not([type="hidden"])')
+            ?.focus();
       });
       cancel.addEventListener("click", close);
     });
@@ -164,6 +159,8 @@ document.addEventListener("astro:page-load", () => {
           "text-destructive",
           Boolean(input.value && (!end || overlaps)),
         );
+        if (form.closest('[data-group-field="schedule"]'))
+          output.classList.toggle("sr-only", Boolean(end && !overlaps));
       };
       input.addEventListener("input", sync);
       sync();
@@ -288,4 +285,11 @@ document.addEventListener("astro:page-load", () => {
         })();
       }),
     );
-});
+}
+
+document.addEventListener("astro:page-load", initializeGroupManagement);
+if (document.readyState === "loading")
+  document.addEventListener("DOMContentLoaded", initializeGroupManagement, {
+    once: true,
+  });
+else initializeGroupManagement();
