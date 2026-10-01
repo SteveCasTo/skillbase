@@ -490,6 +490,7 @@ Antes de crear un componente:
 ### Cargas y mutaciones de la aplicación privada
 
 - Todos los productores de notificaciones administrativas usan la fachada `src/lib/notifications.ts`. Cada operación tiene ID UUID propio; una notificación promise conserva su ID entre loading, success y error para actualizar el aviso correcto.
+- El host Sileo compartido muestra avisos abajo a la derecha; el host privado los posiciona para no tapar las acciones superiores. Ambos layouts coordinan un solo host/viewport activo por documento. Los avisos previos a montar el host quedan encolados y se presentan al activarlo; loading→success/error conserva el mismo ID.
 - JavaScript sigue habilitado como mejora progresiva en la aplicación. Los tests sin JavaScript validan fallbacks HTML/SSR, no una política de desactivar JavaScript. Las animaciones del sidebar siguen activas salvo las reglas existentes de movimiento reducido; no se suprimen globalmente.
 
 - La carga estructural de vistas privadas usa skeleton SSR según variante (lista, formulario, detalle o resumen), se muestra mientras el loader está pendiente y el contenido entra en viewport, y se cancela al resolver, abortar o fallar la navegación. Respeta foco/teclado y `prefers-reduced-motion`; no es una demora decorativa.
@@ -501,4 +502,5 @@ Antes de crear un componente:
 - El formulario aparece únicamente en el detalle del curso elegible; no modifica landing, tarjetas ni catálogo. La presentación separa expresamente expresar interés de reservar cupo, pagar o inscribirse.
 - La estructura SSR conserva el fallback HTML y los valores/errores ante respuesta del servidor. La mejora React usa estados pending/éxito/error, foco en el resultado o primer campo inválido y selector del design system para preferencia de grupo. Sin preferencia disponible, el flujo no fuerza selección.
 - `/app/interesados` resume registros activos por curso; el detalle administrativo presenta registros y buckets por preferencia con filtros de estado, confirmación de cancelación/reactivación y actualización local. En móvil la información usa tarjetas/lista, no una tabla horizontal crítica.
-- La UI está implementada y la cobertura responsive, de teclado y de fallback sin JavaScript está verificada mediante corrida full y revalidaciones dirigidas; ver resultados exactos en `docs/TESTING.md` (no hubo una única corrida full 95/95).
+- La UI está implementada y la cobertura responsive, de teclado y de fallback sin JavaScript está verificada; el E2E completo del release pasó 96/96. La secuencia local anterior de 95 escenarios requirió revalidaciones dirigidas; ver el historial exacto en `docs/TESTING.md`.
+- La lista de cursos permite wrapping de slugs largos y evita overflow horizontal en 320, 390, 768, 1024 y 1440 px. Las regresiones de viewport/toasts pasaron dentro del E2E de release (96/96).

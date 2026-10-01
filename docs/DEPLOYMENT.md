@@ -227,3 +227,16 @@ El estado local/cloud de Fase 3 y la migración 0011 se registra en `docs/PLAN.m
 - `master` requiere checks `quality` e `integration-e2e`, una aprobación y resolución lineal; enforcement a administradores está desactivado. Un administrador puede omitir la aprobación, pero no saltarse checks fallidos. Esta es la configuración observada, no una recomendación de bypass ni evidencia de release.
 
 La configuración cloud de secreto y cadena confiable queda preparada/verificada de forma estática, pero la migración cloud y la verificación runtime continúan pendientes. No afirmar que la feature está operativa en producción hasta aplicar migraciones mediante el flujo autorizado, desplegar y comprobar GET/POST, `no-store`, limitación y rechazo de spoofing.
+
+### Cierre de release Fase 3 (2026-10-02)
+
+Esta actualización supersede el estado pendiente registrado el 2026-10-01, sin reescribirlo como si las verificaciones ya hubieran ocurrido entonces.
+
+- PR 112 (normalización del test de auditoría) se integró a `development`; PR 113 se integró a `master` como `8f5bb2dc45ad373ff12aefd6325456885b20d5c6`.
+- CI del PR 112, run `36827391089`: `quality` e `integration-e2e` PASS. CI de push a `master`, run `36828194127`: `quality`, `integration-e2e` y `deploy` PASS; integration 65/65, E2E 96/96 sin flaky.
+- Vercel deploy `dpl_2kB2xrbE6ppxF4KYPVuR6cpfty9k` terminó `READY` y asignó el alias `https://skillbase-alpha.vercel.app`.
+- Supabase `SkillBase` (`fvzxqlezdrlzykyoevub`) está `ACTIVE_HEALTHY`; ledger Drizzle 0000–0011 con hashes y timestamps coincidentes con el repositorio. 0010/0011 se aplicaron por el pipeline; tablas de interesados y rate limits con RLS/revocaciones verificados.
+- Smoke público: landing, catálogo y detalle/formulario respondieron 200. Alta y duplicado devolvieron el mismo 200 neutro con `no-store`, dejando una fila. Dos `X-Forwarded-For` falsificados usaron el mismo bucket por red/curso (contador 2 por scope), mostrando que el header no anula `Astro.clientAddress`. No se realizó stress 429 ni verificación de HMAC con una IP real. Se eliminó el único interesado sintético; quedan 0 filas y 2 buckets técnicos con TTL.
+- Una petición privada anónima a `/app/interesados` redirigió 303 a login. No se hizo sesión ni prueba manual de interfaz como ADMIN en producción.
+
+El secreto HMAC está presente en Production/Preview, con su contenido nunca leído ni registrado. Preview no tiene credenciales DB ni despliegue funcional. El smoke confirma únicamente los flujos públicos descritos; no afirmar una prueba manual administrativa en producción.
