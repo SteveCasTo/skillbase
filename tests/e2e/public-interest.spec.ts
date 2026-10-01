@@ -1,5 +1,15 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
+import {
+  INTEREST_FORMAT_FIELDS,
+  interestCourseCalendar,
+} from "../fixtures/interest-course-calendar";
 import { signInFixture } from "./auth-helper";
 
 const successMessage =
@@ -21,19 +31,13 @@ async function publicCourse(
     headers,
     form: {
       name: `Formato interés ${suffix}`,
-      totalHours: "20",
-      sessionMinutes: "90",
-      studentAmount: "80",
-      externalAmount: "100",
+      ...INTEREST_FORMAT_FIELDS,
     },
   });
   expect(format.status()).toBe(201);
   const courseTypeId = ((await format.json()) as { id: string }).id;
-  const future = new Date();
-  future.setUTCDate(future.getUTCDate() + 365);
-  while (future.getUTCDay() !== 1) future.setUTCDate(future.getUTCDate() + 1);
-  const futureEnd = new Date(future);
-  futureEnd.setUTCDate(futureEnd.getUTCDate() + 30);
+  const calendar = interestCourseCalendar();
+  const future = new Date(`${calendar.startDate}T00:00:00Z`);
   const registrationStart = new Date(future);
   registrationStart.setUTCDate(registrationStart.getUTCDate() - 3);
   const registrationEnd = new Date(future);
@@ -57,17 +61,14 @@ async function publicCourse(
       description: "Curso sintético para comprobar el registro de interés.",
       courseTypeId,
       level: "BASIC",
-      schedule: "Lunes a viernes, horario por grupo",
+      ...calendar,
       conditions: "Condiciones del curso de prueba.",
-      startsAt: `${future.toISOString().slice(0, 10)}T08:00`,
-      endsAt: `${futureEnd.toISOString().slice(0, 10)}T09:30`,
-      weekdays: "1,2,3,4,5",
       minimumGrade: "70",
       requestKey: crypto.randomUUID(),
       ...window,
     },
   });
-  expect(created.status()).toBe(201);
+  expect(created.status(), await created.text()).toBe(201);
   const { id, revision } = (await created.json()) as {
     id: string;
     revision: string;
@@ -108,6 +109,21 @@ async function fillContact(
   await form.getByLabel("Apellidos", { exact: true }).fill("Pérez García");
   await form.getByLabel("Email", { exact: true }).fill(email);
   return { form, email };
+}
+
+async function submitNativeInterest(form: Locator) {
+  // Keep browser constraints enabled. Keyboard activation avoids Playwright's
+  // repeated auto-scroll of an offscreen button on the smooth-scrolling page.
+  expect(
+    await form.evaluate((element) =>
+      (element as HTMLFormElement).checkValidity(),
+    ),
+  ).toBe(true);
+  const button = form.getByRole("button", { name: submitName });
+  await expect(button).toBeEnabled();
+  await button.focus();
+  await expect(button).toBeFocused();
+  await button.press("Enter");
 }
 
 test("interest is available before presencial opening; JS submits optional group without reserving and duplicates stay neutral", async ({
@@ -217,7 +233,7 @@ test("without a registration window or groups, native HTML still preserves error
         response.request().method() === "POST" &&
         new URL(response.url()).pathname === path,
     );
-    await form.getByRole("button", { name: submitName }).click();
+    await submitNativeInterest(form);
     const rejection = await rejected;
     expect(rejection.status()).toBe(422);
     expect(rejection.headers()["cache-control"]).toContain("no-store");
@@ -235,7 +251,7 @@ test("without a registration window or groups, native HTML still preserves error
         response.request().method() === "POST" &&
         new URL(response.url()).pathname === path,
     );
-    await form.getByRole("button", { name: submitName }).click();
+    await submitNativeInterest(form);
     expect((await accepted).status()).toBe(200);
     await expect(page.locator(".interest-success")).toContainText(
       successMessage,
@@ -263,12 +279,13 @@ test("native group selector has one successful UUID field without JavaScript", a
     await form
       .getByLabel("Preferencia de grupo (opcional)")
       .selectOption(groupId!);
+    await expect(form).not.toHaveAttribute("novalidate");
     const posted = page.waitForResponse(
       (response) =>
         response.request().method() === "POST" &&
         new URL(response.url()).pathname === path,
     );
-    await form.getByRole("button", { name: submitName }).click();
+    await submitNativeInterest(form);
     const response = await posted;
     expect(response.status()).toBe(200);
     expect(

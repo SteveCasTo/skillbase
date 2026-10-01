@@ -6,6 +6,10 @@ import {
   type Page,
 } from "@playwright/test";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
+import {
+  INTEREST_FORMAT_FIELDS,
+  interestCourseCalendar,
+} from "../fixtures/interest-course-calendar";
 import { signInFixture } from "./auth-helper";
 
 const headers = { Origin: "http://127.0.0.1:4321", Accept: "application/json" };
@@ -19,10 +23,7 @@ async function interestCourse(page: Page, context: BrowserContext) {
     headers,
     form: {
       name,
-      totalHours: "20",
-      sessionMinutes: "90",
-      studentAmount: "80",
-      externalAmount: "100",
+      ...INTEREST_FORMAT_FIELDS,
     },
   });
   expect(format.status()).toBe(201);
@@ -34,16 +35,13 @@ async function interestCourse(page: Page, context: BrowserContext) {
       description: "Curso sintético para interesados.",
       level: "BASIC",
       courseTypeId,
-      schedule: "Lunes a viernes, 08:00–09:30",
+      ...interestCourseCalendar(),
       conditions: "Solicitud de interés, sin reserva.",
       requestKey: crypto.randomUUID(),
-      startsAt: "2040-03-05T08:00",
-      endsAt: "2040-03-23T09:30",
-      weekdays: "1,2,3,4,5",
       minimumGrade: "70",
     },
   });
-  expect(created.status()).toBe(201);
+  expect(created.status(), await created.text()).toBe(201);
   const { id, revision } = (await created.json()) as {
     id: string;
     revision: string;
@@ -116,10 +114,12 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
 }) => {
   const course = await interestCourse(page, context);
   await page.goto("/app/interesados");
+  const courseCard = page.getByRole("link", { name: new RegExp(course.name) });
   await expect(
-    page.getByRole("link", { name: new RegExp(course.name) }),
-  ).toContainText("Interesados activos 2");
-  await page.getByRole("link", { name: new RegExp(course.name) }).click();
+    courseCard.getByText("Interesados activos", { exact: true }),
+  ).toBeVisible();
+  await expect(courseCard.getByText("2", { exact: true })).toBeVisible();
+  await courseCard.click();
   await expect(page).toHaveURL(course.path);
   await expect(page.locator("[data-active-total]")).toHaveText("2");
   await expect(

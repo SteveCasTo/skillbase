@@ -47,6 +47,38 @@ describe("public interest SSR fallback", () => {
     expect(html).toContain('name="phone"');
     expect(html).toContain("Dejar mis datos de interés");
   });
+  test("native fallback exposes an enabled submit and retains HTML constraints after a server error", () => {
+    const html = render({
+      initialValues: {
+        ...EMPTY_INTEREST_VALUES,
+        firstName: "María José",
+        lastName: "Pérez García",
+        email: "interest@example.test",
+      },
+      initialResult: {
+        ok: false,
+        code: "VALIDATION_FAILED",
+        message: "Revisa los campos indicados.",
+        issues: { firstName: "Introduce un valor válido." },
+      },
+    });
+    const submit = html.match(/<button\b[^>]*>/)?.[0];
+    expect(submit).toBeDefined();
+    expect(submit).toContain('type="submit"');
+    expect(submit).not.toMatch(/\sdisabled(?:=|\s|>)/i);
+    expect(html.toLowerCase()).not.toContain("novalidate");
+    for (const name of ["firstName", "lastName", "email"]) {
+      const input = html.match(
+        new RegExp(`<input\\b[^>]*name="${name}"[^>]*>`),
+      )?.[0];
+      expect(input).toBeDefined();
+      expect(input).toContain('required=""');
+      expect(input).not.toMatch(/\b(?:disabled|readonly|pattern)=/i);
+    }
+    expect(html).toContain('type="email"');
+    expect(html).toContain('value="María José"');
+    expect(html).toContain('aria-invalid="true"');
+  });
   test("preserves and escapes attempted values, with linked field errors", () => {
     const html = render({
       initialValues: {
