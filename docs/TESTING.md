@@ -242,6 +242,12 @@ La cobertura de Auth incluye redirects no autenticados, roles individuales y mú
 
 También se verifica signup público deshabilitado, creación de fixture por Admin API, usuario activo sin roles, motivos exactos de denegación, políticas fail-closed, opciones de cookies, cache privado, origen de acciones Auth, reemplazo exacto de roles y vinculación concurrente. Los escenarios server-side se ejecutan una vez en Chromium desktop; mobile conserva únicamente Foundation y un smoke de navegación privada.
 
+### Cobertura de autenticación dual (feature Fase 4, aún sin integrar)
+
+Las pruebas añadidas en la rama `feat/dual-auth-and-profile` cubren login password solo para cuenta interna autorizada, rechazo de identidad/método no permitido, validación de sesión actual con `getUser()` y claims firmados, provisión interna de instructor con autorización ADMIN/transacción/compensación, cambio/recovery de contraseña, asociación Google explícita ligada al actor y sesión, PKCE, nonce de un uso/expiración, mismatch de email/provider, identidades Google preexistentes y restauración de la sesión original. Los tests Google usan un fixture de provider OAuth aislado; no son login con Google real ni prueba de entrega de email.
+
+Estado local comunicado para la rama: unit 146 PASS, integration 71 PASS, suite E2E dirigida de Auth/Google/sidebar/mobile 43/43 PASS; lint PASS; typecheck 0 errores/0 warnings/83 hints; build, Drizzle y formatter PASS; `git diff --check` PASS. Una corrida full E2E sigue en progreso en otro worktree; no declarar cierre full, CI remoto, integración a `development`, migraciones en el stack local persistente/cloud ni SMTP verificado a partir de esos checks.
+
 ### Cobertura de cursos y formatos
 
 - Unit cubre validación de campos, niveles, dinero decimal, fechas civiles Bolivia estrictas y simétricas, ventana opcional, nota explícita —incluido cero—, slug, transiciones, autorización activa, logging sanitizado y disponibilidad derivada.
@@ -314,6 +320,10 @@ Se añadieron pruebas unitarias en `tests/unit/interests.test.ts`, `interests-ad
 La corrección acotada de interesados amplía unit tests para proporciones de demanda, empates positivos/cero, submit SSR habilitado y rutas de skeleton. Los E2E conservan las assertions de autorización, revisión optimista, cancelación/reactivación, duplicado neutro y POST sin JavaScript, y añaden tarjetas/barras responsive en 320, 390, 768, 1024 y 1440 px, gating de campos obligatorios, submit de ancho completo y navegación pendiente real. Estas adiciones deben ejecutarse en el runner aislado/CI; no ejecutar E2E local mientras el servidor del usuario ocupe 4321, ni reutilizarlo como servidor de pruebas.
 
 Verificación local de esta corrección: 133 unit tests PASS (853 assertions), lint y format check global PASS, typecheck con 0 errores/0 warnings/70 hints y build PASS. Chromium aislado en 4437 verificó componentes y CSS reales con DTO sintético en los cinco anchos y ambos temas, barras/empates/cero, confirmación por teclado, revisión/conteos reconciliados con respuestas simuladas, gating, pending/error/reintento, baseline HTML sin JavaScript y skeleton durante un GET realmente pendiente del ClientRouter. No se ejecutaron integration ni E2E completos, ni se accedió a DB; las respuestas simuladas no acreditan contratos HTTP/Auth. El servidor, fixture temporal y scripts de esta comprobación se retiraron al terminar.
+
+#### Cierre posterior del ajuste de interesados (PRs 116 y 117)
+
+PRs 116 y 117 integraron en `development` la corrección compacta/responsive del panel y formulario, junto con la cobertura de rutas/skeleton y navegación/Auth incorporada en esos cambios. La verificación completa posterior de la UI pasó 98/98 E2E; el registro de calidad asociado reportó 133 unitarias y 65 de integración. Estos resultados posteriores superseden para el estado actual las notas anteriores de verificación aislada/local que indicaban integración/E2E pendientes; se conservan arriba como secuencia histórica de pruebas. No se mezclan con los tests Auth dual de la feature actual, cuyo full E2E continúa en progreso.
 
 Resultados locales finales comunicados para Fase 3: full unit 129 PASS (793 assertions); full integration 65 PASS/0 FAIL (478 assertions, 9 archivos); lint global PASS; typecheck 0 errores, 0 warnings y 70 hints; build y Drizzle checks PASS. El primer full integration run fue 45/66 por cleanup de fixtures de cursos incompatible con la FK de `interest_registrations`; se corrigió truncando explícitamente la tabla de interesados, sin `CASCADE`, y el full rerun pasó.
 

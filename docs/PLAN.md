@@ -463,7 +463,8 @@ Parte del alcance de Fase 4 fue anticipada: la gestión de grupos indicada como 
 - [x] Permitir grupos válidos también en cursos borrador; eliminar solo grupos nunca publicados y desactivar/reactivar los que ya tuvieron exposición pública, con historial protegido.
 - [ ] Añadir perfiles y cuentas internas de instructores y asignar exactamente un instructor activo por curso; todos los grupos del curso heredan esa asignación.
 - [ ] Restringir acceso de instructor a su perfil y cursos propios, también en rutas y consultas server-side.
-- [ ] Habilitar email/password además de Google para los usuarios internos; aprovisionamiento y credenciales iniciales administrados exclusivamente en servidor.
+- [x] Implementar login email/password junto con Google para usuarios internos, cambios/recovery de password y asociación Google explícita desde perfil.
+- [x] Implementar el caso server-only de provisionamiento de cuenta INSTRUCTOR por ADMIN, con credencial solo en Supabase Auth y compensación ante fallo de persistencia interna; la UI ADMIN de altas/perfiles/asignaciones aún está pendiente.
 - [ ] Gestionar cambio de instructor sujeto a calendario y conflictos de horario entre cursos.
 - [ ] Resolver, antes de implementar, la regla de activar/desactivar instructores con cursos futuros asignados. No deducirla de una preferencia de UI.
 - [ ] Gestionar reemplazo por feriados cuando existan sesiones y calendario operativo (Fase 6).
@@ -484,7 +485,7 @@ Parte del alcance de Fase 4 fue anticipada: la gestión de grupos indicada como 
 
 1. Definir y revisar migración aditiva, perfil de instructor e identidad Auth sin guardar contraseñas en tablas/logs; acordar política pendiente de activación.
 2. Implementar dominio, repositorios y transacciones/auditoría para cuenta, perfil, asignación, ventana de cambio y conflictos concurrentes.
-3. Implementar autenticación combinada Google/email-password, enlace explícito Google a cuenta autenticada y cambio/recuperación de contraseña; comprobar configuración SMTP de recuperación en deployment sin hacerla prerrequisito del primer login.
+3. [x] Implementar autenticación combinada Google/email-password, enlace explícito Google a cuenta autenticada y cambio/recuperación de contraseña. Pendiente verificar SMTP real para recuperar por email; no bloquea aprovisionamiento/login inicial.
 4. Añadir guards exactos para rutas de instructor y scoping por propiedad de curso en cada lectura/escritura server-side.
 5. Implementar administración de perfiles/asignaciones y la experiencia privada de instructor; selector por instructores activos registrados, sin texto libre.
 6. Actualizar seeds sintéticos/fixtures locales, ejecutar migración sin reset destructivo y completar validación antes de integrar PRs en `development`. PR 113 ya liberó Fase 3; no promocionar cambios de esta fase a `master` hasta la siguiente ventana de release.
@@ -499,7 +500,20 @@ La petición aprobada de renovación de datos es exclusivamente local y para dat
 - Verificar datos de cuentas de fixtures sin credenciales hardcodeadas; revisar específicamente que ninguna respuesta o log transporte contraseña ni tokens. Confirmar configuración SMTP para recuperación en cloud antes de afirmar ese flujo listo.
 - Cerrar con formatter, lint, typecheck, unit/integration/E2E, build, revisión de migraciones/privilegios/RLS y CI del PR en `development`; dejar despliegue de producción para la siguiente release.
 
-La interfaz de análisis de interesados, sus métricas y el formulario público tienen además una corrección visual/UX en un PR independiente, actualmente en implementación paralela. Mantener ese checklist pendiente hasta que su PR se integre y verificarla contra `docs/DESIGN.md`; no atribuirla como terminada por estar especificada aquí.
+El ajuste UX de interesados (copy del formulario, submit progresivo, tarjetas/barras de demanda y skeleton) se integró en PRs 116 y 117 a `development`; la verificación del frontend completo cerró 98/98 E2E. La evidencia local comunicada incluye 133 unitarias y 65 de integración. Esta mejora no completa los módulos pendientes de instructor/asignación.
+
+#### Estado del bloque de autenticación dual
+
+La implementación está en los commits `5613399`, `958053a` y `5ff585c` de `feat/dual-auth-and-profile`, sobre base `cf601d8`. El cambio de código no tiene todavía PR ni se ha integrado en `development`; no implica promoción a `master`, aplicación de migraciones, ni activación de Auth en cloud. Se considera completado únicamente el bloque de autenticación dual/cuenta interna, no Fase 4 en conjunto.
+
+- [x] Google y email/password en login, verificación del método de sesión y autorización por identidad interna activa.
+- [x] Perfil `/app/perfil` con cambio opcional de contraseña, confirmación por contraseña actual o correo, recovery y asociación Google opcional.
+- [x] Provisionamiento server-side de cuenta de instructor mediante `createInstructorAccount(actorAuthUserId, { email, name, password })`; crea usuario Auth confirmado y usuario interno ACTIVE con rol INSTRUCTOR, con compensación si falla la transacción interna. Aún no hay pantalla ADMIN de alta ni asignación de instructores.
+- [ ] Cerrar full E2E en curso; no declarar el gate completo. La cobertura dirigida Auth/Google/sidebar/mobile comunicada pasó 43/43; full E2E continúa ejecutándose en otro worktree.
+- [ ] Integrar por PR a `development` después del gate y revisión; hasta entonces no aplicar cambios a producción.
+- [ ] Antes de habilitarlo en cualquier entorno: aplicar Drizzle 0012/0013, habilitar hook `private_auth.allow_invited_google_signup` en la configuración Auth efectiva y configurar `AUTH_RATE_LIMIT_SECRET` server-only de al menos 32 caracteres. Configuración cloud y SMTP no están verificadas/aplicadas.
+
+Estado local comunicado en el worktree de feature: 146 unit PASS, 71 integration PASS, lint PASS, typecheck PASS (0 errores/0 warnings/83 hints), build, Drizzle y formatter PASS; `git diff --check` PASS. Estos resultados no certifican el full E2E todavía en curso ni CI remota, integración a `development`, migración local compartida/cloud, SMTP, ni despliegue.
 
 ### Resultado demostrable
 

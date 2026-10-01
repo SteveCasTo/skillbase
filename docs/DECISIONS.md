@@ -608,3 +608,34 @@ Los grupos existen, pero la identidad del instructor aún es texto opcional del 
 - Las decisiones de asignación/horario exigen pruebas de concurrencia compartidas con mutaciones de fechas, grupos y publicación; una comprobación en UI no basta.
 - El esquema concreto/migración y la política de activación deben revisarse durante implementación, no inferirse de este ADR. No se afirma que perfil, asignación o autenticación email/password existan ya.
 - Debe comprobarse configuración SMTP cloud antes de afirmar recuperación de contraseña disponible; esto no bloquea cuentas creadas con password por ADMIN ni su login inicial.
+
+---
+
+## ADR-024 — APROBACIÓN DE GOOGLE EN LA CAPA DE APLICACIÓN
+
+**Fecha:** 2026-10-01
+
+**Estado:** Accepted — implementado en feature branch; despliegue pendiente
+
+### Contexto
+
+Supabase Auth puede asociar automáticamente una identidad Google cuando el proveedor verifica que su correo coincide con el correo de una cuenta existente. Ese comportamiento de asociación a nivel proveedor no se puede usar como prueba de consentimiento explícito ni se documenta como configurable para impedirlo. Sin otra comprobación, que Google aparezca en `auth.users.identities` podría convertir una sesión OAuth no solicitada en login de SkillBase.
+
+### Decisión
+
+- Mantener `auth_primary_provider` y `approved_google_identity_id` en el usuario interno. Autorizar OAuth Google solo si el método actual de la sesión, validado desde claims firmados, es OAuth y la identidad Google es admisible: identidad vigente del usuario legado `GOOGLE` o identidad asociada explícitamente/aprobada para cuenta `EMAIL`, siempre con correo verificado normalizado coincidente.
+- Permitir sesiones PASSWORD y confirmación de email según su flujo validado, sin exigir que una asociación Google de proveedor exista o esté aprobada. Así una identidad Google autoasociada no deshabilita el acceso por contraseña.
+- La asociación explícita usa flujo ligado a usuario interno y sesión originales, PKCE/flowId, nonce de un uso y expiración breve; valida identidad Auth y email tras el callback. Al rechazo se intenta quitar solo la nueva identidad agregada y restaurar la sesión original. La autorización sigue dependiendo del estado persistido de aprobación, no del éxito de unlink.
+- No fusionar usuarios internos automáticamente por email; el vínculo proveedor en Auth no equivale a merge de cuentas de dominio.
+
+### Alternativas
+
+- Confiar en que Supabase no asocie automáticamente identidades coincidentes.
+- Considerar cualquier identidad Google visible en `getUser()` como prueba de consentimiento.
+- Deshabilitar el login password si aparece una identidad no aprobada.
+
+### Consecuencias
+
+- La frontera de confianza de proveedor y la aprobación de acceso de SkillBase quedan separadas; tanto ingreso normal como callback de asociación deben validar método de sesión y estado interno.
+- El comportamiento está implementado en la rama dual-auth pero requiere migraciones 0012/0013, hook y secreto server-only antes de habilitarse; no está aplicado en local persistente ni en cloud.
+- Este ADR implementa el requerimiento de asociación explícita a nivel de la aplicación y no reemplaza ni debilita ADR-023 sobre no fusionar usuarios internos automáticamente.
