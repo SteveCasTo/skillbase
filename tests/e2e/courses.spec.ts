@@ -5,6 +5,14 @@ import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
+import {
+  registerCourseInstructor,
+  chooseCourseInstructor,
+  courseInstructor,
+} from "./instructor-helper";
+test.beforeEach(async ({ page }) => {
+  await registerCourseInstructor(page);
+});
 
 function fixtureSuffix(testInfo: TestInfo): string {
   return `${testInfo.parallelIndex}-${testInfo.retry}-${testInfo.repeatEachIndex}-${randomUUID()}`;
@@ -563,9 +571,12 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
 
   await fillCourseFields(page, formatName);
   await expect(create).toBeEnabled();
-  await page.getByLabel("Instructor (opcional)").fill("Docente temporal");
+  await chooseCourseInstructor(page);
   await expect(create).toBeEnabled();
-  await page.getByLabel("Instructor (opcional)").clear();
+  await page.getByRole("combobox", { name: "Instructor", exact: true }).click();
+  await page
+    .getByRole("option", { name: "Sin asignar (solo borrador)", exact: true })
+    .click();
   await page.getByLabel("Condiciones").clear();
   await expect(create).toBeDisabled();
   await page.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
@@ -641,7 +652,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(create).toBeDisabled();
   await startDate.fill("01/03/2027");
   await expect(create).toBeEnabled();
-  await page.getByLabel("Instructor (opcional)").fill("Docente E2E");
+  await chooseCourseInstructor(page);
   await expect(page.locator('input[name="schedule"]')).toHaveValue(
     "Lunes a viernes · horario por grupo",
   );
@@ -833,9 +844,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(page.locator('[name="registrationEndDate"]')).toHaveValue(
     "2027-02-20",
   );
-  await expect(page.getByLabel("Instructor (opcional)")).toHaveValue(
-    "Docente E2E",
-  );
+  await expect(
+    page.getByRole("combobox", { name: "Instructor", exact: true }),
+  ).toHaveText(courseInstructor(page).name);
   await expect(page.locator('input[name="schedule"]')).toHaveValue(
     "Lunes a viernes · horario por grupo",
   );
@@ -922,9 +933,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
       .locator('[data-sileo-toast][data-state="loading"]')
       .filter({ hasText: "Guardando" }),
   ).toBeVisible();
-  await page
-    .getByLabel("Instructor (opcional)")
-    .fill("Edición mientras se guarda");
+  await page.getByLabel("Descripción").fill("Edición mientras se guarda");
   await expect(save).toBeDisabled();
   await expect(
     page.getByRole("button", { name: "Publicar curso", exact: true }),
@@ -952,11 +961,13 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     page.locator("[data-sileo-toast]").filter({ hasText: "Cambios guardados" }),
   ).toBeVisible();
   expect(page.url()).toBe(editUrl);
-  await expect(page.getByLabel("Instructor (opcional)")).toHaveValue(
+  await expect(page.getByLabel("Descripción")).toHaveValue(
     "Edición mientras se guarda",
   );
   await expect(save).toBeEnabled();
-  await page.getByLabel("Instructor (opcional)").fill("Docente E2E");
+  await page
+    .getByLabel("Descripción")
+    .fill("Contenido actualizado antes de publicar.");
   await page.unroute(`**${savePath}`);
   expect(
     await page.evaluate(
@@ -1088,9 +1099,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await page.getByRole("button", { name: "Publicar curso" }).click();
   await dialog.getByRole("button", { name: "Confirmar publicación" }).click();
   await expect(dialog).toBeHidden();
-  await page
-    .getByLabel("Instructor (opcional)")
-    .fill("Cambio durante publicación");
+  await page.getByLabel("Descripción").fill("Cambio durante publicación");
   await expect(save).toBeDisabled();
   await page
     .locator(".course-form")
@@ -1130,9 +1139,11 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
       ),
   ).toBe(true);
   await page.unroute(`**${editorialPath}`);
-  await expect(page.getByLabel("Instructor (opcional)")).toBeFocused();
+  await expect(page.getByLabel("Descripción")).toBeFocused();
   await expect(save).toBeEnabled();
-  await page.getByLabel("Instructor (opcional)").fill("Docente E2E");
+  await page
+    .getByLabel("Descripción")
+    .fill("Contenido actualizado antes de publicar.");
   await page.getByRole("button", { name: "Destacar en la cartelera" }).click();
   await expect(page.getByText("Destacado en la cartelera")).toBeVisible();
   await page.reload();

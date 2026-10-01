@@ -17,7 +17,9 @@ test("mobile private navigation exposes authorized multi-role destinations", asy
   await page.getByLabel("Abrir menú").click();
   const navigation = page.getByRole("navigation", { name: "Navegación móvil" });
   await expect(page.getByRole("dialog", { name: "SkillBase" })).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Cursos" })).toBeVisible();
+  await expect(
+    navigation.getByRole("link", { name: "Cursos", exact: true }),
+  ).toBeVisible();
   await expect(
     navigation.getByRole("link", { name: "Formatos" }),
   ).toBeVisible();
@@ -48,7 +50,12 @@ test("mobile drawer closes with Escape and restores keyboard focus", async ({
   await expect(
     page.getByRole("dialog").getByRole("link", { name: "Mi perfil" }),
   ).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Cursos" })).toHaveCount(0);
+  await expect(
+    navigation.getByRole("link", { name: "Cursos", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    navigation.getByRole("link", { name: "Mis cursos", exact: true }),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
   await expect(trigger).toHaveAttribute("aria-expanded", "false");

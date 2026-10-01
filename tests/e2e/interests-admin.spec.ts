@@ -11,12 +11,14 @@ import {
   interestCourseCalendar,
 } from "../fixtures/interest-course-calendar";
 import { signInFixture } from "./auth-helper";
+import { registerCourseInstructor } from "./instructor-helper";
 
 const headers = { Origin: "http://127.0.0.1:4321", Accept: "application/json" };
 
 // Only the isolated E2E server is used. Auth helper obtains the temporary
 // environment and signs in through the existing Supabase Admin API.
 async function interestCourse(page: Page, context: BrowserContext) {
+  const instructor = await registerCourseInstructor(page);
   await signInFixture(context, AUTH_FIXTURES.admin.email);
   const name = `Interés sintético ${crypto.randomUUID()}`;
   const format = await page.request.post("/app/formatos/nuevo", {
@@ -35,6 +37,7 @@ async function interestCourse(page: Page, context: BrowserContext) {
       description: "Curso sintético para interesados.",
       level: "BASIC",
       courseTypeId,
+      instructorId: instructor.id,
       ...interestCourseCalendar(),
       conditions: "Solicitud de interés, sin reserva.",
       requestKey: crypto.randomUUID(),
@@ -315,7 +318,15 @@ test("interest cards and demand use the available width across mobile, tablet an
       expect(first!.width).toBeCloseTo(root!.width);
       expect(second!.y).toBeGreaterThan(first!.y);
     } else {
-      expect(second!.y).toBe(first!.y);
+      await expect
+        .poll(async () => {
+          const [a, b] = await Promise.all([
+            page.locator("[data-interest-id]").nth(0).boundingBox(),
+            page.locator("[data-interest-id]").nth(1).boundingBox(),
+          ]);
+          return a && b ? b.y - a.y : null;
+        })
+        .toBe(0);
       expect(second!.x).not.toBe(first!.x);
     }
     await expect(rowFor(page).getByRole("link")).toHaveCount(0);

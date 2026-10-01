@@ -29,6 +29,7 @@ import {
 import type { InternalUser } from "@/domain/auth/types";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { COURSE_FIXTURES } from "../fixtures/courses";
+import { createInstructorFixture } from "../fixtures/instructors";
 
 const database = createDatabase(getTestSupabaseEnvironment().databaseUrl, {
   max: 8,
@@ -40,6 +41,7 @@ let admin: InternalUser;
 let courseId: string;
 
 beforeEach(async () => {
+  const instructor = await createInstructorFixture(database.db);
   const [actor] = await database.db
     .insert(users)
     .values({
@@ -72,6 +74,7 @@ beforeEach(async () => {
       ...COURSE_FIXTURES.publishedOpenRegistration,
       name: `Groups ${crypto.randomUUID()}`,
       courseTypeId: format.id,
+      instructorId: instructor.id,
       startsAt: "2027-03-01T18:00",
       endsAt: "2027-03-17T19:30",
       schedule: "Lunes a viernes, 18:00–19:30",
@@ -517,7 +520,7 @@ test("grouped courses retain their calendar and require an active format to repu
   ).rejects.toMatchObject({ code: "FORMAT_INACTIVE" });
 });
 
-test("different courses may have the same daily start", async () => {
+test("different instructors may have the same daily start across courses", async () => {
   const first = await createGroup(repo, admin, courseId, "08:00", 2);
   const [source] = await database.db
     .select()
@@ -530,6 +533,7 @@ test("different courses may have the same daily start", async () => {
       id: crypto.randomUUID(),
       slug: `other-${crypto.randomUUID()}`,
       featured: false,
+      instructorId: (await createInstructorFixture(database.db)).id,
     })
     .returning();
   expect(
