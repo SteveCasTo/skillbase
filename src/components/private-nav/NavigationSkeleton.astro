@@ -1,0 +1,42 @@
+---
+import { Skeleton } from "./Skeleton";
+const variants = ["list", "form", "detail", "summary"] as const;
+---
+
+<div data-navigation-skeleton hidden aria-hidden="true"></div>
+{variants.map((variant) => (
+  <template data-navigation-template={variant}>
+    <div class="private-loading-layout" data-loading-layout={variant}>
+      <div class="flex flex-col gap-4">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-10 w-56 max-w-full" />
+        <Skeleton className="h-4 w-96 max-w-full" />
+      </div>
+      {variant === "form" || variant === "detail" ? (
+        <div class="mt-8 grid gap-6 rounded-xl border bg-card p-6 sm:grid-cols-2">
+          {Array.from({ length: 6 }, () => (
+            <div class="flex flex-col gap-3">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div class="mt-8 grid gap-4 sm:grid-cols-2">
+          {Array.from({ length: variant === "summary" ? 2 : 4 }, () => (
+            <div class="flex flex-col gap-5 rounded-xl border bg-card p-6">
+              <Skeleton className="h-6 w-3/5" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-4/5" />
+              <Skeleton className="h-10 w-28" />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </template>
+))}
+<script>
+  import { installNavigationSkeleton } from "./navigation-skeleton";
+  installNavigationSkeleton();
+</script>

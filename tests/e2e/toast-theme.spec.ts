@@ -1,7 +1,63 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
+
+function trackHydrationErrors(page: Page) {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  return errors;
+}
+
+for (const theme of ["light", "dark", "system"] as const) {
+  test(`initial ${theme} toast mounts once without hydration errors and follows router theme`, async ({
+    context,
+    page,
+  }) => {
+    const errors = trackHydrationErrors(page);
+    await signInFixture(context, AUTH_FIXTURES.admin.email);
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.addInitScript(
+      (selected) => localStorage.setItem("theme", selected),
+      theme,
+    );
+    await page.goto("/app/formatos?success=created");
+    await expect(
+      page.locator('astro-island[component-export="SileoHost"]'),
+    ).toHaveCount(1);
+    await expect(page.locator("[data-sileo-viewport]")).toHaveCount(1);
+    await expect(
+      page.locator("[data-sileo-toast]").filter({ hasText: "Formato creado" }),
+    ).toContainText("Formato creado");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    const link = page
+      .getByRole("navigation", { name: "Navegación privada" })
+      .getByRole("link", { name: "Cursos", exact: true });
+    await link.evaluate((element) =>
+      element.setAttribute("href", "/app/cursos?success=created"),
+    );
+    await link.click();
+    await expect(
+      page
+        .locator("[data-sileo-toast]")
+        .filter({ hasText: "Curso creado como borrador." }),
+    ).toContainText("Curso creado como borrador.");
+    await expect(
+      page.locator('astro-island[component-export="SileoHost"]'),
+    ).toHaveCount(1);
+    await expect(page.locator("[data-sileo-viewport]")).toHaveCount(1);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    const resolved = theme === "system" ? "dark" : theme;
+    await expect(page.locator("[data-sileo-viewport]")).toHaveAttribute(
+      "data-theme",
+      resolved,
+    );
+    expect(errors).toEqual([]);
+  });
+}
 
 test("private success toast uses semantic theme colors in light and dark modes", async ({
   context,
@@ -9,9 +65,9 @@ test("private success toast uses semantic theme colors in light and dark modes",
 }) => {
   await signInFixture(context, AUTH_FIXTURES.admin.email);
   await page.goto("/app/formatos?success=created");
-  await expect(page.locator("[data-sileo-toast]")).toContainText(
-    "Formato creado",
-  );
+  await expect(
+    page.locator("[data-sileo-toast]").filter({ hasText: "Formato creado" }),
+  ).toContainText("Formato creado");
 
   const viewport = page.locator("[data-sileo-viewport]");
   const tokenPairs = [
@@ -44,6 +100,7 @@ test("private success toast uses semantic theme colors in light and dark modes",
     }
     const surface = await page
       .locator("[data-sileo-toast]")
+      .filter({ hasText: "Formato creado" })
       .evaluate((toast) => {
         const rect = toast.querySelector<SVGRectElement>("[data-sileo-pill]");
         const title = toast.querySelector<HTMLElement>("[data-sileo-title]");
@@ -67,17 +124,274 @@ test("private success toast uses semantic theme colors in light and dark modes",
   }
 });
 
+test("independent early notifications survive delayed hydration, concurrent loading updates and theme toggles", async ({
+  context,
+  page,
+}) => {
+  const errors = trackHydrationErrors(page);
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.addInitScript(() => localStorage.setItem("theme", "dark"));
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/*SileoHost*", async (route) => {
+    await pending;
+    await route.continue();
+  });
+  try {
+    await page.goto("/app/formatos?success=created", {
+      waitUntil: "domcontentloaded",
+    });
+    // The page consumes the parameter after emitting its real facade success.
+    await expect(page).toHaveURL(/\/app\/formatos$/);
+    await page.evaluate(async () => {
+      // Reuse the facade module imported by the real page, sharing its Sileo store.
+      const moduleUrl = performance
+        .getEntriesByType("resource")
+        .find((entry) =>
+          /\/src\/lib\/notifications\.ts(?:\?|$)/.test(entry.name),
+        )?.name;
+      if (!moduleUrl)
+        throw new Error("Page notifications facade was not loaded");
+      const { notifications }: typeof import("../../src/lib/notifications") =
+        await import(moduleUrl);
+      void notifications.promise(
+        new Promise<void>((resolve) =>
+          Object.assign(window, { finishFirstEarlyNotification: resolve }),
+        ),
+        {
+          loading: { title: "Operación temprana cargando" },
+          success: { title: "Operación temprana completada", duration: 60000 },
+          error: { title: "Error temprano" },
+        },
+      );
+      void notifications.promise(
+        new Promise<void>((resolve) =>
+          Object.assign(window, { finishEarlyNotification: resolve }),
+        ),
+        {
+          loading: { title: "Segunda operación cargando" },
+          success: { title: "Segunda operación completada", duration: 60000 },
+          error: { title: "Error de segunda operación" },
+        },
+      );
+    });
+    await expect(page.locator("[data-sileo-toast]")).toHaveCount(0);
+  } finally {
+    release();
+  }
+  const toast = page
+    .locator("[data-sileo-toast]")
+    .filter({ hasText: "Formato creado" });
+  await expect(toast).toContainText("Formato creado");
+  await expect(
+    page
+      .locator("[data-sileo-toast]")
+      .filter({ hasText: "Operación temprana cargando" }),
+  ).toHaveCount(1);
+  await page
+    .locator("[data-sileo-toast]")
+    .filter({ hasText: "Operación temprana cargando" })
+    .evaluate((element) => Object.assign(window, { firstEarlyToast: element }));
+  await page
+    .locator("[data-sileo-toast]")
+    .filter({ hasText: "Segunda operación cargando" })
+    .evaluate((element) =>
+      Object.assign(window, { secondEarlyToast: element }),
+    );
+  await page.evaluate(() => {
+    (
+      window as typeof window & { finishFirstEarlyNotification: () => void }
+    ).finishFirstEarlyNotification();
+  });
+  const firstSuccess = page
+    .locator("[data-sileo-toast]")
+    .filter({ hasText: "Operación temprana completada" });
+  await expect(firstSuccess).toHaveAttribute("data-state", "success");
+  expect(
+    await firstSuccess.evaluate(
+      (element) =>
+        (window as typeof window & { firstEarlyToast: Element })
+          .firstEarlyToast === element,
+    ),
+  ).toBe(true);
+  await expect(
+    page
+      .locator("[data-sileo-toast]")
+      .filter({ hasText: "Segunda operación cargando" }),
+  ).toHaveAttribute("data-state", "loading");
+  await expect(
+    page
+      .locator("[data-sileo-toast]")
+      .filter({ hasText: "Segunda operación cargando" }),
+  ).toHaveCount(1);
+  const secondSuccess = page
+    .locator("[data-sileo-toast]")
+    .filter({ hasText: "Segunda operación completada" });
+  await page.evaluate(() => {
+    (
+      window as typeof window & { finishEarlyNotification: () => void }
+    ).finishEarlyNotification();
+  });
+  await expect(
+    page
+      .locator("[data-sileo-toast]")
+      .filter({ hasText: "Segunda operación completada" }),
+  ).toHaveCount(1);
+  await expect(secondSuccess).toHaveAttribute("data-state", "success");
+  expect(
+    await secondSuccess.evaluate(
+      (element) =>
+        (window as typeof window & { secondEarlyToast: Element })
+          .secondEarlyToast === element,
+    ),
+  ).toBe(true);
+  await expect(firstSuccess).toHaveCount(1);
+  await page
+    .locator(".private-sidebar")
+    .getByRole("button", { name: "Cambiar a modo claro" })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(firstSuccess).toContainText("Operación temprana completada");
+  await page
+    .getByRole("navigation", { name: "Navegación privada" })
+    .getByRole("link", { name: "Cursos", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/app\/cursos$/);
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page
+    .locator(".private-sidebar")
+    .getByRole("button", { name: "Cambiar a modo oscuro" })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(
+    page.locator('astro-island[component-export="SileoHost"]'),
+  ).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
+test("theme storage removal and clear reset to each surface default, unrelated keys do not", async ({
+  context,
+  page,
+}) => {
+  const errors = trackHydrationErrors(page);
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.addInitScript(() => localStorage.setItem("theme", "dark"));
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/app");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: "unrelated", newValue: "light" }),
+    ),
+  );
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: "theme", newValue: null }),
+    ),
+  );
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "system");
+  await page
+    .locator(".private-sidebar")
+    .getByRole("button", { name: "Cambiar a modo oscuro" })
+    .click();
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: null, newValue: null }),
+    ),
+  );
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "system");
+  await page.goto("/");
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: "theme", newValue: null }),
+    ),
+  );
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  expect(errors).toEqual([]);
+});
+
+for (const selected of ["light", "dark"] as const) {
+  test(`blocked theme storage preserves ${selected} in memory before and after router swaps`, async ({
+    context,
+    page,
+  }) => {
+    const errors = trackHydrationErrors(page);
+    await signInFixture(context, AUTH_FIXTURES.admin.email);
+    await page.emulateMedia({
+      colorScheme: selected === "dark" ? "light" : "dark",
+    });
+    await page.addInitScript(() => {
+      const getItem = Storage.prototype.getItem;
+      const setItem = Storage.prototype.setItem;
+      Storage.prototype.getItem = function (key) {
+        if (key === "theme") throw new DOMException("Blocked", "SecurityError");
+        return getItem.call(this, key);
+      };
+      Storage.prototype.setItem = function (key, value) {
+        if (key === "theme") throw new DOMException("Blocked", "SecurityError");
+        return setItem.call(this, key, value);
+      };
+    });
+    await page.goto("/app");
+    await page
+      .locator(".private-sidebar")
+      .getByRole("button", {
+        name:
+          selected === "dark"
+            ? "Cambiar a modo oscuro"
+            : "Cambiar a modo claro",
+      })
+      .click();
+    await page.evaluate(() => {
+      const observed: string[] = [];
+      Object.assign(window, { observedThemeSwaps: observed });
+      document.addEventListener("astro:before-swap", (event) =>
+        observed.push(
+          event.newDocument.documentElement.dataset.theme ?? "missing",
+        ),
+      );
+      document.addEventListener("astro:after-swap", () =>
+        observed.push(document.documentElement.dataset.theme ?? "missing"),
+      );
+    });
+    const navigation = page.getByRole("navigation", {
+      name: "Navegación privada",
+    });
+    await navigation.getByRole("link", { name: "Formatos" }).click();
+    await expect(page).toHaveURL(/\/app\/formatos$/);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", selected);
+    await navigation.getByRole("link", { name: "Resumen" }).click();
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", selected);
+    expect(
+      await page.evaluate(
+        () =>
+          (window as typeof window & { observedThemeSwaps: string[] })
+            .observedThemeSwaps,
+      ),
+    ).toEqual([selected, selected, selected, selected]);
+    await expect(
+      page.locator('astro-island[component-export="SileoHost"]'),
+    ).toHaveCount(1);
+    expect(errors).toEqual([]);
+  });
+}
+
 test("private toast host persists across client-side navigation", async ({
   context,
   page,
 }) => {
+  const errors = trackHydrationErrors(page);
   await signInFixture(context, AUTH_FIXTURES.admin.email);
   await page.goto("/app/formatos?success=created");
 
   // Sileo only renders a viewport while it has an active toast.
-  await expect(page.locator("[data-sileo-toast]")).toContainText(
-    "Formato creado",
-  );
+  await expect(
+    page.locator("[data-sileo-toast]").filter({ hasText: "Formato creado" }),
+  ).toContainText("Formato creado");
 
   const viewport = page.locator("[data-sileo-viewport]");
   await expect(viewport).toBeAttached();
@@ -94,9 +408,11 @@ test("private toast host persists across client-side navigation", async ({
   });
   await coursesLink.click();
 
-  await expect(page.locator("[data-sileo-toast]")).toContainText(
-    "Curso creado como borrador.",
-  );
+  await expect(
+    page
+      .locator("[data-sileo-toast]")
+      .filter({ hasText: "Curso creado como borrador." }),
+  ).toContainText("Curso creado como borrador.");
   expect(
     await viewport.evaluate(
       (element) =>
@@ -104,4 +420,8 @@ test("private toast host persists across client-side navigation", async ({
           .toastViewport === element,
     ),
   ).toBe(true);
+  await expect(
+    page.locator('astro-island[component-export="SileoHost"]'),
+  ).toHaveCount(1);
+  expect(errors).toEqual([]);
 });

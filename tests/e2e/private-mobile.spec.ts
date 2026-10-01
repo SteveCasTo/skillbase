@@ -94,3 +94,94 @@ test("mobile drawer respects reduced motion", async ({ context, page }) => {
   await page.getByRole("button", { name: "Cerrar menú" }).click();
   await expect(page.locator("[data-mobile-drawer]")).toBeHidden();
 });
+
+test("mobile footer toggles the resolved system theme and remains usable after router navigation", async ({
+  context,
+  page,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/app");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "system");
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  const footer = page.locator(".private-mobile-footer");
+  await footer.getByRole("button", { name: "Cambiar a modo claro" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page
+    .getByRole("navigation", { name: "Navegación móvil" })
+    .getByRole("link", { name: "Formatos" })
+    .click();
+  await expect(page).toHaveURL(/\/app\/formatos$/);
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  await footer.getByRole("button", { name: "Cambiar a modo oscuro" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.getByRole("button", { name: "Cerrar menú" }).click();
+  await expect(page.getByRole("button", { name: "Abrir menú" })).toBeFocused();
+});
+
+test("mobile navigation closes its drawer while the real next page skeleton loads", async ({
+  context,
+  page,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app");
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/app/formatos", async (route) => {
+    const response = await route.fetch();
+    await pending;
+    await route.fulfill({ response });
+  });
+  try {
+    await page.getByRole("button", { name: "Abrir menú" }).click();
+    await page
+      .getByRole("navigation", { name: "Navegación móvil" })
+      .getByRole("link", { name: "Formatos" })
+      .click();
+    await expect(page.locator("[data-mobile-drawer]")).toBeHidden();
+    await expect(page.getByRole("main")).toHaveAttribute("aria-busy", "true");
+    await expect(page.locator("[data-navigation-skeleton]")).toBeVisible();
+  } finally {
+    release();
+  }
+  await expect(page).toHaveURL(/\/app\/formatos$/);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.locator("[data-navigation-skeleton]")).toBeHidden();
+});
+
+test("failed or cancelled keyboard navigation from the mobile drawer restores trigger focus", async ({
+  context,
+  page,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app");
+  const trigger = page.getByRole("button", { name: "Abrir menú" });
+  for (const cancel of [false, true]) {
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    await page
+      .getByRole("navigation", { name: "Navegación móvil" })
+      .getByRole("link", { name: "Formatos" })
+      .focus();
+    await page.evaluate(async (abort) => {
+      const controller = new AbortController();
+      const event = Object.assign(new Event("astro:before-preparation"), {
+        to: new URL("/app/formatos", location.href),
+        signal: controller.signal,
+        formData: undefined,
+        loader: async () => {
+          if (abort) controller.abort();
+          else throw new Error("Controlled mobile load failure");
+        },
+      });
+      document.dispatchEvent(event);
+      await event.loader().catch(() => {});
+    }, cancel);
+    await expect(trigger).toBeFocused();
+    await expect(page.locator("[data-mobile-drawer]")).toBeHidden();
+    await expect(page.locator("[data-navigation-skeleton]")).toBeHidden();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  }
+});
