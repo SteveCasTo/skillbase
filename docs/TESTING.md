@@ -242,11 +242,13 @@ La cobertura de Auth incluye redirects no autenticados, roles individuales y mú
 
 También se verifica signup público deshabilitado, creación de fixture por Admin API, usuario activo sin roles, motivos exactos de denegación, políticas fail-closed, opciones de cookies, cache privado, origen de acciones Auth, reemplazo exacto de roles y vinculación concurrente. Los escenarios server-side se ejecutan una vez en Chromium desktop; mobile conserva únicamente Foundation y un smoke de navegación privada.
 
-### Cobertura de autenticación dual (feature Fase 4, aún sin integrar)
+### Cobertura de autenticación dual (Fase 4, integrada mediante PR 118)
 
 Las pruebas añadidas en la rama `feat/dual-auth-and-profile` cubren login password solo para cuenta interna autorizada, rechazo de identidad/método no permitido, validación de sesión actual con `getUser()` y claims firmados, provisión interna de instructor con autorización ADMIN/transacción/compensación, cambio/recovery de contraseña, asociación Google explícita ligada al actor y sesión, PKCE, nonce de un uso/expiración, mismatch de email/provider, identidades Google preexistentes y restauración de la sesión original. Los tests Google usan un fixture de provider OAuth aislado; no son login con Google real ni prueba de entrega de email.
 
-Estado local comunicado para la rama: unit 146 PASS, integration 71 PASS, suite E2E dirigida de Auth/Google/sidebar/mobile 43/43 PASS; lint PASS; typecheck 0 errores/0 warnings/83 hints; build, Drizzle y formatter PASS; `git diff --check` PASS. Una corrida full E2E sigue en progreso en otro worktree; no declarar cierre full, CI remoto, integración a `development`, migraciones en el stack local persistente/cloud ni SMTP verificado a partir de esos checks.
+Estado local comunicado por el implementador: unit 146 PASS, integration 71 PASS, 27 E2E dirigidos PASS; lint PASS; typecheck 0 errores/0 warnings/83 hints; build, Drizzle y formatter PASS; `git diff --check` PASS. Después, el full E2E aislado en el puerto canónico 4321 pasó 104/104 (5.9 min). La corrida full anterior en 4323 obtuvo 73 PASS/31 FAIL: tests heredados enviaban `Origin: http://127.0.0.1:4321` y sus POST fueron rechazados como cross-site. Se corrigió solo la invocación al puerto canónico, sin editar código/tests ni modificar retries; el puerto alternativo aún no cubre todos los tests heredados.
+
+[PR 118](https://github.com/SteveCasTo/skillbase/pull/118) se integró en `development` como `f06b4fdf8f8c7691ffdd7937efb0f813a27666d4`. No reportó checks remotos; estos resultados son locales, no CI PASS. Las migraciones 0012/0013 se probaron únicamente en stacks aislados; siguen pendientes su aplicación local persistente/cloud y la configuración efectiva de hook/secreto server-only. SMTP/entrega real y Google real no están verificados. El servidor original quedó apagado con autorización del usuario; no se reinició.
 
 ### Cobertura de cursos y formatos
 
@@ -323,7 +325,7 @@ Verificación local de esta corrección: 133 unit tests PASS (853 assertions), l
 
 #### Cierre posterior del ajuste de interesados (PRs 116 y 117)
 
-PRs 116 y 117 integraron en `development` la corrección compacta/responsive del panel y formulario, junto con la cobertura de rutas/skeleton y navegación/Auth incorporada en esos cambios. La verificación completa posterior de la UI pasó 98/98 E2E; el registro de calidad asociado reportó 133 unitarias y 65 de integración. Estos resultados posteriores superseden para el estado actual las notas anteriores de verificación aislada/local que indicaban integración/E2E pendientes; se conservan arriba como secuencia histórica de pruebas. No se mezclan con los tests Auth dual de la feature actual, cuyo full E2E continúa en progreso.
+PRs 116 y 117 integraron en `development` la corrección compacta/responsive del panel y formulario, junto con la cobertura de rutas/skeleton y navegación/Auth incorporada en esos cambios. La verificación completa posterior de la UI pasó 98/98 E2E; el registro de calidad asociado reportó 133 unitarias y 65 de integración. Estos resultados posteriores superseden para el estado actual las notas anteriores de verificación aislada/local que indicaban integración/E2E pendientes; se conservan arriba como secuencia histórica de pruebas. El full posterior con Auth dual pasó 104/104, según el registro de PR 118 arriba; no se suman corridas como si fueran una suite única.
 
 Resultados locales finales comunicados para Fase 3: full unit 129 PASS (793 assertions); full integration 65 PASS/0 FAIL (478 assertions, 9 archivos); lint global PASS; typecheck 0 errores, 0 warnings y 70 hints; build y Drizzle checks PASS. El primer full integration run fue 45/66 por cleanup de fixtures de cursos incompatible con la FK de `interest_registrations`; se corrigió truncando explícitamente la tabla de interesados, sin `CASCADE`, y el full rerun pasó.
 

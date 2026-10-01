@@ -504,16 +504,16 @@ El ajuste UX de interesados (copy del formulario, submit progresivo, tarjetas/ba
 
 #### Estado del bloque de autenticación dual
 
-La implementación está en los commits `5613399`, `958053a` y `5ff585c` de `feat/dual-auth-and-profile`, sobre base `cf601d8`. El cambio de código no tiene todavía PR ni se ha integrado en `development`; no implica promoción a `master`, aplicación de migraciones, ni activación de Auth en cloud. Se considera completado únicamente el bloque de autenticación dual/cuenta interna, no Fase 4 en conjunto.
+Los commits `5613399`, `958053a` y `5ff585c` de `feat/dual-auth-and-profile`, sobre base `cf601d8`, se integraron mediante [PR 118](https://github.com/SteveCasTo/skillbase/pull/118) como `f06b4fdf8f8c7691ffdd7937efb0f813a27666d4`. No implica promoción a `master`, aplicación de migraciones al stack local persistente/cloud ni activación efectiva de Auth allí. Se considera completado únicamente el bloque de autenticación dual/cuenta interna, no Fase 4 en conjunto; instructor/perfil administrativo/asignaciones siguen pendientes de implementación.
 
 - [x] Google y email/password en login, verificación del método de sesión y autorización por identidad interna activa.
 - [x] Perfil `/app/perfil` con cambio opcional de contraseña, confirmación por contraseña actual o correo, recovery y asociación Google opcional.
 - [x] Provisionamiento server-side de cuenta de instructor mediante `createInstructorAccount(actorAuthUserId, { email, name, password })`; crea usuario Auth confirmado y usuario interno ACTIVE con rol INSTRUCTOR, con compensación si falla la transacción interna. Aún no hay pantalla ADMIN de alta ni asignación de instructores.
-- [ ] Cerrar full E2E en curso; no declarar el gate completo. La cobertura dirigida Auth/Google/sidebar/mobile comunicada pasó 43/43; full E2E continúa ejecutándose en otro worktree.
-- [ ] Integrar por PR a `development` después del gate y revisión; hasta entonces no aplicar cambios a producción.
+- [x] Completar full E2E aislado: 104/104 PASS en el puerto canónico 4321. La corrida anterior en 4323 obtuvo 73 PASS/31 FAIL por `Origin` hardcodeado a 4321 en tests heredados; se corrigió únicamente la invocación, sin cambios de código/tests ni retries.
+- [x] Integrar mediante PR 118 a `development`; sin checks remotos reportados, no se afirma CI PASS. Los cambios siguientes continúan únicamente en `development` hasta la próxima release autorizada.
 - [ ] Antes de habilitarlo en cualquier entorno: aplicar Drizzle 0012/0013, habilitar hook `private_auth.allow_invited_google_signup` en la configuración Auth efectiva y configurar `AUTH_RATE_LIMIT_SECRET` server-only de al menos 32 caracteres. Configuración cloud y SMTP no están verificadas/aplicadas.
 
-Estado local comunicado en el worktree de feature: 146 unit PASS, 71 integration PASS, lint PASS, typecheck PASS (0 errores/0 warnings/83 hints), build, Drizzle y formatter PASS; `git diff --check` PASS. Estos resultados no certifican el full E2E todavía en curso ni CI remota, integración a `development`, migración local compartida/cloud, SMTP, ni despliegue.
+Estado local comunicado por el implementador: 146 unit PASS, 71 integration PASS, 27 E2E dirigidos PASS, lint PASS, typecheck PASS (0 errores/0 warnings/83 hints), build, Drizzle y formatter PASS; `git diff --check` PASS. La validación posterior full aislada pasó 104/104 E2E y PR 118 quedó integrado. No se certifican CI remota, migración local compartida/cloud, configuración efectiva de hook/secreto, SMTP/Google real ni despliegue. El servidor de desarrollo original quedó apagado por autorización del usuario para validar; no se reinició.
 
 ### Resultado demostrable
 

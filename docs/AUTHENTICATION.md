@@ -10,7 +10,7 @@ Supabase Auth.
 
 ## GOOGLE
 
-Google OAuth y email/password son mecanismos visibles para usuarios internos. El flujo de email/password y la asociación opcional de Google están implementados en la rama de feature de Fase 4; integración en `development`, migraciones aplicadas y habilitación cloud siguen pendientes. No hay signup público abierto.
+Google OAuth y email/password son mecanismos visibles para usuarios internos. El flujo de email/password y la asociación opcional de Google se integraron en `development` mediante PR 118; las migraciones en el stack local persistente/cloud y la habilitación efectiva siguen pendientes. No hay signup público abierto.
 
 La configuración requiere credenciales OAuth de Google y configuración correspondiente en Supabase.
 
@@ -119,7 +119,7 @@ El proyecto `SkillBase` está enlazado con referencia `fvzxqlezdrlzykyoevub`. Go
 
 El flujo cloud fue verificado manualmente desde Vercel hasta Google y de regreso a `/app`. El primer administrador quedó vinculado a su identidad Auth, en estado `ACTIVE` y con rol `ADMIN`.
 
-## AUTENTICACIÓN DUAL IMPLEMENTADA (feature de Fase 4; integración y habilitación pendientes)
+## AUTENTICACIÓN DUAL IMPLEMENTADA (Fase 4; integrada en development, habilitación pendiente)
 
 - Login email/password convive con Google. Un identificador interno conserva UUID propio y referencia `auth.users.id`; correo y role/state se resuelven desde el usuario interno. La aplicación valida el usuario en vivo mediante `getUser()` y valida los claims firmados mediante `getClaims()` para determinar el método de la sesión actual; no deduce el método de una identidad vinculada.
 - `createInstructorAccount(actorAuthUserId, { email, name, password })` es operación de servidor, no endpoint público. Verifica ADMIN activo antes y después de llamar Supabase Admin API, normaliza/valida campos y provisiona usuario Auth confirmado. Después crea usuario interno `ACTIVE`, `authPrimaryProvider=EMAIL` y rol únicamente `INSTRUCTOR` en transacción. Si falla el registro interno, intenta borrar la identidad Auth recién creada como compensación. La contraseña nunca forma parte del input persistido, usuario interno, evento de auditoría ni respuesta `InternalUser`; no existe aún pantalla administrativa de alta/asignación de instructores.
@@ -133,4 +133,4 @@ El flujo cloud fue verificado manualmente desde Vercel hasta Google y de regreso
 
 La política de activación/desactivación cuando existen cursos futuros asignados está pendiente de aprobación; no implementar una regla de negocio inferida.
 
-La rama de implementación consta de commits `5613399`, `958053a` y `5ff585c` sobre `cf601d8`. Al corte de esta actualización el feature no tiene PR ni se ha integrado en `development`; producción continúa en el release Fase 3 de `master` (`8f5bb2d`) y no se ha promovido ningún cambio Auth a `master`.
+Los commits `5613399`, `958053a` y `5ff585c`, sobre `cf601d8`, se integraron mediante [PR 118](https://github.com/SteveCasTo/skillbase/pull/118) como `f06b4fdf8f8c7691ffdd7937efb0f813a27666d4`. El full E2E aislado pasó 104/104 en el puerto canónico 4321; es evidencia local, no CI remoto. Las migraciones 0012/0013 solo se ejercitaron en stacks de test aislados; su aplicación al stack local persistente/cloud, hook efectivo, secreto server-only, SMTP y Google real siguen pendientes de habilitación/verificación. Producción continúa en el release Fase 3 de `master` (`8f5bb2d`); no se ha promovido ningún cambio Auth a `master`.
