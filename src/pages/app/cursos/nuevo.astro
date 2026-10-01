@@ -1,5 +1,6 @@
 ---
 import { createCourse } from "@/application/courses/manage-courses";
+import { randomUUID } from "node:crypto";
 import { listFormats } from "@/application/courses/manage-formats";
 import type { CourseFormat } from "@/domain/courses/formats";
 import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
@@ -40,6 +41,7 @@ let values: CourseInput = {
 };
 let errors: Readonly<Record<string, string>> = {};
 let pageError: string | null = null;
+let requestKey: string = randomUUID();
 let formats: readonly CourseFormat[] = [];
 try {
   formats = await listFormats(new DrizzleFormatRepository(getDatabase()), user);
@@ -59,7 +61,9 @@ if (Astro.request.method === "POST" && !pageError) {
       "La solicitud no tiene un origen válido. Recarga la página e inténtalo de nuevo.";
     if (jsonRequested) return json({ error: pageError }, 403);
   } else {
-    values = courseInputFromFormData(await Astro.request.formData());
+    const data = await Astro.request.formData();
+    values = courseInputFromFormData(data);
+    requestKey = String(data.get("requestKey") ?? "");
     try {
       // The image is only accepted by the dedicated bounded upload endpoint,
       // after a real course exists. Never accept a client-supplied artwork key here.
@@ -68,10 +72,16 @@ if (Astro.request.method === "POST" && !pageError) {
         new DrizzleCourseRepository(getDatabase()),
         user,
         values,
+        requestKey,
       );
       if (jsonRequested)
         return json(
-          { id: created.id, revision: created.updatedAt.toISOString() },
+          {
+            id: created.id,
+            revision: (
+              created.creationRevision ?? created.updatedAt
+            ).toISOString(),
+          },
           201,
         );
       const destination = `/app/cursos/${created.id}/editar?success=created`;
@@ -136,6 +146,7 @@ if (Astro.request.method === "POST" && !pageError) {
   <div class="mt-8">
     <CourseForm
       values={values}
+      requestKey={requestKey}
       errors={errors}
       formats={formats}
       disabled={

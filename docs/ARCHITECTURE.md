@@ -172,6 +172,7 @@ Módulos iniciales:
 - Users
 - Courses
 - Groups
+- InterestRegistrations
 - Participants
 - PreRegistrations
 - Enrollments
@@ -187,6 +188,12 @@ Módulos iniciales:
 No es obligatorio que cada módulo sea un package independiente.
 
 El objetivo es separación lógica.
+
+Fase 3 implementa `InterestRegistrations` como agregado autónomo: no es `Participant` ni `PreRegistration`, y el email público no verificado no puede actualizar identidad global. El formulario solo aparece en el detalle del curso; la administración (`/app/interesados` y sus detalles UUID) es solo ADMIN. La preinscripción presencial/pagada permanece en Fase 5. Dominio, aplicación, schema/migración y adaptadores viven separados en `src/domain/interests`, `src/application/interests`, `src/server/interests` y `src/server/db/repositories`. Implementación y validación local están completas; la evidencia E2E combina corrida full y revalidaciones dirigidas, sin afirmar full run 95/95. La integración de PR 105 a `development` queda pendiente; consultar `docs/PLAN.md` y [`docs/INTEREST_REGISTRATION_CONTRACT.md`](INTEREST_REGISTRATION_CONTRACT.md).
+
+Los contratos distinguen DTO de formulario público (disponibilidad y horarios elegibles, sin PII/capacidad) y DTOs administrativos de registros/métricas bajo autorización; las preferencias no asignan cupos ni grupos. La administración filtra estado sin derivar métricas del subconjunto mostrado.
+
+El POST público limita y parsea el body en el adaptador server-side, valida Origin y llama el caso de uso de interés. Un limiter persistente usa PostgreSQL y un HMAC server-only sobre `Astro.clientAddress`; no confía en forwarded headers. Sin secreto válido o dirección de cliente confiable, el flujo falla cerrado. Los defaults técnicos y requisitos de despliegue se describen en el contrato y en `docs/DEPLOYMENT.md`; no implican que los valores cloud estén configurados.
 
 ## ESTRUCTURA DE REFERENCIA
 
@@ -241,9 +248,10 @@ Ejemplos:
 - `/`
 - `/cursos`
 - `/cursos/[slug]`
-- `/preinscripcion/[slug]`
 - `/certificados/[code]`
 - `/login`
+
+El registro de interesados de Fase 3 se accede desde el detalle existente `/cursos/[slug]`; no se define una ruta pública independiente `/preinscripcion/[slug]`. La preinscripción presencial/pagada pertenece a Fase 5.
 
 ### Privadas
 
@@ -405,3 +413,11 @@ La integración Supabase SSR vive en infraestructura server-side y se instancia 
 La conexión `DATABASE_URL` corresponde al runtime y puede apuntar a un pooler compatible con serverless. `MIGRATION_DATABASE_URL` prioriza una conexión directa para Drizzle Kit. En local ambas apuntan a `127.0.0.1:54322`.
 
 La configuración de base y la configuración pública de Auth se validan mediante accessors separados. Las lecturas de oferta pública reutilizan el singleton Drizzle y reintentan exclusivamente `listPublic` ante causas transitorias reconocidas, con tres intentos totales (esperas de 150 ms y 400 ms); errores de configuración, permisos, schema, validación y escrituras no se reintentan.
+
+### Experiencia de mutación privada
+
+Las páginas privadas siguen siendo SSR como fuente de contenido y autorización; `NavigationSkeleton` se conecta al ciclo de navegación/carga y sustituye temporalmente la región mientras la vista está pendiente y visible, con cancelación/recuperación al finalizar o fallar. Los controladores toleran navegación Astro sin registrar listeners duplicados. Las mutaciones de grupos y formatos usan estado de presentación local, pero delegan validación, autorización, revisiones y persistencia a los casos de uso/repositorios; el DTO específico de grupos no transporta navegación.
+
+Los productores de feedback administrativo comparten la fachada `src/lib/notifications.ts` sobre Sileo. Asigna IDs UUID distintos por operación y entrega el mismo ID a loading/success/error en operaciones promise; la fachada tipa el campo runtime `id` que Sileo 0.1.5 no publica en sus declaraciones, sin `any` ni cambios en `node_modules`.
+
+El alta de curso admite idempotencia opcional a través de UUID `requestKey` y fingerprint de datos. El repositorio persiste ambos con actor en la propia fila de curso bajo índice único actor/clave; reintentar la misma solicitud recupera el curso ya creado y una clave reutilizada con contenido distinto se rechaza. La fotografía se carga/asocia después de crear el borrador: no se promete atomicidad entre Storage y PostgreSQL y el fallo conserva una ruta de recuperación del borrador.

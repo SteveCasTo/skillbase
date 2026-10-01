@@ -401,7 +401,7 @@ Las recargas completas tras guardar, eliminar o cambiar un estado interrumpen el
 
 ### Decisión
 
-Con JavaScript, toda mutación administrativa (incluidas altas, ediciones, cambios de estado y eliminaciones) debe confirmar en la interfaz y actualizar el contenido pertinente sin recargar el documento. Los POST con `Accept: application/json` reutilizan el mismo caso de uso, autorización, comprobación de origen, validación y control de concurrencia que el formulario HTML. Errores persistentes y revisiones optimistas se reflejan en la vista. Para acciones irreversibles o de alto impacto se pide confirmación accesible; las operaciones no se ejecutan al cerrar el diálogo. Sin JavaScript se conserva POST/redirect y una confirmación HTML utilizable.
+Con JavaScript, toda mutación administrativa (incluidas altas, ediciones, cambios de estado y eliminaciones) debe confirmar en la interfaz y actualizar el contenido pertinente sin recargar el documento. Los POST con `Accept: application/json` reutilizan el mismo caso de uso, autorización, comprobación de origen, validación y control de concurrencia que el formulario HTML. Errores persistentes y revisiones optimistas se reflejan en la vista. Para acciones irreversibles o de alto impacto se pide confirmación accesible; al aceptar, el diálogo se cierra y la solicitud continúa con feedback pending/success/error independiente. No se comunica éxito ni se navega antes de que el servidor confirme; después se actualiza localmente la vista afectada, sin navegación completa. Las acciones duplicadas se bloquean mientras hay una petición pendiente. Sin JavaScript se conserva POST/redirect y una confirmación HTML utilizable.
 
 ### Alternativas
 
@@ -413,6 +413,8 @@ Con JavaScript, toda mutación administrativa (incluidas altas, ediciones, cambi
 - La interfaz debe sincronizar los datos y tokens devueltos por el servidor y ofrecer recuperación si la sesión caduca o falla una solicitud.
 - Los tests cubren resultados del servidor, continuidad de la página, foco y el fallback sin JavaScript por flujo; las mutaciones que aún hacen redirect con JavaScript se migran por fases.
 - Esta decisión reemplaza la exigencia de Post/Redirect/Get para **todo** éxito mutable en ADR-015: PRG permanece para el fallback HTML.
+
+La extensión del 2026-09-30 precisa el ciclo de confirmación y feedback; no altera la autorización server-side ni elimina el fallback HTML.
 
 ---
 
@@ -505,3 +507,70 @@ El curso tenía una hora de inicio y fin editorial calculada que se confundía c
 
 - Las reglas horarias de ADR-018 y las restricciones de publicación para crear o cambiar grupos de ADR-019 quedan sustituidas por esta decisión; el cálculo de sesiones, la compatibilidad histórica, la auditoría y el control de solapamiento permanecen vigentes.
 - El alta con grupos e imagen realiza varias escrituras autorizadas: si alguna falla, conserva el borrador y ofrece reintentar las operaciones pendientes o abrirlo. No se anuncia atomicidad entre Storage y PostgreSQL.
+
+---
+
+## ADR-021 — ESTADOS Y MÉTRICAS DE INTERESADOS
+
+**Fecha:** 2026-09-30
+
+**Estado:** Accepted
+
+### Contexto
+
+Fase 3 recoge registros de interés sin pago ni asignación de cupo. Se requiere distinguir registros vigentes de cancelados y consultar demanda por preferencia sin confundirla con grupos o plazas.
+
+### Decisión
+
+- Usar estados `ACTIVE` y `CANCELLED`. Administración puede cancelar y reactivar un interesado, conservando su historial.
+- Contabilizar interesados `ACTIVE` por curso y por preferencia de grupo. La preferencia es una dimensión separada: no asigna grupo ni representa plazas/cupos disponibles u ocupados.
+- No interpretar `ACTIVE` como aceptación de la persona, reserva, preinscripción presencial, inscripción ni pago.
+
+### Alternativas
+
+- Mantener registros sin estado y derivar solo el conteo total.
+- Borrar registros cancelados en vez de conservarlos.
+
+### Consecuencias
+
+- Los contratos técnicos, la persistencia, la autorización y la implementación de estas reglas aún deben definirse y completarse en Fase 3.
+- Conservar registros cancelados permite mantener historial; las métricas acordadas cuentan únicamente interesados activos y nunca sustituyen datos de asignación u ocupación de grupos.
+
+---
+
+## ADR-022 — REGISTRO PÚBLICO DE INTERESADOS SIN PAGO
+
+**Fecha:** 2026-09-30
+
+**Estado:** Accepted
+
+### Contexto
+
+El término «preinscripción» se reserva para el registro presencial que registra pago parcial o total y ocupa cupo. Fase 3 requiere captar demanda pública mediante registros de interesados, distinguiéndolos de esa preinscripción presencial.
+
+### Decisión
+
+- Fase 3 registra interesados, no preinscripciones presenciales pagadas. El registro no cobra, asigna grupo ni ocupa cupo, y no comunica aceptación.
+- Modelar el registro de interesado como agregado autónomo, separado de `Participant` y de la preinscripción presencial. El email público no verificado no es identidad global y nunca autoriza sobrescribir datos de `Participant`.
+- El único punto de entrada público es el detalle `/cursos/[slug]`; no se cambia ni añade información a la landing.
+- Nombre, apellidos y email son obligatorios; teléfono y preferencia de grupo son opcionales. Se admite como máximo un registro por curso y email normalizado.
+- El servidor valida disponibilidad: desde que el curso está `PUBLISHED` hasta el cierre de inscripción presencial si tiene ventana configurada, o hasta el inicio oficial si no la tiene. Se rechazan cursos retirados o archivados.
+- La preinscripción presencial pertenece a Fase 5: puede registrarse directamente o usar el interesado como prellenado editable, completa los datos administrativos pendientes y registra pago parcial o total al ocupar cupo. El uso del interesado requiere un vínculo explícito y trazable; no implica que la preinscripción pagada herede una identidad global, ni permite inferir pago a partir del interesado. No se define aquí una transición posterior a inscripción definitiva. Cambios de grupo y devoluciones pertenecen también a Fase 5; no se duplican en Fase 3.
+- Al cierre de disponibilidad pública no se eliminan automáticamente interesados: el formulario deja de aceptar registros y el historial sigue disponible para administración. La política futura de conservación y anonimización, incluido un plazo, queda pendiente; no se promete conservación perpetua.
+- Las reglas monetarias y datos aún por confirmar (precio aplicado, descuentos, pagos, documentos y boleta) no se adelantan como decisiones de Fase 3.
+
+### Alternativas
+
+- Tratar el registro público de interesado como preinscripción presencial con pago y ocupación de cupo.
+- Añadir una llamada a la acción o información nueva en la landing.
+
+### Consecuencias
+
+- El modelo de Fase 3 debe distinguir interesados de preinscripciones presenciales y validar duplicados y elegibilidad en servidor.
+- La entidad persistida y el contrato técnico concreto se definirán antes de su migración; las reglas de estado y métricas aprobadas están en ADR-021.
+- Los interesados sirven para conocer demanda, pero no crean disponibilidad, capacidad ni compromisos financieros. La preinscripción presencial ocupa cupo; su posible paso a inscripción definitiva queda fuera de esta decisión.
+- La separación evita tratar datos de contacto declarados públicamente como identidad verificada. Cierre de captación no equivale a borrado; el plazo de conservación y la anonimización requieren una decisión posterior de privacidad.
+
+Implementación local de ADR-017 (2026-09-30): la carga estructural SSR se coordina con navegación, viewport y cancelación; grupos/formatos aplican actualización local. El alta de curso usa idempotencia actor + UUID + fingerprint persistida en la propia fila de curso (migración 0010), no una tabla de recibos separada ni limpieza automática. La foto sigue siendo una operación posterior al alta con recuperación del borrador, no una transacción atómica DB/Storage. Esta precisión no cambia reglas de negocio ni declara cerrado el gate de validación.
+
+Detalle de implementación local de ADR-017: los productores administrativos pasan por `src/lib/notifications.ts`, que crea un UUID por operación y reutiliza el ID para loading/success/error. El bridge adapta el `id` de runtime de Sileo 0.1.5 sin `any` ni patch en dependencias instaladas. Esto no cambia la decisión de mantener la mejora progresiva/fallback SSR ni la política existente de movimiento reducido.

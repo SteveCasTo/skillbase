@@ -33,6 +33,7 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
       courseTypeId,
       schedule: "Lunes a viernes, 08:00–09:30",
       conditions: "Cupo limitado.",
+      requestKey: crypto.randomUUID(),
       startsAt: "2027-03-01T08:00",
       endsAt: "2027-03-17T09:30",
       registrationStartAt: "2027-01-01T08:00",
@@ -42,10 +43,13 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
     },
   });
   expect(course.status()).toBe(201);
-  const { id } = (await course.json()) as { id: string };
+  const { id, revision } = (await course.json()) as {
+    id: string;
+    revision: string;
+  };
   await page.request.post(`/app/cursos/${id}/editar`, {
     headers,
-    form: { intent: "publish" },
+    form: { intent: "publish", revision },
   });
   await page.goto(`/app/cursos/${id}/grupos`);
   const invalidResponse = await page.request.post(`/app/cursos/${id}/grupos`, {
@@ -72,6 +76,25 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
   await form.getByLabel("Capacidad").fill("15");
   await form.getByRole("button", { name: "Crear grupo" }).click();
   await expect(page).toHaveURL(/success=created/);
+  const capacityEditor = page.locator('[data-group-field="capacity"] details');
+  await capacityEditor.locator("summary").click();
+  await expect(
+    capacityEditor.getByRole("form", { name: "Cambiar capacidad del grupo 1" }),
+  ).toBeVisible();
+  await capacityEditor.getByLabel("Nueva capacidad").fill("18");
+  await capacityEditor.getByRole("link", { name: /Cancelar edición/ }).click();
+  await expect(page.locator('[data-group-field="capacity"]')).toContainText(
+    "15",
+  );
+  await capacityEditor.locator("summary").click();
+  await capacityEditor.getByLabel("Nueva capacidad").fill("18");
+  await capacityEditor
+    .getByRole("button", { name: "Guardar capacidad del grupo 1" })
+    .click();
+  await expect(page).toHaveURL(/success=capacity/);
+  await expect(page.locator('[data-group-field="capacity"]')).toContainText(
+    "18",
+  );
   await page.goto(`/app/cursos/${id}/editar`);
   await expect(page.getByLabel("Horario planificado histórico")).toHaveValue(
     "Lunes a viernes, 08:00–09:30",
@@ -121,4 +144,14 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
   await page.getByRole("button", { name: "Sí, desactivar grupo" }).click();
   await expect(page).toHaveURL(/success=cancelled/);
   await expect(page.getByText("Inactivo", { exact: true })).toBeVisible();
+  await expect(
+    page.locator("[data-group-id] [data-edit-fallback]:visible"),
+  ).toHaveCount(0);
+  await page.locator("[data-action-fallback] summary").click();
+  await page.getByRole("button", { name: "Sí, reactivar grupo" }).click();
+  await expect(page).toHaveURL(/success=reactivated/);
+  await expect(page.getByText("Inactivo", { exact: true })).toHaveCount(0);
+  await expect(
+    page.locator('[data-group-id] [data-group-field="capacity"] summary'),
+  ).toBeVisible();
 });

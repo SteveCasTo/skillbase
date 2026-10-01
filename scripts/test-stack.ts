@@ -71,12 +71,18 @@ export async function runWithTestStack(command: string[]): Promise<number> {
     ...process.env,
     SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID: "local-test-placeholder",
     SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET: "local-test-placeholder",
+    INTEREST_RATE_LIMIT_SECRET: randomBytes(32).toString("hex"),
+    INTEREST_RATE_COURSE_LIMIT: "20",
+    INTEREST_RATE_COURSE_SECONDS: "600",
+    INTEREST_RATE_NETWORK_LIMIT: "100",
+    INTEREST_RATE_NETWORK_SECONDS: "3600",
   };
   // Bun loads .env in the entrypoint. Never let its database or OAuth settings
   // become migration/test targets or test-stack credentials.
   for (const key of [
     "DATABASE_URL",
     "MIGRATION_DATABASE_URL",
+    "PUBLIC_SITE_URL",
     "PUBLIC_SUPABASE_URL",
     "PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
@@ -132,6 +138,11 @@ export async function runWithTestStack(command: string[]): Promise<number> {
       TEST_BUN_EXECUTABLE: process.execPath,
       TEST_SUPABASE_WORKDIR: workdir,
       TEST_SUPABASE_PROJECT_ID: projectId,
+      // Public application configuration must target this isolated test stack,
+      // never a URL/key inherited from a developer or CI environment.
+      PUBLIC_SITE_URL: "http://127.0.0.1:4321",
+      PUBLIC_SUPABASE_URL: local.apiUrl,
+      PUBLIC_SUPABASE_PUBLISHABLE_KEY: local.publishableKey,
       TEST_SUPABASE_URL: local.apiUrl,
       TEST_SUPABASE_PUBLISHABLE_KEY: local.publishableKey,
       TEST_SUPABASE_SERVICE_ROLE_KEY: local.serviceRoleKey,

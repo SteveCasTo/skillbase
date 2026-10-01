@@ -154,7 +154,7 @@ El job `integration-e2e` instala Chromium y ejecuta los runners aislados. `test:
 
 El proyecto cloud Supabase `SkillBase` (`fvzxqlezdrlzykyoevub`) y el proyecto Vercel `stevecasto-projects/skillbase` están enlazados. El dominio de producción es `https://skillbase-alpha.vercel.app`; `skillbase.vercel.app` no está disponible porque pertenece a otra cuenta.
 
-Por petición explícita se cargaron manualmente en producción los dos formatos de ejemplo de 20 y 30 horas (80/100 y 120/150 BOB) y los cinco cursos sintéticos de `seed-demo`, todos en estado `DRAFT` y sin destacado. El formato local adicional `Promedio` no se cargó. Esta carga puntual no forma parte de las migraciones ni del despliegue automático; los ejemplos no constituyen oferta académica aprobada y solo pueden mostrarse públicamente mediante publicación administrativa posterior.
+Por petición explícita se cargaron manualmente en producción los dos formatos de ejemplo de 20 y 30 horas (80/100 y 120/150 BOB) y los cinco cursos sintéticos de `seed-demo`. El formato local adicional `Promedio` no se cargó. Esta carga puntual no forma parte de las migraciones ni del despliegue automático. Cuatro demos están publicados y `demo-gestion-de-proyectos` permanece en borrador; su estado editorial no se cambia durante la reconciliación.
 
 ### Reconciliación manual de los cinco demos cloud
 
@@ -171,6 +171,8 @@ bun scripts/reconcile-production-demo-courses.ts --apply --confirm-project-ref f
 ```
 
 Omitir `--accept-edited-calendars` cuando no hay ediciones de calendario auditadas. La aplicación revalida el snapshot bajo locks en una única operación SQL atómica; cualquier cambio posterior o grupo inesperado impide escribir. Si ya se aplicó el mismo snapshot, repetir **el mismo comando apply** responde sin nuevas escrituras/auditorías. Verificar el resultado mediante las vistas administrativas; el comando preview está pensado para el estado previo y rechaza grupos existentes. Ante error o discrepancia, no repetir con un hash anterior: investigar primero y crear un preview nuevo solo si los grupos continúan ausentes. No pegar el snapshot ni la salida de la CLI en tickets o logs públicos; el backup local no equivale al backup/PITR gestionado de producción.
+
+El 28 de septiembre de 2026 se aplicó esta reconciliación a los cinco demos cloud después del despliegue del PR #100. El snapshot privado previo permanece fuera del repositorio. Se comprobaron cinco calendarios L–V, seis grupos (cinco marcados como publicados y uno de borrador), la conservación de todos los demás campos de curso, revisiones de formato y eventos de auditoría anteriores, y las cuatro fichas públicas sin horas ni horario heredado. La cartelera pública tampoco muestra fechas; las fechas se consultan en cada ficha.
 
 El job `deploy` se ejecuta únicamente en pushes a `master`, y su condición requiere éxito explícito de `quality` e `integration-e2e`. Aplica migraciones Drizzle y despliega el output preconstruido con Vercel CLI. La integración Git automática de Vercel está desconectada para impedir despliegues paralelos que omitan estos gates.
 
@@ -204,3 +206,24 @@ Antes de habilitar Auth cloud se debe verificar explícitamente:
 - variables públicas y privadas asignadas al entorno correcto sin exponer secretos.
 
 Estas comprobaciones quedaron aplicadas durante la Fase 1. La clave legacy `service_role` debe rotarse o deshabilitarse antes de operar con datos reales porque una inspección inicial del CLI la mostró completa aun sin solicitar `--reveal`.
+
+## REGISTRO PÚBLICO DE INTERESADOS: LOCAL LISTO, CLOUD PENDIENTE
+
+El POST público de interesados requiere `INTEREST_RATE_LIMIT_SECRET` server-only, generado fuera de la aplicación con al menos 32 caracteres; nunca debe tener prefijo `PUBLIC_`, registrarse en logs o llegar al navegador. `INTEREST_RATE_COURSE_LIMIT`/`INTEREST_RATE_COURSE_SECONDS` y `INTEREST_RATE_NETWORK_LIMIT`/`INTEREST_RATE_NETWORK_SECONDS` son enteros positivos opcionales; defaults técnicos: 20/600 y 100/3600. No son cuotas comerciales.
+
+El adaptador debe proporcionar una dirección confiable mediante `Astro.clientAddress`. La aplicación valida que el dato sea IP y calcula HMAC para el limiter persistente. Si el secreto falta/es inválido o no hay IP confiable, el POST falla cerrado. En local el secreto está configurado únicamente en el `.env` ignorado y se verificó el smoke con loopback; no se guarda ni imprime su valor. Se verificó la presencia del secreto en Vercel Production y Preview sin revelar su contenido. Antes de habilitar el endpoint en un entorno desplegado hay que probar ambas fuentes en runtime. Los tests usan secreto efímero propio del stack temporal, no un secreto persistente.
+
+La migración 0011 se aplicó al Supabase local estándar `127.0.0.1:54322` mediante Drizzle sin reset; el rerun idempotente conservó los datos y verificó checksum/ledger según `docs/PLAN.md`. No se afirma que se haya aplicado a Supabase cloud; aplicar migraciones cloud requiere su propio flujo autorizado y evidencia.
+
+El estado local/cloud de Fase 3 y la migración 0011 se registra en `docs/PLAN.md`; no aplicar manualmente su SQL ni inferir despliegue cloud a partir del estado local.
+
+### Estado cloud registrado (2026-10-01)
+
+- El proyecto Supabase canónico `SkillBase` (`fvzxqlezdrlzykyoevub`) está `ACTIVE_HEALTHY` y su URL pública coincide con Production de Vercel. El ledger cloud contiene 0000–0009 y sus hashes/timestamps corresponden al historial local; las migraciones aditivas 0010 y 0011 siguen pendientes en cloud.
+- `INTEREST_RATE_LIMIT_SECRET` está configurado por separado en Vercel Production y Preview, con generación aleatoria de 64 caracteres; solo se verificó presencia, nunca se leyó/imprimió su valor. Preview contiene únicamente este secreto para esta feature: no se le asignaron credenciales DB ni se creó un despliegue Preview funcional.
+- El adapter Astro/Vercel provee `Astro.clientAddress`; Vercel sobrescribe el primer `X-Forwarded-For`, y la aplicación valida la IP con `net.isIP`. Esto valida la cadena de confianza estáticamente, no el comportamiento de un POST contra la versión cloud desplegada. Referencias: [Vercel request headers](https://vercel.com/docs/headers/request-headers), [Astro `clientAddress`](https://docs.astro.build/en/reference/api-reference/#clientaddress), [Astro Vercel adapter](https://docs.astro.build/en/guides/integrations-guide/vercel/).
+- La producción existente permanece `READY` en SHA `3a5258a` en `https://skillbase-alpha.vercel.app`; es anterior al flujo de interesados. No se creó un nuevo deployment ni se verificó allí el POST o un ataque con forwarded header.
+- La integración Git de Vercel está desconectada. La CI ejecuta quality e integration/E2E en pull requests dirigidos a `master`; `deploy` ocurre solo tras push a `master` y depende del éxito de ambos jobs. El secreto GitHub `production` `MIGRATION_DATABASE_URL` solo está disponible para ese workflow autorizado; no se intentó leer ni revelar. El entorno Vercel se inspeccionó sin extraer valores de conexión.
+- `master` requiere checks `quality` e `integration-e2e`, una aprobación y resolución lineal; enforcement a administradores está desactivado. Un administrador puede omitir la aprobación, pero no saltarse checks fallidos. Esta es la configuración observada, no una recomendación de bypass ni evidencia de release.
+
+La configuración cloud de secreto y cadena confiable queda preparada/verificada de forma estática, pero la migración cloud y la verificación runtime continúan pendientes. No afirmar que la feature está operativa en producción hasta aplicar migraciones mediante el flujo autorizado, desplegar y comprobar GET/POST, `no-store`, limitación y rechazo de spoofing.

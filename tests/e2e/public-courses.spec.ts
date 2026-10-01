@@ -28,9 +28,9 @@ test("published course is public end-to-end and withdrawal removes every public 
     await createFormat.getByLabel("Precio externo (BOB)").fill("100.50");
     await createFormat.getByRole("button", { name: "Crear formato" }).click();
     await expect(page).toHaveURL(/\/app\/formatos$/);
-    await expect(page.locator("[data-sileo-toast]")).toContainText(
-      "Formato creado",
-    );
+    await expect(
+      page.locator("[data-sileo-toast]").filter({ hasText: "Formato creado" }),
+    ).toContainText("Formato creado");
 
     await page.goto("/app/cursos/nuevo");
     await page.getByLabel("Nombre").fill(courseName);
@@ -61,9 +61,9 @@ test("published course is public end-to-end and withdrawal removes every public 
     await page.getByLabel("Nota mínima (0–100)").fill("70");
     await page.getByRole("button", { name: "Crear borrador" }).click();
     await expect(page).toHaveURL(/\/app\/cursos\/[^/]+\/editar$/);
-    await expect(page.locator("[data-sileo-toast]")).toContainText(
-      "Borrador creado",
-    );
+    await expect(
+      page.locator("[data-sileo-toast]").filter({ hasText: "Borrador creado" }),
+    ).toContainText("Borrador creado");
     courseId = new URL(page.url()).pathname.split("/").at(-2);
     expect(courseId).toMatch(/^[0-9a-f-]{36}$/i);
 
@@ -99,9 +99,11 @@ test("published course is public end-to-end and withdrawal removes every public 
       .click();
     await expect(page.locator('input[name="artwork"]')).toHaveValue("");
     await page.getByRole("button", { name: "Guardar cambios" }).click();
-    await expect(page.locator("[data-sileo-toast]")).toContainText(
-      "Cambios guardados",
-    );
+    await expect(
+      page
+        .locator("[data-sileo-toast]")
+        .filter({ hasText: "Cambios guardados" }),
+    ).toContainText("Cambios guardados");
     artworkKey = await page.locator('input[name="artwork"]').inputValue();
     expect(artworkKey).toMatch(
       new RegExp(`^courses/${courseId}/[0-9a-f-]+\\.webp$`, "i"),
@@ -112,9 +114,9 @@ test("published course is public end-to-end and withdrawal removes every public 
 
     await page.getByRole("button", { name: "Publicar curso" }).click();
     await page.getByRole("button", { name: "Confirmar publicación" }).click();
-    await expect(page.locator("[data-sileo-toast]")).toContainText(
-      "Curso publicado",
-    );
+    await expect(
+      page.locator("[data-sileo-toast]").filter({ hasText: "Curso publicado" }),
+    ).toContainText("Curso publicado");
     await expect(page).toHaveURL(/\/app\/cursos\/[^/]+\/editar$/);
     await page
       .getByRole("button", { name: "Destacar en la cartelera" })
@@ -276,9 +278,11 @@ test("published course is public end-to-end and withdrawal removes every public 
     await page.goto(`/app/cursos/${courseId}/editar`);
     await page.getByRole("button", { name: "Retirar publicación" }).click();
     await page.getByRole("button", { name: "Confirmar retiro" }).click();
-    await expect(page.locator("[data-sileo-toast]")).toContainText(
-      "devuelto a borrador",
-    );
+    await expect(
+      page
+        .locator("[data-sileo-toast]")
+        .filter({ hasText: "devuelto a borrador" }),
+    ).toContainText("devuelto a borrador");
     await context.clearCookies();
 
     await page.goto("/cursos");
@@ -300,9 +304,9 @@ test("published course is public end-to-end and withdrawal removes every public 
     await page.goto(`/app/cursos/${courseId}/editar`);
     await page.getByRole("button", { name: "Archivar curso" }).click();
     await page.getByRole("button", { name: "Confirmar archivo" }).click();
-    await expect(page.locator("[data-sileo-toast]")).toContainText(
-      "Curso archivado",
-    );
+    await expect(
+      page.locator("[data-sileo-toast]").filter({ hasText: "Curso archivado" }),
+    ).toContainText("Curso archivado");
   } finally {
     if (artworkKey) {
       const environment = getTestSupabaseEnvironment();

@@ -298,3 +298,23 @@ No desplegar `master` si falla:
 - build.
 
 Un fallo de CI debe considerarse bloqueo de release.
+
+### Avance local de navegación privada y recuperabilidad
+
+Hay cobertura unitaria nueva para resultado de mutaciones, idempotencia/recuperación de alta y skeleton de navegación, además de escenarios E2E para cursos, grupos, formatos, tema, sidebar, mobile y skeleton. Estado final local comunicado: full unit 108 PASS; full integration 54 PASS; lint PASS; typecheck PASS con 0 errores y 47 hints (también PASS en full-check posterior a notifications); build PASS a las 20:55; `drizzle-kit check`, schema checks, formatter de archivos modificados y `git diff --check` PASS. E2E: el primer full run fue 76/82; tras corregir cinco selectores y un ID de biblioteca, el rerun full fue 81/82 con un fallo en el selector toast de `public-courses`. El test dirigido `public-courses` pasó 4/4, incluyendo el escenario que falló en el full run. Por tanto, existe cobertura colectiva de los 82 escenarios, pero no se declara un full run 82/82.
+
+Las notificaciones administrativas pasan por `src/lib/notifications.ts`: cada operación obtiene un ID UUID independiente, y `promise` conserva el mismo ID entre loading/success/error. El bridge adapta en tipos estrictos el `id` que Sileo 0.1.5 consume en runtime pero no declara; no se usa `any` ni un patch en `node_modules`.
+
+La migración `0010_course_creation_receipts` se aplicó a la base Supabase local estándar en `127.0.0.1:54322` mediante `bun run db:migrate`, sin reset y preservando los datos existentes. No se aplicó en cloud. Los stacks temporales de integración/E2E siguen teniendo su ciclo aislado e independiente.
+
+### Cobertura de interesados (Fase 3)
+
+Se añadieron pruebas unitarias en `tests/unit/interests.test.ts`, `interests-admin-presentation.test.ts`, `public-interest-presentation.test.ts` y `public-interest-form-ssr.test.tsx`; integración del repositorio en `tests/integration/interests.test.ts`; E2E público y administrativo en `tests/e2e/public-interest.spec.ts` y `interests-admin.spec.ts`. Cubren contrato, presentación, persistencia, autorización, rate limit y flujos UI según sus escenarios. PR 105 se integró en `development` como `0bf0979`; los resultados locales no implican CI/cloud.
+
+Resultados locales finales comunicados para Fase 3: full unit 129 PASS (793 assertions); full integration 65 PASS/0 FAIL (478 assertions, 9 archivos); lint global PASS; typecheck 0 errores, 0 warnings y 70 hints; build y Drizzle checks PASS. El primer full integration run fue 45/66 por cleanup de fixtures de cursos incompatible con la FK de `interest_registrations`; se corrigió truncando explícitamente la tabla de interesados, sin `CASCADE`, y el full rerun pasó.
+
+E2E: corrida full 81/95 PASS y 14 fallos vinculados a fixtures (12 calendarios de cursos que respondían 422 y 2 cargas de formatos). Sin cambios posteriores de código productivo, las suites dirigidas `courses` pasaron 2/2 (47.9 s) e `interests` 13/13 (1.1 min), con un escenario Auth solapado. Se registran los 95 escenarios cubiertos por combinación de corrida full y revalidaciones dirigidas; no se afirma un full run 95/95. Fallback sin JavaScript y navegación/animación mobile pasan; JavaScript de la aplicación no se deshabilita.
+
+La migración 0011 se aplicó en los stacks aislados de tests y después, sin reset, al Supabase local estándar `127.0.0.1:54322`. El rerun local fue idempotente: checksum `377bb93ab34a1e9745ff69823ee065f11183b7db7f5881337dedd99e9dfa72b6`, ledger 11→12, ambas tablas nuevas con RLS; se conservaron 7 cursos, 9 grupos, 1 usuario y 34 eventos de auditoría. Un smoke local obtuvo 200 para `/`, `/cursos` y curso demo; dos POST sintéticos devolvieron 200 neutro/`no-store`. Rate limit utilizó loopback e ignoró un header forwarded falsificado. Se eliminaron los registros sintéticos: quedan 0 interesados y 2 buckets técnicos con TTL. El secreto local está configurado únicamente en `.env` ignorado; no documentar su valor. El servidor de desarrollo quedó activo en `http://127.0.0.1:4321`.
+
+La operación cloud verificó presencia de `INTEREST_RATE_LIMIT_SECRET` en Vercel Production y Preview, sin leer ni registrar el valor. También confirmó estáticamente que Vercel sobrescribe el primer `X-Forwarded-For`, que Astro/Vercel lo entrega como `Astro.clientAddress` y que el código valida la dirección con `net.isIP`. No se ejecutó POST ni spoof test contra el runtime cloud, que continúa sirviendo el deployment anterior; Preview no tiene credenciales DB ni deployment funcional. La base cloud aún tiene pendientes 0010/0011. No tratar configuración presente ni verificación de código como runtime/CI pass.

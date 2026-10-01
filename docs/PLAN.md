@@ -126,7 +126,7 @@ La fase se divide en dos entregas consecutivas. La capa visual de la landing se 
 - La disponibilidad para preinscripción se deriva de su ventana de fechas y no constituye un estado editorial.
 - Fase 2A configura únicamente la nota mínima de aprobación. El porcentaje de asistencia se pospone hasta confirmar la regla académica.
 - Los cursos no se eliminan físicamente desde la interfaz: pueden retirarse o archivarse.
-- Fase 2 no implementa participantes, preinscripciones, grupos, inscripciones, descuentos aplicados, pagos, sesiones ni elegibilidad académica.
+- El alcance original de Fase 2 no implementaba participantes, preinscripciones, grupos, inscripciones, descuentos aplicados, pagos, sesiones ni elegibilidad académica. La gestión de grupos se anticipó y quedó implementada parcialmente dentro del alcance que el plan ubicaba originalmente en Fase 4; no implica que Fase 3 esté implementada.
 
 ### FASE 2A — GESTIÓN DE CURSOS
 
@@ -232,6 +232,14 @@ La implementación original guardaba `totalHours` y precios directamente por cur
 - [x] Incorporar la fotografía opcional con upload/storage administrativo, conservando el fallback gráfico de Cota Activa.
 - [ ] Ejecutar la revisión de cierre del gate y actualizar la documentación con el estado real.
 
+#### Avance de experiencia privada (fix/private-app-feedback)
+
+La implementación local cubre skeleton SSR vinculado a carga real y viewport visible, con conservación de foco, cancelación, errores y movimiento reducido. El selector de tema queda oculto en el rail colapsado; tema y preferencia toleran almacenamiento no disponible. La inicialización evita discrepancias de hidratación. Los productores administrativos usan `src/lib/notifications.ts`, con UUID independiente por operación y el mismo ID entre loading/success/error. JavaScript permanece habilitado como mejora progresiva; los tests sin JavaScript verifican fallbacks HTML, y las animaciones del sidebar se mantienen.
+
+Grupos y formatos actualizan localmente con bloqueo contra acciones duplicadas y conservan foco/datos para recuperación. El alta admite `requestKey` UUID persistente por actor/fingerprint: repetir la solicitud devuelve el curso creado y cambiar los datos con la misma clave se rechaza. La carga de artwork permite recuperar el borrador sin sobrescritura silenciosa. El bloqueo de fila del repositorio protege las ediciones; fixtures históricos sin revisión opcional conservan compatibilidad. Migración 0010 añade metadatos a `courses`, sin limpieza automática de historial.
+
+Validación local registrada para el bloque privado (histórica): unit 108 PASS; integration 54 PASS; lint/typecheck/build y checks de schema/formatter PASS. E2E: rerun 81/82 y revalidación dirigida `public-courses` 4/4; no se afirma una corrida completa 82/82. PR 104 se integró en `development` como `6fc81da`. La migración 0010 se aplicó a la base Supabase local estándar en `127.0.0.1:54322` mediante migración sin reset, preservando datos; no se aplicó a cloud. El gate remoto/cloud histórico de Fase 2 no cambia.
+
 #### Alcance acordado para completar 2B (2026-09-24)
 
 Estas decisiones precisan el alcance acordado. El estado actualizado distingue implementación disponible de cierre/verificación del gate.
@@ -331,22 +339,111 @@ La landing presenta el sistema, el catálogo muestra automáticamente los cursos
 
 Administración crea y publica un curso; este aparece automáticamente en una experiencia pública completa sin exponer borradores ni información administrativa.
 
-## FASE 3 — PREINSCRIPCIÓN
+## GATE PREVIO A FASE 3 - EXPERIENCIA PRIVADA
+
+La experiencia privada existente está implementada y validada localmente. PR 104 se integró en `development` como `6fc81da`; esta integración no promueve cambios a `master` ni altera los gates remotos/cloud históricos de Fase 2. Fase 3 sigue en progreso.
+
+- [x] Incorporar skeletons reales durante las cargas estructurales de `/app`, vinculados al estado de carga y no a una demora decorativa.
+- [x] Usar Sileo para feedback transitorio de mutaciones, con estados pending, success y error, sin sustituir errores junto a campos.
+- [x] Actualizar el contenido afectado sin recarga completa, conservando foco y valores.
+- [x] Cerrar confirmaciones al aceptar; la request continúa con feedback independiente.
+- [x] Prevenir acciones duplicadas y permitir recuperar errores/reintentar sin perder datos.
+- [x] Ubicar el toggle de tema en el sidebar expandido y menú móvil, oculto al cerrar el rail.
+- [x] Verificar responsive y teclado mediante cobertura E2E colectiva: full rerun 81/82 más prueba dirigida 4/4 de `public-courses`; no se afirma full 82/82.
+- [x] Completar implementación, validación local e integración de PR 104 a `development`; no implica promoción a `master`, gates remotos/cloud ni cierre de Fase 3.
+
+Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión final del gate de Fase 2B) siguen pendientes según su registro anterior. Este avance no los revalida ni declara cerrado ese gate.
+
+## FASE 3 — REGISTRO DE INTERESADOS (SIN PAGO)
 
 ### Objetivos
 
-- Formulario público.
+- Formulario público de registro de interesados en el detalle del curso.
 - Validaciones.
 - Prevención razonable de duplicados.
 - Listado administrativo.
 - Métricas de demanda.
-- Estados de preinscripción.
+- Estados `ACTIVE`/`CANCELLED`, con cancelación/reactivación administrativa y métricas de activos aprobados (ADR-021); implementados en esta fase.
+
+### Checklist de definición y contratos
+
+- [x] Confirmar el alcance de Fase 3 como registro de **interesados**, no preinscripción pagada ni inscripción definitiva. Las reglas aprobadas están en `docs/REQUIREMENTS.md`.
+- [x] Confirmar campos y elegibilidad: nombre, apellidos y email obligatorios; teléfono y preferencia de grupo opcionales. Público limitado al detalle de curso existente; no añadir ni cambiar información de la landing.
+- [x] Confirmar duplicados y disponibilidad: una solicitud por curso/email normalizado; validación autoritativa server-side y sin aceptar para cursos retirados/archivados. Se puede solicitar desde `PUBLISHED` hasta cierre presencial si existe ventana, o hasta el inicio oficial si no existe.
+- [x] Confirmar estados `ACTIVE`/`CANCELLED`, cancelación/reactivación administrativa conservando historial y métricas de activos por curso/preferencia; la preferencia no es asignación de grupo ni dato de plazas (ADR-021).
+- [x] Definir el contrato técnico de Fase 3 para entrada/salida, errores, DTO, operaciones, persistencia y pruebas en [`docs/INTEREST_REGISTRATION_CONTRACT.md`](INTEREST_REGISTRATION_CONTRACT.md). Contrato aprobado no significa implementación realizada.
+
+### Checklist de datos, dominio y persistencia
+
+- [x] Implementar el registro de interesado como entidad autónoma, separada de `Participant` y de la preinscripción presencial; no usar email público no verificado para modificar identidad global ni crear entidades pagadas en Fase 3.
+- [ ] La relación explícita y trazable entre el interesado y una preinscripción presencial es dependencia de Fase 5; no bloquea el cierre de Fase 3. Allí se implementará junto al prellenado editable; el registro presencial directo seguirá disponible.
+- [x] Especificar e implementar relaciones, restricciones e índices del agregado autónomo; el detalle permanece en el contrato técnico.
+- [x] Implementar validaciones y reglas de dominio independientes de HTTP/UI; las pruebas unitarias específicas del backend pasan 9/9.
+- [x] Implementar casos de uso y repositorio con escrituras transaccionales y prevención de duplicados; las pruebas de integración dirigidas pasan 11/11.
+- [x] Versionar la migración reproducible, constraints e índices; la integración completa pasó y la migración 0011 se aplicó idempotentemente al Supabase local estándar. Cloud permanece pendiente.
+
+### Checklist de interfaz pública
+
+- [x] Implementar el formulario público únicamente en el detalle del curso y el acceso desde la oferta elegible.
+- [x] Implementar estados del formulario, errores junto a los campos, conservación de valores y prevención de dobles envíos; la validación autoritativa permanece en servidor.
+- [x] Implementar feedback persistente de éxito/error y feedback transitorio; no se presenta el interesado como inscripción ni reserva.
+- [x] Completar verificación responsive, teclado y foco con E2E completo más revalidaciones dirigidas; no se afirma una única corrida full 95/95.
+
+### Checklist de administración y métricas
+
+- [x] Implementar listado/resumen administrativo y operaciones de estado bajo autorización `ADMIN`.
+- [x] Implementar métricas persistidas de interesados activos por curso y preferencia, sin equiparar preferencia con asignación ni plazas/cupos.
+- [x] Mostrar estados administrativos vacíos/error; los datos personales se mantienen en las vistas privadas autorizadas.
+- [x] Aplicar el patrón de mutaciones del gate previo: confirmación, feedback independiente y recuperación de errores.
+
+### Checklist de seguridad, pruebas y documentación
+
+- [x] Implementar permisos server-side para operaciones administrativas y validación de entradas públicas.
+- [x] Implementar minimización de datos, errores públicos sanitizados, límite de body y rate limiter persistente atómico; la suite backend dirigida está verde.
+- [x] Configurar presencia de `INTEREST_RATE_LIMIT_SECRET` server-only en Vercel Production/Preview y verificar estáticamente `Astro.clientAddress` mediante la cadena oficial Astro/Vercel. El valor no se registra.
+- [ ] Probar el POST y la resistencia a forwarded-header spoofing en runtime tras desplegar la versión nueva; producción aún sirve la versión anterior.
+- [ ] Definir política de conservación y anonimización de interesados, incluido el plazo; el cierre de disponibilidad no elimina registros y no se presume retención perpetua.
+- [x] Crear fixtures sintéticos y deterministas; unit e integración locales completos PASS.
+- [x] Añadir E2E público/administrativo para disponibilidad, duplicados, recuperación, permisos y accesibilidad; cobertura validada por corrida full y revalidaciones dirigidas descritas en `docs/TESTING.md`.
+- [x] Actualizar los documentos afectados al estado real; la política de retención/anónimización permanece pendiente.
+
+### Checklist de PR y gate de cierre
+
+- [x] Resolver los hallazgos encontrados durante la validación del bloque; la corrección del cleanup de fixtures de cursos se hizo explícita y sin `CASCADE`.
+- [x] Integrar PR 105 a `development` (merge `0bf0979`, 2026-10-01). No implica promoción a `master`.
+- [x] Ejecutar formatter, lint, typecheck, unitarias, integración, E2E y build locales correspondientes; la cobertura E2E se compone de la corrida full 81/95 y las suites dirigidas, no de una corrida full 95/95.
+- [x] Registrar el estado real local/cloud: secreto configurado y origen confiable revisado estáticamente; migraciones cloud y POST runtime aún sin verificar.
+- [x] Completar implementación y validación local del milestone Fase 3. La migración cloud 0010/0011, prueba runtime en producción y PR de release a `master` permanecen pendientes.
+
+### Cierre de implementación local y pendientes de producción
+
+La implementación de Fase 3 y su validación local están completas. Full unit 129 PASS (793 assertions); full integration 65 PASS/0 FAIL (478 assertions, 9 archivos), después de corregir el cleanup de fixtures para incluir la tabla de interesados explícitamente, sin `CASCADE`; lint global PASS; typecheck PASS con 0 errores/0 warnings/70 hints; build y Drizzle checks PASS. E2E: corrida full 81/95 PASS, 14 fallos por fixtures de calendarios de cursos (12 respuestas 422) y carga de formatos (2). Después, sin cambios de código de producción, `courses` dirigido 2/2 PASS (47.9 s) y `interests` dirigido 13/13 PASS (1.1 min); las suites se solapan en un escenario de Auth. La evidencia combinada cubre los 95 escenarios mediante la corrida full y revalidaciones dirigidas; no se afirma un full run 95/95. Fallback sin JavaScript y navegación/animación mobile comprobados PASS.
+
+La migración 0011 se aplicó de forma idempotente al Supabase local estándar `127.0.0.1:54322` sin reset; el rerun verificó el checksum `377bb93ab34a1e9745ff69823ee065f11183b7db7f5881337dedd99e9dfa72b6` y el ledger avanzó de 11 a 12. Ambas tablas nuevas tienen RLS. Antes/después se conservaron 7 cursos, 9 grupos, 1 usuario y 34 eventos de auditoría. Los datos sintéticos de intereses se eliminaron al terminar el smoke (0 filas de interesados; 2 buckets técnicos con TTL). El secreto local se guardó en `.env` ignorado y no se registra su valor; no se requirieron cambios tracked al arranque (`bun run dev` sin cambios) y el servidor quedó activo en `http://127.0.0.1:4321`. Smoke local: GET `/`, `/cursos` y curso demo devolvieron 200; dos POST sintéticos devolvieron 200 con mensaje neutro y `no-store`; el rate limit usó loopback y no aceptó un header forwarded falsificado.
+
+Cloud: se verificó presencia del secreto server-only en Vercel Production y Preview (no se registra el valor; Preview no tiene credenciales DB ni un despliegue funcional). La cadena Astro/Vercel confía en `Astro.clientAddress`; la plataforma sobrescribe el primer `X-Forwarded-For`, y la aplicación valida que el valor sea IP. Esta es verificación estática/documental: el POST contra runtime cloud y el spoof test aún no se han ejecutado. La migración cloud sigue pendiente en 0000–0009; 0010 y 0011 no aplicadas. Por lo tanto no se afirma release, migración cloud ni funcionamiento runtime de producción.
+
+PR 105 (`https://github.com/SteveCasTo/skillbase/pull/105`) se integró en `development` como `0bf0979` el 2026-10-01. La rama de feature incluyó los commits backend `3fea0df`, público `d8f714f`, administrativo `e903084` y ajuste de rutas Auth `6112080`. La preparación restante para producción y cualquier promoción a `master` siguen pendientes.
+
+#### Propuesta de conservación (no aprobada)
+
+Como propuesta de trabajo, anonimizar los datos de contacto doce meses después del cierre del curso y conservar solo métricas agregadas anónimas. El plazo y el tratamiento exacto no están aprobados por el usuario, no son requisito vigente ni están automatizados; la definición de gobierno de datos sigue pendiente para operación con datos reales. Esta propuesta no bloquea el cierre de implementación de Fase 3 en desarrollo.
+
+### Baseline verificado de calidad
+
+El siguiente baseline es histórico y precede al trabajo actual de Fase 3; no acredita las validaciones de esta implementación.
+
+En el baseline verificado para esta actualización: lint exitoso; 93 pruebas unitarias y 50 de integración exitosas; 62 E2E ejecutadas; typecheck con 0 errores y 41 hints; build exitoso. Durante E2E se observó un hydration mismatch relacionado con Sileo; su corrección está activa en otra rama y este baseline no cierra el gate de Fase 3. El formatter global solo reportó un aviso sobre `opencode.json`, ajeno a estos cambios; no modificar ese archivo.
 
 ### Resultado demostrable
 
-Una persona se preinscribe y administración ve la demanda acumulada.
+Una persona deja datos como interesada sin pagar ni ocupar cupo; administración puede consultar la demanda. No implica aceptación ni inscripción.
 
 ## FASE 4 — GRUPOS
+
+### Estado y dependencias
+
+Parte del alcance de Fase 4 fue anticipada: la gestión de grupos indicada como implementada abajo ya figura en el plan. No implica el cierre completo de Fase 4 ni la implementación de Fase 3. En Fase 3 el interesado puede expresar una preferencia de grupo; cualquier asignación efectiva a un grupo corresponde a Fase 5. Las sesiones conservan sus dependencias posteriores.
 
 ### Objetivos
 
@@ -356,17 +453,20 @@ Una persona se preinscribe y administración ve la demanda acumulada.
 - [x] Permitir grupos válidos también en cursos borrador; eliminar solo grupos nunca publicados y desactivar/reactivar los que ya tuvieron exposición pública, con historial protegido.
 - Asignar instructor real cuando exista el módulo de asignaciones; mientras tanto se conserva el instructor textual del curso.
 - Gestionar reemplazo por feriados cuando existan sesiones y calendario operativo.
-- Vincular preinscritos e inscritos a grupos cuando estén disponibles esos módulos.
+- Permitir expresar preferencia de grupo en Fase 3; asignar inscritos a grupos en Fase 5, sin tratar la preferencia como asignación.
 
 ### Resultado demostrable
 
 Administración transforma demanda en grupos operativos.
 
-## FASE 5 — INSCRIPCIÓN ADMINISTRATIVA
+## FASE 5 — PREINSCRIPCIÓN PRESENCIAL Y GESTIÓN ADMINISTRATIVA
 
 ### Objetivos
 
-- Convertir preinscripción en inscripción.
+- Registrar presencialmente a una persona como preinscrita, con pago parcial o total y ocupación de cupo; permitir registro directo o prellenar desde un interesado con datos editables.
+- Diseñar el vínculo de origen con el interesado como explícito y trazable, sin inferir identidad global ni pago desde el registro público.
+- No denominar este registro inscripción definitiva sin una regla posterior que confirme esa transición.
+- Completar en esta fase los datos administrativos pendientes, incluido CI cuando se confirme su necesidad.
 - Registrar tipo de participante.
 - Registrar precio aplicado.
 - Aplicar descuentos.
@@ -374,11 +474,14 @@ Administración transforma demanda en grupos operativos.
 - Registrar boleta/valorado si corresponde.
 - Revertir inscripciones.
 - Gestionar devolución por cancelación de grupo.
+- Gestionar cambios de grupo y devoluciones en esta fase; no duplicar estas operaciones en Fase 3.
 - Generar listados administrativos.
+
+El registro público de interesados de Fase 3 no cobra ni ocupa cupo. La preinscripción presencial y pagada pertenece a esta fase; reglas de dinero —precio aplicado, descuentos, pagos, documentos/boleta y devoluciones— permanecen en su alcance y sus detalles pendientes de definición no se adelantan aquí.
 
 ### Resultado demostrable
 
-Administración puede cerrar una lista real de participantes inscritos.
+Administración puede mantener la lista de preinscripciones presenciales con pagos parciales o totales y cupos ocupados. Su eventual paso a inscripción definitiva requiere una regla posterior.
 
 ## FASE 6 — SESIONES Y ASISTENCIA
 

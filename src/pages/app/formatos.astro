@@ -122,7 +122,7 @@ const success = Astro.url.searchParams.get("success");
     </section>
   )}
   <script>
-    import { sileo } from "sileo";
+    import { notifications } from "@/lib/notifications";
     document.addEventListener("astro:page-load", () => {
       if (window.location.pathname !== "/app/formatos") return;
       const success = new URLSearchParams(window.location.search).get(
@@ -135,7 +135,7 @@ const success = Astro.url.searchParams.get("success");
       const message = success ? messages[success] : undefined;
       if (message) {
         {
-          sileo.success({ title: message, duration: 6000 });
+          notifications.success({ title: message, duration: 6000 });
           const url = new URL(window.location.href);
           url.searchParams.delete("success");
           window.history.replaceState(

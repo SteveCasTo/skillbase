@@ -39,6 +39,11 @@ test("collapsed rail expands on hover without shifting main and persists across 
   );
   const collapseBox = await collapseButton.boundingBox();
   const logoutBox = await logoutButton.boundingBox();
+  const themeToggle = sidebar.locator("[data-theme-toggle]");
+  const themeBox = await themeToggle.boundingBox();
+  expect(themeBox).not.toBeNull();
+  expect(themeBox!.x).toBeGreaterThan(collapseBox!.x);
+  expect(themeBox!.x).toBeLessThan(logoutBox!.x);
   expect(collapseBox).not.toBeNull();
   expect(logoutBox).not.toBeNull();
   expect(Math.abs(collapseBox!.y - logoutBox!.y)).toBeLessThan(2);
@@ -84,6 +89,11 @@ test("collapsed rail expands on hover without shifting main and persists across 
     ),
   );
   await expect(logoutButton).toBeHidden();
+  await expect(themeToggle).toBeHidden();
+  await themeToggle.evaluate((element) => (element as HTMLElement).focus());
+  expect(
+    await themeToggle.evaluate((element) => element === document.activeElement),
+  ).toBe(false);
   await logoutButton.evaluate((element) => (element as HTMLElement).focus());
   expect(
     await logoutButton.evaluate(
@@ -110,6 +120,7 @@ test("collapsed rail expands on hover without shifting main and persists across 
   await page.locator(".private-brand-mark").hover();
   await expect(shell).toHaveAttribute("data-preview", "true");
   await expect(logoutButton).toBeVisible();
+  await expect(themeToggle).toBeVisible();
   expect((await main.boundingBox())?.width).toBe(railWidth);
   await page.locator(".private-main-scroll").hover();
   await expect(shell).not.toHaveAttribute("data-preview", "true");

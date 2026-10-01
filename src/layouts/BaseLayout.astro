@@ -7,6 +7,7 @@ import "@/styles/globals.css";
 
 import { SileoHost } from "@/components/SileoHost";
 import { ClientRouter } from "astro:transitions";
+import { themeInitializationScript } from "@/lib/theme";
 
 interface Props {
   title: string;
@@ -28,7 +29,11 @@ const {
 ---
 
 <!doctype html>
-<html lang="es" data-theme={allowSystemTheme ? "system" : "light"}>
+<html
+  lang="es"
+  data-theme={allowSystemTheme ? "system" : "light"}
+  data-allow-system-theme={String(allowSystemTheme)}
+>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
@@ -48,29 +53,23 @@ const {
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>{title}</title>
     {clientRouter && <ClientRouter fallback="swap" />}
-    <script is:inline define:vars={{ allowSystemTheme }}>
-      (() => {
-        const saved = localStorage.getItem("theme");
-        const theme =
-          saved === "light" || saved === "dark"
-            ? saved
-            : allowSystemTheme && saved === "system"
-              ? "system"
-              : allowSystemTheme
-                ? "system"
-                : "light";
-        const dark =
-          theme === "dark" ||
-          (theme === "system" &&
-            matchMedia("(prefers-color-scheme: dark)").matches);
-        document.documentElement.classList.toggle("dark", dark);
-        document.documentElement.dataset.theme = theme;
-        document.documentElement.style.colorScheme = dark ? "dark" : "light";
-      })();
+    <script is:inline set:html={themeInitializationScript}></script>
+    <script>
+      import { syncTheme, syncThemeStorage } from "@/lib/theme";
+      document.addEventListener("astro:before-swap", (event) =>
+        syncTheme(event.newDocument),
+      );
+      document.addEventListener("astro:after-swap", () => syncTheme());
+      window.addEventListener("storage", syncThemeStorage);
+      window
+        .matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", () => {
+          syncTheme();
+        });
     </script>
   </head>
   <body>
     <slot />
-    {showToasts && <SileoHost client:load transition:persist />}
+    {showToasts && <SileoHost client:load transition:persist="sileo-host" />}
   </body>
 </html>

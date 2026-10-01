@@ -125,6 +125,8 @@ La creación está disponible para cursos `DRAFT` o `PUBLISHED` con plan L–V y
 
 ### Participant
 
+La entidad representa a una persona incorporada al proceso administrativo de inscripción (Fase 5), no a quien únicamente dejó sus datos de interés en Fase 3. La necesidad y momento de persistir CI se confirmarán antes de incorporarlo.
+
 - id
 - names
 - lastNames
@@ -134,13 +136,17 @@ La creación está disponible para cursos `DRAFT` o `PUBLISHED` con plan L–V y
 - type
 - createdAt
 
-### PreRegistration
+### InterestRegistration (Fase 3, implementación en progreso)
 
-- id
-- participantId
-- courseId
-- status
-- createdAt
+Representa un registro público autónomo, separado de `Participant` y de la preinscripción presencial. El schema Drizzle y la migración versionada 0011 están en el repositorio; el cierre de implementación y su validación siguen pendientes. El email declarado públicamente no se verifica como identidad y no puede usarse para sobrescribir o fusionar datos de una persona global. La fila contiene `courseId`, nombre, apellidos, email normalizado, teléfono nullable, preferencia nullable, estado `ACTIVE`/`CANCELLED` y timestamps de precisión milisegundo. Un unique no parcial limita a un registro por curso/email en cualquier estado. La FK compuesta curso/grupo impide referencias cruzadas; las tablas nuevas habilitan RLS y revocan privilegios Data API a roles cliente.
+
+No cobra, no ocupa cupo ni asigna grupo. La preferencia de grupo no implica asignación ni plazas. La tabla técnica `interest_registration_rate_limits` almacena solo claves HMAC, contador y expiración; no se conserva IP cruda. El limiter persistente y sus parámetros de configuración están implementados; falta acreditar el secreto y la fuente confiable de IP en producción. El cierre de disponibilidad detiene nuevas solicitudes, no elimina registros. Política de retención, plazo y anonimización quedan pendientes; no se asume conservación perpetua. Ver [`INTEREST_REGISTRATION_CONTRACT.md`](INTEREST_REGISTRATION_CONTRACT.md) para reglas y estado detallado.
+
+La migración `0011_interest_registrations.sql` añade el enum `interest_registration_status`, las tablas `interest_registrations` y `interest_registration_rate_limits`, unicidad no parcial por curso/email, FK compuesta opcional curso/grupo, checks de strings/email/teléfono, índices de listado/preferencia/expiración, RLS y revocación de privilegios Data API. La migración está versionada y aplicada en stacks temporales y en el Supabase local estándar; el rerun local fue idempotente y preservó datos. No se ha aplicado a cloud. La integración completa local pasó 65/65; consultar `docs/TESTING.md` para el resultado detallado.
+
+### PreRegistration (presencial, Fase 5)
+
+En este proyecto el término se refiere a la preinscripción administrativa presencial que registra pago parcial o total y ocupa cupo. Puede iniciarse directamente o prellenarse desde un interesado de forma editable. La relación con ese registro debe ser explícita y trazable; no debe inferirse identidad global, pago ni equivalencia entre interesado y persona participante. Su modelo persistido y campos aún están por definir; la lista histórica de `Participant`/`PreRegistration` no debe interpretarse como contrato vigente. Esta entidad no implica por sí misma una transición a inscripción definitiva.
 
 ### Enrollment
 
@@ -243,6 +249,10 @@ La creación está disponible para cursos `DRAFT` o `PUBLISHED` con plan L–V y
 Fase 2A registra atómicamente `COURSE_CREATED`, `COURSE_UPDATED`, `COURSE_PRICES_UPDATED`, `COURSE_PUBLISHED`, `COURSE_WITHDRAWN` y `COURSE_ARCHIVED`. `actorId` referencia al usuario interno y está indexado; las consultas por entidad también están indexadas.
 
 ## RESTRICCIONES
+
+### Idempotencia del alta de cursos
+
+`courses` incluye `create_actor_id` (FK restrictiva a `users.id`), `create_request_key` (UUID) y `create_fingerprint` (SHA-256 hexadecimal de 64 caracteres). Los tres son nulos en altas sin clave o están presentes conjuntamente; un índice único por actor/clave evita duplicar altas cuando se reintenta una creación. La misma combinación y fingerprint recupera la fila existente; si la clave se reutiliza con otro fingerprint, la solicitud se rechaza. Estos campos son internos y no forman parte de los DTO administrativos/públicos. La migración 0010 es aditiva; no automatiza borrado de historial.
 
 Ejemplos que deben evaluarse a nivel DB:
 

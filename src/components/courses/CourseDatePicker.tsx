@@ -20,6 +20,7 @@ interface Props {
   disabled?: boolean;
   error?: string;
   onDateChange?: (date: string) => void;
+  futureOnly?: boolean;
 }
 
 const keyOf = (date: Date) =>
@@ -46,6 +47,7 @@ export default function CourseDatePicker({
   disabled = false,
   error = "",
   onDateChange,
+  futureOnly = true,
 }: Props) {
   const [text, setText] = useState(
     /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -88,7 +90,7 @@ export default function CourseDatePicker({
   const date = selected ? keyOf(selected) : "";
   const blocked = (key: string, weekday: number) =>
     (name === "startDate" &&
-      (key < today ||
+      ((futureOnly && key < today) ||
         weekday === 0 ||
         weekday === 6 ||
         (Boolean(bounds.registrationEnd) && key <= bounds.registrationEnd))) ||

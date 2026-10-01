@@ -1,9 +1,53 @@
-import { expect, test, type Page } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
+
+function fixtureSuffix(testInfo: TestInfo): string {
+  return `${testInfo.parallelIndex}-${testInfo.retry}-${testInfo.repeatEachIndex}-${randomUUID()}`;
+}
+
+// Capture the committed ID even when the simulated network failure hides it
+// from the browser. Failed attempts must not leave this course published.
+const lifecycleCourseIds = new Map<string, string>();
+
+test.afterEach(async ({ page }, testInfo) => {
+  const id = lifecycleCourseIds.get(testInfo.testId);
+  lifecycleCourseIds.delete(testInfo.testId);
+  if (!id || testInfo.status === testInfo.expectedStatus) return;
+  getTestSupabaseEnvironment(); // Refuse cleanup outside the runner's isolated stack.
+  const path = `/app/cursos/${id}/editar`;
+  const response = await page.request.get(path);
+  expect(response.ok()).toBe(true);
+  const persisted = await page.evaluate(
+    (html) => {
+      const document = new DOMParser().parseFromString(html, "text/html");
+      return {
+        status: document
+          .querySelector("[data-course-status]")
+          ?.textContent?.trim(),
+        revision: document.querySelector<HTMLInputElement>(
+          '.course-form input[name="revision"]',
+        )?.value,
+      };
+    },
+    await response.text(),
+  );
+  if (persisted.status === "Archivado") return;
+  expect(persisted.revision).toBeTruthy();
+  const archived = await page.request.post(path, {
+    headers: {
+      Accept: "application/json",
+      Origin: new URL(page.url()).origin,
+    },
+    form: { intent: "archive", revision: persisted.revision! },
+  });
+  expect(archived.status()).toBe(200);
+  expect((await archived.json()).status).toBe("ARCHIVED");
+});
 
 async function fillCourseFields(page: Page, formatName: string): Promise<void> {
   await page
@@ -19,7 +63,11 @@ async function fillCourseFields(page: Page, formatName: string): Promise<void> {
     .toBe(true);
   await page.getByRole("option", { name: "Medio" }).click();
   await page.getByRole("combobox", { name: "Formato de curso" }).click();
-  await page.getByRole("option", { name: new RegExp(formatName) }).click();
+  await page
+    .getByRole("option", {
+      name: new RegExp(formatName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    })
+    .click();
   await page.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
   for (const [label, date] of [
     ["Apertura de preinscripción", "01/01/2027"],
@@ -42,15 +90,15 @@ async function fillCourseFields(page: Page, formatName: string): Promise<void> {
 test("missing format is announced beside the selector and focuses it without an artwork error", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
+  const suffix = fixtureSuffix(testInfo);
+  const formatName = `Formato sin selección ${suffix}`;
   await signInFixture(context, AUTH_FIXTURES.admin.email);
   // This test must not depend on formats created by another spec or test.
   await page.goto("/app/formatos");
   await page.getByRole("link", { name: "Nuevo formato" }).click();
   const formatForm = page.getByRole("form", { name: "Crear formato" });
-  await formatForm
-    .getByLabel("Nombre")
-    .fill(`Formato sin selección ${Date.now()}`);
+  await formatForm.getByLabel("Nombre").fill(formatName);
   await formatForm.getByLabel("Duración total (horas)").fill("20");
   await page.getByLabel("Duración de sesión (minutos)").fill("90");
   await formatForm.getByLabel("Precio estudiante (BOB)").fill("80");
@@ -59,7 +107,7 @@ test("missing format is announced beside the selector and focuses it without an 
   await expect(page).toHaveURL(/\/app\/formatos$/);
   await page.goto("/app/cursos/nuevo");
   const create = page.getByRole("button", { name: "Crear borrador" });
-  await page.getByLabel("Nombre").fill("Curso sin formato");
+  await page.getByLabel("Nombre").fill(`Curso sin formato ${suffix}`);
   await expect(create).toBeEnabled();
   await create.click();
   const format = page.getByRole("combobox", { name: "Formato de curso" });
@@ -70,17 +118,23 @@ test("missing format is announced beside the selector and focuses it without an 
   );
   await expect(page.locator(".artwork-create-error")).toBeHidden();
   await format.click();
-  await page.getByRole("option").filter({ hasText: /BOB/ }).first().click();
+  await page
+    .getByRole("option", {
+      name: new RegExp(formatName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    })
+    .click();
   await expect(page.locator("[data-format-error]")).toBeHidden();
 });
 
 test("admin crops a photo in the new-course form and can retry a failed upload without creating another draft", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   test.setTimeout(90_000);
   await signInFixture(context, AUTH_FIXTURES.admin.email);
-  const formatName = `Formato foto ${Date.now()}`;
+  const suffix = fixtureSuffix(testInfo);
+  const formatName = `Formato foto ${suffix}`;
+  const courseName = `Curso con foto ${suffix}`;
   await page.goto("/app/formatos");
   await page.getByRole("link", { name: "Nuevo formato" }).click();
   const format = page.getByRole("form", { name: "Crear formato" });
@@ -101,7 +155,7 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
     ),
   ).toBe(true);
   await page.goto("/app/cursos/nuevo");
-  await page.getByLabel("Nombre").fill(`Curso con foto ${Date.now()}`);
+  await page.getByLabel("Nombre").fill(courseName);
   await fillCourseFields(page, formatName);
   const groups = page.locator("[data-initial-groups]");
   await groups.getByRole("button", { name: "Añadir grupo" }).click();
@@ -264,7 +318,7 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   expect(invalidResponse.status()).toBe(422);
   const invalidBody = await invalidResponse.json();
   expect(invalidBody.fieldErrors).toHaveProperty("startsAt");
-  await expect(page.getByLabel("Nombre")).toHaveValue(/Curso con foto/);
+  await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
   await expect(
     page.getByRole("img", { name: "Vista previa del recorte del curso" }),
   ).toBeVisible();
@@ -293,8 +347,29 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
     .getByRole("link", { name: "Abrir borrador" })
     .getAttribute("href");
   expect(draftUrl).toMatch(/\/app\/cursos\/[0-9a-f-]+\/editar/);
+  let associations = 0;
+  let recoveryReads = 0;
+  await page.route(`**${draftUrl}`, async (route) => {
+    if (route.request().method() === "POST") {
+      associations++;
+      const committed = await route.fetch();
+      expect(committed.ok()).toBe(true);
+      await route.abort("failed"); // Commit succeeded, but the client never received its revision.
+    } else {
+      recoveryReads++;
+      await route.continue();
+    }
+  });
+  await page.getByRole("button", { name: "Reintentar pendientes" }).click();
+  await expect(page.locator(".artwork-create-error")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Reintentar pendientes" }),
+  ).toBeEnabled();
   await page.getByRole("button", { name: "Reintentar pendientes" }).click();
   await expect(page).toHaveURL(/\/grupos(?:\?success=created)?$/);
+  expect(associations).toBe(1);
+  expect(recoveryReads).toBe(1);
+  await page.unroute(`**${draftUrl}`);
   await expect(page.locator("[data-group-id]")).toHaveCount(2);
   await page.goto(draftUrl!);
   const artwork = page.locator('input[name="artwork"]');
@@ -379,9 +454,10 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
 test("retries a persisted initial group after its POST response is lost and creates the remaining groups", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   await signInFixture(context, AUTH_FIXTURES.admin.email);
-  const formatName = `Formato retry grupo ${Date.now()}`;
+  const suffix = fixtureSuffix(testInfo);
+  const formatName = `Formato retry grupo ${suffix}`;
   await page.goto("/app/formatos");
   await page.getByRole("link", { name: "Nuevo formato" }).click();
   const format = page.getByRole("form", { name: "Crear formato" });
@@ -392,11 +468,11 @@ test("retries a persisted initial group after its POST response is lost and crea
   await format.getByLabel("Precio externo (BOB)").fill("100");
   await format.getByRole("button", { name: "Crear formato" }).click();
   await expect(page).toHaveURL(/\/app\/formatos$/);
-  await expect(page.locator("[data-sileo-toast]")).toContainText(
-    "Formato creado",
-  );
+  await expect(
+    page.locator("[data-sileo-toast]").filter({ hasText: "Formato creado" }),
+  ).toBeVisible();
   await page.goto("/app/cursos/nuevo");
-  await page.getByLabel("Nombre").fill(`Curso retry grupo ${Date.now()}`);
+  await page.getByLabel("Nombre").fill(`Curso retry grupo ${suffix}`);
   await fillCourseFields(page, formatName);
   const groups = page.locator("[data-initial-groups]");
   await groups.getByRole("button", { name: "Añadir grupo" }).click();
@@ -442,10 +518,12 @@ test("retries a persisted initial group after its POST response is lost and crea
 test("admin creates, validates, edits, publishes, withdraws and archives a course", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   test.setTimeout(90_000);
   await signInFixture(context, AUTH_FIXTURES.admin.email);
-  const formatName = `Formato E2E ${Date.now()}`;
+  const suffix = fixtureSuffix(testInfo);
+  const formatName = `Formato E2E ${suffix}`;
+  const courseName = `Curso E2E conservación ${suffix}`;
   await page.goto("/app/formatos");
   await page.getByRole("link", { name: "Nuevo formato" }).click();
   await page
@@ -467,9 +545,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     .fill("100.50");
   await page.getByRole("button", { name: "Crear formato" }).click();
   await expect(page).toHaveURL(/\/app\/formatos$/);
-  await expect(page.locator("[data-sileo-toast]")).toContainText(
-    "Formato creado",
-  );
+  await expect(
+    page.locator("[data-sileo-toast]").filter({ hasText: "Formato creado" }),
+  ).toBeVisible();
   await page.goto("/app/cursos/nuevo");
   const create = page.getByRole("button", { name: "Crear borrador" });
   // SSR keeps the form usable without JS; wait until client validation takes over.
@@ -478,10 +556,10 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     "true",
   );
   await expect(create).toBeDisabled();
-  await page.getByLabel("Nombre").fill("Curso E2E conservación");
+  await page.getByLabel("Nombre").fill(courseName);
   await expect(create).toBeEnabled();
   await expect(page).toHaveURL(/\/app\/cursos\/nuevo$/);
-  await expect(page.getByLabel("Nombre")).toHaveValue("Curso E2E conservación");
+  await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
 
   await fillCourseFields(page, formatName);
   await expect(create).toBeEnabled();
@@ -573,30 +651,65 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await page.evaluate(() => {
     (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
   });
+  const creationKey = await page
+    .locator('input[name="requestKey"]')
+    .inputValue();
+  const createdIds: string[] = [];
+  await page.route("**/app/cursos/nuevo", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    expect(route.request().postData()).toContain(creationKey);
+    const committed = await route.fetch();
+    expect(committed.status()).toBe(201);
+    const id: string = (await committed.json()).id;
+    createdIds.push(id);
+    lifecycleCourseIds.set(testInfo.testId, id);
+    if (createdIds.length === 1) await route.abort("failed");
+    else await route.fulfill({ response: committed });
+  });
   await page.getByRole("button", { name: "Crear borrador" }).click();
+  await expect(
+    page.getByRole("button", { name: "Reintentar creación" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Crear borrador" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Reintentar creación" }).click();
   await expect(page).toHaveURL(/\/app\/cursos\/[^/]+\/editar$/);
+  expect(createdIds).toHaveLength(2);
+  expect(createdIds[1]).toBe(createdIds[0]);
+  await page.unroute("**/app/cursos/nuevo");
   expect(
     await page.evaluate(
       () =>
         (window as Window & { navigationMarker?: boolean }).navigationMarker,
     ),
   ).toBe(true);
-  await expect(page.locator("[data-sileo-toast]")).toContainText(
-    "Borrador creado",
-  );
+  await expect(
+    page.locator("[data-sileo-toast]").filter({ hasText: "Borrador creado" }),
+  ).toBeVisible();
   const savedCourseEditUrl = page.url();
   await page.goto("/app/cursos");
-  const savedCourseCard = page
-    .locator("article")
-    .filter({ hasText: "Curso E2E conservación" });
+  const savedCourseCard = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: courseName, exact: true }),
+  });
+  await expect(savedCourseCard).toHaveCount(1);
   await expect(savedCourseCard).toBeVisible();
+  await expect(savedCourseCard.getByRole("link")).toHaveAttribute(
+    "href",
+    `/app/cursos/${createdIds[0]}/editar`,
+  );
   await page.goto(savedCourseEditUrl);
-  const save = page.getByRole("button", { name: "Guardar cambios" });
+  const save = page
+    .locator(".course-form")
+    .getByRole("button", { name: /^(Guardar cambios|Guardando…)$/ });
   await expect(save).toBeDisabled();
   await page.getByLabel("Nombre").fill("Curso temporalmente inválido");
   await page.getByLabel("Nombre").clear();
   await expect(save).toBeDisabled();
-  await page.getByLabel("Nombre").fill("Curso E2E conservación");
+  await page.getByLabel("Nombre").fill(courseName);
   await expect(save).toBeDisabled();
   const gradeInput = page.getByLabel("Nota mínima (0–100)");
   await page.getByLabel("Nombre").fill("Curso temporalmente inválido");
@@ -613,11 +726,21 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     name: "Fecha de inicio de clases (Bolivia)",
     exact: true,
   });
-  await courseStart.fill("2027-03-06");
+  await expect(
+    page.getByRole("button", {
+      name: /Elegir fecha de fecha de inicio de clases/i,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: /Elegir fecha de apertura de preinscripción/i,
+    }),
+  ).toBeVisible();
+  await courseStart.fill("06/03/2027");
   await expect(save).toBeDisabled();
-  await courseStart.fill("2027-03-01");
+  await courseStart.fill("01/03/2027");
   await expect(save).toBeEnabled();
-  await page.getByLabel("Nombre").fill("Curso E2E conservación");
+  await page.getByLabel("Nombre").fill(courseName);
   await expect(save).toBeDisabled();
   await page.locator('input[name="artwork"]').evaluate((input) => {
     (input as HTMLInputElement).value = "artwork/temporary.webp";
@@ -631,12 +754,14 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(save).toBeDisabled();
   await page.getByLabel("Descripción").fill("Texto conservado tras rechazo.");
   const persistedRevision = await page
-    .locator('input[name="revision"]')
+    .locator('.course-form input[name="revision"]')
     .inputValue();
-  await page.locator('input[name="revision"]').evaluate((input) => {
-    (input as HTMLInputElement).value = "invalid-revision";
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await page
+    .locator('.course-form input[name="revision"]')
+    .evaluate((input) => {
+      (input as HTMLInputElement).value = "invalid-revision";
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
   await expect(save).toBeEnabled();
   const failedUpdate = page.waitForResponse(
     (response) =>
@@ -652,15 +777,17 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(page.getByRole("alert").first()).toContainText(
     "La revisión del curso no es válida.",
   );
-  await page.locator('input[name="revision"]').evaluate((input, revision) => {
-    (input as HTMLInputElement).value = revision;
-  }, persistedRevision);
+  await page
+    .locator('.course-form input[name="revision"]')
+    .evaluate((input, revision) => {
+      (input as HTMLInputElement).value = revision;
+    }, persistedRevision);
   await page
     .getByLabel("Descripción")
     .fill("Contenido determinista para validar el flujo administrativo.");
   await page.getByLabel("Nombre").fill("Curso E2E editado");
   await expect(save).toBeEnabled();
-  await page.getByLabel("Nombre").fill("Curso E2E conservación");
+  await page.getByLabel("Nombre").fill(courseName);
   await expect(save).toBeDisabled();
   await page.getByRole("combobox", { name: "Nivel" }).click();
   await page.getByRole("option", { name: "Básico" }).click();
@@ -668,9 +795,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await page.getByRole("combobox", { name: "Nivel" }).click();
   await page.getByRole("option", { name: "Medio" }).click();
   await expect(save).toBeDisabled();
-  await courseStart.fill("2027-03-02");
+  await courseStart.fill("02/03/2027");
   await expect(save).toBeEnabled();
-  await courseStart.fill("2027-03-01");
+  await courseStart.fill("01/03/2027");
   await expect(save).toBeDisabled();
   const markdown = page.getByLabel("Contenido del curso (Markdown, opcional)");
   await markdown.fill("## Temario\n- Unidad uno\nNota");
@@ -687,7 +814,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
       name: "Fecha de inicio de clases (Bolivia)",
       exact: true,
     }),
-  ).toHaveValue("2027-03-01");
+  ).toHaveValue("01/03/2027");
   await expect(page.locator('input[name="startsAt"]')).toHaveValue(
     "2027-03-01T00:00",
   );
@@ -723,7 +850,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   );
   await expect(markdown).toBeVisible();
   await expect(markdown).toHaveValue("## Temario\n- Unidad uno");
-  await expect(page.getByLabel("Nombre")).toHaveValue("Curso E2E conservación");
+  await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
   await expect(page.getByRole("combobox", { name: "Nivel" })).toContainText(
     "Medio",
   );
@@ -745,14 +872,92 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     .getByLabel("Descripción")
     .fill("Contenido actualizado antes de publicar.");
   const editUrl = page.url();
+  await page.route(`**${new URL(editUrl).pathname}`, async (route) => {
+    if (route.request().method() === "POST")
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ revision: true, name: "Invalid reply" }),
+      });
+    else await route.continue();
+  });
+  await save.click();
+  await expect(page.locator("[data-save-error]")).toBeVisible();
+  await expect(save).toBeEnabled();
+  await expect(
+    page
+      .locator("[data-sileo-toast]")
+      .filter({ hasText: "Cambios guardados correctamente" }),
+  ).toHaveCount(0);
+  await page.unroute(`**${new URL(editUrl).pathname}`);
+  let releaseSave!: () => void;
+  const saveGate = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+  const savePath = new URL(editUrl).pathname;
+  let saveAndPublishGets = 0;
+  const countRefresh = (request: import("@playwright/test").Request) => {
+    if (
+      request.method() === "GET" &&
+      new URL(request.url()).pathname === savePath
+    )
+      saveAndPublishGets++;
+  };
+  page.on("request", countRefresh);
+  await page.route(`**${savePath}`, async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    const response = await route.fetch();
+    await saveGate;
+    await route.fulfill({ response });
+  });
   await page.evaluate(() => {
     (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
   });
   await page.getByRole("button", { name: "Guardar cambios" }).click();
-  await expect(page.locator("[data-sileo-toast]")).toContainText(
-    "Cambios guardados",
-  );
+  await expect(
+    page
+      .locator('[data-sileo-toast][data-state="loading"]')
+      .filter({ hasText: "Guardando" }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Instructor (opcional)")
+    .fill("Edición mientras se guarda");
+  await expect(save).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Publicar curso", exact: true }),
+  ).toBeDisabled();
+  const saveIntentCount = { count: 0 };
+  const countEditorial = (request: import("@playwright/test").Request) => {
+    if (
+      request.method() === "POST" &&
+      new URL(request.url()).pathname === savePath
+    )
+      saveIntentCount.count++;
+  };
+  page.on("request", countEditorial);
+  await page.locator("[data-course-dialog-form]").evaluate((form) => {
+    form.querySelector<HTMLInputElement>('input[name="intent"]')!.value =
+      "publish";
+    form.dispatchEvent(
+      new Event("submit", { cancelable: true, bubbles: true }),
+    );
+  });
+  expect(saveIntentCount.count).toBe(0);
+  page.off("request", countEditorial);
+  releaseSave();
+  await expect(
+    page.locator("[data-sileo-toast]").filter({ hasText: "Cambios guardados" }),
+  ).toBeVisible();
   expect(page.url()).toBe(editUrl);
+  await expect(page.getByLabel("Instructor (opcional)")).toHaveValue(
+    "Edición mientras se guarda",
+  );
+  await expect(save).toBeEnabled();
+  await page.getByLabel("Instructor (opcional)").fill("Docente E2E");
+  await page.unroute(`**${savePath}`);
   expect(
     await page.evaluate(
       () =>
@@ -762,10 +967,39 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(page.locator('input[name="schedule"]')).toHaveValue(
     "Lunes a viernes · horario por grupo",
   );
-  await expect(page.locator("[data-sileo-toast]")).toContainText(
-    "Cambios guardados",
-  );
   await expect(save).toBeDisabled();
+  await page.getByRole("button", { name: "Publicar curso" }).click();
+  const publishAfterSave = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === savePath,
+  );
+  await page
+    .getByRole("dialog", { name: "Publicar curso" })
+    .getByRole("button", { name: "Confirmar publicación" })
+    .click();
+  const publicationResult = await publishAfterSave;
+  expect(publicationResult.status()).toBe(200);
+  const publicationRevision = (await publicationResult.json()).revision;
+  await expect(page.locator("[data-course-status]")).toHaveText("Publicado");
+  await expect(
+    page.getByRole("button", { name: "Retirar publicación" }),
+  ).toBeFocused();
+  for (const control of await page
+    .locator(
+      'form[data-course-mutation-id] input[name="revision"], .course-form input[name="revision"]',
+    )
+    .all())
+    await expect(control).toHaveValue(publicationRevision);
+  expect(saveAndPublishGets).toBe(0);
+  await page.getByRole("button", { name: "Retirar publicación" }).click();
+  await page
+    .getByRole("dialog", { name: "Retirar publicación" })
+    .getByRole("button", { name: "Confirmar retiro" })
+    .click();
+  await expect(page.locator("[data-course-status]")).toHaveText("Borrador");
+  expect(saveAndPublishGets).toBe(0);
+  page.off("request", countRefresh);
   await page.getByRole("button", { name: "Publicar curso" }).click();
   const dialog = page.getByRole("dialog", { name: "Publicar curso" });
   await expect(dialog.getByRole("button", { name: "Cancelar" })).toBeFocused();
@@ -782,13 +1016,19 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
         Origin: new URL(page.url()).origin,
         Accept: "application/json",
       },
-      form: { intent: "publish" },
+      form: {
+        intent: "publish",
+        revision: await page
+          .locator('.course-form input[name="revision"]')
+          .first()
+          .inputValue(),
+      },
     },
   );
   expect(publishedElsewhere.status()).toBe(200);
   await dialog.getByRole("button", { name: "Confirmar publicación" }).click();
   await expect(
-    page.getByRole("alert").filter({ hasText: /PUBLISHED/ }),
+    page.locator("[data-save-error]").filter({ hasText: /El curso cambió/ }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Publicar curso" }),
@@ -806,12 +1046,63 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
         Origin: new URL(page.url()).origin,
         Accept: "application/json",
       },
-      form: { intent: "withdraw" },
+      form: {
+        intent: "withdraw",
+        revision: (await publishedElsewhere.json()).revision,
+      },
     },
   );
   expect(withdrawnElsewhere.status()).toBe(200);
+  await page.reload(); // Explicit recovery from an optimistic conflict, not a mutation refresh.
+  await page.evaluate(() => {
+    (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
+  });
+  const editorialPath = new URL(page.url()).pathname;
+  let editorialGets = 0;
+  page.on("request", (request) => {
+    if (
+      request.method() === "GET" &&
+      new URL(request.url()).pathname === editorialPath
+    )
+      editorialGets++;
+  });
+  await page.getByLabel("Nombre").evaluate((node) => {
+    (window as Window & { retainedCourseInput?: Element }).retainedCourseInput =
+      node;
+  });
+  let releaseEditorial!: () => void;
+  let editorialRequests = 0;
+  const editorialGate = new Promise<void>((resolve) => {
+    releaseEditorial = resolve;
+  });
+  await page.route(`**${editorialPath}`, async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    editorialRequests++;
+    const response = await route.fetch();
+    await editorialGate;
+    await route.fulfill({ response });
+  });
   await page.getByRole("button", { name: "Publicar curso" }).click();
   await dialog.getByRole("button", { name: "Confirmar publicación" }).click();
+  await expect(dialog).toBeHidden();
+  await page
+    .getByLabel("Instructor (opcional)")
+    .fill("Cambio durante publicación");
+  await expect(save).toBeDisabled();
+  await page
+    .locator(".course-form")
+    .evaluate((form) =>
+      form.dispatchEvent(
+        new Event("submit", { cancelable: true, bubbles: true }),
+      ),
+    );
+  await expect(
+    page.locator("[data-sileo-toast]").filter({ hasText: "Guardando" }),
+  ).toBeVisible();
+  releaseEditorial();
   await expect(
     page
       .locator("span")
@@ -824,9 +1115,24 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
         (window as Window & { navigationMarker?: boolean }).navigationMarker,
     ),
   ).toBe(true);
-  await expect(page.locator("[data-sileo-toast]")).toContainText(
-    "Curso publicado",
-  );
+  await expect(
+    page.locator("[data-sileo-toast]").filter({ hasText: "Curso publicado" }),
+  ).toBeVisible();
+  expect(editorialGets).toBe(0);
+  expect(editorialRequests).toBe(1);
+  expect(
+    await page
+      .getByLabel("Nombre")
+      .evaluate(
+        (node) =>
+          (window as Window & { retainedCourseInput?: Element })
+            .retainedCourseInput === node,
+      ),
+  ).toBe(true);
+  await page.unroute(`**${editorialPath}`);
+  await expect(page.getByLabel("Instructor (opcional)")).toBeFocused();
+  await expect(save).toBeEnabled();
+  await page.getByLabel("Instructor (opcional)").fill("Docente E2E");
   await page.getByRole("button", { name: "Destacar en la cartelera" }).click();
   await expect(page.getByText("Destacado en la cartelera")).toBeVisible();
   await page.reload();
@@ -840,17 +1146,19 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     .getByRole("dialog", { name: "Retirar publicación" })
     .getByRole("button", { name: "Confirmar retiro" })
     .click();
-  await expect(page.locator("[data-sileo-toast]")).toContainText(
-    "devuelto a borrador",
-  );
+  await expect(
+    page
+      .locator("[data-sileo-toast]")
+      .filter({ hasText: "devuelto a borrador" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Archivar curso" }).click();
   await page
     .getByRole("dialog", { name: "Archivar curso" })
     .getByRole("button", { name: "Confirmar archivo" })
     .click();
-  await expect(page.locator("[data-sileo-toast]")).toContainText(
-    "Curso archivado",
-  );
+  await expect(
+    page.locator("[data-sileo-toast]").filter({ hasText: "Curso archivado" }),
+  ).toBeVisible();
   await expect(page.getByLabel("Nombre")).toBeDisabled();
   expect(
     await page.evaluate(
@@ -902,19 +1210,46 @@ test("course administration remains keyboard reachable and responsive", async ({
   page,
   context,
 }) => {
+  const expectNoHorizontalOverflow = async () => {
+    const layout = await page.evaluate(() => {
+      const viewportWidth = document.documentElement.clientWidth;
+      return {
+        url: window.location.pathname,
+        viewportWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        overflowingElements: Array.from(document.querySelectorAll("body *"))
+          .flatMap((element) => {
+            const bounds = element.getBoundingClientRect();
+            if (bounds.width === 0 || bounds.right <= viewportWidth) return [];
+            const styles = getComputedStyle(element);
+            return [
+              {
+                tag: element.tagName,
+                id: element.id,
+                classes: element.getAttribute("class"),
+                width: bounds.width,
+                right: bounds.right,
+                minWidth: styles.minWidth,
+                gridTemplateColumns: styles.gridTemplateColumns,
+                text: element.textContent?.trim().slice(0, 120),
+              },
+            ];
+          })
+          .slice(0, 30),
+      };
+    });
+    expect(
+      layout.scrollWidth,
+      JSON.stringify(layout, null, 2),
+    ).toBeLessThanOrEqual(layout.viewportWidth);
+  };
   await signInFixture(context, AUTH_FIXTURES.multiRole.email);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/app/cursos");
   await expect(
     page.getByRole("heading", { name: "Cursos", exact: true }),
   ).toBeVisible();
-  expect(
-    await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth <=
-        document.documentElement.clientWidth,
-    ),
-  ).toBe(true);
+  await expectNoHorizontalOverflow();
   await page.keyboard.press("Tab");
   await expect(page.locator(":focus")).toBeVisible();
   await expect(page.getByRole("link", { name: "Nuevo curso" })).toBeVisible();
@@ -922,11 +1257,5 @@ test("course administration remains keyboard reachable and responsive", async ({
   await expect(
     page.getByRole("toolbar", { name: "Formato Markdown" }),
   ).toBeVisible();
-  expect(
-    await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth <=
-        document.documentElement.clientWidth,
-    ),
-  ).toBe(true);
+  await expectNoHorizontalOverflow();
 });

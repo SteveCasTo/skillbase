@@ -71,6 +71,20 @@
       "when": 1790567771860,
       "tag": "0009_stiff_la_nuit",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790812087486,
+      "tag": "0010_course_creation_receipts",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790817356088,
+      "tag": "0011_interest_registrations",
+      "breakpoints": true
     }
   ]
 }

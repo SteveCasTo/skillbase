@@ -115,7 +115,7 @@ const levelLabel = {
       </h2>
       <ul class="grid gap-4 lg:grid-cols-2">
         {courses.map((course) => (
-          <li>
+          <li class="min-w-0">
             <article class="h-full rounded-xl border bg-card shadow-xs transition-colors hover:border-primary/50 hover:bg-secondary/30">
               <a
                 href={`/app/cursos/${course.id}/editar`}
@@ -123,7 +123,7 @@ const levelLabel = {
               >
                 <div class="flex items-start justify-between gap-4">
                   <div class="min-w-0">
-                    <h3 class="text-lg font-semibold leading-snug">
+                    <h3 class="text-lg font-semibold leading-snug [overflow-wrap:anywhere]">
                       {course.name}
                     </h3>
                     <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
@@ -186,7 +186,7 @@ const levelLabel = {
     </section>
   )}
   <script>
-    import { sileo } from "sileo";
+    import { notifications } from "@/lib/notifications";
     document.addEventListener("astro:page-load", () => {
       if (window.location.pathname !== "/app/cursos") return;
       const success = new URLSearchParams(window.location.search).get(
@@ -199,7 +199,7 @@ const levelLabel = {
       const message = success ? messages[success] : undefined;
       if (message) {
         {
-          sileo.success({ title: message, duration: 6000 });
+          notifications.success({ title: message, duration: 6000 });
           const url = new URL(window.location.href);
           url.searchParams.delete("success");
           window.history.replaceState(

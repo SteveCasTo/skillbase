@@ -120,37 +120,16 @@ export default function CourseWeekdayPlanner({
         />
       ) : (
         <div className="min-w-0">
-          {newCourse ? (
-            <CourseDatePicker
-              name="startDate"
-              label="Fecha de inicio de clases (Bolivia)"
-              value={startsAt.slice(0, 10)}
-              onDateChange={setStartDate}
-              required
-              disabled={disabled ?? false}
-              error={error || problem}
-            />
-          ) : (
-            <div className="flex flex-col gap-2">
-              <label htmlFor="startsAt-date" className="text-sm font-medium">
-                Fecha de inicio de clases (Bolivia)
-              </label>
-              <input
-                id="startsAt-date"
-                type="date"
-                required
-                disabled={disabled}
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
-                className="bg-background min-h-11 w-full rounded-lg border px-3"
-              />
-              {(error || problem) && (
-                <p role="alert" className="text-destructive text-sm">
-                  {error || problem}
-                </p>
-              )}
-            </div>
-          )}
+          <CourseDatePicker
+            name="startDate"
+            label="Fecha de inicio de clases (Bolivia)"
+            value={startsAt.slice(0, 10)}
+            onDateChange={setStartDate}
+            futureOnly={newCourse}
+            required
+            disabled={disabled ?? false}
+            error={error || problem}
+          />
           <input
             type="hidden"
             name="startsAt"
