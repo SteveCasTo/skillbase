@@ -289,6 +289,7 @@ export const groups = pgTable(
   },
   (table) => [
     index("groups_course_id_idx").on(table.courseId),
+    unique("groups_course_id_id_unique").on(table.courseId, table.id),
     index("groups_course_type_revision_id_idx").on(table.courseTypeRevisionId),
     foreignKey({
       name: "groups_course_revision_fk",
@@ -299,6 +300,85 @@ export const groups = pgTable(
     check("groups_dates_check", sql`${table.startsAt} < ${table.endsAt}`),
   ],
 );
+
+export const interestRegistrationStatus = pgEnum(
+  "interest_registration_status",
+  ["ACTIVE", "CANCELLED"],
+);
+export const interestRegistrations = pgTable(
+  "interest_registrations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "restrict" }),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name").notNull(),
+    email: text("email").notNull(),
+    phone: text("phone"),
+    preferredGroupId: uuid("preferred_group_id"),
+    status: interestRegistrationStatus("status").notNull().default("ACTIVE"),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("interest_registrations_course_email_unique").on(
+      table.courseId,
+      table.email,
+    ),
+    foreignKey({
+      name: "interest_registrations_course_group_fk",
+      columns: [table.courseId, table.preferredGroupId],
+      foreignColumns: [groups.courseId, groups.id],
+    }).onDelete("restrict"),
+    index("interest_registrations_course_status_created_idx").on(
+      table.courseId,
+      table.status,
+      table.createdAt,
+      table.id,
+    ),
+    index("interest_registrations_course_preference_idx").on(
+      table.courseId,
+      table.preferredGroupId,
+    ),
+    check(
+      "interest_registrations_first_name_check",
+      sql`char_length(${table.firstName}) between 1 and 100 and ${table.firstName} = btrim(${table.firstName}) and ${table.firstName} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      "interest_registrations_last_name_check",
+      sql`char_length(${table.lastName}) between 1 and 150 and ${table.lastName} = btrim(${table.lastName}) and ${table.lastName} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      "interest_registrations_email_check",
+      sql`${table.email} = lower(btrim(${table.email})) and char_length(${table.email}) between 3 and 254 and ${table.email} ~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$' and ${table.email} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      "interest_registrations_phone_check",
+      sql`${table.phone} is null or (char_length(${table.phone}) between 1 and 32 and ${table.phone} = btrim(${table.phone}) and ${table.phone} !~ '[[:cntrl:]]')`,
+    ),
+  ],
+).enableRLS();
+
+export const interestRegistrationRateLimits = pgTable(
+  "interest_registration_rate_limits",
+  {
+    key: text("key").primaryKey(),
+    attempts: integer("attempts").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("interest_registration_rate_limits_expiry_idx").on(table.expiresAt),
+    check(
+      "interest_registration_rate_limits_attempts_check",
+      sql`${table.attempts} > 0`,
+    ),
+  ],
+).enableRLS();
 
 export const auditEvents = pgTable(
   "audit_events",

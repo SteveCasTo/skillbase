@@ -71,6 +71,11 @@ export async function runWithTestStack(command: string[]): Promise<number> {
     ...process.env,
     SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID: "local-test-placeholder",
     SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET: "local-test-placeholder",
+    INTEREST_RATE_LIMIT_SECRET: randomBytes(32).toString("hex"),
+    INTEREST_RATE_COURSE_LIMIT: "20",
+    INTEREST_RATE_COURSE_SECONDS: "600",
+    INTEREST_RATE_NETWORK_LIMIT: "100",
+    INTEREST_RATE_NETWORK_SECONDS: "3600",
   };
   // Bun loads .env in the entrypoint. Never let its database or OAuth settings
   // become migration/test targets or test-stack credentials.
