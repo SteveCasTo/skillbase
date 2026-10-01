@@ -1210,19 +1210,46 @@ test("course administration remains keyboard reachable and responsive", async ({
   page,
   context,
 }) => {
+  const expectNoHorizontalOverflow = async () => {
+    const layout = await page.evaluate(() => {
+      const viewportWidth = document.documentElement.clientWidth;
+      return {
+        url: window.location.pathname,
+        viewportWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        overflowingElements: Array.from(document.querySelectorAll("body *"))
+          .flatMap((element) => {
+            const bounds = element.getBoundingClientRect();
+            if (bounds.width === 0 || bounds.right <= viewportWidth) return [];
+            const styles = getComputedStyle(element);
+            return [
+              {
+                tag: element.tagName,
+                id: element.id,
+                classes: element.getAttribute("class"),
+                width: bounds.width,
+                right: bounds.right,
+                minWidth: styles.minWidth,
+                gridTemplateColumns: styles.gridTemplateColumns,
+                text: element.textContent?.trim().slice(0, 120),
+              },
+            ];
+          })
+          .slice(0, 30),
+      };
+    });
+    expect(
+      layout.scrollWidth,
+      JSON.stringify(layout, null, 2),
+    ).toBeLessThanOrEqual(layout.viewportWidth);
+  };
   await signInFixture(context, AUTH_FIXTURES.multiRole.email);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/app/cursos");
   await expect(
     page.getByRole("heading", { name: "Cursos", exact: true }),
   ).toBeVisible();
-  expect(
-    await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth <=
-        document.documentElement.clientWidth,
-    ),
-  ).toBe(true);
+  await expectNoHorizontalOverflow();
   await page.keyboard.press("Tab");
   await expect(page.locator(":focus")).toBeVisible();
   await expect(page.getByRole("link", { name: "Nuevo curso" })).toBeVisible();
@@ -1230,11 +1257,5 @@ test("course administration remains keyboard reachable and responsive", async ({
   await expect(
     page.getByRole("toolbar", { name: "Formato Markdown" }),
   ).toBeVisible();
-  expect(
-    await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth <=
-        document.documentElement.clientWidth,
-    ),
-  ).toBe(true);
+  await expectNoHorizontalOverflow();
 });
