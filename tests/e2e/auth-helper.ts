@@ -3,11 +3,114 @@ import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
+import {
+  oauthFixtureClient,
+  prepareOAuthFixtureCode,
+  prepareProviderCodeFixture,
+} from "../fixtures/oauth-provider";
 
 interface CapturedCookie {
   readonly name: string;
   readonly value: string;
   readonly options: CookieOptionsWithName;
+}
+
+/** Simulates email confirmation at the provider boundary, not SMTP delivery. */
+export async function prepareBrowserRecoveryFixture(
+  context: BrowserContext,
+  authUserId: string,
+  siteUrl: string,
+): Promise<{ code: string; flowId: string }> {
+  const environment = getTestSupabaseEnvironment();
+  const all = new Map(
+    (await context.cookies()).map(({ name, value }) => [name, value]),
+  );
+  const changed = new Map<string, CapturedCookie>();
+  const ssr = createServerClient(
+    environment.apiUrl,
+    environment.publishableKey,
+    {
+      cookieOptions: { httpOnly: true, sameSite: "lax", path: "/" },
+      cookies: {
+        getAll: () => [...all].map(([name, value]) => ({ name, value })),
+        setAll: (cookies) => {
+          for (const cookie of cookies) {
+            all.set(cookie.name, cookie.value);
+            changed.set(cookie.name, cookie);
+          }
+        },
+      },
+    },
+  );
+  const { data, error } = await ssr.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: new URL("/auth/recovery", siteUrl).toString() },
+  });
+  const challenge = data.url
+    ? new URL(data.url).searchParams.get("code_challenge")
+    : null;
+  if (error || !challenge || !data.flowId)
+    throw new Error("Recovery confirmation fixture verifier is unavailable");
+  await context.addCookies(
+    [...changed.values()].map(({ name, value, options }) => ({
+      name,
+      value,
+      domain: "127.0.0.1",
+      path: options.path ?? "/",
+      httpOnly: true,
+      secure: false,
+      sameSite: "Lax" as const,
+    })),
+  );
+  return {
+    code: await prepareProviderCodeFixture(authUserId, challenge, "recovery"),
+    flowId: data.flowId,
+  };
+}
+
+export async function signInOAuthFixture(
+  context: BrowserContext,
+  authUserId: string,
+): Promise<void> {
+  const environment = getTestSupabaseEnvironment();
+  const fixture = oauthFixtureClient();
+  const verifier = crypto.randomUUID() + crypto.randomUUID();
+  fixture.setVerifier(verifier);
+  const code = await prepareOAuthFixtureCode(authUserId, verifier);
+  const { data, error } =
+    await fixture.client.auth.exchangeCodeForSession(code);
+  if (error || !data.session)
+    throw new Error("Isolated OAuth fixture exchange failed");
+  let cookies: CapturedCookie[] = [];
+  const ssr = createServerClient(
+    environment.apiUrl,
+    environment.publishableKey,
+    {
+      cookieOptions: { httpOnly: true, sameSite: "lax", path: "/" },
+      cookies: {
+        getAll: () => cookies,
+        setAll: (values) => {
+          cookies = values;
+        },
+      },
+    },
+  );
+  const verified = await ssr.auth.setSession({
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token,
+  });
+  if (verified.error) throw new Error("Isolated OAuth fixture cookies failed");
+  await context.addCookies(
+    cookies.map(({ name, value, options }) => ({
+      name,
+      value,
+      domain: "127.0.0.1",
+      path: options.path ?? "/",
+      httpOnly: true,
+      secure: false,
+      sameSite: "Lax" as const,
+    })),
+  );
 }
 
 export async function signInFixture(

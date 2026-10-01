@@ -1,11 +1,12 @@
 import { getTestSupabaseEnvironment } from "./supabase-local-env";
+import { e2ePort, e2eSiteUrl } from "./e2e-port";
 
 const isolated = getTestSupabaseEnvironment();
 process.env.DATABASE_URL = isolated.databaseUrl;
 process.env.PUBLIC_SUPABASE_URL = isolated.apiUrl;
 process.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY = isolated.publishableKey;
 process.env.SUPABASE_SERVICE_ROLE_KEY = isolated.serviceRoleKey;
-process.env.PUBLIC_SITE_URL = "http://127.0.0.1:4321";
+process.env.PUBLIC_SITE_URL = e2eSiteUrl();
 
 // Astro/Vite can snapshot public env at import time; inject test settings first.
 const { dev } = await import("astro");
@@ -16,13 +17,13 @@ const server = await dev({
   devToolbar: { enabled: false },
   server: {
     host: "127.0.0.1",
-    port: 4321,
+    port: e2ePort(),
   },
 });
-if (server.address.port !== 4321) {
+if (server.address.port !== e2ePort()) {
   await server.stop();
   throw new Error(
-    "E2E Astro did not bind port 4321; refusing to reuse another server.",
+    "E2E Astro did not bind its dedicated port; refusing to reuse another server.",
   );
 }
 

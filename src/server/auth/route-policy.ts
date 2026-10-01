@@ -12,7 +12,7 @@ export const PRIVATE_ROUTE_POLICIES = {
   "/app/formatos": { access: "ROLES", roles: ["ADMIN"] },
   "/app/formatos/nuevo": { access: "ROLES", roles: ["ADMIN"] },
   "/app/interesados": { access: "ROLES", roles: ["ADMIN"] },
-  "/app/asistencia": { access: "ROLES", roles: ["INSTRUCTOR"] },
+  "/app/perfil": { access: "ACTIVE_USER" },
 } as const satisfies Readonly<Record<string, PrivateRoutePolicy>>;
 
 const COURSE_EDIT_PATH =

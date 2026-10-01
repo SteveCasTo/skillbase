@@ -43,6 +43,11 @@ export const users = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     authUserId: uuid("auth_user_id"),
+    approvedGoogleIdentityId: text("approved_google_identity_id"),
+    authPrimaryProvider: text("auth_primary_provider")
+      .$type<"GOOGLE" | "EMAIL">()
+      .notNull()
+      .default("GOOGLE"),
     email: text("email").notNull(),
     name: text("name").notNull(),
     status: userStatus("status").notNull().default("INVITED"),
@@ -57,6 +62,10 @@ export const users = pgTable(
     uniqueIndex("users_email_unique").on(table.email),
     uniqueIndex("users_auth_user_id_unique").on(table.authUserId),
     index("users_status_idx").on(table.status),
+    check(
+      "users_auth_primary_provider_check",
+      sql`${table.authPrimaryProvider} in ('GOOGLE', 'EMAIL')`,
+    ),
     check(
       "users_email_normalized_check",
       sql`${table.email} = lower(btrim(${table.email})) and position('@' in ${table.email}) > 1`,
@@ -81,6 +90,37 @@ export const roles = pgTable(
     check("roles_code_check", sql`${table.code} in ('ADMIN', 'INSTRUCTOR')`),
   ],
 );
+
+export const authAttemptBuckets = pgTable(
+  "auth_attempt_buckets",
+  {
+    key: text("key").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    attempts: integer("attempts").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.key, table.windowStart] }),
+    index("auth_attempt_buckets_expiry_idx").on(table.expiresAt),
+    check("auth_attempt_buckets_attempts_check", sql`${table.attempts} > 0`),
+  ],
+).enableRLS();
+
+export const authGoogleLinkRequests = pgTable(
+  "auth_google_link_requests",
+  {
+    nonceHash: text("nonce_hash").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("auth_google_link_requests_user_idx").on(table.userId),
+    index("auth_google_link_requests_expiry_idx").on(table.expiresAt),
+  ],
+).enableRLS();
 
 export const userRoles = pgTable(
   "user_roles",

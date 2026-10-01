@@ -7,19 +7,29 @@ import {
 import { requireRequestSupabaseClient } from "@/server/auth/context";
 import { privateNoStoreResponse } from "@/server/auth/route-policy";
 import { getPublicAuthEnvironment } from "@/server/environment";
+import { consumeAuthAttempt, readAuthForm } from "@/server/auth/security";
 
 export const POST: APIRoute = async ({
   request,
   cookies,
   locals,
   redirect,
+  clientAddress,
 }) => {
   const environment = getPublicAuthEnvironment();
   const supabase = requireRequestSupabaseClient(locals);
   if (!requestHasExpectedOrigin(request, environment.siteUrl))
     return privateNoStoreResponse("Invalid request origin", { status: 403 });
 
-  const form = await request.formData();
+  let form: URLSearchParams;
+  try {
+    if (!(await consumeAuthAttempt(clientAddress, "oauth")))
+      return redirect("/login?error=oauth_start", 303);
+    form = await readAuthForm(request);
+  } catch {
+    return redirect("/login?error=oauth_start", 303);
+  }
+  cookies.delete("auth-link-proof", { path: "/" });
   const nextValue = form.get("next");
   const next = safeRelativeRedirect(
     typeof nextValue === "string" ? nextValue : null,

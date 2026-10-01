@@ -85,6 +85,20 @@
       "when": 1790817356088,
       "tag": "0011_interest_registrations",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790855881175,
+      "tag": "0012_dual_auth_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790859404332,
+      "tag": "0013_google_link_requests",
+      "breakpoints": true
     }
   ]
 }

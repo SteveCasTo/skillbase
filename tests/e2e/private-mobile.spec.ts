@@ -23,10 +23,13 @@ test("mobile private navigation exposes authorized multi-role destinations", asy
   ).toBeVisible();
   await expect(
     navigation.getByRole("link", { name: "Asistencia" }),
-  ).toBeVisible();
-  await navigation.getByRole("link", { name: "Asistencia" }).click();
+  ).toHaveCount(0);
+  await page
+    .getByRole("dialog")
+    .getByRole("link", { name: "Mi perfil" })
+    .click();
   await expect(
-    page.getByRole("heading", { level: 1, name: "Asistencia" }),
+    page.getByRole("heading", { level: 1, name: "Mi perfil" }),
   ).toBeVisible();
 });
 
@@ -41,6 +44,9 @@ test("mobile drawer closes with Escape and restores keyboard focus", async ({
   const navigation = page.getByRole("navigation", { name: "Navegación móvil" });
   await expect(
     navigation.getByRole("link", { name: "Asistencia" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("dialog").getByRole("link", { name: "Mi perfil" }),
   ).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Cursos" })).toHaveCount(0);
   await page.keyboard.press("Escape");
