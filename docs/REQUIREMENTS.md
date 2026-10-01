@@ -79,6 +79,18 @@ Los niveles iniciales son:
 - El contenido opcional Markdown se presenta sin HTML crudo y se filtran protocolos de enlaces no permitidos. Instructor se almacena como texto provisional, no como asignación de identidad.
 - Se puede seleccionar como destacado, con máximo uno entre cursos publicados; si no se designa uno, landing y catálogo usan fallback determinista.
 
+### Instructor y asignación (contrato aprobado para Fase 4; pendiente de implementación)
+
+- Administración crea un perfil de instructor con nombre, apellido y email obligatorios; el email se normaliza antes de persistirse y el teléfono es opcional. En presentación pública se usa únicamente el nombre completo; no se recopila ni publica descripción.
+- Cada instructor interno tiene rol `INSTRUCTOR` y una cuenta Supabase Auth aprovisionada por el ADMIN desde servidor. El ADMIN establece la contraseña inicial; no se envía invitación ni se fuerza un paso adicional de cambio de contraseña. El instructor puede cambiarla desde su perfil opcionalmente.
+- Email/password complementa Google para cuentas internas. Un instructor autenticado puede enlazar Google explícitamente a la misma cuenta solo tras verificar el correo y confirmar coincidencia normalizada. No se permite fusión automática. ADMIN existentes conservan Google y pueden añadir contraseña; esta fase no añade gestión de creación de ADMIN.
+- Instructor solo puede consultar/editar su propio perfil y consultar los cursos que tiene asignados. Formatos, interesados, participantes, usuarios y configuración quedan fuera de su autorización en Fase 4. Sesiones y asistencia permanecen en Fase 6.
+- Cada curso tiene exactamente un instructor asignado; todos los grupos heredan esa asignación. El texto libre `instructorName` deja de ser la fuente de asignación real.
+- Cambiar instructor en curso publicado se permite antes del inicio oficial; desde el inicio queda bloqueado. Las validaciones se hacen en servidor y se mantienen las reglas actuales de retiro/archivo e historial.
+- Una asignación no puede hacer que un instructor esté en dos cursos cuyos calendarios L–V coincidan en fecha y horario civil de Bolivia (`America/La_Paz`). Se usan intervalos semiabiertos, por lo que turnos contiguos no se consideran conflicto. Mutaciones concurrentes de asignación, fecha de curso, horario/grupo, estado o publicación deben serializar conflicto y escritura para evitar carreras.
+- Los perfiles usados conservan identificadores estables e historial referencial; no se borran físicamente. No se ha aprobado qué ocurre al desactivar un instructor con cursos futuros asignados: resolver antes de implementar activación/desactivación en ese caso.
+- Incluir eventos de auditoría para creación/actualización de asignación y mutaciones de cuenta, sin credenciales. Auditoría como UI/reportes no es parte de este flujo.
+
 ### Reglas implementadas de formatos e imágenes
 
 - Administración puede crear y activar/desactivar formatos tarifarios, cada uno con duración y valores `STUDENT`/`EXTERNAL` en `BOB`.
