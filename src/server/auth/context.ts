@@ -1,17 +1,24 @@
 import type { User } from "@supabase/supabase-js";
 
 import { resolveActiveUser } from "@/application/auth/authorize";
+import {
+  requireApprovedProviders,
+  type VerifiedAuthSession,
+} from "@/domain/auth/identity";
+import { accountIdentity } from "./identity";
 import type { AuthUserRepository } from "@/application/auth/user-repository";
 import { AuthorizationError } from "@/domain/auth/errors";
 import type { InternalUser } from "@/domain/auth/types";
 import { traceSlowOperation } from "@/server/observability/slow-operation";
 
 import type { RequestSupabaseClient } from "./supabase";
+import { loadVerifiedAuthSession } from "./session";
 
 export interface RequestAuthContext {
   readonly authUser: User | null;
   readonly internalUser: InternalUser | null;
   readonly error: AuthorizationError | null;
+  readonly session: VerifiedAuthSession | null;
 }
 
 export async function loadRequestAuthContext(
@@ -22,16 +29,23 @@ export async function loadRequestAuthContext(
     supabase.auth.getUser(),
   );
   if (error || !data.user)
-    return { authUser: null, internalUser: null, error: null };
+    return { authUser: null, internalUser: null, error: null, session: null };
   try {
     const internalUser = await traceSlowOperation(
       "auth.resolveActiveUser",
       () => resolveActiveUser(repository, data.user.id),
     );
-    return { authUser: data.user, internalUser, error: null };
+    const session = await loadVerifiedAuthSession(supabase, data.user.id);
+    requireApprovedProviders(internalUser, accountIdentity(data.user), session);
+    return { authUser: data.user, internalUser, error: null, session };
   } catch (caught) {
     if (caught instanceof AuthorizationError)
-      return { authUser: data.user, internalUser: null, error: caught };
+      return {
+        authUser: data.user,
+        internalUser: null,
+        error: caught,
+        session: null,
+      };
     throw caught;
   }
 }
