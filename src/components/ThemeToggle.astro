@@ -1,6 +1,13 @@
+---
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+---
+
 <button
   type="button"
-  class="theme-toggle"
+  class:list={["theme-toggle", className]}
   data-theme-toggle
   data-current-theme="light"
   aria-label="Cambiar a modo oscuro"
@@ -47,36 +54,41 @@
 </button>
 
 <script>
-  const toggle = document.querySelector<HTMLButtonElement>(
-    "[data-theme-toggle]",
-  );
+  import { applyTheme } from "@/lib/theme";
 
-  if (toggle) {
-    const applyTheme = (theme: "light" | "dark") => {
-      const isDark = theme === "dark";
-      document.documentElement.classList.toggle("dark", isDark);
-      document.documentElement.dataset.theme = theme;
-      document.documentElement.style.colorScheme = isDark ? "dark" : "light";
-    };
-
-    const syncToggle = () => {
-      const selectedTheme = document.documentElement.dataset.theme;
-      const theme = selectedTheme === "dark" ? "dark" : "light";
-      const nextThemeName = theme === "dark" ? "claro" : "oscuro";
-      toggle.dataset.currentTheme = theme;
-      toggle.ariaLabel = `Cambiar a modo ${nextThemeName}`;
-      toggle.title = `Cambiar a modo ${nextThemeName}`;
-    };
-
-    syncToggle();
-    toggle.addEventListener("click", () => {
-      const theme = toggle.dataset.currentTheme;
-      const nextTheme = theme === "dark" ? "light" : "dark";
-      localStorage.setItem("theme", nextTheme);
-      applyTheme(nextTheme);
-      syncToggle();
-    });
-  }
+  const syncToggles = () => {
+    document
+      .querySelectorAll<HTMLButtonElement>(
+        "[data-theme-toggle]:not([data-slot])",
+      )
+      .forEach((toggle) => {
+        const theme = document.documentElement.classList.contains("dark")
+          ? "dark"
+          : "light";
+        const nextThemeName = theme === "dark" ? "claro" : "oscuro";
+        toggle.dataset.currentTheme = theme;
+        toggle.ariaLabel = `Cambiar a modo ${nextThemeName}`;
+        toggle.title = `Cambiar a modo ${nextThemeName}`;
+      });
+  };
+  document.addEventListener("click", (event) => {
+    const toggle =
+      event.target instanceof Element
+        ? event.target.closest("[data-theme-toggle]:not([data-slot])")
+        : null;
+    if (!toggle) return;
+    applyTheme(
+      document.documentElement.classList.contains("dark") ? "light" : "dark",
+      true,
+    );
+    syncToggles();
+  });
+  new MutationObserver(syncToggles).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class", "data-theme"],
+  });
+  document.addEventListener("astro:page-load", syncToggles);
+  syncToggles();
 </script>
 
 <style>

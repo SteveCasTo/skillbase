@@ -70,14 +70,21 @@ const canCreate =
   course.status !== "ARCHIVED" &&
   course.weekdaysMask === 31 &&
   course.sessionMinutes !== null;
+const groupDto = (group: Group) => ({
+  id: group.id,
+  revision: group.updatedAt.toISOString(),
+  startTime: instantToBoliviaCivil(group.startsAt).slice(11, 16),
+  endTime: instantToBoliviaCivil(group.endsAt).slice(11, 16),
+  capacity: group.capacity,
+  status: group.status,
+  published: group.publishedAt !== null,
+});
+void groupDto;
 if (wantsJson && Astro.request.method === "GET")
   return new Response(
     JSON.stringify({
-      groups: groups.map((group) => ({
-        startTime: instantToBoliviaCivil(group.startsAt).slice(11, 16),
-        capacity: group.capacity,
-        status: group.status,
-      })),
+      canCreate,
+      groups: groups.map(groupDto),
     }),
     {
       status: loadError ? 503 : course ? 200 : 404,
@@ -178,6 +185,7 @@ if (course && Astro.request.method === "POST") {
             revision:
               result?.updatedAt.toISOString() ??
               String(form.get("revision") ?? ""),
+            group: result ? groupDto(result) : null,
           }),
           {
             headers: {
@@ -296,13 +304,13 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
         >
           <p>{pageError}</p>
           {Astro.response.status === 409 && (
-            <button
-              type="button"
-              data-reload-page
+            <a
+              href={path}
+              data-group-recover={failedGroupId}
               class="mt-2 min-h-11 underline underline-offset-4"
             >
               Recargar datos actuales
-            </button>
+            </a>
           )}
         </div>
       )}

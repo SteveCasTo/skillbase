@@ -298,3 +298,11 @@ No desplegar `master` si falla:
 - build.
 
 Un fallo de CI debe considerarse bloqueo de release.
+
+### Avance local de navegación privada y recuperabilidad
+
+Hay cobertura unitaria nueva para resultado de mutaciones, idempotencia/recuperación de alta y skeleton de navegación, además de escenarios E2E para cursos, grupos, formatos, tema, sidebar, mobile y skeleton. Estado final local comunicado: full unit 108 PASS; full integration 54 PASS; lint PASS; typecheck PASS con 0 errores y 47 hints (también PASS en full-check posterior a notifications); build PASS a las 20:55; `drizzle-kit check`, schema checks, formatter de archivos modificados y `git diff --check` PASS. E2E: el primer full run fue 76/82; tras corregir cinco selectores y un ID de biblioteca, el rerun full fue 81/82 con un fallo en el selector toast de `public-courses`. El test dirigido `public-courses` pasó 4/4, incluyendo el escenario que falló en el full run. Por tanto, existe cobertura colectiva de los 82 escenarios, pero no se declara un full run 82/82.
+
+Las notificaciones administrativas pasan por `src/lib/notifications.ts`: cada operación obtiene un ID UUID independiente, y `promise` conserva el mismo ID entre loading/success/error. El bridge adapta en tipos estrictos el `id` que Sileo 0.1.5 consume en runtime pero no declara; no se usa `any` ni un patch en `node_modules`.
+
+La migración `0010_course_creation_receipts` se aplicó y verificó únicamente en el stack temporal/aislado de tests de esta ejecución; no hay evidencia aquí de aplicación en Supabase de desarrollo o cloud.

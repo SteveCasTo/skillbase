@@ -5,6 +5,130 @@ import { signInFixture } from "./auth-helper";
 
 test.use({ javaScriptEnabled: false });
 
+test("stale HTML drafts and editorial confirmations retain their rejected revision until explicit reconciliation", async ({
+  page,
+  context,
+  browser,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  const headers = {
+    Origin: "http://127.0.0.1:4321",
+    Accept: "application/json",
+  };
+  const format = await page.request.post("/app/formatos/nuevo", {
+    headers,
+    form: {
+      name: `Formato conflicto HTML ${Date.now()}`,
+      totalHours: "20",
+      sessionMinutes: "90",
+      studentAmount: "80",
+      externalAmount: "100",
+    },
+  });
+  expect(format.status()).toBe(201);
+  const created = await page.request.post("/app/cursos/nuevo", {
+    headers,
+    form: {
+      requestKey: crypto.randomUUID(),
+      name: `Curso conflicto HTML ${Date.now()}`,
+      description: "Descripción inicial",
+      level: "BASIC",
+      courseTypeId: (await format.json()).id,
+      schedule: "Lunes a viernes, 18:30–20:00",
+      weekdays: "1,2,3,4,5",
+      startsAt: "2027-03-01T18:30",
+      endsAt: "2027-03-17T20:00",
+      conditions: "Sujeto a cupo",
+      minimumGrade: "70",
+      instructorName: "Instructor inicial",
+    },
+  });
+  expect(created.status()).toBe(201);
+  const path = `/app/cursos/${(await created.json()).id}/editar`;
+  await page.goto(path);
+  const form = page.locator("form.course-form");
+  const rejectedRevision = await form
+    .locator('input[name="revision"]')
+    .inputValue();
+  const original = await form.evaluate((element) =>
+    Object.fromEntries(
+      [...new FormData(element as HTMLFormElement)].filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
+    ),
+  );
+  const peer = await browser.newContext({ javaScriptEnabled: false });
+  try {
+    await signInFixture(peer, AUTH_FIXTURES.multiRole.email);
+    const update = await peer.request.post(path, {
+      headers,
+      form: {
+        ...original,
+        description: "Descripción guardada por otro admin",
+        instructorName: "Instructor guardado por otro admin",
+      },
+    });
+    expect(update.status()).toBe(200);
+    const peerRevision = (await update.json()).revision;
+    await form.getByLabel("Descripción").fill("Mi intento anterior");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = page.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          new URL(response.url()).pathname === path,
+      );
+      await form.getByRole("button", { name: "Guardar cambios" }).click();
+      expect((await response).status()).toBe(409);
+      await expect(form.getByLabel("Descripción")).toHaveValue(
+        "Mi intento anterior",
+      );
+      await expect(form.getByLabel("Instructor (opcional)")).toHaveValue(
+        "Instructor inicial",
+      );
+      await expect(form.locator('input[name="revision"]')).toHaveValue(
+        rejectedRevision,
+      );
+      await expect(
+        page.getByRole("link", { name: "Cargar valores actuales" }),
+      ).toBeVisible();
+    }
+    await page.locator('[data-confirm-fallback="publish"] summary').click();
+    const publication = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === path,
+    );
+    await page.getByRole("button", { name: "Confirmar publicación" }).click();
+    expect((await publication).status()).toBe(409);
+    const peerPage = await peer.newPage();
+    await peerPage.goto(path);
+    await expect(peerPage.getByLabel("Descripción")).toHaveValue(
+      "Descripción guardada por otro admin",
+    );
+    await expect(peerPage.getByLabel("Instructor (opcional)")).toHaveValue(
+      "Instructor guardado por otro admin",
+    );
+    await expect(peerPage.locator("[data-course-status]")).toHaveText(
+      "Borrador",
+    );
+    await page.getByRole("link", { name: "Cargar valores actuales" }).click();
+    await expect(form.getByLabel("Descripción")).toHaveValue(
+      "Descripción guardada por otro admin",
+    );
+    await expect(form.getByLabel("Instructor (opcional)")).toHaveValue(
+      "Instructor guardado por otro admin",
+    );
+    await expect(form.locator('input[name="revision"]')).toHaveValue(
+      peerRevision,
+    );
+    await expect(
+      page.getByRole("link", { name: "Cargar valores actuales" }),
+    ).toHaveCount(0);
+  } finally {
+    await peer.close();
+  }
+});
+
 test("new courses preserve values and can be corrected after server validation without JavaScript", async ({
   page,
   context,
@@ -249,6 +373,7 @@ test("used formats require confirmation to deactivate without JavaScript", async
     headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
     form: {
       name: `Curso sin JS ${Date.now()}`,
+      requestKey: crypto.randomUUID(),
       description: "Curso asociado para comprobar la confirmación.",
       level: "INTERMEDIATE",
       courseTypeId: path.split("/").at(-1)!,

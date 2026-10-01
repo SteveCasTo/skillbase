@@ -269,8 +269,12 @@ const successKey = Astro.url.searchParams.get("success");
           </p>
         </div>
         <div data-format-action>
-          {format.used && (
-            <form method="post" data-action-form hidden={format.active}>
+          {
+            <form
+              method="post"
+              data-action-form
+              hidden={!format.used || format.active}
+            >
               <input
                 type="hidden"
                 name="revisionId"
@@ -285,7 +289,7 @@ const successKey = Astro.url.searchParams.get("success");
                 Activar formato
               </button>
             </form>
-          )}
+          }
           <>
             <button
               type="button"
@@ -395,6 +399,14 @@ const successKey = Astro.url.searchParams.get("success");
         hidden
         class="mt-4 rounded-lg border border-destructive/40 p-4 text-sm text-destructive"
       ></p>
+      <button
+        type="button"
+        data-action-retry
+        hidden
+        class="mt-3 min-h-11 rounded-lg border px-4 text-sm font-semibold"
+      >
+        Reintentar acción
+      </button>
       {successKey && success[successKey] && (
         <noscript>
           <p
@@ -537,9 +549,12 @@ const successKey = Astro.url.searchParams.get("success");
   )}
   <script>
     import { navigate } from "astro:transitions/client";
-    import { sileo } from "sileo";
+    import { notifications } from "@/lib/notifications";
+    import { isRevision, isUuid } from "@/domain/courses/mutation-result";
     document.addEventListener("astro:page-load", () => {
       type FormatResult = {
+        id: string;
+        revisionNumber: number;
         name: string;
         active: boolean;
         used: boolean;
@@ -557,7 +572,10 @@ const successKey = Astro.url.searchParams.get("success");
         errors?: Record<string, string>;
       };
       const mutation = async (form: HTMLFormElement, field?: string) => {
-        const response = await fetch(window.location.pathname, {
+        const intent = form.querySelector<HTMLInputElement>(
+          'input[name="intent"]',
+        )?.value;
+        const response = await fetch(mutationPath, {
           method: "POST",
           headers: { Accept: "application/json" },
           body: new FormData(form),
@@ -569,16 +587,70 @@ const successKey = Astro.url.searchParams.get("success");
           throw new Error(
             "La sesión cambió. Recarga la página e inténtalo de nuevo.",
           );
-        const result = (await response.json()) as MutationResult;
+        const payload: unknown = await response.json();
+        if (!payload || typeof payload !== "object" || Array.isArray(payload))
+          throw new Error(
+            "No se pudo confirmar el cambio. Inténtalo nuevamente.",
+          );
+        const result = payload as MutationResult;
         if (!response.ok)
           throw new Error(
             (field && result.errors?.[field]) ||
               result.message ||
               "No se pudo guardar el cambio. Inténtalo nuevamente.",
           );
+        if (
+          intent === "delete"
+            ? result.deleted !== true || result.format !== undefined
+            : result.deleted !== undefined ||
+              !result.format ||
+              !isUuid(result.format.id) ||
+              result.format.id !==
+                mutationPath.split("/").filter(Boolean).at(-1) ||
+              !Number.isInteger(result.format.revisionNumber) ||
+              result.format.revisionNumber < 1 ||
+              result.format.revisionNumber > 2147483647 ||
+              typeof result.format.name !== "string" ||
+              !result.format.name.trim() ||
+              !isUuid(result.format.revisionId) ||
+              !isRevision(result.format.updatedAt) ||
+              typeof result.format.active !== "boolean" ||
+              typeof result.format.used !== "boolean" ||
+              !Number.isInteger(result.format.totalHours) ||
+              result.format.totalHours < 1 ||
+              result.format.totalHours > 2147483647 ||
+              (result.format.sessionMinutes !== null &&
+                (!Number.isInteger(result.format.sessionMinutes) ||
+                  result.format.sessionMinutes < 15 ||
+                  result.format.sessionMinutes > 480)) ||
+              typeof result.format.studentAmount !== "string" ||
+              !/^(?:0|[1-9][0-9]{0,9})(?:\.[0-9]{1,2})?$/.test(
+                result.format.studentAmount,
+              ) ||
+              typeof result.format.externalAmount !== "string" ||
+              !/^(?:0|[1-9][0-9]{0,9})(?:\.[0-9]{1,2})?$/.test(
+                result.format.externalAmount,
+              )
+        )
+          throw new Error(
+            "No se pudo confirmar el cambio. Inténtalo nuevamente.",
+          );
+        if (
+          (intent === "activate" && result.format?.active !== true) ||
+          (intent === "deactivate" && result.format?.active !== false)
+        )
+          throw new Error(
+            "No se pudo confirmar el estado del formato. Inténtalo nuevamente.",
+          );
         return result;
       };
-      const renderFormat = (current: FormatResult) => {
+      let pending = false;
+      const mutationPath = window.location.pathname;
+      const originalValue = document.querySelector<HTMLElement>(
+        '[data-format-value="name"]',
+      );
+      const renderFormat = (current: FormatResult, field?: string) => {
+        if (!originalValue?.isConnected) return;
         document
           .querySelectorAll<HTMLInputElement>('input[name="revisionId"]')
           .forEach((control) => (control.value = current.revisionId));
@@ -592,6 +664,7 @@ const successKey = Astro.url.searchParams.get("success");
           "studentAmount",
           "externalAmount",
         ] as const) {
+          if (field && key !== field) continue;
           const value = String(current[key]);
           const label = document.querySelector<HTMLElement>(
             `[data-format-value="${key}"]`,
@@ -602,11 +675,17 @@ const successKey = Astro.url.searchParams.get("success");
             `#edit-${key}`,
           );
           if (control) {
-            control.value = value;
+            if (
+              field === key ||
+              (control.value === control.dataset.persistedValue &&
+                !control.closest("details")?.open)
+            )
+              control.value = value;
             control.dataset.persistedValue = value;
           }
         }
-        document.querySelector("main h1")!.textContent = current.name;
+        if (!field || field === "name")
+          document.querySelector("main h1")!.textContent = current.name;
         document.querySelector<HTMLElement>(
           'nav[aria-label="Ruta de navegación"] [aria-current="page"]',
         )!.textContent = current.name;
@@ -616,7 +695,6 @@ const successKey = Astro.url.searchParams.get("success");
         document
           .querySelectorAll<HTMLDetailsElement>("dd details")
           .forEach((details) => {
-            details.open = false;
             details.hidden = !current.active;
           });
         const action = document.querySelector<HTMLElement>(
@@ -630,8 +708,36 @@ const successKey = Astro.url.searchParams.get("success");
         const fallback = action?.querySelector<HTMLDetailsElement>(
           "[data-action-fallback]",
         );
-        if (actionForm) actionForm.hidden = current.active;
-        if (trigger) trigger.hidden = !current.active;
+        if (actionForm) actionForm.hidden = !current.used || current.active;
+        if (trigger) {
+          trigger.hidden = current.used && !current.active;
+          trigger.textContent = current.used
+            ? "Desactivar formato"
+            : "Eliminar formato";
+        }
+        const dialog = document.querySelector<HTMLDialogElement>(
+          "[data-action-dialog]",
+        );
+        if (dialog) {
+          dialog.querySelector<HTMLElement>(
+            "#action-dialog-title",
+          )!.textContent = current.used
+            ? "¿Desactivar formato?"
+            : "¿Eliminar formato?";
+          dialog.querySelector<HTMLElement>(
+            "#action-dialog-description",
+          )!.textContent = current.used
+            ? "No se podrá elegir este formato en nuevos cursos."
+            : "Se eliminará el formato y todas sus revisiones sin uso. No se puede deshacer.";
+          dialog.querySelector<HTMLInputElement>(
+            'input[name="intent"]',
+          )!.value = current.used ? "deactivate" : "delete";
+          dialog.querySelector<HTMLButtonElement>(
+            'button[type="submit"]',
+          )!.textContent = current.used
+            ? "Sí, desactivar formato"
+            : "Sí, eliminar formato";
+        }
         if (fallback) fallback.hidden = true;
         document.title = `${current.name} | SkillBase`;
       };
@@ -720,7 +826,19 @@ const successKey = Astro.url.searchParams.get("success");
             const submit = form.querySelector<HTMLButtonElement>(
               'button[type="submit"]',
             );
-            if (!field || !input || !submit || !form.reportValidity()) return;
+            if (
+              !field ||
+              !input ||
+              !submit ||
+              pending ||
+              !form.reportValidity()
+            )
+              return;
+            pending = true;
+            const wasReadOnly = input.readOnly;
+            input.readOnly = true;
+            const wasCancelDisabled = cancel.disabled;
+            cancel.disabled = true;
             submit.disabled = true;
             submit.setAttribute("aria-busy", "true");
             form.querySelector<HTMLElement>(`#error-${field}`)?.remove();
@@ -728,7 +846,24 @@ const successKey = Astro.url.searchParams.get("success");
             input.removeAttribute("aria-describedby");
             void (async () => {
               try {
-                const result = await mutation(form, field);
+                const result = await notifications.promise(
+                  () => mutation(form, field),
+                  {
+                    loading: { title: "Guardando…" },
+                    success: {
+                      title:
+                        field === "name"
+                          ? "Nombre actualizado."
+                          : "Nueva revisión guardada. Los borradores usan los valores vigentes.",
+                    },
+                    error: (failure) => ({
+                      title:
+                        failure instanceof Error
+                          ? failure.message
+                          : "No se pudo guardar el cambio.",
+                    }),
+                  },
+                );
                 if (!result.format) {
                   const message =
                     "No se pudo guardar el cambio. Inténtalo nuevamente.";
@@ -741,16 +876,11 @@ const successKey = Astro.url.searchParams.get("success");
                   input.setAttribute("aria-describedby", error.id);
                   return;
                 }
-                renderFormat(result.format);
+                const returnFocus = details.contains(document.activeElement);
+                renderFormat(result.format, field);
                 details.open = false;
-                details.querySelector<HTMLElement>("summary")?.focus();
-                sileo.success({
-                  title:
-                    field === "name"
-                      ? "Nombre actualizado."
-                      : "Nueva revisión guardada. Los borradores usan los valores vigentes.",
-                  duration: 6000,
-                });
+                if (returnFocus)
+                  details.querySelector<HTMLElement>("summary")?.focus();
               } catch (failure) {
                 const error = document.createElement("p");
                 error.id = `error-${field}`;
@@ -763,6 +893,9 @@ const successKey = Astro.url.searchParams.get("success");
                 input.setAttribute("aria-invalid", "true");
                 input.setAttribute("aria-describedby", error.id);
               } finally {
+                pending = false;
+                input.readOnly = wasReadOnly;
+                cancel.disabled = wasCancelDisabled;
                 submit.disabled = false;
                 submit.removeAttribute("aria-busy");
               }
@@ -783,11 +916,20 @@ const successKey = Astro.url.searchParams.get("success");
         document.querySelector<HTMLFormElement>("[data-action-form]");
       const dialogForm =
         document.querySelector<HTMLFormElement>("[data-dialog-form]");
+      let failedForm: HTMLFormElement | null = null;
+      const retry = document.querySelector<HTMLButtonElement>(
+        "[data-action-retry]",
+      );
+      retry?.addEventListener("click", () => {
+        if (!pending) failedForm?.requestSubmit();
+      });
       if (fallback && trigger) {
         fallback.hidden = true;
         trigger.hidden = Boolean(actionForm && !actionForm.hidden);
       }
-      trigger?.addEventListener("click", () => dialog?.showModal());
+      trigger?.addEventListener("click", () => {
+        if (!pending) dialog?.showModal();
+      });
       dialog
         ?.querySelector<HTMLButtonElement>("[data-dialog-cancel]")
         ?.addEventListener("click", () => dialog.close());
@@ -798,31 +940,50 @@ const successKey = Astro.url.searchParams.get("success");
           const submit = form.querySelector<HTMLButtonElement>(
             'button[type="submit"]',
           );
-          if (!submit) return;
+          if (!submit || pending) return;
+          pending = true;
+          if (retry) retry.hidden = true;
+          dialog?.close();
           submit.disabled = true;
           submit.setAttribute("aria-busy", "true");
           if (error) error.hidden = true;
           void (async () => {
             try {
-              const result = await mutation(form);
+              const result = await notifications.promise(() => mutation(form), {
+                loading: { title: "Guardando…" },
+                success: (result) => ({
+                  title: result.deleted
+                    ? "Formato eliminado."
+                    : result.format?.active
+                      ? "Formato activado."
+                      : "Formato desactivado.",
+                }),
+                error: (failure) => ({
+                  title:
+                    failure instanceof Error
+                      ? failure.message
+                      : "No se pudo guardar el cambio.",
+                }),
+              });
               if (result.deleted) {
                 dialog?.close();
-                await navigate("/app/formatos?success=deleted");
+                if (form.isConnected) await navigate("/app/formatos");
               } else if (result.format) {
                 renderFormat(result.format);
                 dialog?.close();
-                if (form === actionForm) trigger?.focus();
-                sileo.success({
-                  title: result.format.active
-                    ? "Formato activado."
-                    : "Formato desactivado.",
-                  duration: 6000,
-                });
+                if (
+                  form === actionForm &&
+                  (form.contains(document.activeElement) ||
+                    document.activeElement === document.body)
+                )
+                  trigger?.focus();
               } else
                 throw new Error(
                   "No se pudo guardar el cambio. Inténtalo nuevamente.",
                 );
             } catch (failure) {
+              failedForm = form;
+              if (retry) retry.hidden = false;
               if (error) {
                 error.textContent =
                   failure instanceof Error
@@ -833,6 +994,7 @@ const successKey = Astro.url.searchParams.get("success");
               dialog?.close();
               error?.focus();
             } finally {
+              pending = false;
               submit.disabled = false;
               submit.removeAttribute("aria-busy");
             }
@@ -855,7 +1017,7 @@ const successKey = Astro.url.searchParams.get("success");
       const message = success ? messages[success] : undefined;
       if (message) {
         {
-          sileo.success({ title: message, duration: 6000 });
+          notifications.success({ title: message, duration: 6000 });
           const url = new URL(window.location.href);
           url.searchParams.delete("success");
           window.history.replaceState(

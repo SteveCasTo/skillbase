@@ -5,6 +5,8 @@ import "@/styles/private-nav.css";
 import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 
 import PrivateNavigation from "@/components/private-nav/PrivateNavigation.astro";
+import NavigationSkeleton from "@/components/private-nav/NavigationSkeleton.astro";
+import ThemeToggle from "@/components/ThemeToggle.astro";
 import { hasRole } from "@/domain/auth/policies";
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import { requireInternalUser } from "@/server/auth/context";
@@ -70,6 +72,7 @@ const currentPath = Astro.url.pathname;
                 aria-hidden="true"
               />
             </button>
+            <ThemeToggle class="private-action private-theme-toggle" />
             <form method="post" action="/auth/logout">
               <button
                 class="private-action"
@@ -133,16 +136,19 @@ const currentPath = Astro.url.pathname;
           <div class="private-mobile-footer">
             <p class="truncate text-sm font-semibold">{user.name}</p>
             <p class="truncate text-xs text-muted-foreground">{user.email}</p>
-            <form method="post" action="/auth/logout">
-              <button
-                class="private-action"
-                type="submit"
-                aria-label="Cerrar sesión"
-                title="Cerrar sesión"
-              >
-                <LogOut size={19} aria-hidden="true" />
-              </button>
-            </form>
+            <div class="private-mobile-actions">
+              <form method="post" action="/auth/logout">
+                <button
+                  class="private-action"
+                  type="submit"
+                  aria-label="Cerrar sesión"
+                  title="Cerrar sesión"
+                >
+                  <LogOut size={19} aria-hidden="true" />
+                </button>
+              </form>
+              <ThemeToggle class="private-action private-theme-toggle" />
+            </div>
           </div>
         </aside>
       </div>
@@ -151,16 +157,27 @@ const currentPath = Astro.url.pathname;
           id="main-content"
           class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10"
         >
-          <slot />
+          <div data-private-page>
+            <slot />
+          </div>
+          <NavigationSkeleton />
         </main>
       </div>
     </div>
   </div>
   <script>
+    let navigationListeners: AbortController | undefined;
+    document.addEventListener("astro:before-swap", () => {
+      navigationListeners?.abort();
+      document.body.classList.remove("private-drawer-open");
+    });
     const initializePrivateNavigation = () => {
       const shell = document.querySelector<HTMLElement>("[data-private-shell]");
       if (shell && shell.dataset.navigationInitialized !== "true") {
         shell.dataset.navigationInitialized = "true";
+        navigationListeners?.abort();
+        navigationListeners = new AbortController();
+        const { signal } = navigationListeners;
         const toggle = shell.querySelector<HTMLButtonElement>(
           "[data-sidebar-toggle]",
         );
@@ -232,17 +249,21 @@ const currentPath = Astro.url.pathname;
             closePreview();
           }
         });
-        document.addEventListener("keydown", (event) => {
-          if (event.key === "Tab") keyboardFocus = true;
-          if (event.key === "Escape") {
-            if (drawer && !drawer.hidden) closeDrawer();
-            else if (shell.dataset.preview === "true") {
-              closePreview();
-              keyboardFocus = false;
-              toggle?.focus();
+        document.addEventListener(
+          "keydown",
+          (event) => {
+            if (event.key === "Tab") keyboardFocus = true;
+            if (event.key === "Escape") {
+              if (drawer && !drawer.hidden) closeDrawer();
+              else if (shell.dataset.preview === "true") {
+                closePreview();
+                keyboardFocus = false;
+                toggle?.focus();
+              }
             }
-          }
-        });
+          },
+          { signal },
+        );
         sidebar?.addEventListener("pointerdown", () => {
           keyboardFocus = false;
         });
@@ -262,6 +283,37 @@ const currentPath = Astro.url.pathname;
             if (drawer.dataset.state === "closed") drawer.hidden = true;
           });
         };
+        document.addEventListener(
+          "astro:before-preparation",
+          (event) => {
+            const needsFocusRecovery =
+              drawer?.dataset.state === "open" &&
+              drawer.contains(document.activeElement);
+            closeDrawer(false);
+            if (!needsFocusRecovery) return;
+            let recovered = false;
+            const recover = () => {
+              if (recovered) return;
+              recovered = true;
+              if (shell.isConnected && openButton?.isConnected)
+                openButton.focus({ preventScroll: true });
+            };
+            event.signal.addEventListener("abort", recover, { once: true });
+            const loader = event.loader;
+            event.loader = async () => {
+              try {
+                await loader();
+                if (event.defaultPrevented || event.signal.aborted) recover();
+              } catch (error) {
+                recover();
+                throw error;
+              } finally {
+                event.signal.removeEventListener("abort", recover);
+              }
+            };
+          },
+          { signal },
+        );
         openButton?.addEventListener("click", () => {
           if (!drawer) return;
           returnFocus = openButton;
@@ -278,11 +330,13 @@ const currentPath = Astro.url.pathname;
           .forEach((button) =>
             button.addEventListener("click", () => closeDrawer()),
           );
-        window
-          .matchMedia("(min-width: 1024px)")
-          .addEventListener("change", (event) => {
+        window.matchMedia("(min-width: 1024px)").addEventListener(
+          "change",
+          (event) => {
             if (event.matches) closeDrawer(false);
-          });
+          },
+          { signal },
+        );
         drawer?.addEventListener("keydown", (event) => {
           if (event.key !== "Tab") return;
           const focusable = Array.from(

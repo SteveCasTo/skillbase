@@ -195,6 +195,11 @@ export const courses = pgTable(
     }),
     minimumGrade: integer("minimum_grade").notNull(),
     status: courseStatus("status").notNull().default("DRAFT"),
+    createActorId: uuid("create_actor_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    createRequestKey: uuid("create_request_key"),
+    createFingerprint: text("create_fingerprint"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -204,6 +209,14 @@ export const courses = pgTable(
   },
   (table) => [
     uniqueIndex("courses_slug_unique").on(table.slug),
+    uniqueIndex("courses_create_request_unique").on(
+      table.createActorId,
+      table.createRequestKey,
+    ),
+    check(
+      "courses_create_request_check",
+      sql`(${table.createActorId} is null and ${table.createRequestKey} is null and ${table.createFingerprint} is null) or (${table.createActorId} is not null and ${table.createRequestKey} is not null and ${table.createFingerprint} is not null and ${table.createFingerprint} ~ '^[0-9a-f]{64}$')`,
+    ),
     index("courses_status_idx").on(table.status),
     index("courses_status_created_at_idx").on(table.status, table.createdAt),
     index("courses_course_type_revision_idx").on(table.courseTypeRevisionId),

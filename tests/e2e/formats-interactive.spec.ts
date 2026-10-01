@@ -63,9 +63,9 @@ test("create form filters edits and enables submit only for valid required value
   await expect(
     page.getByRole("link", { name: new RegExp(formatName) }),
   ).toBeVisible();
-  await expect(page.locator("[data-sileo-toast]")).toContainText(
-    "Formato creado",
-  );
+  await expect(
+    page.locator("[data-sileo-toast]").filter({ hasText: "Formato creado" }),
+  ).toBeVisible();
 });
 
 test("inline editing swaps icons in the same row, filters input and cancels without navigation", async ({
@@ -159,19 +159,94 @@ test("inline editing swaps icons in the same row, filters input and cancels with
   await page.evaluate(() => {
     (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
   });
+  await page.locator('summary[aria-label="Editar precio externo"]').click();
+  const otherEditor = page.getByRole("form", { name: "Editar precio externo" });
+  await otherEditor.getByLabel("Nuevo precio externo").fill("123.45");
+  await otherEditor.evaluate((node) => {
+    (
+      window as Window & { retainedFormatEditor?: Element }
+    ).retainedFormatEditor = node;
+  });
+  let samePageGets = 0;
+  page.on("request", (request) => {
+    if (request.method() === "GET" && new URL(request.url()).pathname === path)
+      samePageGets++;
+  });
+  let releaseSave!: () => void;
+  const pendingSave = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+  let requests = 0;
+  await page.route(`**${path}`, async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    requests++;
+    const response = await route.fetch();
+    await pendingSave;
+    await route.fulfill({ response });
+  });
   await form.getByRole("button", { name: "Guardar precio estudiante" }).click();
+  await expect(input).toHaveJSProperty("readOnly", true);
+  await input.focus();
+  await input.press("9");
+  await expect(input).toHaveValue("90.25");
+  await otherEditor.getByLabel("Nuevo precio externo").focus();
+  releaseSave();
   await expect(page.getByText("90.25 BOB")).toBeVisible();
+  expect(requests).toBe(1);
+  await expect(form).toBeHidden();
+  await expect(edit).toBeVisible();
+  await expect(otherEditor.getByLabel("Nuevo precio externo")).toBeFocused();
+  await page.unroute(`**${path}`);
+  await expect(otherEditor).toBeVisible();
+  await expect(otherEditor.getByLabel("Nuevo precio externo")).toHaveValue(
+    "123.45",
+  );
+  expect(
+    await otherEditor.evaluate(
+      (node) =>
+        (window as Window & { retainedFormatEditor?: Element })
+          .retainedFormatEditor === node,
+    ),
+  ).toBe(true);
+  expect(samePageGets).toBe(0);
+  await otherEditor
+    .getByRole("button", { name: "Cancelar edición de precio externo" })
+    .click();
   expect(
     await page.evaluate(
       () =>
         (window as Window & { navigationMarker?: boolean }).navigationMarker,
     ),
   ).toBe(true);
+  await expect(form).toBeHidden();
+  await expect(edit).toBeVisible();
   await expect(page.locator('input[name="revisionId"]').first()).toHaveValue(
     /.+/,
   );
   await edit.click();
+  await expect(input).toBeEditable();
+  await expect(input).toHaveValue("90.25");
   await input.fill("95.00");
+  await page.route(`**${path}`, async (route) => {
+    if (route.request().method() === "POST")
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ deleted: true }),
+      });
+    else await route.continue();
+  });
+  await form.getByRole("button", { name: "Guardar precio estudiante" }).click();
+  await expect(form).toBeVisible();
+  await expect(form.locator("#error-studentAmount")).toContainText(
+    "No se pudo confirmar",
+  );
+  await expect(input).toHaveValue("95.00");
+  await expect(input).toBeEditable();
+  await page.unroute(`**${path}`);
   await form.getByRole("button", { name: "Guardar precio estudiante" }).click();
   await expect(page.getByText("95.00 BOB")).toBeVisible();
   const stale = await page.request.post(path, {
@@ -214,6 +289,48 @@ test("inline editing swaps icons in the same row, filters input and cancels with
   await page.getByRole("button", { name: "Cancelar", exact: true }).click();
   await expect(deleteButton).toBeFocused();
   await expect(dialog).toBeHidden();
+  const detailPath = new URL(page.url()).pathname;
+  let releaseFailure!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    releaseFailure = resolve;
+  });
+  let attempts = 0;
+  await page.route(`**${detailPath}`, async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    attempts++;
+    await gate;
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "Fallo recuperable de prueba." }),
+    });
+  });
+  await deleteButton.click();
+  await dialog.getByRole("button", { name: "Sí, eliminar formato" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(
+    page.locator("[data-sileo-toast]").filter({ hasText: "Guardando" }),
+  ).toBeVisible();
+  await page
+    .locator("[data-dialog-form]")
+    .evaluate((form) =>
+      form.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      ),
+    );
+  releaseFailure();
+  await expect(page.locator("[data-action-error]")).toContainText(
+    "Fallo recuperable de prueba.",
+  );
+  expect(attempts).toBe(1);
+  await expect(
+    page.getByRole("button", { name: "Reintentar acción" }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await page.unroute(`**${detailPath}`);
   await deleteButton.click();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
@@ -293,6 +410,7 @@ test("used formats toggle availability in place and disable editors while inacti
     headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
     form: {
       name: `Curso formato en uso ${Date.now()}`,
+      requestKey: crypto.randomUUID(),
       description: "Curso para probar el estado del formato asociado.",
       level: "INTERMEDIATE",
       courseTypeId: id,
@@ -312,6 +430,9 @@ test("used formats toggle availability in place and disable editors while inacti
   await page.evaluate(() => {
     (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
   });
+  await page.locator('summary[aria-label="Editar nombre"]').click();
+  const nameEditor = page.getByRole("form", { name: "Editar nombre" });
+  await nameEditor.getByLabel("Nuevo nombre").fill(`${name} pendiente`);
   await page.getByRole("button", { name: "Desactivar formato" }).click();
   const dialog = page.getByRole("dialog", { name: "¿Desactivar formato?" });
   await expect(dialog).toBeVisible();
@@ -331,9 +452,10 @@ test("used formats toggle availability in place and disable editors while inacti
   ).toBe(true);
   await page.getByRole("button", { name: "Activar formato" }).click();
   await expect(page.locator("[data-format-status]")).toHaveText("Activo");
-  await expect(
-    page.locator('summary[aria-label="Editar nombre"]'),
-  ).toBeVisible();
+  await expect(nameEditor).toBeVisible();
+  await expect(nameEditor.getByLabel("Nuevo nombre")).toHaveValue(
+    `${name} pendiente`,
+  );
   await expect(
     page.getByRole("button", { name: "Desactivar formato" }),
   ).toBeVisible();

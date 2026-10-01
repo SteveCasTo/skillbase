@@ -232,6 +232,14 @@ La implementación original guardaba `totalHours` y precios directamente por cur
 - [x] Incorporar la fotografía opcional con upload/storage administrativo, conservando el fallback gráfico de Cota Activa.
 - [ ] Ejecutar la revisión de cierre del gate y actualizar la documentación con el estado real.
 
+#### Avance de experiencia privada (fix/private-app-feedback)
+
+La implementación local cubre skeleton SSR vinculado a carga real y viewport visible, con conservación de foco, cancelación, errores y movimiento reducido. El selector de tema queda oculto en el rail colapsado; tema y preferencia toleran almacenamiento no disponible. La inicialización evita discrepancias de hidratación. Los productores administrativos usan `src/lib/notifications.ts`, con UUID independiente por operación y el mismo ID entre loading/success/error. JavaScript permanece habilitado como mejora progresiva; los tests sin JavaScript verifican fallbacks HTML, y las animaciones del sidebar se mantienen.
+
+Grupos y formatos actualizan localmente con bloqueo contra acciones duplicadas y conservan foco/datos para recuperación. El alta admite `requestKey` UUID persistente por actor/fingerprint: repetir la solicitud devuelve el curso creado y cambiar los datos con la misma clave se rechaza. La carga de artwork permite recuperar el borrador sin sobrescritura silenciosa. El bloqueo de fila del repositorio protege las ediciones; fixtures históricos sin revisión opcional conservan compatibilidad. Migración 0010 añade metadatos a `courses`, sin limpieza automática de historial.
+
+Validación local: unit 108 PASS; integration 54 PASS; lint PASS; typecheck PASS (0 errores, 47 hints; helper full-check posterior también PASS); build PASS (20:55); drizzle-kit check, schema checks, formatter de archivos modificados y `git diff --check` PASS. E2E: primera corrida 76/82; tras corregir cinco selectores y un ID de biblioteca, rerun completo 81/82 con un fallo del selector toast de `public-courses`; prueba dirigida `public-courses` 4/4 PASS, incluido ese escenario. Hay cobertura colectiva de los 82 escenarios, pero no se afirma una corrida completa 82/82. El gate previo a Fase 3 queda implementado y validado localmente por la cobertura colectiva; PR 104 está listo para integración a `development`, que queda pendiente de ejecutar por el orquestador. No hay afirmación de CI/cloud remoto ni de aplicación de migración 0010 en desarrollo/cloud; solo se aplicó en el stack aislado de tests. Fase 3 permanece sin implementar y su checklist no cambia. El gate remoto/cloud histórico de Fase 2 tampoco cambia.
+
 #### Alcance acordado para completar 2B (2026-09-24)
 
 Estas decisiones precisan el alcance acordado. El estado actualizado distingue implementación disponible de cierre/verificación del gate.
@@ -331,20 +339,20 @@ La landing presenta el sistema, el catálogo muestra automáticamente los cursos
 
 Administración crea y publica un curso; este aparece automáticamente en una experiencia pública completa sin exponer borradores ni información administrativa.
 
-## GATE PREVIO A FASE 3 — EXPERIENCIA PRIVADA
+## GATE PREVIO A FASE 3 - EXPERIENCIA PRIVADA
 
-Antes de implementar el registro público de interesados, corregir y verificar el flujo existente de `/app`. Este checklist expresa trabajo pendiente, no resultados verificados:
+La experiencia privada existente está implementada y validada localmente para esta entrega; la integración de PR 104 hacia `development` queda pendiente. El registro público de interesados de Fase 3 sigue sin implementar.
 
-- [ ] Incorporar skeletons reales durante las cargas estructurales de `/app`, vinculados al estado de carga y no a una demora decorativa.
-- [ ] Usar Sileo para feedback transitorio de todas las mutaciones, con estados pending, success y error, sin sustituir los errores junto a los campos.
-- [ ] Evitar recargar la página o rerenderizar la vista completa por cada cambio de campo, cambio de estado o eliminación; actualizar únicamente el estado y contenido afectados, conservando foco y valores.
-- [ ] Cerrar las confirmaciones al aceptar; la request continúa con feedback pending/success/error independiente del diálogo.
-- [ ] Prevenir envíos y acciones duplicados mientras la operación está pendiente; permitir recuperar errores y reintentar sin perder datos ni dejar controles bloqueados.
-- [ ] Ubicar el toggle de tema en el sidebar entre el control de colapso y logout; ocultarlo cuando el rail está cerrado y mantener su acceso en la navegación expandida y móvil.
-- [ ] Verificar estos comportamientos en las mutaciones existentes, incluidos formularios, cambios de estado y eliminaciones permitidas, con pruebas de regresión, responsive y teclado.
-- [ ] Revisar el bloque, corregir los hallazgos y registrar evidencia antes de abrir la implementación de Fase 3.
+- [x] Incorporar skeletons reales durante las cargas estructurales de `/app`, vinculados al estado de carga y no a una demora decorativa.
+- [x] Usar Sileo para feedback transitorio de mutaciones, con estados pending, success y error, sin sustituir errores junto a campos.
+- [x] Actualizar el contenido afectado sin recarga completa, conservando foco y valores.
+- [x] Cerrar confirmaciones al aceptar; la request continúa con feedback independiente.
+- [x] Prevenir acciones duplicadas y permitir recuperar errores/reintentar sin perder datos.
+- [x] Ubicar el toggle de tema en el sidebar expandido y menú móvil, oculto al cerrar el rail.
+- [x] Verificar responsive y teclado mediante cobertura E2E colectiva: full rerun 81/82 más prueba dirigida 4/4 de `public-courses`; no se afirma full 82/82.
+- [x] Completar implementación y validación local. La integración del PR hacia `development` queda pendiente; esto no implica gates remotos/cloud ni inicio de Fase 3.
 
-Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión final del gate de Fase 2B) siguen pendientes según su registro anterior. Este plan no los revalida ni declara cerrado ese gate.
+Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión final del gate de Fase 2B) siguen pendientes según su registro anterior. Este avance no los revalida ni declara cerrado ese gate.
 
 ## FASE 3 — REGISTRO DE INTERESADOS (SIN PAGO)
 

@@ -488,3 +488,12 @@ Antes de crear un componente:
 - Las páginas de alta, edición y configuración de formatos muestran una ruta de navegación semántica hacia Resumen y Cursos, en lugar de depender de un único enlace «Volver». Las operaciones administrativas siguen renderizadas por servidor y las confirmaciones de éxito no sustituyen errores persistentes de formulario.
 - La diferencia de escala entre convocatoria principal y afiches secundarios debe expresar prioridad editorial, no convertir el conjunto en una retícula uniforme de cards.
 - La referencia compositiva aprobada se conserva en `.impeccable/mocks/decision/editorial-billboard.png`; la adaptación mobile está implementada y verificada en los breakpoints de la landing.
+
+### Cargas y mutaciones de la aplicación privada
+
+- Todos los productores de notificaciones administrativas usan la fachada `src/lib/notifications.ts`. Cada operación tiene ID UUID propio; una notificación promise conserva su ID entre loading, success y error para actualizar el aviso correcto.
+- JavaScript sigue habilitado como mejora progresiva en la aplicación. Los tests sin JavaScript validan fallbacks HTML/SSR, no una política de desactivar JavaScript. Las animaciones del sidebar siguen activas salvo las reglas existentes de movimiento reducido; no se suprimen globalmente.
+
+- La carga estructural de vistas privadas usa skeleton SSR según variante (lista, formulario, detalle o resumen), se muestra mientras el loader está pendiente y el contenido entra en viewport, y se cancela al resolver, abortar o fallar la navegación. Respeta foco/teclado y `prefers-reduced-motion`; no es una demora decorativa.
+- El selector de tema vive en el sidebar expandido y en el menú móvil, pero no queda visible ni enfocable en el rail cerrado. El tema se aplica tempranamente y se sincroniza tras navegaciones; si el almacenamiento del navegador está bloqueado, la interfaz conserva el cambio en memoria.
+- Las acciones de grupos mantienen una presentación local del DTO de curso y formatos, sin incluir enlaces de navegación ajenos a la vista. Los bloqueos de petición y los diálogos evitan duplicados; tras mutaciones se actualiza localmente la tarjeta/lista pertinente y se conserva el foco. Los controles de formato/cursos mantienen cambios de formulario ante errores y permiten reintento.

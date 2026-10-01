@@ -1,4 +1,6 @@
 import { requireRoles } from "@/application/auth/authorize";
+import { createHash } from "node:crypto";
+import { isUuid } from "@/domain/courses/mutation-result";
 import type { CourseRepository } from "@/application/courses/course-repository";
 import { AuthorizationError } from "@/domain/auth/errors";
 import type { InternalUser } from "@/domain/auth/types";
@@ -37,6 +39,7 @@ export async function createCourse(
   repository: CourseRepository,
   user: InternalUser,
   input: CourseInput,
+  requestKey?: string,
 ) {
   requireAdmin(user);
   const data = validateCourseData(input);
@@ -48,13 +51,33 @@ export async function createCourse(
         weekdays: "Las clases deben ser de lunes a viernes.",
       },
     );
-  if (data.weekdaysMask != null && data.startsAt.getTime() < Date.now())
+  if (
+    requestKey === undefined &&
+    data.weekdaysMask != null &&
+    data.startsAt.getTime() < Date.now()
+  )
     throw new CourseDomainError(
       "VALIDATION_FAILED",
       "El inicio de un curso nuevo debe ser futuro.",
       { startsAt: "Selecciona una fecha futura." },
     );
-  return repository.create(data, user.id);
+  if (requestKey !== undefined && !isUuid(requestKey))
+    throw new CourseDomainError(
+      "VALIDATION_FAILED",
+      "La clave de solicitud no es válida.",
+    );
+  const fingerprint = createHash("sha256")
+    .update(
+      JSON.stringify(
+        Object.entries(data).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+      ),
+    )
+    .digest("hex");
+  return repository.create(
+    data,
+    user.id,
+    requestKey ? { key: requestKey, fingerprint } : undefined,
+  );
 }
 
 export async function updateCourse(
@@ -76,36 +99,50 @@ export async function publishCourse(
   repository: CourseRepository,
   user: InternalUser,
   id: string,
+  revision: string,
 ) {
   requireAdmin(user);
-  return repository.transition(id, "PUBLISHED", user.id);
+  return repository.transition(
+    id,
+    "PUBLISHED",
+    user.id,
+    parseRevision(revision),
+  );
 }
 
 export async function withdrawCourse(
   repository: CourseRepository,
   user: InternalUser,
   id: string,
+  revision: string,
 ) {
   requireAdmin(user);
-  return repository.transition(id, "DRAFT", user.id);
+  return repository.transition(id, "DRAFT", user.id, parseRevision(revision));
 }
 
 export async function archiveCourse(
   repository: CourseRepository,
   user: InternalUser,
   id: string,
+  revision: string,
 ) {
   requireAdmin(user);
-  return repository.transition(id, "ARCHIVED", user.id);
+  return repository.transition(
+    id,
+    "ARCHIVED",
+    user.id,
+    parseRevision(revision),
+  );
 }
 
 export async function featureCourse(
   repository: CourseRepository,
   user: InternalUser,
   id: string,
+  revision: string,
 ) {
   requireAdmin(user);
-  return repository.setFeatured(id, user.id);
+  return repository.setFeatured(id, user.id, parseRevision(revision));
 }
 
 export async function listAdminCourses(
