@@ -238,7 +238,7 @@ La implementación local cubre skeleton SSR vinculado a carga real y viewport vi
 
 Grupos y formatos actualizan localmente con bloqueo contra acciones duplicadas y conservan foco/datos para recuperación. El alta admite `requestKey` UUID persistente por actor/fingerprint: repetir la solicitud devuelve el curso creado y cambiar los datos con la misma clave se rechaza. La carga de artwork permite recuperar el borrador sin sobrescritura silenciosa. El bloqueo de fila del repositorio protege las ediciones; fixtures históricos sin revisión opcional conservan compatibilidad. Migración 0010 añade metadatos a `courses`, sin limpieza automática de historial.
 
-Validación local registrada para el bloque privado (histórica): unit 108 PASS; integration 54 PASS; lint/typecheck/build y checks de schema/formatter PASS. E2E: rerun 81/82 y revalidación dirigida `public-courses` 4/4; no se afirma una corrida completa 82/82. PR 104 se integró en `development` como `6fc81da`. La migración 0010 se aplicó a la base Supabase local estándar en `127.0.0.1:54322` mediante migración sin reset, preservando datos; no se aplicó a cloud. Fase 3 está en progreso, no finalizada; el gate remoto/cloud histórico de Fase 2 no cambia.
+Validación local registrada para el bloque privado (histórica): unit 108 PASS; integration 54 PASS; lint/typecheck/build y checks de schema/formatter PASS. E2E: rerun 81/82 y revalidación dirigida `public-courses` 4/4; no se afirma una corrida completa 82/82. PR 104 se integró en `development` como `6fc81da`. La migración 0010 se aplicó a la base Supabase local estándar en `127.0.0.1:54322` mediante migración sin reset, preservando datos; no se aplicó a cloud. El gate remoto/cloud histórico de Fase 2 no cambia.
 
 #### Alcance acordado para completar 2B (2026-09-24)
 
@@ -380,7 +380,7 @@ Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión f
 - [x] Especificar e implementar relaciones, restricciones e índices del agregado autónomo; el detalle permanece en el contrato técnico.
 - [x] Implementar validaciones y reglas de dominio independientes de HTTP/UI; las pruebas unitarias específicas del backend pasan 9/9.
 - [x] Implementar casos de uso y repositorio con escrituras transaccionales y prevención de duplicados; las pruebas de integración dirigidas pasan 11/11.
-- [x] Versionar la migración reproducible, constraints e índices; la verificación dirigida de integración pasa. La suite completa de integración continúa ejecutándose y la migración 0011 aún no se ha aplicado al Supabase local estándar.
+- [x] Versionar la migración reproducible, constraints e índices; la integración completa pasó y la migración 0011 se aplicó idempotentemente al Supabase local estándar. Cloud permanece pendiente.
 
 ### Checklist de interfaz pública
 
@@ -400,7 +400,8 @@ Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión f
 
 - [x] Implementar permisos server-side para operaciones administrativas y validación de entradas públicas.
 - [x] Implementar minimización de datos, errores públicos sanitizados, límite de body y rate limiter persistente atómico; la suite backend dirigida está verde.
-- [ ] Configurar y verificar el origen de red confiable y el secreto HMAC en el entorno de producción antes de habilitar el POST; su configuración cloud no está acreditada.
+- [x] Configurar presencia de `INTEREST_RATE_LIMIT_SECRET` server-only en Vercel Production/Preview y verificar estáticamente `Astro.clientAddress` mediante la cadena oficial Astro/Vercel. El valor no se registra.
+- [ ] Probar el POST y la resistencia a forwarded-header spoofing en runtime tras desplegar la versión nueva; producción aún sirve la versión anterior.
 - [ ] Definir política de conservación y anonimización de interesados, incluido el plazo; el cierre de disponibilidad no elimina registros y no se presume retención perpetua.
 - [x] Crear fixtures sintéticos y deterministas; unit e integración locales completos PASS.
 - [x] Añadir E2E público/administrativo para disponibilidad, duplicados, recuperación, permisos y accesibilidad; cobertura validada por corrida full y revalidaciones dirigidas descritas en `docs/TESTING.md`.
@@ -408,17 +409,25 @@ Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión f
 
 ### Checklist de PR y gate de cierre
 
-- [ ] Completar revisión por bloque y corrección conjunta de hallazgos antes de integrar los bloques dependientes.
-- [x] Crear PR 105 como draft hacia `development` con el alcance y los pendientes explícitos; integración/merge siguen pendientes.
+- [x] Resolver los hallazgos encontrados durante la validación del bloque; la corrección del cleanup de fixtures de cursos se hizo explícita y sin `CASCADE`.
+- [x] Integrar PR 105 a `development` (merge `0bf0979`, 2026-10-01). No implica promoción a `master`.
 - [x] Ejecutar formatter, lint, typecheck, unitarias, integración, E2E y build locales correspondientes; la cobertura E2E se compone de la corrida full 81/95 y las suites dirigidas, no de una corrida full 95/95.
-- [x] Registrar el estado real de validaciones locales y remotas; no se afirma resultado remoto/cloud.
-- [ ] Cerrar el milestone solo con contratos confirmados, flujo demostrado y gate revisado; promover a `master` mediante PR de release únicamente después de validar el milestone.
+- [x] Registrar el estado real local/cloud: secreto configurado y origen confiable revisado estáticamente; migraciones cloud y POST runtime aún sin verificar.
+- [x] Completar implementación y validación local del milestone Fase 3. La migración cloud 0010/0011, prueba runtime en producción y PR de release a `master` permanecen pendientes.
 
-### Estado actual y validación pendiente
+### Cierre de implementación local y pendientes de producción
 
-La implementación de Fase 3 y su validación local están completas. Full unit 129 PASS (793 assertions); full integration 65 PASS/0 FAIL (478 assertions, 9 archivos), después de corregir el cleanup de fixtures para incluir la tabla de interesados explícitamente, sin `CASCADE`; lint global PASS; typecheck PASS con 0 errores/0 warnings/70 hints; build y Drizzle checks PASS. E2E: corrida full 81/95 PASS, 14 fallos por fixtures de calendarios de cursos (12 respuestas 422) y carga de formatos (2). Después, sin cambios de código de producción, `courses` dirigido 2/2 PASS (47.9 s) y `interests` dirigido 13/13 PASS (1.1 min); las suites se solapan en un escenario de Auth. La evidencia combinada cubre escenarios que pasaron en full o dirigido; no se afirma un full run 95/95. Fallback sin JavaScript y navegación/animación mobile comprobados PASS. La migración 0011 solo se aplicó en el stack aislado de tests, no en Supabase local estándar ni cloud; no se requiere aplicarla allí para validar estas suites. La configuración cloud de `INTEREST_RATE_LIMIT_SECRET` server-only y la fuente confiable de `Astro.clientAddress` siguen sin verificarse, y son requisito antes de habilitar el POST en producción.
+La implementación de Fase 3 y su validación local están completas. Full unit 129 PASS (793 assertions); full integration 65 PASS/0 FAIL (478 assertions, 9 archivos), después de corregir el cleanup de fixtures para incluir la tabla de interesados explícitamente, sin `CASCADE`; lint global PASS; typecheck PASS con 0 errores/0 warnings/70 hints; build y Drizzle checks PASS. E2E: corrida full 81/95 PASS, 14 fallos por fixtures de calendarios de cursos (12 respuestas 422) y carga de formatos (2). Después, sin cambios de código de producción, `courses` dirigido 2/2 PASS (47.9 s) y `interests` dirigido 13/13 PASS (1.1 min); las suites se solapan en un escenario de Auth. La evidencia combinada cubre los 95 escenarios mediante la corrida full y revalidaciones dirigidas; no se afirma un full run 95/95. Fallback sin JavaScript y navegación/animación mobile comprobados PASS.
 
-PR 105 está abierto como draft hacia `development` (`https://github.com/SteveCasTo/skillbase/pull/105`). La rama publicada incluye los commits backend `3fea0df`, público `d8f714f`, administrativo `e903084` y ajuste de rutas Auth `6112080`. Su integración/merge queda pendiente del orquestador; no promover a `master`.
+La migración 0011 se aplicó de forma idempotente al Supabase local estándar `127.0.0.1:54322` sin reset; el rerun verificó el checksum `377bb93ab34a1e9745ff69823ee065f11183b7db7f5881337dedd99e9dfa72b6` y el ledger avanzó de 11 a 12. Ambas tablas nuevas tienen RLS. Antes/después se conservaron 7 cursos, 9 grupos, 1 usuario y 34 eventos de auditoría. Los datos sintéticos de intereses se eliminaron al terminar el smoke (0 filas de interesados; 2 buckets técnicos con TTL). El secreto local se guardó en `.env` ignorado y no se registra su valor; no se requirieron cambios tracked al arranque (`bun run dev` sin cambios) y el servidor quedó activo en `http://127.0.0.1:4321`. Smoke local: GET `/`, `/cursos` y curso demo devolvieron 200; dos POST sintéticos devolvieron 200 con mensaje neutro y `no-store`; el rate limit usó loopback y no aceptó un header forwarded falsificado.
+
+Cloud: se verificó presencia del secreto server-only en Vercel Production y Preview (no se registra el valor; Preview no tiene credenciales DB ni un despliegue funcional). La cadena Astro/Vercel confía en `Astro.clientAddress`; la plataforma sobrescribe el primer `X-Forwarded-For`, y la aplicación valida que el valor sea IP. Esta es verificación estática/documental: el POST contra runtime cloud y el spoof test aún no se han ejecutado. La migración cloud sigue pendiente en 0000–0009; 0010 y 0011 no aplicadas. Por lo tanto no se afirma release, migración cloud ni funcionamiento runtime de producción.
+
+PR 105 (`https://github.com/SteveCasTo/skillbase/pull/105`) se integró en `development` como `0bf0979` el 2026-10-01. La rama de feature incluyó los commits backend `3fea0df`, público `d8f714f`, administrativo `e903084` y ajuste de rutas Auth `6112080`. La preparación restante para producción y cualquier promoción a `master` siguen pendientes.
+
+#### Propuesta de conservación (no aprobada)
+
+Como propuesta de trabajo, anonimizar los datos de contacto doce meses después del cierre del curso y conservar solo métricas agregadas anónimas. El plazo y el tratamiento exacto no están aprobados por el usuario, no son requisito vigente ni están automatizados; la definición de gobierno de datos sigue pendiente para operación con datos reales. Esta propuesta no bloquea el cierre de implementación de Fase 3 en desarrollo.
 
 ### Baseline verificado de calidad
 

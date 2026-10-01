@@ -207,10 +207,23 @@ Antes de habilitar Auth cloud se debe verificar explícitamente:
 
 Estas comprobaciones quedaron aplicadas durante la Fase 1. La clave legacy `service_role` debe rotarse o deshabilitarse antes de operar con datos reales porque una inspección inicial del CLI la mostró completa aun sin solicitar `--reveal`.
 
-## REGISTRO PÚBLICO DE INTERESADOS: CONFIGURACIÓN PENDIENTE
+## REGISTRO PÚBLICO DE INTERESADOS: LOCAL LISTO, CLOUD PENDIENTE
 
 El POST público de interesados requiere `INTEREST_RATE_LIMIT_SECRET` server-only, generado fuera de la aplicación con al menos 32 caracteres; nunca debe tener prefijo `PUBLIC_`, registrarse en logs o llegar al navegador. `INTEREST_RATE_COURSE_LIMIT`/`INTEREST_RATE_COURSE_SECONDS` y `INTEREST_RATE_NETWORK_LIMIT`/`INTEREST_RATE_NETWORK_SECONDS` son enteros positivos opcionales; defaults técnicos: 20/600 y 100/3600. No son cuotas comerciales.
 
-El adaptador debe proporcionar una dirección confiable mediante `Astro.clientAddress`. La aplicación ignora `X-Forwarded-For` arbitrario, valida que el dato sea una IP y calcula HMAC para el limiter persistente. Si el secreto falta/es inválido o no hay IP confiable, el POST falla cerrado. Antes de habilitar el endpoint en cualquier entorno desplegado, configurar y probar ambas fuentes; esta documentación no confirma configuración cloud ni disponibilidad de trusted client address en producción. Los tests usan secreto efímero propio del stack temporal, no un secreto persistente.
+El adaptador debe proporcionar una dirección confiable mediante `Astro.clientAddress`. La aplicación valida que el dato sea IP y calcula HMAC para el limiter persistente. Si el secreto falta/es inválido o no hay IP confiable, el POST falla cerrado. En local el secreto está configurado únicamente en el `.env` ignorado y se verificó el smoke con loopback; no se guarda ni imprime su valor. Se verificó la presencia del secreto en Vercel Production y Preview sin revelar su contenido. Antes de habilitar el endpoint en un entorno desplegado hay que probar ambas fuentes en runtime. Los tests usan secreto efímero propio del stack temporal, no un secreto persistente.
 
-El estado de implementación de Fase 3 y de la migración 0011 se registra en `docs/PLAN.md`; no aplicar manualmente su SQL ni inferir que ya está desplegada por aparecer en el repositorio.
+La migración 0011 se aplicó al Supabase local estándar `127.0.0.1:54322` mediante Drizzle sin reset; el rerun idempotente conservó los datos y verificó checksum/ledger según `docs/PLAN.md`. No se afirma que se haya aplicado a Supabase cloud; aplicar migraciones cloud requiere su propio flujo autorizado y evidencia.
+
+El estado local/cloud de Fase 3 y la migración 0011 se registra en `docs/PLAN.md`; no aplicar manualmente su SQL ni inferir despliegue cloud a partir del estado local.
+
+### Estado cloud registrado (2026-10-01)
+
+- El proyecto Supabase canónico `SkillBase` (`fvzxqlezdrlzykyoevub`) está `ACTIVE_HEALTHY` y su URL pública coincide con Production de Vercel. El ledger cloud contiene 0000–0009 y sus hashes/timestamps corresponden al historial local; las migraciones aditivas 0010 y 0011 siguen pendientes en cloud.
+- `INTEREST_RATE_LIMIT_SECRET` está configurado por separado en Vercel Production y Preview, con generación aleatoria de 64 caracteres; solo se verificó presencia, nunca se leyó/imprimió su valor. Preview contiene únicamente este secreto para esta feature: no se le asignaron credenciales DB ni se creó un despliegue Preview funcional.
+- El adapter Astro/Vercel provee `Astro.clientAddress`; Vercel sobrescribe el primer `X-Forwarded-For`, y la aplicación valida la IP con `net.isIP`. Esto valida la cadena de confianza estáticamente, no el comportamiento de un POST contra la versión cloud desplegada. Referencias: [Vercel request headers](https://vercel.com/docs/headers/request-headers), [Astro `clientAddress`](https://docs.astro.build/en/reference/api-reference/#clientaddress), [Astro Vercel adapter](https://docs.astro.build/en/guides/integrations-guide/vercel/).
+- La producción existente permanece `READY` en SHA `3a5258a` en `https://skillbase-alpha.vercel.app`; es anterior al flujo de interesados. No se creó un nuevo deployment ni se verificó allí el POST o un ataque con forwarded header.
+- La integración Git de Vercel está desconectada. La CI ejecuta quality e integration/E2E en pull requests dirigidos a `master`; `deploy` ocurre solo tras push a `master` y depende del éxito de ambos jobs. El secreto GitHub `production` `MIGRATION_DATABASE_URL` solo está disponible para ese workflow autorizado; no se intentó leer ni revelar. El entorno Vercel se inspeccionó sin extraer valores de conexión.
+- `master` requiere checks `quality` e `integration-e2e`, una aprobación y resolución lineal; enforcement a administradores está desactivado. Un administrador puede omitir la aprobación, pero no saltarse checks fallidos. Esta es la configuración observada, no una recomendación de bypass ni evidencia de release.
+
+La configuración cloud de secreto y cadena confiable queda preparada/verificada de forma estática, pero la migración cloud y la verificación runtime continúan pendientes. No afirmar que la feature está operativa en producción hasta aplicar migraciones mediante el flujo autorizado, desplegar y comprobar GET/POST, `no-store`, limitación y rechazo de spoofing.

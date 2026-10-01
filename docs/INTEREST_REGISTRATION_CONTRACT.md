@@ -2,7 +2,7 @@
 
 ## ESTADO Y ALCANCE
 
-Contrato técnico de ejecución de Fase 3, basado en RF-PRE-001–004 y ADR-021/022. Backend, interfaz pública y administración están implementados y validados localmente. Las suites E2E se documentan con corrida full más revalidaciones dirigidas; no hubo una única corrida full 95/95. El merge de PR 105, la configuración cloud del rate limit y la aplicación de la migración en cloud siguen pendientes. Las propuestas operativas señaladas como pendientes no se convierten en políticas legales aprobadas.
+Contrato técnico de ejecución de Fase 3, basado en RF-PRE-001–004 y ADR-021/022. Backend, interfaz pública y administración están implementados y validados localmente; PR 105 se integró en `development` como `0bf0979`. Las suites E2E se documentan con corrida full más revalidaciones dirigidas; no hubo una única corrida full 95/95. La presencia del secreto cloud y el origen confiable se verificaron estáticamente; migraciones cloud y POST runtime siguen pendientes. Las propuestas operativas señaladas como pendientes no se convierten en políticas legales aprobadas.
 
 - El único acceso público es el detalle `/cursos/[slug]`. No cambiar landing, catálogo, tarjetas ni sus DTO para este flujo.
 - Nombre, apellidos y email obligatorios; teléfono y preferencia de grupo opcionales.
@@ -163,7 +163,7 @@ Con JavaScript actualizar fila, revisión, controles y métricas desde el DTO re
 
 ### Schema y migración versionados; validación/cierre pendientes
 
-En `src/server/db/schema/index.ts` están definidos `interestRegistrationStatus` (`ACTIVE`, `CANCELLED`) e `interestRegistrations`, tabla `interest_registrations`, con UUID `id`, FK `courseId`, `firstName`, `lastName`, `email`, `phone` nullable, `preferredGroupId` nullable, estado por defecto `ACTIVE` y `createdAt`/`updatedAt` `timestamptz(3)`. No hay FK a `users`/`participants` ni snapshot mutable compartido entre cursos. La migración 0011 está versionada y se aplica en los stacks temporales de integración; no se ha aplicado al Supabase local estándar ni a cloud.
+En `src/server/db/schema/index.ts` están definidos `interestRegistrationStatus` (`ACTIVE`, `CANCELLED`) e `interestRegistrations`, tabla `interest_registrations`, con UUID `id`, FK `courseId`, `firstName`, `lastName`, `email`, `phone` nullable, `preferredGroupId` nullable, estado por defecto `ACTIVE` y `createdAt`/`updatedAt` `timestamptz(3)`. No hay FK a `users`/`participants` ni snapshot mutable compartido entre cursos. La migración 0011 está versionada y aplicada en los stacks temporales y en el Supabase local estándar; no se ha aplicado a cloud.
 
 - Unique **no parcial** `(course_id, email)` para todos los estados: cancelar nunca libera el email. Normalización y checks DB de email trim/lowercase, longitudes y no-blancos respaldan validación de aplicación.
 - FK simple `course_id -> courses.id`, `ON DELETE RESTRICT`.
@@ -203,7 +203,7 @@ Baseline técnico requerido para implementación, configurable y revisable con e
 - Obtener IP solo de `Astro.clientAddress` proporcionada por el adaptador confiable; no confiar en `X-Forwarded-For` arbitrario. Persistir HMAC con `INTEREST_RATE_LIMIT_SECRET` exclusivamente server-side (mínimo 32 caracteres), no IP cruda; no registrar email/body. Si falta el secreto, no hay IP confiable o falla el almacenamiento, responder 503 y no aceptar el registro (fail-closed).
 - Exceso responde 429 con `Retry-After` calculado desde las ventanas limitantes. Expirar/limpiar buckets técnicos mediante tarea acotada o limpieza oportunista indexada; no acumular identificadores de red indefinidamente. Este TTL técnico no define retención de datos personales del interesado.
 
-Los límites indicados son defaults configurables y pueden ajustarse con evidencia de tráfico/NAT. La limpieza de buckets vencidos se realiza oportunistamente con límite acotado. La fuente confiable de IP disponible en la plataforma de despliegue y el secreto HMAC aún deben configurarse y validarse; son gate para habilitar el POST en producción, no para comenzar dominio/repositorio/UI. Este control persistente reduce abuso bajo los límites definidos, pero no promete bloquear todo ataque distribuido.
+Los límites indicados son defaults configurables y pueden ajustarse con evidencia de tráfico/NAT. La limpieza de buckets vencidos se realiza oportunistamente con límite acotado. La presencia de `INTEREST_RATE_LIMIT_SECRET` está comprobada en los entornos Vercel Production/Preview y la cadena de IP confiable Vercel → adapter Astro → `Astro.clientAddress` está verificada estáticamente; el POST contra el runtime desplegado y la prueba de spoofing aún no se ejecutaron. Migraciones cloud pendientes y runtime smoke son gate antes de afirmar que el endpoint está operativo en producción. Este control persistente reduce abuso bajo los límites definidos, pero no promete bloquear todo ataque distribuido.
 
 Honeypot accesible (excluido de foco/lectores de pantalla) es defensa opcional adicional pendiente; si se aprueba, responde el mismo éxito neutro sin persistir. CAPTCHA, Redis, correo de verificación, listas de bloqueo y fingerprinting no se incorporan por defecto. Si se evidencia abuso que el baseline no controla, evaluar protección en el edge sin introducirla como requisito de negocio de Fase 3.
 
