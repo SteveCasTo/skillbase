@@ -305,4 +305,14 @@ Hay cobertura unitaria nueva para resultado de mutaciones, idempotencia/recupera
 
 Las notificaciones administrativas pasan por `src/lib/notifications.ts`: cada operación obtiene un ID UUID independiente, y `promise` conserva el mismo ID entre loading/success/error. El bridge adapta en tipos estrictos el `id` que Sileo 0.1.5 consume en runtime pero no declara; no se usa `any` ni un patch en `node_modules`.
 
-La migración `0010_course_creation_receipts` se aplicó y verificó únicamente en el stack temporal/aislado de tests de esta ejecución; no hay evidencia aquí de aplicación en Supabase de desarrollo o cloud.
+La migración `0010_course_creation_receipts` se aplicó a la base Supabase local estándar en `127.0.0.1:54322` mediante `bun run db:migrate`, sin reset y preservando los datos existentes. No se aplicó en cloud. Los stacks temporales de integración/E2E siguen teniendo su ciclo aislado e independiente.
+
+### Cobertura de interesados (Fase 3)
+
+Se añadieron pruebas unitarias en `tests/unit/interests.test.ts`, `interests-admin-presentation.test.ts`, `public-interest-presentation.test.ts` y `public-interest-form-ssr.test.tsx`; integración del repositorio en `tests/integration/interests.test.ts`; E2E público y administrativo en `tests/e2e/public-interest.spec.ts` y `interests-admin.spec.ts`. Cubren contrato, presentación, persistencia, autorización, rate limit y flujos UI según sus escenarios. Los resultados locales de esta fase se recogen a continuación; no implican CI/cloud ni merge a `development`.
+
+Resultados locales finales comunicados para Fase 3: full unit 129 PASS (793 assertions); full integration 65 PASS/0 FAIL (478 assertions, 9 archivos); lint global PASS; typecheck 0 errores, 0 warnings y 70 hints; build y Drizzle checks PASS. El primer full integration run fue 45/66 por cleanup de fixtures de cursos incompatible con la FK de `interest_registrations`; se corrigió truncando explícitamente la tabla de interesados, sin `CASCADE`, y el full rerun pasó.
+
+E2E: corrida full 81/95 PASS y 14 fallos vinculados a fixtures (12 calendarios de cursos que respondían 422 y 2 cargas de formatos). Sin cambios posteriores de código productivo, las suites dirigidas `courses` pasaron 2/2 (47.9 s) e `interests` 13/13 (1.1 min), con un escenario Auth solapado. Se registran los 95 escenarios cubiertos por combinación de corrida full y revalidaciones dirigidas; no se afirma un full run 95/95. Fallback sin JavaScript y navegación/animación mobile pasan; JavaScript de la aplicación no se deshabilita.
+
+La migración 0011 se aplicó solamente en el stack aislado de tests; no se ha aplicado al Supabase local estándar ni a cloud. No se necesita migrarla a esos entornos para considerar verificadas las suites aisladas. La configuración cloud de secreto HMAC server-only y dirección confiable `Astro.clientAddress` sigue sin verificar.

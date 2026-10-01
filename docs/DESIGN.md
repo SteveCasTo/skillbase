@@ -497,3 +497,10 @@ Antes de crear un componente:
 - La carga estructural de vistas privadas usa skeleton SSR según variante (lista, formulario, detalle o resumen), se muestra mientras el loader está pendiente y el contenido entra en viewport, y se cancela al resolver, abortar o fallar la navegación. Respeta foco/teclado y `prefers-reduced-motion`; no es una demora decorativa.
 - El selector de tema vive en el sidebar expandido y en el menú móvil, pero no queda visible ni enfocable en el rail cerrado. El tema se aplica tempranamente y se sincroniza tras navegaciones; si el almacenamiento del navegador está bloqueado, la interfaz conserva el cambio en memoria.
 - Las acciones de grupos mantienen una presentación local del DTO de curso y formatos, sin incluir enlaces de navegación ajenos a la vista. Los bloqueos de petición y los diálogos evitan duplicados; tras mutaciones se actualiza localmente la tarjeta/lista pertinente y se conserva el foco. Los controles de formato/cursos mantienen cambios de formulario ante errores y permiten reintento.
+
+## Registro público de interesados (Fase 3, UI implementada)
+
+- El formulario aparece únicamente en el detalle del curso elegible; no modifica landing, tarjetas ni catálogo. La presentación separa expresamente expresar interés de reservar cupo, pagar o inscribirse.
+- La estructura SSR conserva el fallback HTML y los valores/errores ante respuesta del servidor. La mejora React usa estados pending/éxito/error, foco en el resultado o primer campo inválido y selector del design system para preferencia de grupo. Sin preferencia disponible, el flujo no fuerza selección.
+- `/app/interesados` resume registros activos por curso; el detalle administrativo presenta registros y buckets por preferencia con filtros de estado, confirmación de cancelación/reactivación y actualización local. En móvil la información usa tarjetas/lista, no una tabla horizontal crítica.
+- La UI está implementada y la cobertura responsive, de teclado y de fallback sin JavaScript está verificada mediante corrida full y revalidaciones dirigidas; ver resultados exactos en `docs/TESTING.md` (no hubo una única corrida full 95/95).
