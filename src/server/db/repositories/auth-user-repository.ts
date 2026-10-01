@@ -15,6 +15,10 @@ import type {
 } from "@/domain/auth/types";
 import { AUTH_ROLES } from "@/domain/auth/types";
 import * as schema from "@/server/db/schema";
+import {
+  validateInstructor,
+  type InstructorProfileData,
+} from "@/domain/instructors/profile";
 
 type Database = PostgresJsDatabase<typeof schema>;
 
@@ -87,8 +91,32 @@ export class DrizzleAuthUserRepository implements AuthUserRepository {
     email: string;
     name: string;
     authUserId: string;
+    profile?: InstructorProfileData;
+    actorId?: string;
   }): Promise<InternalUser> {
     return this.db.transaction(async (tx) => {
+      if (input.profile) {
+        if (!input.actorId) throw new Error("Provisioning actor missing");
+        const [actor] = await tx
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.id, input.actorId))
+          .for("update");
+        const [role] = await tx
+          .select()
+          .from(schema.userRoles)
+          .where(
+            and(
+              eq(schema.userRoles.userId, input.actorId),
+              eq(schema.userRoles.roleCode, "ADMIN"),
+            ),
+          );
+        if (actor?.status !== "ACTIVE" || !role)
+          throw new AuthorizationError(
+            "FORBIDDEN",
+            "Provisioning is forbidden",
+          );
+      }
       const [user] = await tx
         .insert(schema.users)
         .values({
@@ -103,6 +131,26 @@ export class DrizzleAuthUserRepository implements AuthUserRepository {
       await tx
         .insert(schema.userRoles)
         .values({ userId: user.id, roleCode: "INSTRUCTOR" });
+      if (input.profile) {
+        const profile = validateInstructor({
+          ...input.profile,
+          phone: input.profile.phone ?? "",
+          email: input.email,
+        });
+        await tx.insert(schema.instructorProfiles).values({
+          id: user.id,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          phone: profile.phone,
+        });
+        if (!input.actorId) throw new Error("Provisioning actor missing");
+        await tx.insert(schema.auditEvents).values({
+          actorId: input.actorId,
+          entityType: "INSTRUCTOR",
+          entityId: user.id,
+          action: "INSTRUCTOR_CREATED",
+        });
+      }
       const result = await hydrateUser(tx, user.id);
       if (!result) throw new Error("Account was not created");
       return result;

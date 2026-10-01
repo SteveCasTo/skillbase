@@ -3,17 +3,25 @@ import type { AuthUserRepository } from "./user-repository";
 import { requirePassword } from "@/domain/auth/identity";
 import { normalizeEmail } from "@/domain/auth/policies";
 import type { InternalUser } from "@/domain/auth/types";
+import {
+  validateInstructor,
+  instructorFullName,
+  type InstructorProfileData,
+} from "@/domain/instructors/profile";
 
 export interface PasswordProvisionInput {
   email: string;
   name: string;
   password: string;
+  profile?: InstructorProfileData;
 }
 export interface PasswordProvisionRepository extends AuthUserRepository {
   createPasswordInstructor(input: {
     email: string;
     name: string;
     authUserId: string;
+    profile?: InstructorProfileData;
+    actorId?: string;
   }): Promise<InternalUser>;
 }
 export interface PasswordProvisionGateway {
@@ -32,12 +40,19 @@ export async function provisionPasswordInstructor(
   requireRoles(actor, ["ADMIN"]);
   requirePassword(input.password);
   const email = normalizeEmail(input.email);
-  const name = input.name.trim();
+  const profile = input.profile
+    ? validateInstructor({
+        ...input.profile,
+        phone: input.profile.phone ?? "",
+        email,
+      })
+    : undefined;
+  const name = profile ? instructorFullName(profile) : input.name.trim();
   if (
     email.length > 254 ||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email) ||
     !name ||
-    name.length > 160
+    name.length > 251
   )
     throw new Error("Los datos de la cuenta no son válidos.");
   let authUserId: string | null;
@@ -61,6 +76,8 @@ export async function provisionPasswordInstructor(
       email,
       name,
       authUserId,
+      ...(profile ? { profile } : {}),
+      actorId: actor.id,
     });
   } catch {
     await gateway.removeCreatedUser(authUserId).catch(() => {});
