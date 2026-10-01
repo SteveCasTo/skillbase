@@ -312,7 +312,7 @@ test("inline editing swaps icons in the same row, filters input and cancels with
   await dialog.getByRole("button", { name: "Sí, eliminar formato" }).click();
   await expect(dialog).toBeHidden();
   await expect(
-    page.locator("[data-sileo-toast]").filter({ hasText: "Guardando" }),
+    page.locator('[data-sileo-toast][data-state="loading"]'),
   ).toBeVisible();
   await page
     .locator("[data-dialog-form]")

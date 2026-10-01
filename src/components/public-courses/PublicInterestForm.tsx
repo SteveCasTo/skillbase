@@ -117,10 +117,15 @@ export default function PublicInterestForm({
     // SSR stays submittable without JS. Once enhanced, gate the real DOM before
     // the frame that reconciles hydration/autofill and the native group selector.
     const form = formRef.current;
+    const updateValidity = () => {
+      if (form) setRequiredValid(requiredInputsValid(form));
+    };
     const button = form?.querySelector<HTMLButtonElement>(
       'button[type="submit"]',
     );
     if (form && button) button.disabled = !requiredInputsValid(form);
+    form?.addEventListener("input", updateValidity, true);
+    form?.addEventListener("change", updateValidity, true);
     const frame = requestAnimationFrame(() => {
       if (formRef.current)
         setRequiredValid(requiredInputsValid(formRef.current));
@@ -131,7 +136,11 @@ export default function PublicInterestForm({
         if (document.activeElement !== native) setEnhancedSelect(true);
       }
     });
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      form?.removeEventListener("input", updateValidity, true);
+      form?.removeEventListener("change", updateValidity, true);
+    };
   }, []);
 
   useEffect(() => {
@@ -287,12 +296,6 @@ export default function PublicInterestForm({
       aria-busy={pending}
       noValidate={hydrated}
       onSubmit={submit}
-      onInput={(event) =>
-        setRequiredValid(requiredInputsValid(event.currentTarget))
-      }
-      onChange={(event) =>
-        setRequiredValid(requiredInputsValid(event.currentTarget))
-      }
       className="interest-form"
     >
       {result?.ok === false && (

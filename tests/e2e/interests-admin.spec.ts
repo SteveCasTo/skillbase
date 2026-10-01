@@ -132,12 +132,14 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
   ).toHaveText("1");
   await expect(page.locator('[data-preference-id=""]')).toHaveText("1");
   await expect(
+    page.getByText(
+      "Cada barra muestra la proporción del total de interesados activos.",
+    ),
+  ).toHaveCount(0);
+  await expect(
     page.locator('[data-demand-row][data-leading="true"]'),
   ).toHaveCount(2);
   for (const demand of await page.locator("[data-demand-row]").all()) {
-    await expect(demand.locator("[data-demand-share]")).toHaveText(
-      "50 % del total activo",
-    );
     expect(
       await demand
         .locator("[data-demand-bar]")
@@ -186,9 +188,6 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
     "data-leading",
     "true",
   );
-  await expect(
-    page.locator('[data-demand-row=""] [data-demand-share]'),
-  ).toHaveText("100 % del total activo");
   await expect(row.locator('input[name="revision"]')).not.toHaveValue(revision);
   expect(await originalRow?.evaluate((node) => node.isConnected)).toBe(true);
   await expect(row.locator("summary")).toBeFocused();
