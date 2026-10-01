@@ -275,3 +275,7 @@ Si un secreto se expone:
 - Las cookies SSR declaran `HttpOnly`, `SameSite=Lax`, path `/` y `Secure` cuando `PUBLIC_SITE_URL` usa HTTPS.
 - Las respuestas de `/app`, `/app/**`, `/login`, `/unauthorized` y `/auth/**` usan `Cache-Control: private, no-store`.
 - Toda ruta bajo `/app` requiere una política exacta registrada. Las rutas futuras no declaradas fallan cerradas; los endpoints de operaciones sensibles deben seguir invocando guards propios aunque una página ya esté protegida.
+
+### Idempotencia y recuperación del alta
+
+La clave de idempotencia del curso se vincula en servidor al actor autenticado y al fingerprint de la carga validada; no se acepta identidad de actor del cliente y reutilizar la clave con datos distintos falla. Los metadatos no salen en DTOs. El artwork se asocia después de crear el borrador; ante fallo se ofrece recuperar/reintentar sobre ese borrador. No se sustituye silenciosamente la asociación existente ni se asume una transacción distribuida entre PostgreSQL y Storage. La migración aditiva 0010 no automatiza borrado de historial.

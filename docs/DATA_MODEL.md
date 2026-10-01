@@ -246,6 +246,10 @@ Fase 2A registra atómicamente `COURSE_CREATED`, `COURSE_UPDATED`, `COURSE_PRICE
 
 ## RESTRICCIONES
 
+### Idempotencia del alta de cursos
+
+`courses` incluye `create_actor_id` (FK restrictiva a `users.id`), `create_request_key` (UUID) y `create_fingerprint` (SHA-256 hexadecimal de 64 caracteres). Los tres son nulos en altas sin clave o están presentes conjuntamente; un índice único por actor/clave evita duplicar altas cuando se reintenta una creación. La misma combinación y fingerprint recupera la fila existente; si la clave se reutiliza con otro fingerprint, la solicitud se rechaza. Estos campos son internos y no forman parte de los DTO administrativos/públicos. La migración 0010 es aditiva; no automatiza borrado de historial.
+
 Ejemplos que deben evaluarse a nivel DB:
 
 - email de User cuando corresponda;
