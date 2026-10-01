@@ -15,7 +15,7 @@ test("desktop sidebar respects roles and marks nested courses and formats", asyn
     "page",
   );
   await expect(nav.getByRole("link", { name: "Cursos" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Asistencia" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Asistencia" })).toHaveCount(0);
   await nav.getByRole("link", { name: "Cursos" }).click();
   await expect(nav.getByRole("link", { name: "Cursos" })).toHaveAttribute(
     "aria-current",
@@ -237,7 +237,7 @@ test("keyboard focus previews rail, Escape closes it; instructor sees no admin l
   const shell = page.locator("[data-private-shell]");
   const nav = page.getByRole("navigation", { name: "Navegación privada" });
   await expect(nav.getByRole("link", { name: "Cursos" })).toHaveCount(0);
-  await expect(nav.getByRole("link", { name: "Asistencia" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Asistencia" })).toHaveCount(0);
   await page.getByRole("button", { name: "Contraer barra lateral" }).click();
   await page.locator(".private-main-scroll").hover();
   await page.keyboard.press("Shift+Tab");

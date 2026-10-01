@@ -1,0 +1,192 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import { requireInternalUser } from "@/server/auth/context";
+import { updateProfilePassword } from "@/server/auth/profile";
+import PasswordField from "@/components/auth/PasswordField";
+import AuthFormPending from "@/components/auth/AuthFormPending.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { isGoogleAssociated } from "@/domain/auth/identity";
+import { accountIdentity } from "@/server/auth/identity";
+const user = requireInternalUser(Astro.locals);
+let error: string | null = null;
+if (Astro.request.method === "POST") {
+  const result = await updateProfilePassword(Astro);
+  error = result.error;
+  if (!error) return Astro.redirect("/app/perfil?status=password_changed", 303);
+}
+const googleLinked = Astro.locals.authUser
+  ? isGoogleAssociated(user, accountIdentity(Astro.locals.authUser))
+  : false;
+const status = Astro.url.searchParams.get("status");
+---
+
+<PrivateLayout title="Mi perfil">
+  <header class="max-w-2xl">
+    <h1 class="text-3xl font-semibold tracking-tight">Mi perfil</h1>
+    <p class="mt-3 leading-7 text-muted-foreground">
+      Administra el acceso a tu cuenta. Tus roles y tu correo los gestiona el
+      equipo administrador.
+    </p>
+  </header>
+  <div class="mt-8 flex max-w-2xl flex-col gap-6">
+    {status === "recovery_sent" && (
+      <p class="rounded-lg border bg-muted p-4 text-sm" role="status">
+        Si podemos procesar la solicitud para una cuenta habilitada, enviaremos
+        un enlace para confirmar tu acceso. Revisa también spam.
+      </p>
+    )}
+    {(status === "password_changed" ||
+      status === "linked" ||
+      status === "confirmed") && (
+      <p class="rounded-lg border bg-muted p-4 text-sm" role="status">
+        {status === "password_changed"
+          ? "Contraseña actualizada."
+          : status === "linked"
+            ? "Google está asociado a tu cuenta."
+            : "Acceso confirmado. Puedes establecer una contraseña durante los próximos cinco minutos."}
+      </p>
+    )}
+    {(error || Astro.url.searchParams.get("error")) && (
+      <p
+        class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm"
+        role="alert"
+      >
+        {error ??
+          "No pudimos asociar Google. Utiliza la cuenta con el mismo correo e inténtalo nuevamente."}
+      </p>
+    )}
+    <section
+      class="rounded-xl border bg-card p-5 sm:p-6"
+      aria-labelledby="account-title"
+    >
+      <h2 id="account-title" class="text-lg font-semibold">
+        Datos de la cuenta
+      </h2>
+      <dl class="mt-5 grid gap-4 text-sm">
+        <div>
+          <dt class="text-muted-foreground">Nombre</dt>
+          <dd class="mt-1 break-words font-medium">{user.name}</dd>
+        </div>
+        <div>
+          <dt class="text-muted-foreground">Correo electrónico</dt>
+          <dd class="mt-1 break-all font-medium">{user.email}</dd>
+        </div>
+        <div>
+          <dt class="text-muted-foreground">Roles</dt>
+          <dd class="mt-1 font-medium">
+            {user.roles
+              .map((role) =>
+                role === "ADMIN" ? "Administrador" : "Instructor",
+              )
+              .join(", ")}
+          </dd>
+        </div>
+      </dl>
+    </section>
+    <section
+      class="rounded-xl border bg-card p-5 sm:p-6"
+      aria-labelledby="password-title"
+    >
+      <h2 id="password-title" class="text-lg font-semibold">
+        Contraseña
+      </h2>
+      <p class="mt-2 text-sm leading-6 text-muted-foreground">
+        Es opcional. Para establecerla o cambiarla, confirma tu contraseña
+        actual o solicita un enlace de confirmación a tu correo.
+      </p>
+      <form
+        class="mt-5 flex flex-col gap-5"
+        method="post"
+        action="/app/perfil"
+        data-auth-form
+        data-astro-reload
+      >
+        <PasswordField
+          name="currentPassword"
+          label="Contraseña actual (si tienes una)"
+          autoComplete="current-password"
+          required={false}
+          client:load
+        />
+        <PasswordField
+          name="password"
+          label="Nueva contraseña"
+          autoComplete="new-password"
+          minLength={12}
+          client:load
+        />
+        <PasswordField
+          name="confirmation"
+          label="Confirmar nueva contraseña"
+          autoComplete="new-password"
+          minLength={12}
+          client:load
+        />
+        <p class="text-xs text-muted-foreground">
+          Usa entre 12 y 128 caracteres.
+        </p>
+        <button
+          class={buttonVariants({ className: "min-h-11 self-start" })}
+          type="submit"
+          data-label="Guardar contraseña"
+        >
+          Guardar contraseña
+        </button>
+      </form>
+      <form
+        class="mt-5"
+        method="post"
+        action="/auth/forgot-password"
+        data-auth-form
+        data-astro-reload
+      >
+        <input type="hidden" name="email" value={user.email} />
+        <input type="hidden" name="returnTo" value="profile" />
+        <button
+          class={buttonVariants({
+            variant: "outline",
+            className: "min-h-11 whitespace-normal text-left",
+          })}
+          type="submit"
+          data-label="Enviar enlace de confirmación"
+        >
+          Enviar enlace de confirmación
+        </button>
+      </form>
+    </section>
+    <section
+      class="rounded-xl border bg-card p-5 sm:p-6"
+      aria-labelledby="google-title"
+    >
+      <h2 id="google-title" class="text-lg font-semibold">
+        Cuenta de Google
+      </h2>
+      <p class="mt-2 text-sm leading-6 text-muted-foreground">
+        {googleLinked
+          ? "Google está asociado a esta misma cuenta."
+          : "Puedes asociar Google de forma opcional. El correo verificado debe coincidir exactamente con el correo de tu cuenta."}
+      </p>
+      {!googleLinked && (
+        <form
+          class="mt-5"
+          method="post"
+          action="/auth/link-google"
+          data-auth-form
+          data-astro-reload
+        >
+          <button
+            class={buttonVariants({
+              variant: "outline",
+              className: "min-h-11",
+            })}
+            type="submit"
+            data-label="Asociar Google"
+          >
+            Asociar Google
+          </button>
+        </form>
+      )}
+    </section>
+  </div>
+  <AuthFormPending />
+</PrivateLayout>
