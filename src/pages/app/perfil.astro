@@ -7,9 +7,26 @@ import AuthFormPending from "@/components/auth/AuthFormPending.astro";
 import { buttonVariants } from "@/components/ui/button";
 import { isGoogleAssociated } from "@/domain/auth/identity";
 import { accountIdentity } from "@/server/auth/identity";
+import { instructorEditor } from "@/server/instructors/editor";
+import InstructorForm from "@/components/instructors/InstructorForm.astro";
 const user = requireInternalUser(Astro.locals);
+const professionalRequest =
+  Astro.url.searchParams.get("edit") === "professional";
+const professional = user.roles.includes("INSTRUCTOR")
+  ? await instructorEditor(
+      {
+        request: professionalRequest ? Astro.request : new Request(Astro.url),
+        locals: Astro.locals,
+        redirect: Astro.redirect,
+        response: Astro.response,
+      },
+      user.id,
+      true,
+    )
+  : null;
+if (professional?.response) return professional.response;
 let error: string | null = null;
-if (Astro.request.method === "POST") {
+if (Astro.request.method === "POST" && !professionalRequest) {
   const result = await updateProfilePassword(Astro);
   error = result.error;
   if (!error) return Astro.redirect("/app/perfil?status=password_changed", 303);
@@ -29,6 +46,30 @@ const status = Astro.url.searchParams.get("status");
     </p>
   </header>
   <div class="mt-8 flex max-w-2xl flex-col gap-6">
+    {professional?.previous && (
+      <section aria-labelledby="professional-title">
+        <h2 id="professional-title" class="text-xl font-semibold">
+          Perfil profesional
+        </h2>
+        {professional.error && (
+          <p role="alert" class="mt-4 text-destructive">
+            {professional.error}
+          </p>
+        )}
+        {Astro.url.searchParams.get("status") === "profile_updated" && (
+          <p role="status" class="mt-4">
+            Perfil actualizado.
+          </p>
+        )}
+        <InstructorForm
+          values={professional.values}
+          errors={professional.errors}
+          revision={professional.revision}
+          editing
+          action="/app/perfil?edit=professional"
+        />
+      </section>
+    )}
     {status === "recovery_sent" && (
       <p class="rounded-lg border bg-muted p-4 text-sm" role="status">
         Si podemos procesar la solicitud para una cuenta habilitada, enviaremos

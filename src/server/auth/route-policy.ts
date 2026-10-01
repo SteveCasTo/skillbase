@@ -13,6 +13,9 @@ export const PRIVATE_ROUTE_POLICIES = {
   "/app/formatos/nuevo": { access: "ROLES", roles: ["ADMIN"] },
   "/app/interesados": { access: "ROLES", roles: ["ADMIN"] },
   "/app/perfil": { access: "ACTIVE_USER" },
+  "/app/instructores": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/instructores/nuevo": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/mis-cursos": { access: "ROLES", roles: ["INSTRUCTOR"] },
 } as const satisfies Readonly<Record<string, PrivateRoutePolicy>>;
 
 const COURSE_EDIT_PATH =
@@ -36,6 +39,18 @@ export function getPrivateRoutePolicy(
       normalizedPath as keyof typeof PRIVATE_ROUTE_POLICIES
     ] ?? null;
   if (exact) return exact;
+  if (
+    /^\/app\/instructores\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\/editar$/iu.test(
+      normalizedPath,
+    )
+  )
+    return { access: "ROLES", roles: ["ADMIN"] };
+  if (
+    /^\/app\/mis-cursos\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(
+      normalizedPath,
+    )
+  )
+    return { access: "ROLES", roles: ["INSTRUCTOR"] };
   if (
     COURSE_EDIT_PATH.test(normalizedPath) ||
     COURSE_GROUPS_PATH.test(normalizedPath) ||
