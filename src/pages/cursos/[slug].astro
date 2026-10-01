@@ -15,6 +15,43 @@ import { getDatabase } from "@/server/db/client";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
 import { publicArtworkUrl } from "@/server/courses/artwork";
 import CourseArtworkFallback from "@/components/public-courses/CourseArtworkFallback.astro";
+import PublicInterestSection from "@/components/public-courses/PublicInterestSection.astro";
+import {
+  EMPTY_INTEREST_VALUES,
+  INTEREST_SUCCESS_MESSAGE,
+} from "@/components/public-courses/public-interest-presentation";
+import {
+  handlePublicInterestPost,
+  loadPublicInterestForm,
+} from "@/server/interests/http";
+import type { PublicInterestFormDto } from "@/domain/interests/types";
+
+let interestPost:
+  Awaited<ReturnType<typeof handlePublicInterestPost>> | undefined;
+if (Astro.request.method === "POST" && Astro.params.slug) {
+  let clientAddress = "";
+  try {
+    clientAddress = Astro.clientAddress;
+  } catch {
+    /* The backend fails closed without a trusted adapter address. */
+  }
+  interestPost = await handlePublicInterestPost({
+    request: Astro.request,
+    slug: Astro.params.slug,
+    clientAddress,
+  });
+  const headers = new Headers(interestPost.headers);
+  headers.set("Cache-Control", "no-store");
+  if (Astro.request.headers.get("accept")?.includes("application/json")) {
+    headers.set("Content-Type", "application/json; charset=utf-8");
+    return new Response(JSON.stringify(interestPost.payload), {
+      status: interestPost.status,
+      headers,
+    });
+  }
+  Astro.response.status = interestPost.status;
+  headers.forEach((value, key) => Astro.response.headers.set(key, value));
+}
 
 const slug = Astro.params.slug;
 let course: DisplayCourse | null = null;
@@ -25,14 +62,24 @@ try {
     : null;
 } catch {
   loadError = true;
-  Astro.response.status = 503;
+  if (!interestPost) Astro.response.status = 503;
 }
-if (!loadError && !course) Astro.response.status = 404;
+if (!loadError && !course && !interestPost) Astro.response.status = 404;
+let interestForm: PublicInterestFormDto | null = null;
+if (course && slug) {
+  try {
+    interestForm = await loadPublicInterestForm(slug);
+  } catch {
+    /* Keep the published detail readable when interest lookup is unavailable. */
+  }
+}
 const title = course
   ? `${course.name} | Formación continua · UMSS`
-  : loadError
-    ? "Consulta no disponible | Formación continua"
-    : "Curso no encontrado | Formación continua";
+  : interestPost?.payload.ok
+    ? "Gracias por tu interés | Formación continua"
+    : loadError
+      ? "Consulta no disponible | Formación continua"
+      : "Curso no encontrado | Formación continua";
 const artworkUrl = publicArtworkUrl(
   course?.artwork,
   import.meta.env.PUBLIC_SUPABASE_URL,
@@ -54,10 +101,27 @@ const registrationDates = course ? registrationWindow(course) : null;
         <header class="detail-hero">
           <div class="detail-heading">
             <p class="course-status">
-              {availabilityLabels[course.registrationAvailability]}
+              {availabilityLabels[course.registrationAvailability].replace(
+                "Preinscripción",
+                "Preinscripción presencial",
+              )}
             </p>
             <h1>{course.name}</h1>
             <p class="detail-description">{course.description}</p>
+            {interestForm?.available && !interestPost?.payload.ok && (
+              <a class="interest-anchor" href="#interes">
+                Dejar mis datos de interés
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path d="M12 4v16m-6-6 6 6 6-6" />
+                </svg>
+              </a>
+            )}
           </div>
           {artworkUrl ? (
             <div class="detail-art has-photo" aria-hidden="true">
@@ -150,7 +214,26 @@ const registrationDates = course ? registrationWindow(course) : null;
             </section>
           </aside>
         </div>
+        <PublicInterestSection
+          slug={slug!}
+          form={interestForm}
+          values={
+            interestPost?.payload.ok
+              ? EMPTY_INTEREST_VALUES
+              : (interestPost?.values ?? EMPTY_INTEREST_VALUES)
+          }
+          result={interestPost?.payload}
+        />
       </>
+    ) : interestPost?.payload.ok ? (
+      <section
+        class="catalog-state detail-state"
+        aria-labelledby="detail-success-title"
+        role="status"
+      >
+        <h1 id="detail-success-title">Gracias por tu interés</h1>
+        <p>{INTEREST_SUCCESS_MESSAGE}</p>
+      </section>
     ) : (
       <section
         class="catalog-state detail-state"
