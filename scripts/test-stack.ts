@@ -82,6 +82,7 @@ export async function runWithTestStack(command: string[]): Promise<number> {
   for (const key of [
     "DATABASE_URL",
     "MIGRATION_DATABASE_URL",
+    "PUBLIC_SITE_URL",
     "PUBLIC_SUPABASE_URL",
     "PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
@@ -137,6 +138,11 @@ export async function runWithTestStack(command: string[]): Promise<number> {
       TEST_BUN_EXECUTABLE: process.execPath,
       TEST_SUPABASE_WORKDIR: workdir,
       TEST_SUPABASE_PROJECT_ID: projectId,
+      // Public application configuration must target this isolated test stack,
+      // never a URL/key inherited from a developer or CI environment.
+      PUBLIC_SITE_URL: "http://127.0.0.1:4321",
+      PUBLIC_SUPABASE_URL: local.apiUrl,
+      PUBLIC_SUPABASE_PUBLISHABLE_KEY: local.publishableKey,
       TEST_SUPABASE_URL: local.apiUrl,
       TEST_SUPABASE_PUBLISHABLE_KEY: local.publishableKey,
       TEST_SUPABASE_SERVICE_ROLE_KEY: local.serviceRoleKey,
