@@ -1,4 +1,28 @@
 export const AUTH_FIXTURES = {
+  googleLegacyAdmin: {
+    email: "google-legacy.fixture@example.test",
+    name: "Legacy Google Admin",
+  },
+  associationOwner: {
+    email: "association-owner.fixture@example.test",
+    name: "Association Owner",
+    password: "Synthetic-Association-Password-2026",
+  },
+  associationStale: {
+    email: "association-stale.fixture@example.test",
+    name: "Association Stale",
+    password: "Synthetic-Association-Password-2026",
+  },
+  passwordAdmin: {
+    email: "password-admin.fixture@example.test",
+    name: "Password Admin",
+    password: "Synthetic-Auth-Fixture-2026",
+  },
+  passwordInstructor: {
+    email: "password-instructor.fixture@example.test",
+    name: "Password Instructor",
+    password: "Synthetic-Auth-Fixture-2026",
+  },
   admin: { email: "admin.fixture@example.test", name: "Ada Admin" },
   instructor: {
     email: "instructor.fixture@example.test",

@@ -95,13 +95,13 @@ describe("private route policies and caching", () => {
   test("declares every current route and denies unknown future routes", () => {
     expect(Object.keys(PRIVATE_ROUTE_POLICIES).sort()).toEqual([
       "/app",
-      "/app/asistencia",
       "/app/cursos",
       "/app/cursos/imagen",
       "/app/cursos/nuevo",
       "/app/formatos",
       "/app/formatos/nuevo",
       "/app/interesados",
+      "/app/perfil",
     ]);
     expect(getPrivateRoutePolicy("/app")).toEqual({ access: "ACTIVE_USER" });
     expect(getPrivateRoutePolicy("/app/cursos")).toEqual({
@@ -135,9 +135,9 @@ describe("private route policies and caching", () => {
         "/app/formatos/10000000-0000-4000-8000-000000000001/otra",
       ),
     ).toBeNull();
-    expect(getPrivateRoutePolicy("/app/asistencia/")).toEqual({
-      access: "ROLES",
-      roles: ["INSTRUCTOR"],
+    expect(getPrivateRoutePolicy("/app/asistencia/")).toBeNull();
+    expect(getPrivateRoutePolicy("/app/perfil")).toEqual({
+      access: "ACTIVE_USER",
     });
     expect(
       getPrivateRoutePolicy(

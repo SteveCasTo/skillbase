@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 import { getTestSupabaseEnvironment } from "./scripts/supabase-local-env";
+import { e2eSiteUrl } from "./scripts/e2e-port";
 
 const localSupabase = getTestSupabaseEnvironment();
 
@@ -15,7 +16,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
-    baseURL: "http://127.0.0.1:4321",
+    baseURL: e2eSiteUrl(),
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
@@ -33,11 +34,12 @@ export default defineConfig({
   ],
   webServer: {
     command: "bun scripts/e2e-server.ts",
-    url: "http://127.0.0.1:4321",
-    reuseExistingServer: !process.env.CI,
+    url: e2eSiteUrl(),
+    reuseExistingServer: false,
     env: {
       DATABASE_URL: localSupabase.databaseUrl,
-      PUBLIC_SITE_URL: "http://127.0.0.1:4321",
+      PUBLIC_SITE_URL: e2eSiteUrl(),
+      AUTH_RATE_LIMIT_SECRET: process.env.AUTH_RATE_LIMIT_SECRET!,
       PUBLIC_SUPABASE_URL: localSupabase.apiUrl,
       PUBLIC_SUPABASE_PUBLISHABLE_KEY: localSupabase.publishableKey,
       SUPABASE_SERVICE_ROLE_KEY: localSupabase.serviceRoleKey,
