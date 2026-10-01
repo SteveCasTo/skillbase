@@ -1,9 +1,53 @@
-import { expect, test, type Page } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
+
+function fixtureSuffix(testInfo: TestInfo): string {
+  return `${testInfo.parallelIndex}-${testInfo.retry}-${testInfo.repeatEachIndex}-${randomUUID()}`;
+}
+
+// Capture the committed ID even when the simulated network failure hides it
+// from the browser. Failed attempts must not leave this course published.
+const lifecycleCourseIds = new Map<string, string>();
+
+test.afterEach(async ({ page }, testInfo) => {
+  const id = lifecycleCourseIds.get(testInfo.testId);
+  lifecycleCourseIds.delete(testInfo.testId);
+  if (!id || testInfo.status === testInfo.expectedStatus) return;
+  getTestSupabaseEnvironment(); // Refuse cleanup outside the runner's isolated stack.
+  const path = `/app/cursos/${id}/editar`;
+  const response = await page.request.get(path);
+  expect(response.ok()).toBe(true);
+  const persisted = await page.evaluate(
+    (html) => {
+      const document = new DOMParser().parseFromString(html, "text/html");
+      return {
+        status: document
+          .querySelector("[data-course-status]")
+          ?.textContent?.trim(),
+        revision: document.querySelector<HTMLInputElement>(
+          '.course-form input[name="revision"]',
+        )?.value,
+      };
+    },
+    await response.text(),
+  );
+  if (persisted.status === "Archivado") return;
+  expect(persisted.revision).toBeTruthy();
+  const archived = await page.request.post(path, {
+    headers: {
+      Accept: "application/json",
+      Origin: new URL(page.url()).origin,
+    },
+    form: { intent: "archive", revision: persisted.revision! },
+  });
+  expect(archived.status()).toBe(200);
+  expect((await archived.json()).status).toBe("ARCHIVED");
+});
 
 async function fillCourseFields(page: Page, formatName: string): Promise<void> {
   await page
@@ -19,7 +63,11 @@ async function fillCourseFields(page: Page, formatName: string): Promise<void> {
     .toBe(true);
   await page.getByRole("option", { name: "Medio" }).click();
   await page.getByRole("combobox", { name: "Formato de curso" }).click();
-  await page.getByRole("option", { name: new RegExp(formatName) }).click();
+  await page
+    .getByRole("option", {
+      name: new RegExp(formatName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    })
+    .click();
   await page.getByLabel("Condiciones").fill("Sujeto a confirmación de cupo.");
   for (const [label, date] of [
     ["Apertura de preinscripción", "01/01/2027"],
@@ -42,15 +90,15 @@ async function fillCourseFields(page: Page, formatName: string): Promise<void> {
 test("missing format is announced beside the selector and focuses it without an artwork error", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
+  const suffix = fixtureSuffix(testInfo);
+  const formatName = `Formato sin selección ${suffix}`;
   await signInFixture(context, AUTH_FIXTURES.admin.email);
   // This test must not depend on formats created by another spec or test.
   await page.goto("/app/formatos");
   await page.getByRole("link", { name: "Nuevo formato" }).click();
   const formatForm = page.getByRole("form", { name: "Crear formato" });
-  await formatForm
-    .getByLabel("Nombre")
-    .fill(`Formato sin selección ${Date.now()}`);
+  await formatForm.getByLabel("Nombre").fill(formatName);
   await formatForm.getByLabel("Duración total (horas)").fill("20");
   await page.getByLabel("Duración de sesión (minutos)").fill("90");
   await formatForm.getByLabel("Precio estudiante (BOB)").fill("80");
@@ -59,7 +107,7 @@ test("missing format is announced beside the selector and focuses it without an 
   await expect(page).toHaveURL(/\/app\/formatos$/);
   await page.goto("/app/cursos/nuevo");
   const create = page.getByRole("button", { name: "Crear borrador" });
-  await page.getByLabel("Nombre").fill("Curso sin formato");
+  await page.getByLabel("Nombre").fill(`Curso sin formato ${suffix}`);
   await expect(create).toBeEnabled();
   await create.click();
   const format = page.getByRole("combobox", { name: "Formato de curso" });
@@ -70,17 +118,23 @@ test("missing format is announced beside the selector and focuses it without an 
   );
   await expect(page.locator(".artwork-create-error")).toBeHidden();
   await format.click();
-  await page.getByRole("option").filter({ hasText: /BOB/ }).first().click();
+  await page
+    .getByRole("option", {
+      name: new RegExp(formatName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    })
+    .click();
   await expect(page.locator("[data-format-error]")).toBeHidden();
 });
 
 test("admin crops a photo in the new-course form and can retry a failed upload without creating another draft", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   test.setTimeout(90_000);
   await signInFixture(context, AUTH_FIXTURES.admin.email);
-  const formatName = `Formato foto ${Date.now()}`;
+  const suffix = fixtureSuffix(testInfo);
+  const formatName = `Formato foto ${suffix}`;
+  const courseName = `Curso con foto ${suffix}`;
   await page.goto("/app/formatos");
   await page.getByRole("link", { name: "Nuevo formato" }).click();
   const format = page.getByRole("form", { name: "Crear formato" });
@@ -101,7 +155,7 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
     ),
   ).toBe(true);
   await page.goto("/app/cursos/nuevo");
-  await page.getByLabel("Nombre").fill(`Curso con foto ${Date.now()}`);
+  await page.getByLabel("Nombre").fill(courseName);
   await fillCourseFields(page, formatName);
   const groups = page.locator("[data-initial-groups]");
   await groups.getByRole("button", { name: "Añadir grupo" }).click();
@@ -264,7 +318,7 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   expect(invalidResponse.status()).toBe(422);
   const invalidBody = await invalidResponse.json();
   expect(invalidBody.fieldErrors).toHaveProperty("startsAt");
-  await expect(page.getByLabel("Nombre")).toHaveValue(/Curso con foto/);
+  await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
   await expect(
     page.getByRole("img", { name: "Vista previa del recorte del curso" }),
   ).toBeVisible();
@@ -400,9 +454,10 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
 test("retries a persisted initial group after its POST response is lost and creates the remaining groups", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   await signInFixture(context, AUTH_FIXTURES.admin.email);
-  const formatName = `Formato retry grupo ${Date.now()}`;
+  const suffix = fixtureSuffix(testInfo);
+  const formatName = `Formato retry grupo ${suffix}`;
   await page.goto("/app/formatos");
   await page.getByRole("link", { name: "Nuevo formato" }).click();
   const format = page.getByRole("form", { name: "Crear formato" });
@@ -417,7 +472,7 @@ test("retries a persisted initial group after its POST response is lost and crea
     page.locator("[data-sileo-toast]").filter({ hasText: "Formato creado" }),
   ).toBeVisible();
   await page.goto("/app/cursos/nuevo");
-  await page.getByLabel("Nombre").fill(`Curso retry grupo ${Date.now()}`);
+  await page.getByLabel("Nombre").fill(`Curso retry grupo ${suffix}`);
   await fillCourseFields(page, formatName);
   const groups = page.locator("[data-initial-groups]");
   await groups.getByRole("button", { name: "Añadir grupo" }).click();
@@ -463,10 +518,12 @@ test("retries a persisted initial group after its POST response is lost and crea
 test("admin creates, validates, edits, publishes, withdraws and archives a course", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   test.setTimeout(90_000);
   await signInFixture(context, AUTH_FIXTURES.admin.email);
-  const formatName = `Formato E2E ${Date.now()}`;
+  const suffix = fixtureSuffix(testInfo);
+  const formatName = `Formato E2E ${suffix}`;
+  const courseName = `Curso E2E conservación ${suffix}`;
   await page.goto("/app/formatos");
   await page.getByRole("link", { name: "Nuevo formato" }).click();
   await page
@@ -499,10 +556,10 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     "true",
   );
   await expect(create).toBeDisabled();
-  await page.getByLabel("Nombre").fill("Curso E2E conservación");
+  await page.getByLabel("Nombre").fill(courseName);
   await expect(create).toBeEnabled();
   await expect(page).toHaveURL(/\/app\/cursos\/nuevo$/);
-  await expect(page.getByLabel("Nombre")).toHaveValue("Curso E2E conservación");
+  await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
 
   await fillCourseFields(page, formatName);
   await expect(create).toBeEnabled();
@@ -606,7 +663,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     expect(route.request().postData()).toContain(creationKey);
     const committed = await route.fetch();
     expect(committed.status()).toBe(201);
-    createdIds.push((await committed.json()).id);
+    const id: string = (await committed.json()).id;
+    createdIds.push(id);
+    lifecycleCourseIds.set(testInfo.testId, id);
     if (createdIds.length === 1) await route.abort("failed");
     else await route.fulfill({ response: committed });
   });
@@ -633,10 +692,15 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   ).toBeVisible();
   const savedCourseEditUrl = page.url();
   await page.goto("/app/cursos");
-  const savedCourseCard = page
-    .locator("article")
-    .filter({ hasText: "Curso E2E conservación" });
+  const savedCourseCard = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: courseName, exact: true }),
+  });
+  await expect(savedCourseCard).toHaveCount(1);
   await expect(savedCourseCard).toBeVisible();
+  await expect(savedCourseCard.getByRole("link")).toHaveAttribute(
+    "href",
+    `/app/cursos/${createdIds[0]}/editar`,
+  );
   await page.goto(savedCourseEditUrl);
   const save = page
     .locator(".course-form")
@@ -645,7 +709,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await page.getByLabel("Nombre").fill("Curso temporalmente inválido");
   await page.getByLabel("Nombre").clear();
   await expect(save).toBeDisabled();
-  await page.getByLabel("Nombre").fill("Curso E2E conservación");
+  await page.getByLabel("Nombre").fill(courseName);
   await expect(save).toBeDisabled();
   const gradeInput = page.getByLabel("Nota mínima (0–100)");
   await page.getByLabel("Nombre").fill("Curso temporalmente inválido");
@@ -676,7 +740,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(save).toBeDisabled();
   await courseStart.fill("01/03/2027");
   await expect(save).toBeEnabled();
-  await page.getByLabel("Nombre").fill("Curso E2E conservación");
+  await page.getByLabel("Nombre").fill(courseName);
   await expect(save).toBeDisabled();
   await page.locator('input[name="artwork"]').evaluate((input) => {
     (input as HTMLInputElement).value = "artwork/temporary.webp";
@@ -723,7 +787,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     .fill("Contenido determinista para validar el flujo administrativo.");
   await page.getByLabel("Nombre").fill("Curso E2E editado");
   await expect(save).toBeEnabled();
-  await page.getByLabel("Nombre").fill("Curso E2E conservación");
+  await page.getByLabel("Nombre").fill(courseName);
   await expect(save).toBeDisabled();
   await page.getByRole("combobox", { name: "Nivel" }).click();
   await page.getByRole("option", { name: "Básico" }).click();
@@ -786,7 +850,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   );
   await expect(markdown).toBeVisible();
   await expect(markdown).toHaveValue("## Temario\n- Unidad uno");
-  await expect(page.getByLabel("Nombre")).toHaveValue("Curso E2E conservación");
+  await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
   await expect(page.getByRole("combobox", { name: "Nivel" })).toContainText(
     "Medio",
   );

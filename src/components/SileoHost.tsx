@@ -32,6 +32,6 @@ export function SileoHost() {
   // including direct sileo calls made by page scripts before the island loads.
   // Hydrating an SSR-empty Toaster against that store can discard early toasts.
   return mounted ? (
-    <Toaster position="top-right" theme={theme} options={toastOptions} />
+    <Toaster position="bottom-right" theme={theme} options={toastOptions} />
   ) : null;
 }

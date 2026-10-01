@@ -124,6 +124,57 @@ test("private success toast uses semantic theme colors in light and dark modes",
   }
 });
 
+test("private toast placement leaves top-right page actions clickable", async ({
+  context,
+  page,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app/formatos");
+  await page.evaluate(async () => {
+    const moduleUrl = performance
+      .getEntriesByType("resource")
+      .find((entry) =>
+        /\/src\/lib\/notifications\.ts(?:\?|$)/.test(entry.name),
+      )?.name;
+    if (!moduleUrl) throw new Error("Page notifications facade was not loaded");
+    const { notifications }: typeof import("../../src/lib/notifications") =
+      await import(moduleUrl);
+    notifications.success({
+      title: "Aviso persistente de prueba",
+      duration: 60000,
+    });
+
+    const action = document.createElement("button");
+    action.type = "button";
+    action.textContent = "Acción superior derecha";
+    action.style.cssText =
+      "position:fixed;top:12px;right:12px;z-index:49;min-height:44px";
+    action.addEventListener("click", () => {
+      action.textContent = "Acción completada";
+    });
+    document.body.append(action);
+  });
+
+  await expect(
+    page
+      .locator("[data-sileo-toast]")
+      .filter({ hasText: "Aviso persistente de prueba" }),
+  ).toBeVisible();
+  await expect(page.locator("[data-sileo-viewport]")).toHaveAttribute(
+    "data-position",
+    "bottom-right",
+  );
+  await page.getByRole("button", { name: "Acción superior derecha" }).click();
+  await expect(
+    page.getByRole("button", { name: "Acción completada" }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator("[data-sileo-toast]")
+      .filter({ hasText: "Aviso persistente de prueba" }),
+  ).toBeVisible();
+});
+
 test("independent early notifications survive delayed hydration, concurrent loading updates and theme toggles", async ({
   context,
   page,
