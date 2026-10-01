@@ -50,7 +50,7 @@ async function clear() {
       sql`${auditEvents.entityType} in ('COURSE', 'COURSE_TYPE') or (${auditEvents.entityType} = 'GROUP' and ${auditEvents.actorId} in (select id from users where email = 'course.actor@repository.test'))`,
     );
   await database.db.execute(
-    sql`truncate groups, courses, course_type_revisions, course_types`,
+    sql`truncate interest_registrations, groups, courses, course_type_revisions, course_types`,
   );
   await database.db
     .delete(users)
