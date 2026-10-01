@@ -16,6 +16,7 @@ interface Props {
   placeholder: string;
   disabled?: boolean;
   error?: string;
+  required?: boolean;
 }
 
 /** A form-associated Radix Select, scoped to the course editor island. */
@@ -27,6 +28,7 @@ export default function CourseSelect({
   placeholder,
   disabled,
   error,
+  required = true,
 }: Props) {
   const [selectedValue, setSelectedValue] = useState(value);
 
@@ -43,7 +45,7 @@ export default function CourseSelect({
         value={selectedValue}
         onValueChange={setSelectedValue}
         disabled={disabled ?? false}
-        required
+        required={required}
       >
         <Select.Trigger
           id={`${name}-select`}

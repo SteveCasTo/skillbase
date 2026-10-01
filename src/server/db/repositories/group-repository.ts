@@ -8,6 +8,10 @@ import {
   overlaps,
 } from "@/domain/groups/rules";
 import * as schema from "@/server/db/schema";
+import {
+  instructorHasConflict,
+  lockInstructorSchedules,
+} from "./instructor-schedule";
 
 type Database = PostgresJsDatabase<typeof schema>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -34,6 +38,7 @@ export class DrizzleGroupRepository implements GroupRepository {
     requireAvailable = true,
     requirePlan = true,
   ) {
+    await lockInstructorSchedules(tx, id);
     const [course] = await tx
       .select()
       .from(schema.courses)
@@ -67,6 +72,19 @@ export class DrizzleGroupRepository implements GroupRepository {
     endsAt: Date,
     except?: string,
   ) {
+    const [course] = await tx
+      .select({ instructorId: schema.courses.instructorId })
+      .from(schema.courses)
+      .where(eq(schema.courses.id, courseId));
+    if (
+      await instructorHasConflict(tx, courseId, course?.instructorId, [
+        { startsAt, endsAt },
+      ])
+    )
+      throw new GroupError(
+        "SCHEDULE_CONFLICT",
+        "El instructor tiene otro curso en ese horario.",
+      );
     const existing = await tx
       .select()
       .from(schema.groups)

@@ -143,6 +143,11 @@ export function validateCourseData(input: CourseInput): CourseData {
   validateTextControls(input, "schedule", false, errors);
   validateTextControls(input, "conditions", true, errors);
   validateTextControls(input, "instructorName", false, errors);
+  if (
+    input.instructorId &&
+    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(input.instructorId)
+  )
+    errors.instructorId = "Selecciona un instructor registrado.";
   validateTextControls(input, "contentMarkdown", true, errors);
   const levelRaw = input.level ?? "";
   if (!COURSE_LEVELS.some((level) => level === levelRaw))
@@ -218,6 +223,7 @@ export function validateCourseData(input: CourseInput): CourseData {
     level: levelRaw as CourseLevel,
     contentMarkdown: input.contentMarkdown?.trim() || null,
     instructorName: input.instructorName?.trim() || null,
+    instructorId: input.instructorId?.trim() || null,
     artwork: input.artwork?.trim() || null,
     schedule,
     weekdaysMask,

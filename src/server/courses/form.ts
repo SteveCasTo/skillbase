@@ -8,7 +8,7 @@ export function courseInputFromFormData(formData: FormData): CourseInput {
     "level",
     "courseTypeId",
     "contentMarkdown",
-    "instructorName",
+    "instructorId",
     "artwork",
     "schedule",
     "weekdays",
@@ -35,7 +35,14 @@ export function courseInputFromFormData(formData: FormData): CourseInput {
       )
       .map((field) => {
         const value = formData.get(field);
-        return [field, typeof value === "string" ? value : ""];
+        return [
+          field,
+          field === "instructorId" && value === "unassigned"
+            ? ""
+            : typeof value === "string"
+              ? value
+              : "",
+        ];
       }),
   );
   if (formData.has("startDate") || formData.has("endDate"))
