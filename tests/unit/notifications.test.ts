@@ -23,7 +23,11 @@ const backend = {
     operation: Promise<T> | (() => Promise<T>),
     options: Parameters<typeof sileo.promise<T>>[1],
   ) {
-    const id = record("loading", options.loading);
+    // Match the vendor: promise-level position overwrites loading.position.
+    const id = record("loading", {
+      ...options.loading,
+      position: options.position ?? "top-right",
+    });
     const result = typeof operation === "function" ? operation() : operation;
     void result.then(
       (value) =>
@@ -79,8 +83,28 @@ describe("notification operation identity", () => {
       expect(call.options.title).toBe(options.title);
       expect(call.options.description).toBe(options.description);
       expect(call.options.duration).toBe(options.duration);
+      expect(call.options.position).toBe("bottom-right");
     }
     expect(options).not.toHaveProperty("id");
+    expect(options).not.toHaveProperty("position");
+  });
+
+  test("explicit notice and promise positions remain supported before host mount", async () => {
+    notifications.info({ title: "Elsewhere", position: "top-left" });
+    expect(calls[0]!.options.position).toBe("top-left");
+    await notifications.promise(Promise.resolve(), {
+      loading: { title: "Loading", position: "bottom-left" },
+      success: { title: "Done" },
+      error: { title: "Failed" },
+    });
+    expect(calls[1]!.options.position).toBe("bottom-left");
+    await notifications.promise(Promise.resolve(), {
+      position: "top-center",
+      loading: { title: "Loading", position: "bottom-left" },
+      success: { title: "Done" },
+      error: { title: "Failed" },
+    });
+    expect(calls[3]!.options.position).toBe("top-center");
   });
 
   test("explicit existing id updates one operation and loading stays until settled", () => {
@@ -107,6 +131,9 @@ describe("notification operation identity", () => {
     expect(firstResult).toBe(first);
     expect(secondResult).toBe(second);
     const ids = calls.map((call) => call.id);
+    expect(
+      calls.every((call) => call.options.position === "bottom-right"),
+    ).toBe(true);
     expect(ids[0]).not.toBe(ids[1]);
     expect(await firstResult).toEqual({ value: 1 });
     expect(await secondResult).toEqual({ value: 2 });
