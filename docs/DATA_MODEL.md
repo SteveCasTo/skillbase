@@ -37,6 +37,8 @@ Implementación de Fase 1:
 - las FK de `user_roles` están indexadas cuando la PK compuesta no cubre el acceso inverso.
 - todas las tablas públicas de Auth interno tienen RLS habilitado y los roles Data API `anon`/`authenticated`/`service_role` no reciben privilegios ni políticas.
 
+Fase 4 aprobada, pendiente de implementación: separar un perfil interno de instructor con nombre, apellido, email normalizado y teléfono opcional (nombre completo solamente para exposición pública). La identidad Auth permanece en Supabase Auth, nunca se copia contraseña al modelo de aplicación. Mantener ID estable para cursos e historial; perfiles referenciados no se borran físicamente. La forma final de migración y el tratamiento de desactivación con asignaciones futuras requieren implementación/revisión; esa regla de ciclo de vida aún no está aprobada.
+
 ### Course
 
 - id
@@ -65,7 +67,7 @@ Implementación actual:
 - `minimum_grade` está limitado a `0..100`; todavía no existe `minimum_attendance` ni cálculo académico.
 - `schedule` continúa como texto no vacío por compatibilidad. Los cursos nuevos usan «Lunes a viernes · horario por grupo» y los históricos conservan su texto informativo u horario planificado.
 - `weekdays_mask` es `31` para nuevos cursos planificados de lunes a viernes; los cursos históricos sin planificación estructurada lo conservan nulo. Los nuevos `starts_at`/`ends_at` representan las fechas comunes en Bolivia (00:00 de la primera y 23:59 de la última); la hora diaria vive en cada grupo. Los cursos existentes con grupos o con cierre de preinscripción el primer día conservan sus instantes horarios para no invalidar el calendario o la ventana de inscripción. Esto aún no sustituye la entidad futura de sesiones de grupo.
-- `content_markdown` e `instructor_name` son campos de texto opcionales. `artwork` almacena una key canónica del objeto de Storage, no una URL arbitraria. `featured` solo puede ser true en un curso publicado y un índice parcial permite como máximo un destacado publicado.
+- `content_markdown` e `instructor_name` son campos de texto opcionales. `instructor_name` es un campo legado, no una identidad/asignación. `artwork` almacena una key canónica del objeto de Storage, no una URL arbitraria. `featured` solo puede ser true en un curso publicado y un índice parcial permite como máximo un destacado publicado.
 - fechas públicas de inicio y fin usan `timestamptz`, son obligatorias y mantienen `starts_at < ends_at`. Para cursos nuevos planificados, la UI recibe fechas civiles `YYYY-MM-DD` y las convierte a los límites del día en `America/La_Paz` (00:00 inicial y 23:59 final); los cursos históricos que conservan horas se editan como tiempo civil estricto `YYYY-MM-DDTHH:mm`. La ventana de preinscripción también conserva precisión de hora.
 - la ventana de preinscripción usa dos `timestamptz`: ambos son nulos o ambos existen con inicio anterior al fin. La conversión inversa UTC → Bolivia preserva exactamente la hora civil al reeditar.
 - el slug normalizado es único, se genera al crear bajo un advisory lock global de asignación, resuelve colisiones —incluidas bases solapadas concurrentes— con sufijo numérico y no se modifica después.
@@ -109,6 +111,10 @@ Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no cons
 - `artwork`: key de Storage opcional, canónica y vinculada al curso; si falta o es inválida se utiliza el fallback gráfico.
 - `featured`: booleano que solo puede aplicar a publicados; índice único parcial asegura singleton entre publicados.
 - La landing omite precios y horario detallados; `/cursos/[slug]` presenta términos de la revisión referenciada y los datos editoriales públicos permitidos.
+
+#### Asignación de Instructor (diseño aprobado para Fase 4, no implementado)
+
+El objetivo es una relación de exactamente un instructor interno por curso, con todos los grupos del curso heredando el instructor a través de su curso. La asignación referencia ID estable de usuario/perfil; no duplicar nombre libre como fuente de verdad. El contrato aprobado no fija todavía columnas, tabla de asignación ni constraints de migración: decidirlo en implementación preservando referencias/historial y sin borrar perfiles usados. La validación de solapamientos comprende al mismo instructor en cursos distintos y debe abarcar todas las escrituras concurrentes relevantes; intervalo civil Bolivia L–V semiabierto y contiguo permitido. No implementar sesiones ni asistencia en Fase 4.
 
 ### Group
 

@@ -46,6 +46,14 @@ Instructor:
 
 No confiar únicamente en ocultar botones.
 
+### Extensión de cuentas y asignación de Fase 4 (pendiente)
+
+- Email/password no habilita registro público. Solo ADMIN autenticado puede aprovisionar cuenta interna mediante operación server-side; la credencial inicial no debe aparecer en logs, respuestas posteriores ni base de datos de aplicación.
+- El enlace Google requiere usuario ya autenticado, acción explícita, email del proveedor verificado y coincidencia normalizada con la identidad interna. No fusionar automáticamente identidades ni cuentas.
+- Cada ruta y query de instructor debe revalidar `INSTRUCTOR` y ownership sobre el curso en servidor; filtrar navegación no es autorización. No ampliar su permiso a módulos ajenos al perfil/cursos en esta fase.
+- Asignación única por curso y conflicto horario se validan atómicamente en servidor. Operaciones concurrentes de asignación, cambio de fechas, edición/creación de grupo y transición de estado/publicación deben usar bloqueo/transacción compartidos; una comprobación previa solo en UI no evita carreras.
+- Registrar cambios de perfil/asignación y mutaciones de cuenta en auditoría, excluyendo passwords, tokens y secretos. Sin interfaz de consulta de auditoría como parte del alcance.
+
 ## RUTAS
 
 Las rutas privadas deben validar sesión server-side.
@@ -279,3 +287,7 @@ Si un secreto se expone:
 ### Idempotencia y recuperación del alta
 
 La clave de idempotencia del curso se vincula en servidor al actor autenticado y al fingerprint de la carga validada; no se acepta identidad de actor del cliente y reutilizar la clave con datos distintos falla. Los metadatos no salen en DTOs. El artwork se asocia después de crear el borrador; ante fallo se ofrece recuperar/reintentar sobre ese borrador. No se sustituye silenciosamente la asociación existente ni se asume una transacción distribuida entre PostgreSQL y Storage. La migración aditiva 0010 no automatiza borrado de historial.
+
+### Contraseñas de cuentas internas (Fase 4 planificada)
+
+Las credenciales pertenecen exclusivamente a Supabase Auth. Crear cuenta y asignar contraseña inicial requiere API privilegiada exclusivamente server-side; no versionar secretos ni retornar/registrar la contraseña después de la respuesta inicial necesaria para entregarla al ADMIN. Nunca persistirla en PostgreSQL, auditarla, incluirla en telemetría, devolverla en cargas de navegación ni repoblar el formulario. Mantener signup público deshabilitado, protección CSRF/origen, cookies seguras, `Cache-Control: private, no-store`, redirects permitidos y rate limiting del proveedor/endpoint. Configurar y comprobar SMTP antes de prometer recuperación por correo en cloud.

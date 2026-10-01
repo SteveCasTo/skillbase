@@ -240,3 +240,10 @@ Esta actualización supersede el estado pendiente registrado el 2026-10-01, sin 
 - Una petición privada anónima a `/app/interesados` redirigió 303 a login. No se hizo sesión ni prueba manual de interfaz como ADMIN en producción.
 
 El secreto HMAC está presente en Production/Preview, con su contenido nunca leído ni registrado. Preview no tiene credenciales DB ni despliegue funcional. El smoke confirma únicamente los flujos públicos descritos; no afirmar una prueba manual administrativa en producción.
+
+## PREPARACIÓN DE FASE 4 (pendiente)
+
+- Las ramas de trabajo de Fase 4 se integran primero en `development`; no se despliega ni se promueve a `master` hasta la siguiente fase de release y sus gates/ventana autorizada.
+- Cualquier reset de datos solicitado para preparar desarrollo es local y limitado a datos de aplicación sintéticos. No ejecutar reset de Auth ni de producción. Preservar identidad/cuenta ADMIN local válida y settings/secretos de proveedor; no automatizar reset de producción en deploy. Una futura renovación de demos cloud requiere gate manual y autorización explícita.
+- Recuperación de contraseña depende de configuración SMTP de Supabase Auth: verificar remitente, proveedor y entrega en cloud antes de declarar recuperación por email lista. La verificación SMTP no bloquea el login email/password de una cuenta aprovisionada por ADMIN.
+- Las claves de Google, service role y demás secretos permanecen server-only; no poner contraseña inicial de seed en Git. La provisión de cuentas de prueba debe obtener secretos por mecanismo local ignorado/proceso y no registrarlos.
