@@ -54,7 +54,9 @@ async function clear() {
   );
   await database.db
     .delete(users)
-    .where(eq(users.email, "course.actor@repository.test"));
+    .where(
+      sql`${users.email} in ('course.actor@repository.test', 'other.course.actor@repository.test')`,
+    );
 }
 afterAll(async () => {
   await clear();
@@ -83,6 +85,145 @@ beforeEach(async () => {
 });
 
 describe("course format persistence", () => {
+  test("creation receipts roll back with a failed insert and allow a corrected retry", async () => {
+    const key = crypto.randomUUID();
+    expect(
+      await failure(
+        repository.create({ ...input(), minimumGrade: 101 }, actorId, {
+          key,
+          fingerprint: "a".repeat(64),
+        }),
+      ),
+    ).not.toBeNull();
+    expect(await repository.listAdmin()).toHaveLength(0);
+    expect(
+      await database.db
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.action, "COURSE_CREATED")),
+    ).toHaveLength(0);
+    const retry = await repository.create(input(), actorId, {
+      key,
+      fingerprint: "b".repeat(64),
+    });
+    expect(await repository.listAdmin()).toHaveLength(1);
+    expect((await repository.getAdmin(retry.id))?.minimumGrade).toBe(
+      input().minimumGrade,
+    );
+  });
+  test("creation receipts are atomic, actor-scoped and reject changed fingerprints", async () => {
+    const key = crypto.randomUUID();
+    const request = { key, fingerprint: "a".repeat(64) };
+    const [first, replay] = await Promise.all([
+      repository.create(input(), actorId, request),
+      repository.create(input(), actorId, request),
+    ]);
+    expect(replay.id).toBe(first.id);
+    const edited = await repository.update(
+      first.id,
+      { ...input(), description: "Changed after initial creation" },
+      actorId,
+      first.updatedAt,
+    );
+    const recovered = await repository.create(input(), actorId, request);
+    expect(recovered.creationRevision?.getTime()).toBe(
+      first.updatedAt.getTime(),
+    );
+    expect(recovered.updatedAt.getTime()).toBe(edited.updatedAt.getTime());
+    expect(recovered.description).toBe("Changed after initial creation");
+    expect(await repository.listAdmin()).toHaveLength(1);
+    expect(
+      await failure(
+        repository.create(input(), actorId, {
+          key,
+          fingerprint: "b".repeat(64),
+        }),
+      ),
+    ).toMatchObject({ code: "VALIDATION_FAILED" });
+    const [other] = await database.db
+      .insert(users)
+      .values({
+        email: "other.course.actor@repository.test",
+        name: "Other actor",
+      })
+      .returning();
+    if (!other) throw new Error("Missing actor");
+    const independent = await repository.create(input(), other.id, request);
+    expect(independent.id).not.toBe(first.id);
+    expect("createFingerprint" in first).toBe(false);
+    const audits = await database.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, "COURSE_CREATED"));
+    expect(audits).toHaveLength(2);
+  });
+
+  test("editorial transitions and featuring reject stale revisions under the row lock", async () => {
+    const created = await repository.create(input(), actorId);
+    const changed = await repository.update(
+      created.id,
+      { ...input(), description: "New description" },
+      actorId,
+      created.updatedAt,
+    );
+    expect(
+      await failure(
+        repository.transition(
+          created.id,
+          "PUBLISHED",
+          actorId,
+          created.updatedAt,
+        ),
+      ),
+    ).toMatchObject({ code: "STALE_COURSE" });
+    const published = await repository.transition(
+      created.id,
+      "PUBLISHED",
+      actorId,
+      changed.updatedAt,
+    );
+    expect(
+      await failure(
+        repository.setFeatured(created.id, actorId, changed.updatedAt),
+      ),
+    ).toMatchObject({ code: "STALE_COURSE" });
+    expect(
+      await failure(
+        repository.transition(
+          created.id,
+          "ARCHIVED",
+          actorId,
+          changed.updatedAt,
+        ),
+      ),
+    ).toMatchObject({ code: "STALE_COURSE" });
+    expect((await repository.getAdmin(created.id))?.status).toBe("PUBLISHED");
+    await repository.setFeatured(created.id, actorId, published.updatedAt);
+  });
+  test("editorial transitions and saves sharing one revision cannot both commit", async () => {
+    const created = await repository.create(input(), actorId);
+    const outcomes = await Promise.allSettled([
+      repository.transition(
+        created.id,
+        "PUBLISHED",
+        actorId,
+        created.updatedAt,
+      ),
+      repository.update(
+        created.id,
+        { ...input(), description: "Concurrent save" },
+        actorId,
+        created.updatedAt,
+      ),
+    ]);
+    expect(
+      outcomes.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(1);
+    const rejected = outcomes.find((result) => result.status === "rejected");
+    if (rejected?.status !== "rejected")
+      throw new Error("Missing optimistic rejection");
+    expect(rejected.reason).toMatchObject({ code: "STALE_COURSE" });
+  });
   test("keeps historical text-only courses editable when their format gains session minutes", async () => {
     const legacy = await formats.create(
       "Legacy",

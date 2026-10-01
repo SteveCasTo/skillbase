@@ -17,6 +17,7 @@ interface Props {
   errors?: Readonly<Record<string, string>>;
   disabled?: boolean;
   submitLabel: string;
+  requestKey?: string;
   intent?: "update";
   revision?: string;
   courseId?: string;
@@ -32,6 +33,7 @@ const {
   errors = {},
   disabled = false,
   submitLabel,
+  requestKey,
   intent,
   revision,
   courseId,
@@ -81,6 +83,7 @@ const currentArtworkUrl = publicArtworkUrl(
   method="post"
   class="course-form flex flex-col gap-8"
   data-course-id={courseId}
+  data-course-mutation-id={courseId}
   data-baseline={baseline ? JSON.stringify(initialValues) : undefined}
   data-group-formats={JSON.stringify(
     formats.map(({ id, sessionMinutes }) => [id, sessionMinutes]),
@@ -88,6 +91,7 @@ const currentArtworkUrl = publicArtworkUrl(
   novalidate
 >
   {intent && <input type="hidden" name="intent" value={intent} />}
+  {requestKey && <input type="hidden" name="requestKey" value={requestKey} />}
   {revision && <input type="hidden" name="revision" value={revision} />}
   <input type="hidden" name="artwork" value={values.artwork ?? ""} />
   {!courseId && (
@@ -680,8 +684,15 @@ const currentArtworkUrl = publicArtworkUrl(
 </form>
 
 <script>
+  import { notifications } from "@/lib/notifications";
+  import {
+    acquireCourseMutation,
+    synchronizeCourseRevision,
+  } from "./course-mutation-lock";
+  import { isCourseSaveResult } from "@/domain/courses/mutation-result";
   import {
     createCourseWithArtwork,
+    DefinitiveCreateError,
     isError,
     type InitialGroup,
   } from "./createCourseWithArtwork";
@@ -706,6 +717,7 @@ const currentArtworkUrl = publicArtworkUrl(
     document
       .querySelectorAll<HTMLFormElement>(".course-form")
       .forEach((form) => {
+        const mutationPath = window.location.pathname;
         const button = form.querySelector<HTMLButtonElement>(".submit-button");
         const groupList = form.querySelector<HTMLElement>(
           "[data-initial-group-list]",
@@ -889,6 +901,7 @@ const currentArtworkUrl = publicArtworkUrl(
           ? JSON.parse(form.dataset.baseline)
           : null;
         let saving = false;
+        let createdDraft = false;
         let pendingArtworkKey: string | null = null;
         window.addEventListener("course-artwork-prepared", () => {
           pendingArtworkKey = null;
@@ -935,6 +948,9 @@ const currentArtworkUrl = publicArtworkUrl(
               form.checkValidity() && draftFieldsReady(values, !baseline);
             button.disabled =
               saving ||
+              form.dataset.mutationPending === "true" ||
+              createdDraft ||
+              form.dataset.archived === "true" ||
               (baseline ? !changed || !valid : !awaitingFormat && !valid);
           };
           // FormData reads the controls' current values directly, including hidden
@@ -960,6 +976,10 @@ const currentArtworkUrl = publicArtworkUrl(
           window.addEventListener("pageshow", sync);
         }
         form.addEventListener("submit", (event) => {
+          if (saving || createdDraft) {
+            event.preventDefault();
+            return;
+          }
           if (
             !form.dataset.courseId &&
             !new FormData(form).get("courseTypeId")
@@ -1040,6 +1060,7 @@ const currentArtworkUrl = publicArtworkUrl(
               return;
             }
             if (groupError) groupError.hidden = true;
+            saving = true;
             if (button) {
               button.disabled = true;
               button.querySelector(".submit-label")?.classList.add("hidden");
@@ -1057,6 +1078,36 @@ const currentArtworkUrl = publicArtworkUrl(
               error.classList.remove("hidden");
               error.scrollIntoView({ block: "center" });
               if (draftExists) recovery.classList.remove("hidden");
+              else if (!(caught instanceof DefinitiveCreateError)) {
+                createdDraft = true; // Creation is uncertain: only retry the exact request, never a changed draft.
+                recovery.classList.remove("hidden");
+                recovery.querySelector("p")!.textContent =
+                  "No se confirmó la respuesta. Reintenta la misma solicitud para recuperar el borrador sin duplicarlo.";
+                link.hidden = true;
+                retry.hidden = false;
+                retry.textContent = "Reintentar creación";
+                retry.onclick = () => {
+                  if (saving) return;
+                  saving = true;
+                  retry.disabled = true;
+                  void notifications
+                    .promise(attempt, {
+                      loading: { title: "Recuperando borrador…" },
+                      success: { title: "Borrador creado correctamente." },
+                      error: (caught) => ({
+                        title:
+                          caught instanceof Error
+                            ? caught.message
+                            : "No se pudo recuperar el borrador.",
+                      }),
+                    })
+                    .catch(showError)
+                    .finally(() => {
+                      saving = false;
+                      retry.disabled = false;
+                    });
+                };
+              }
               if (!draftExists && button) {
                 button.disabled = false;
                 button
@@ -1067,34 +1118,71 @@ const currentArtworkUrl = publicArtworkUrl(
                   ?.classList.add("hidden");
               }
             };
-            void createCourseWithArtwork(
-              fields,
-              image,
-              groups,
-              (url, attach) => {
+            const attempt = () =>
+              createCourseWithArtwork(fields, image, groups, (url, attach) => {
                 draftExists = true;
+                createdDraft = true;
+                link.hidden = false;
+                recovery.querySelector("p")!.textContent =
+                  "El borrador ya se creó, pero faltan cambios por guardar. Puedes reintentar o abrirlo para continuar.";
                 link.href = url;
                 retry.textContent = groups.length
                   ? "Reintentar pendientes"
                   : "Reintentar foto";
                 retry.hidden = !image && !groups.length;
                 retry.onclick = () => {
+                  if (saving) return;
+                  saving = true;
                   retry.disabled = true;
                   error.classList.add("hidden");
-                  void attach()
+                  void notifications
+                    .promise(attach, {
+                      loading: { title: "Guardando pendientes…" },
+                      success: { title: "Cambios pendientes guardados." },
+                      error: (caught) => ({
+                        title:
+                          caught instanceof Error
+                            ? caught.message
+                            : "No se pudieron guardar los pendientes.",
+                      }),
+                    })
                     .catch(showError)
                     .finally(() => {
+                      saving = false;
                       retry.disabled = false;
                     });
                 };
-              },
-            ).catch(showError);
+              });
+            void notifications
+              .promise(attempt, {
+                loading: { title: "Creando borrador…" },
+                success: { title: "Borrador creado correctamente." },
+                error: (caught) => ({
+                  title:
+                    caught instanceof Error
+                      ? caught.message
+                      : "No se pudo crear el borrador.",
+                }),
+              })
+              .catch(showError)
+              .finally(() => {
+                saving = false;
+                button
+                  ?.querySelector(".submit-label")
+                  ?.classList.remove("hidden");
+                button
+                  ?.querySelector(".submit-pending")
+                  ?.classList.add("hidden");
+                form.dispatchEvent(new Event("course-form-change"));
+              });
             return;
           }
           if (form.dataset.courseId) {
             event.preventDefault();
             if (!button || saving) return;
             if (imageSelected && !preparedImage) return;
+            const release = acquireCourseMutation(form);
+            if (!release) return;
             saving = true;
             button.disabled = true;
             button.setAttribute("aria-busy", "true");
@@ -1109,149 +1197,172 @@ const currentArtworkUrl = publicArtworkUrl(
             form
               .querySelectorAll<HTMLElement>('[aria-invalid="true"]')
               .forEach((item) => item.removeAttribute("aria-invalid"));
-            void (async () => {
-              try {
-                const fields = new FormData(form);
-                if (preparedImage) {
-                  if (!pendingArtworkKey) {
-                    const upload = new FormData();
-                    upload.set("courseId", form.dataset.courseId!);
-                    upload.set("image", preparedImage);
-                    const uploaded = await fetch("/app/cursos/imagen", {
+            void notifications
+              .promise(
+                async () => {
+                  try {
+                    const fields = new FormData(form);
+                    const submittedImage = preparedImage;
+                    let submittedArtworkKey = pendingArtworkKey;
+                    if (submittedImage) {
+                      if (!submittedArtworkKey) {
+                        const upload = new FormData();
+                        upload.set("courseId", form.dataset.courseId!);
+                        upload.set("image", submittedImage);
+                        const uploaded = await fetch("/app/cursos/imagen", {
+                          method: "POST",
+                          body: upload,
+                          credentials: "same-origin",
+                        });
+                        if (
+                          uploaded.redirected ||
+                          !uploaded.headers
+                            .get("content-type")
+                            ?.includes("application/json")
+                        )
+                          throw new Error(
+                            "La sesión cambió. Recarga la página.",
+                          );
+                        const result: unknown = await uploaded.json();
+                        if (
+                          !uploaded.ok ||
+                          !result ||
+                          typeof result !== "object" ||
+                          !("artwork" in result) ||
+                          typeof result.artwork !== "string"
+                        )
+                          throw new Error(
+                            isError(result)
+                              ? result.error
+                              : "No se pudo subir la foto.",
+                          );
+                        submittedArtworkKey = result.artwork;
+                        if (preparedImage === submittedImage)
+                          pendingArtworkKey = result.artwork;
+                      }
+                      fields.set("artwork", submittedArtworkKey);
+                    }
+                    const response = await fetch(mutationPath, {
                       method: "POST",
-                      body: upload,
-                      credentials: "same-origin",
+                      headers: { Accept: "application/json" },
+                      body: fields,
                     });
                     if (
-                      uploaded.redirected ||
-                      !uploaded.headers
+                      response.redirected ||
+                      !response.headers
                         .get("content-type")
                         ?.includes("application/json")
                     )
-                      throw new Error("La sesión cambió. Recarga la página.");
-                    const result: unknown = await uploaded.json();
-                    if (
-                      !uploaded.ok ||
-                      !result ||
-                      typeof result !== "object" ||
-                      !("artwork" in result) ||
-                      typeof result.artwork !== "string"
-                    )
                       throw new Error(
-                        isError(result)
-                          ? result.error
-                          : "No se pudo subir la foto.",
+                        "La sesión cambió. Recarga la página e inténtalo de nuevo.",
                       );
-                    pendingArtworkKey = result.artwork;
-                  }
-                  fields.set("artwork", pendingArtworkKey);
-                }
-                const response = await fetch(window.location.pathname, {
-                  method: "POST",
-                  headers: { Accept: "application/json" },
-                  body: fields,
-                });
-                if (
-                  response.redirected ||
-                  !response.headers
-                    .get("content-type")
-                    ?.includes("application/json")
-                )
-                  throw new Error(
-                    "La sesión cambió. Recarga la página e inténtalo de nuevo.",
-                  );
-                const result = (await response.json()) as {
-                  revision?: string;
-                  name?: string;
-                  message?: string;
-                  errors?: Record<string, string>;
-                };
-                if (!response.ok || !result.revision) {
-                  if (error) {
-                    error.textContent =
-                      result.message ??
-                      "No se pudieron guardar los cambios. Inténtalo nuevamente.";
-                    error.hidden = false;
-                  }
-                  for (const [name, message] of Object.entries(
-                    result.errors ?? {},
-                  )) {
-                    const control = Array.from(form.elements).find(
-                      (element) =>
-                        element instanceof HTMLElement &&
-                        element.getAttribute("name") === name,
+                    const result = (await response.json()) as {
+                      revision?: string;
+                      name?: string;
+                      message?: string;
+                      errors?: Record<string, string>;
+                    };
+                    if (!response.ok || !isCourseSaveResult(result)) {
+                      if (error) {
+                        error.textContent =
+                          result.message ??
+                          "No se pudieron guardar los cambios. Inténtalo nuevamente.";
+                        error.hidden = false;
+                      }
+                      for (const [name, message] of Object.entries(
+                        result.errors ?? {},
+                      )) {
+                        const control = Array.from(form.elements).find(
+                          (element) =>
+                            element instanceof HTMLElement &&
+                            element.getAttribute("name") === name,
+                        );
+                        if (!(control instanceof HTMLElement)) continue;
+                        const hint = document.createElement("p");
+                        hint.dataset.asyncFieldError = name;
+                        hint.className = "mt-1 text-sm text-destructive";
+                        hint.textContent = message;
+                        const wrapper =
+                          control.closest("label") ?? control.parentElement;
+                        wrapper?.append(hint);
+                        control.setAttribute("aria-invalid", "true");
+                      }
+                      error?.scrollIntoView({ block: "center" });
+                      throw new Error(
+                        result.message ?? "Revisa los campos del formulario.",
+                      );
+                    }
+                    if (!form.isConnected) return; // A late response must not update another course after navigation.
+                    synchronizeCourseRevision(
+                      form.dataset.courseId!,
+                      result.revision,
                     );
-                    if (!(control instanceof HTMLElement)) continue;
-                    const hint = document.createElement("p");
-                    hint.dataset.asyncFieldError = name;
-                    hint.className = "mt-1 text-sm text-destructive";
-                    hint.textContent = message;
-                    const wrapper =
-                      control.closest("label") ?? control.parentElement;
-                    wrapper?.append(hint);
-                    control.setAttribute("aria-invalid", "true");
+                    if (submittedImage && submittedArtworkKey) {
+                      form.querySelector<HTMLInputElement>(
+                        'input[name="artwork"]',
+                      )!.value = submittedArtworkKey;
+                      if (preparedImage === submittedImage) {
+                        window.dispatchEvent(
+                          new CustomEvent("course-artwork-saved", {
+                            detail: submittedArtworkKey,
+                          }),
+                        );
+                        preparedImage = null;
+                        imageSelected = false;
+                        pendingArtworkKey = null;
+                      }
+                    }
+                    baseline = Object.fromEntries(
+                      [...fields].filter(
+                        (entry): entry is [string, string] =>
+                          typeof entry[1] === "string" &&
+                          entry[0] in (baseline ?? {}),
+                      ),
+                    );
+                    form.dataset.baseline = JSON.stringify(baseline);
+                    form.dispatchEvent(new Event("course-form-change"));
+                    const breadcrumb = document.querySelector<HTMLElement>(
+                      'nav[aria-label="Ruta de navegación"] [aria-current="page"]',
+                    );
+                    if (breadcrumb && result.name)
+                      breadcrumb.textContent = result.name;
+                    if (result.name)
+                      document.title = `Editar ${result.name} | SkillBase`;
+                  } catch (caught) {
+                    if (error) {
+                      error.textContent =
+                        caught instanceof Error
+                          ? caught.message
+                          : "No se pudieron guardar los cambios. Inténtalo nuevamente.";
+                      error.hidden = false;
+                      error.scrollIntoView({ block: "center" });
+                    }
+                    throw caught;
+                  } finally {
+                    saving = false;
+                    release();
+                    button
+                      .querySelector(".submit-label")
+                      ?.classList.remove("hidden");
+                    button
+                      .querySelector(".submit-pending")
+                      ?.classList.add("hidden");
+                    button.removeAttribute("aria-busy");
+                    form.dispatchEvent(new Event("course-form-change"));
                   }
-                  error?.scrollIntoView({ block: "center" });
-                  return;
-                }
-                form.querySelector<HTMLInputElement>(
-                  'input[name="revision"]',
-                )!.value = result.revision;
-                if (pendingArtworkKey) {
-                  form.querySelector<HTMLInputElement>(
-                    'input[name="artwork"]',
-                  )!.value = pendingArtworkKey;
-                  window.dispatchEvent(
-                    new CustomEvent("course-artwork-saved", {
-                      detail: pendingArtworkKey,
-                    }),
-                  );
-                  preparedImage = null;
-                  imageSelected = false;
-                  pendingArtworkKey = null;
-                }
-                baseline = Object.fromEntries(
-                  [...new FormData(form)].filter(
-                    (entry): entry is [string, string] =>
-                      typeof entry[1] === "string" &&
-                      entry[0] in (baseline ?? {}),
-                  ),
-                );
-                form.dataset.baseline = JSON.stringify(baseline);
-                form.dispatchEvent(new Event("course-form-change"));
-                const breadcrumb = document.querySelector<HTMLElement>(
-                  'nav[aria-label="Ruta de navegación"] [aria-current="page"]',
-                );
-                if (breadcrumb && result.name)
-                  breadcrumb.textContent = result.name;
-                if (result.name)
-                  document.title = `Editar ${result.name} | SkillBase`;
-                const { sileo } = await import("sileo");
-                sileo.success({
-                  title: "Cambios guardados correctamente.",
-                  duration: 6000,
-                });
-              } catch (caught) {
-                if (error) {
-                  error.textContent =
-                    caught instanceof Error
-                      ? caught.message
-                      : "No se pudieron guardar los cambios. Inténtalo nuevamente.";
-                  error.hidden = false;
-                  error.scrollIntoView({ block: "center" });
-                }
-              } finally {
-                saving = false;
-                button
-                  .querySelector(".submit-label")
-                  ?.classList.remove("hidden");
-                button
-                  .querySelector(".submit-pending")
-                  ?.classList.add("hidden");
-                button.removeAttribute("aria-busy");
-                form.dispatchEvent(new Event("course-form-change"));
-              }
-            })();
+                },
+                {
+                  loading: { title: "Guardando cambios…" },
+                  success: { title: "Cambios guardados correctamente." },
+                  error: (caught) => ({
+                    title:
+                      caught instanceof Error
+                        ? caught.message
+                        : "No se pudieron guardar los cambios.",
+                  }),
+                },
+              )
+              .catch(() => {});
             return;
           }
           if (!button) return;

@@ -104,6 +104,8 @@ const baseline = course ? valuesFromCourse(course) : undefined;
 let values: CourseInput = course ? valuesFromCourse(course) : {};
 let errors: Readonly<Record<string, string>> = {};
 let pageError: string | null = null;
+let renderedRevision = course?.updatedAt.toISOString() ?? "";
+let reconciliationRequired = false;
 const successMessages = {
   created: "Borrador creado. Ya puedes añadir una foto.",
   updated: "Cambios guardados correctamente.",
@@ -127,6 +129,7 @@ if (course && Astro.request.method === "POST") {
       "La solicitud no tiene un origen válido. Recarga la página e inténtalo de nuevo.";
   } else {
     const formData = await Astro.request.formData();
+    renderedRevision = String(formData.get("revision") ?? "");
     const intent = formData.get("intent");
     try {
       if (intent === "update") {
@@ -149,12 +152,22 @@ if (course && Astro.request.method === "POST") {
             JSON.stringify({
               revision: course.updatedAt.toISOString(),
               name: course.name,
+              course: {
+                id: course.id,
+                status: course.status,
+                featured: course.featured,
+              },
             }),
             { headers: { "Content-Type": "application/json" } },
           );
         return Astro.redirect(`/app/cursos/${id}/editar?success=updated`, 303);
       } else if (intent === "publish") {
-        course = await publishCourse(repository, user, id);
+        course = await publishCourse(
+          repository,
+          user,
+          id,
+          String(formData.get("revision") ?? ""),
+        );
         if (wantsJson)
           return new Response(
             JSON.stringify({
@@ -174,7 +187,12 @@ if (course && Astro.request.method === "POST") {
           303,
         );
       } else if (intent === "withdraw") {
-        course = await withdrawCourse(repository, user, id);
+        course = await withdrawCourse(
+          repository,
+          user,
+          id,
+          String(formData.get("revision") ?? ""),
+        );
         if (wantsJson)
           return new Response(
             JSON.stringify({
@@ -194,7 +212,12 @@ if (course && Astro.request.method === "POST") {
           303,
         );
       } else if (intent === "archive") {
-        course = await archiveCourse(repository, user, id);
+        course = await archiveCourse(
+          repository,
+          user,
+          id,
+          String(formData.get("revision") ?? ""),
+        );
         if (wantsJson)
           return new Response(
             JSON.stringify({
@@ -211,7 +234,12 @@ if (course && Astro.request.method === "POST") {
           );
         return Astro.redirect(`/app/cursos/${id}/editar?success=archived`, 303);
       } else if (intent === "feature") {
-        course = await featureCourse(repository, user, id);
+        course = await featureCourse(
+          repository,
+          user,
+          id,
+          String(formData.get("revision") ?? ""),
+        );
         if (wantsJson)
           return new Response(
             JSON.stringify({
@@ -234,6 +262,8 @@ if (course && Astro.request.method === "POST") {
       if (course) values = valuesFromCourse(course);
     } catch (error) {
       if (error instanceof CourseDomainError) {
+        reconciliationRequired =
+          error.code === "STALE_COURSE" || Boolean(error.fieldErrors.revision);
         Astro.response.status = courseDomainStatus(error);
         errors = error.fieldErrors;
         pageError =
@@ -253,6 +283,25 @@ if (course && Astro.request.method === "POST") {
     }
   }
 }
+if (wantsJson && Astro.request.method === "GET")
+  return new Response(
+    JSON.stringify(
+      course
+        ? {
+            id: course.id,
+            revision: course.updatedAt.toISOString(),
+            artwork: course.artwork,
+          }
+        : { message: "El curso no existe." },
+    ),
+    {
+      status: Astro.response.status,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "private, no-store",
+      },
+    },
+  );
 if (wantsJson && Astro.request.method === "POST")
   return new Response(JSON.stringify({ message: pageError, errors }), {
     status: Astro.response.status,
@@ -303,14 +352,28 @@ const statusLabel = {
           class="flex flex-wrap items-center gap-2 lg:justify-end"
           aria-label="Estado y acciones del curso"
         >
-          <span class="rounded-full bg-secondary px-3 py-1.5 text-sm font-semibold text-secondary-foreground">
+          <span
+            data-course-status
+            tabindex="-1"
+            class="rounded-full bg-secondary px-3 py-1.5 text-sm font-semibold text-secondary-foreground"
+          >
             {statusLabel[course.status]}
           </span>
           {course.status !== "ARCHIVED" && (
             <>
-              {course.status === "PUBLISHED" && !course.featured && (
-                <form method="post" class="mutation-form">
+              {
+                <form
+                  method="post"
+                  class="mutation-form"
+                  data-course-mutation-id={course.id}
+                  hidden={course.status !== "PUBLISHED" || course.featured}
+                >
                   <input type="hidden" name="intent" value="feature" />
+                  <input
+                    type="hidden"
+                    name="revision"
+                    value={renderedRevision}
+                  />
                   <button
                     type="submit"
                     class="inline-flex min-h-11 items-center rounded-lg border px-3 text-sm font-semibold hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
@@ -328,22 +391,33 @@ const statusLabel = {
                     Destacar en la cartelera
                   </button>
                 </form>
-              )}
-              {course.featured && (
-                <span class="text-sm font-medium">
+              }
+              {
+                <span
+                  data-course-featured
+                  hidden={!course.featured}
+                  class="text-sm font-medium"
+                >
                   Destacado en la cartelera
                 </span>
-              )}
+              }
               <div data-confirm-actions hidden class="flex flex-wrap gap-2">
-                {(course.status === "DRAFT"
-                  ? [{ intent: "publish", label: "Publicar curso" }]
-                  : [{ intent: "withdraw", label: "Retirar publicación" }]
-                )
+                {[
+                  { intent: "publish", label: "Publicar curso" },
+                  { intent: "withdraw", label: "Retirar publicación" },
+                ]
                   .concat([{ intent: "archive", label: "Archivar curso" }])
                   .map((action) => (
                     <button
                       type="button"
                       data-confirm-trigger={action.intent}
+                      hidden={
+                        action.intent === "publish"
+                          ? course.status !== "DRAFT"
+                          : action.intent === "withdraw"
+                            ? course.status !== "PUBLISHED"
+                            : false
+                      }
                       class="inline-flex min-h-11 items-center rounded-lg border px-3 text-sm font-semibold hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
                     >
                       <svg
@@ -409,6 +483,7 @@ const statusLabel = {
                       </summary>
                       <form
                         method="post"
+                        data-course-mutation-id={course.id}
                         data-astro-reload
                         class="absolute right-0 z-10 mt-1 w-[min(18rem,calc(100vw-2rem))] rounded-lg border bg-card p-4 shadow-md mutation-form"
                       >
@@ -416,6 +491,11 @@ const statusLabel = {
                           type="hidden"
                           name="intent"
                           value={action.intent}
+                        />
+                        <input
+                          type="hidden"
+                          name="revision"
+                          value={renderedRevision}
                         />
                         <p class="mb-3 text-sm text-muted-foreground">
                           {action.description}
@@ -449,9 +529,11 @@ const statusLabel = {
           <form
             method="post"
             data-course-dialog-form
+            data-course-mutation-id={course.id}
             class="mt-6 flex flex-wrap justify-end gap-3"
           >
             <input type="hidden" name="intent" />
+            <input type="hidden" name="revision" value={renderedRevision} />
             <button
               type="button"
               data-dialog-cancel
@@ -485,12 +567,36 @@ const statusLabel = {
           {pageError}
         </p>
       )}
+      {reconciliationRequired && (
+        <div class="mt-3 text-sm">
+          <p>
+            Conservamos la revisión anterior. Reenviar no reemplazará los
+            cambios de otra persona. Carga los valores actuales para revisarlos;
+            esta acción descarta el intento mostrado.
+          </p>
+          <a
+            href={`/app/cursos/${course.id}/editar`}
+            data-astro-reload
+            class="mt-2 inline-flex min-h-11 items-center rounded-lg border px-4 font-semibold focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            Cargar valores actuales
+          </a>
+        </div>
+      )}
       <p
         data-save-error
         role="alert"
         hidden
         class="mt-7 rounded-lg border border-destructive/40 bg-card px-4 py-3 text-sm text-destructive"
       ></p>
+      <button
+        type="button"
+        data-editorial-retry
+        hidden
+        class="mt-3 min-h-11 rounded-lg border px-4 text-sm font-semibold"
+      >
+        Reintentar acción
+      </button>
       <div class="mt-8">
         <CourseForm
           values={values}
@@ -499,7 +605,7 @@ const statusLabel = {
           disabled={course.status === "ARCHIVED"}
           submitLabel="Guardar cambios"
           intent="update"
-          revision={course.updatedAt.toISOString()}
+          revision={renderedRevision}
           courseId={course.id}
           {baseline}
           pinnedFormat={
@@ -513,8 +619,12 @@ const statusLabel = {
         />
       </div>
       <script>
-        import { navigate } from "astro:transitions/client";
-        import { sileo } from "sileo";
+        import { notifications } from "@/lib/notifications";
+        import {
+          acquireCourseMutation,
+          synchronizeCourseRevision,
+        } from "@/components/courses/course-mutation-lock";
+        import { isEditorialResult } from "@/domain/courses/mutation-result";
         document.addEventListener("astro:page-load", () => {
           if (
             !/^\/app\/cursos\/[^/]+\/editar\/?$/.test(window.location.pathname)
@@ -533,7 +643,7 @@ const statusLabel = {
           };
           const message = success ? messages[success] : undefined;
           if (message) {
-            sileo.success({ title: message, duration: 6000 });
+            notifications.success({ title: message, duration: 6000 });
             const url = new URL(window.location.href);
             url.searchParams.delete("success");
             window.history.replaceState(
@@ -554,6 +664,76 @@ const statusLabel = {
           const error =
             document.querySelector<HTMLElement>("[data-save-error]");
           let trigger: HTMLButtonElement | null = null;
+          let restoreAfterMutation = false;
+          let pending = false;
+          const mutationPath = window.location.pathname;
+          const originalEditor =
+            document.querySelector<HTMLFormElement>(".course-form");
+          let failedForm: HTMLFormElement | null = null;
+          let failedIntent = "";
+          const retry = document.querySelector<HTMLButtonElement>(
+            "[data-editorial-retry]",
+          );
+          retry?.addEventListener("click", () => {
+            if (!pending && failedForm) {
+              failedForm.querySelector<HTMLInputElement>(
+                'input[name="intent"]',
+              )!.value = failedIntent;
+              failedForm.requestSubmit();
+            }
+          });
+          const renderEditorial = (result: {
+            status: string;
+            revision: string;
+            featured: boolean;
+          }) => {
+            if (!originalEditor?.isConnected) return;
+            document.querySelector<HTMLElement>(
+              "[data-course-status]",
+            )!.textContent =
+              result.status === "PUBLISHED"
+                ? "Publicado"
+                : result.status === "ARCHIVED"
+                  ? "Archivado"
+                  : "Borrador";
+            synchronizeCourseRevision(
+              originalEditor.dataset.courseId!,
+              result.revision,
+            );
+            actions
+              ?.querySelectorAll<HTMLButtonElement>("[data-confirm-trigger]")
+              .forEach((button) => {
+                button.hidden =
+                  result.status === "ARCHIVED" ||
+                  (button.dataset.confirmTrigger === "publish" &&
+                    result.status !== "DRAFT") ||
+                  (button.dataset.confirmTrigger === "withdraw" &&
+                    result.status !== "PUBLISHED");
+              });
+            const feature = document.querySelector<HTMLFormElement>(
+              ".mutation-form:not([data-astro-reload])",
+            );
+            if (feature)
+              feature.hidden = result.status !== "PUBLISHED" || result.featured;
+            const featured = document.querySelector<HTMLElement>(
+              "[data-course-featured]",
+            );
+            if (featured) featured.hidden = !result.featured;
+            if (result.status === "ARCHIVED") {
+              const form = document.querySelector<HTMLFormElement>(
+                "form[data-course-id]",
+              );
+              if (form) {
+                form.inert = true;
+                form.dataset.archived = "true";
+                form
+                  .querySelectorAll<
+                    HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement
+                  >("input, button, textarea")
+                  .forEach((control) => (control.disabled = true));
+              }
+            }
+          };
           if (dialog && actions && dialogForm) {
             document
               .querySelectorAll<HTMLElement>("[data-confirm-fallback-actions]")
@@ -573,6 +753,8 @@ const statusLabel = {
               .querySelectorAll<HTMLButtonElement>("[data-confirm-trigger]")
               .forEach((button) =>
                 button.addEventListener("click", () => {
+                  if (pending) return;
+                  restoreAfterMutation = false;
                   trigger = button;
                   const intent = button.dataset.confirmTrigger ?? "";
                   dialogForm.querySelector<HTMLInputElement>(
@@ -593,71 +775,135 @@ const statusLabel = {
             dialog
               .querySelector<HTMLButtonElement>("[data-dialog-cancel]")
               ?.addEventListener("click", () => dialog.close());
-            dialog.addEventListener("close", () => trigger?.focus());
+            dialog.addEventListener("close", () => {
+              if (!restoreAfterMutation) trigger?.focus();
+            });
             dialogForm.addEventListener("submit", (event) => {
               event.preventDefault();
               const button = dialogForm.querySelector<HTMLButtonElement>(
                 'button[type="submit"]',
               )!;
-              if (button.disabled) return;
+              if (pending) return;
+              const release = acquireCourseMutation(dialogForm);
+              if (!release) return;
+              pending = true;
+              if (retry) retry.hidden = true;
               button.disabled = true;
               button.setAttribute("aria-busy", "true");
               if (error) error.hidden = true;
               const intent = dialogForm.querySelector<HTMLInputElement>(
                 'input[name="intent"]',
               )!.value;
-              void (async () => {
-                try {
-                  const response = await fetch(window.location.pathname, {
-                    method: "POST",
-                    headers: { Accept: "application/json" },
-                    body: new FormData(dialogForm),
-                  });
-                  if (
-                    response.redirected ||
-                    !response.headers
-                      .get("content-type")
-                      ?.includes("application/json")
-                  )
-                    throw new Error(
-                      "La sesión cambió. Recarga la página e inténtalo de nuevo.",
-                    );
-                  const result: unknown = await response.json();
-                  if (
-                    !response.ok ||
-                    !result ||
-                    typeof result !== "object" ||
-                    !("revision" in result) ||
-                    typeof result.revision !== "string"
-                  )
-                    throw new Error(
-                      result &&
-                        typeof result === "object" &&
-                        "message" in result &&
-                        typeof result.message === "string"
-                        ? result.message
-                        : "No se pudo completar la acción.",
-                    );
-                  dialog.close();
-                  await navigate(
-                    `${window.location.pathname}?success=${intent === "publish" ? "published" : intent === "withdraw" ? "withdrawn" : "archived"}`,
-                  );
-                } catch (failure) {
-                  dialog.close();
-                  if (error) {
-                    error.textContent =
-                      failure instanceof Error
-                        ? failure.message
-                        : "No se pudo completar la acción.";
-                    error.hidden = false;
-                    error.setAttribute("tabindex", "-1");
-                    error.focus();
-                  }
-                } finally {
-                  button.disabled = false;
-                  button.removeAttribute("aria-busy");
-                }
-              })();
+              const acceptedTrigger = trigger;
+              restoreAfterMutation = true;
+              dialog.close();
+              void notifications
+                .promise(
+                  async () => {
+                    try {
+                      const response = await fetch(mutationPath, {
+                        method: "POST",
+                        headers: { Accept: "application/json" },
+                        body: new FormData(dialogForm),
+                      });
+                      if (
+                        response.redirected ||
+                        !response.headers
+                          .get("content-type")
+                          ?.includes("application/json")
+                      )
+                        throw new Error(
+                          "La sesión cambió. Recarga la página e inténtalo de nuevo.",
+                        );
+                      const result: unknown = await response.json();
+                      if (
+                        !response.ok ||
+                        !result ||
+                        typeof result !== "object" ||
+                        !("revision" in result) ||
+                        !isEditorialResult(result, intent)
+                      )
+                        throw new Error(
+                          result &&
+                            typeof result === "object" &&
+                            "message" in result &&
+                            typeof result.message === "string"
+                            ? result.message
+                            : "No se pudo completar la acción.",
+                        );
+                      if (
+                        !("status" in result) ||
+                        typeof result.status !== "string" ||
+                        !("featured" in result) ||
+                        typeof result.featured !== "boolean"
+                      )
+                        throw new Error(
+                          "Respuesta no válida. Inténtalo nuevamente.",
+                        );
+                      renderEditorial({
+                        status: result.status,
+                        revision: result.revision,
+                        featured: result.featured,
+                      });
+                    } catch (failure) {
+                      failedForm = dialogForm;
+                      failedIntent = intent;
+                      if (retry) retry.hidden = false;
+                      dialog.close();
+                      if (error) {
+                        error.textContent =
+                          failure instanceof Error
+                            ? failure.message
+                            : "No se pudo completar la acción.";
+                        error.hidden = false;
+                        error.setAttribute("tabindex", "-1");
+                        error.focus();
+                      }
+                      throw failure;
+                    } finally {
+                      pending = false;
+                      release();
+                      if (
+                        originalEditor?.isConnected &&
+                        document.activeElement === document.body
+                      ) {
+                        const target =
+                          acceptedTrigger?.isConnected &&
+                          !acceptedTrigger.hidden &&
+                          !acceptedTrigger.disabled
+                            ? acceptedTrigger
+                            : (actions?.querySelector<HTMLButtonElement>(
+                                "[data-confirm-trigger]:not([hidden]):not(:disabled)",
+                              ) ??
+                              document.querySelector<HTMLElement>(
+                                "[data-course-status]",
+                              ));
+                        target?.focus();
+                      }
+                      button.removeAttribute("aria-busy");
+                    }
+                  },
+                  {
+                    loading: { title: "Guardando…" },
+                    success: {
+                      title:
+                        messages[
+                          intent === "publish"
+                            ? "published"
+                            : intent === "withdraw"
+                              ? "withdrawn"
+                              : "archived"
+                        ] ?? "Cambio guardado.",
+                    },
+                    error: (failure) => ({
+                      title:
+                        failure instanceof Error
+                          ? failure.message
+                          : "No se pudo completar la acción.",
+                    }),
+                  },
+                )
+                .catch(() => {});
             });
           }
           document
@@ -670,54 +916,90 @@ const statusLabel = {
                 const button = form.querySelector<HTMLButtonElement>(
                   'button[type="submit"]',
                 );
-                if (!button || button.disabled) return;
+                if (!button || pending) return;
+                const release = acquireCourseMutation(form);
+                if (!release) return;
+                pending = true;
+                if (retry) retry.hidden = true;
+                if (error) error.hidden = true;
                 button.disabled = true;
-                void (async () => {
-                  try {
-                    const response = await fetch(window.location.pathname, {
-                      method: "POST",
-                      headers: { Accept: "application/json" },
-                      body: new FormData(form),
-                    });
-                    if (
-                      response.redirected ||
-                      !response.headers
-                        .get("content-type")
-                        ?.includes("application/json")
-                    )
-                      throw new Error(
-                        "La sesión cambió. Recarga la página e inténtalo de nuevo.",
-                      );
-                    const result: unknown = await response.json();
-                    if (
-                      !response.ok ||
-                      !result ||
-                      typeof result !== "object" ||
-                      !("revision" in result)
-                    )
-                      throw new Error(
-                        result &&
-                          typeof result === "object" &&
-                          "message" in result &&
-                          typeof result.message === "string"
-                          ? result.message
-                          : "No se pudo completar la acción.",
-                      );
-                    await navigate(
-                      `${window.location.pathname}?success=featured`,
-                    );
-                  } catch (failure) {
-                    if (error) {
-                      error.textContent =
-                        failure instanceof Error
-                          ? failure.message
-                          : "No se pudo completar la acción.";
-                      error.hidden = false;
-                    }
-                  } finally {
-                    button.disabled = false;
-                  }
-                })();
+                void notifications
+                  .promise(
+                    async () => {
+                      try {
+                        const response = await fetch(mutationPath, {
+                          method: "POST",
+                          headers: { Accept: "application/json" },
+                          body: new FormData(form),
+                        });
+                        if (
+                          response.redirected ||
+                          !response.headers
+                            .get("content-type")
+                            ?.includes("application/json")
+                        )
+                          throw new Error(
+                            "La sesión cambió. Recarga la página e inténtalo de nuevo.",
+                          );
+                        const result: unknown = await response.json();
+                        if (
+                          !response.ok ||
+                          !result ||
+                          typeof result !== "object" ||
+                          !isEditorialResult(result, "feature")
+                        )
+                          throw new Error(
+                            result &&
+                              typeof result === "object" &&
+                              "message" in result &&
+                              typeof result.message === "string"
+                              ? result.message
+                              : "No se pudo completar la acción.",
+                          );
+                        if (
+                          !("status" in result) ||
+                          typeof result.status !== "string" ||
+                          !("featured" in result) ||
+                          typeof result.featured !== "boolean" ||
+                          typeof result.revision !== "string"
+                        )
+                          throw new Error(
+                            "Respuesta no válida. Inténtalo nuevamente.",
+                          );
+                        renderEditorial({
+                          status: result.status,
+                          revision: result.revision,
+                          featured: result.featured,
+                        });
+                      } catch (failure) {
+                        failedForm = form;
+                        failedIntent = "feature";
+                        if (retry) retry.hidden = false;
+                        if (error) {
+                          error.textContent =
+                            failure instanceof Error
+                              ? failure.message
+                              : "No se pudo completar la acción.";
+                          error.hidden = false;
+                        }
+                        throw failure;
+                      } finally {
+                        pending = false;
+                        release();
+                      }
+                    },
+                    {
+                      loading: { title: "Guardando…" },
+                      success: { title: "Curso seleccionado como destacado." },
+                      error: (failure) => ({
+                        title:
+                          failure instanceof Error
+                            ? failure.message
+                            : "No se pudo completar la acción.",
+                      }),
+                    },
+                  )
+                  .catch(() => {});
               }),
             );
         });

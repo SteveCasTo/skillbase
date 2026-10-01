@@ -6,7 +6,11 @@ import type {
 } from "@/domain/courses/types";
 
 export interface CourseRepository {
-  create(input: CourseData, actorId: string): Promise<AdminCourseDto>;
+  create(
+    input: CourseData,
+    actorId: string,
+    request?: { key: string; fingerprint: string },
+  ): Promise<AdminCourseDto & { creationRevision?: Date }>;
   update(
     id: string,
     input: CourseData,
@@ -17,8 +21,13 @@ export interface CourseRepository {
     id: string,
     next: CourseStatus,
     actorId: string,
+    expectedUpdatedAt?: Date,
   ): Promise<AdminCourseDto>;
-  setFeatured(id: string, actorId: string): Promise<AdminCourseDto>;
+  setFeatured(
+    id: string,
+    actorId: string,
+    expectedUpdatedAt?: Date,
+  ): Promise<AdminCourseDto>;
   listAdmin(): Promise<readonly AdminCourseDto[]>;
   getAdmin(id: string): Promise<AdminCourseDto | null>;
   listPublic(now?: Date): Promise<readonly PublicCourseDto[]>;

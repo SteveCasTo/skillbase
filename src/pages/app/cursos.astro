@@ -186,7 +186,7 @@ const levelLabel = {
     </section>
   )}
   <script>
-    import { sileo } from "sileo";
+    import { notifications } from "@/lib/notifications";
     document.addEventListener("astro:page-load", () => {
       if (window.location.pathname !== "/app/cursos") return;
       const success = new URLSearchParams(window.location.search).get(
@@ -199,7 +199,7 @@ const levelLabel = {
       const message = success ? messages[success] : undefined;
       if (message) {
         {
-          sileo.success({ title: message, duration: 6000 });
+          notifications.success({ title: message, duration: 6000 });
           const url = new URL(window.location.href);
           url.searchParams.delete("success");
           window.history.replaceState(

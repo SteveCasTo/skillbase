@@ -61,8 +61,11 @@ function prices(revision: Revision): readonly CoursePrice[] {
 }
 
 function admin(row: Row, revision: Revision, now = new Date()): AdminCourseDto {
+  const { createActorId, createRequestKey, createFingerprint, ...visible } =
+    row;
+  void [createActorId, createRequestKey, createFingerprint]; // Internal receipts never enter DTOs.
   return {
-    ...row,
+    ...visible,
     courseTypeId: revision.courseTypeId,
     totalHours: revision.totalHours,
     sessionMinutes: revision.sessionMinutes,
@@ -255,11 +258,46 @@ function nextVersion(previous: Date) {
 export class DrizzleCourseRepository implements CourseRepository {
   constructor(private readonly db: Database) {}
 
-  async create(input: CourseData, actorId: string): Promise<AdminCourseDto> {
+  async create(
+    input: CourseData,
+    actorId: string,
+    request?: { key: string; fingerprint: string },
+  ): Promise<AdminCourseDto & { creationRevision?: Date }> {
     return persistence("create", () =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+        if (request) {
+          const [receipt] = await tx
+            .select()
+            .from(schema.courses)
+            .where(
+              and(
+                eq(schema.courses.createActorId, actorId),
+                eq(schema.courses.createRequestKey, request.key),
+              ),
+            );
+          if (receipt) {
+            if (receipt.createFingerprint !== request.fingerprint)
+              throw new CourseDomainError(
+                "VALIDATION_FAILED",
+                "La solicitud ya fue usada con otros datos. Reintenta los datos originales o abre el borrador.",
+              );
+            return {
+              ...admin(
+                receipt,
+                revisionFor(receipt, await revisions(tx, [receipt])),
+              ),
+              creationRevision: receipt.createdAt,
+            };
+          }
+        }
         const revision = await currentRevision(tx, input.courseTypeId);
+        if (request && input.startsAt.getTime() < Date.now())
+          throw new CourseDomainError(
+            "VALIDATION_FAILED",
+            "El inicio de un curso nuevo debe ser futuro.",
+            { startsAt: "Selecciona una fecha futura." },
+          );
         assertSchedule(input, revision);
         const baseSlug = normalizeSlug(input.name);
         await tx.execute(sql`select pg_advisory_xact_lock(20260915, 1)`);
@@ -273,13 +311,22 @@ export class DrizzleCourseRepository implements CourseRepository {
         let slug = baseSlug;
         for (let suffix = 2; used.has(slug); suffix++)
           slug = `${baseSlug}-${suffix}`;
+        const createdAt = new Date();
         const [row] = await tx
           .insert(schema.courses)
           .values({
             ...values(input),
             courseTypeRevisionId: revision.id,
             slug,
-            updatedAt: new Date(),
+            createdAt,
+            updatedAt: createdAt,
+            ...(request
+              ? {
+                  createActorId: actorId,
+                  createRequestKey: request.key,
+                  createFingerprint: request.fingerprint,
+                }
+              : {}),
           })
           .returning();
         if (!row) throw new Error("Course insert failed");
@@ -290,7 +337,10 @@ export class DrizzleCourseRepository implements CourseRepository {
           action: "COURSE_CREATED",
           metadata: { slug },
         });
-        return admin(row, revision);
+        return {
+          ...admin(row, revision),
+          ...(request ? { creationRevision: row.createdAt } : {}),
+        };
       }),
     );
   }
@@ -410,6 +460,7 @@ export class DrizzleCourseRepository implements CourseRepository {
     id: string,
     next: CourseStatus,
     actorId: string,
+    expectedUpdatedAt?: Date,
   ): Promise<AdminCourseDto> {
     return persistence("transition", () =>
       this.db.transaction(async (tx) => {
@@ -423,6 +474,14 @@ export class DrizzleCourseRepository implements CourseRepository {
           throw new CourseDomainError(
             "COURSE_NOT_FOUND",
             "El curso no existe.",
+          );
+        if (
+          expectedUpdatedAt &&
+          previous.updatedAt.getTime() !== expectedUpdatedAt.getTime()
+        )
+          throw new CourseDomainError(
+            "STALE_COURSE",
+            "El curso cambió desde que abriste esta página. Recarga y revisa antes de continuar.",
           );
         assertTransition(previous.status, next);
         const existing = revisionFor(previous, await revisions(tx, [previous]));
@@ -494,7 +553,11 @@ export class DrizzleCourseRepository implements CourseRepository {
     );
   }
 
-  async setFeatured(id: string, actorId: string): Promise<AdminCourseDto> {
+  async setFeatured(
+    id: string,
+    actorId: string,
+    expectedUpdatedAt?: Date,
+  ): Promise<AdminCourseDto> {
     return persistence("setFeatured", () =>
       this.db.transaction(async (tx) => {
         // Serialize competing selections; the partial unique index also protects direct writes.
@@ -504,6 +567,15 @@ export class DrizzleCourseRepository implements CourseRepository {
           .from(schema.courses)
           .where(eq(schema.courses.id, id))
           .for("update");
+        if (
+          target &&
+          expectedUpdatedAt &&
+          target.updatedAt.getTime() !== expectedUpdatedAt.getTime()
+        )
+          throw new CourseDomainError(
+            "STALE_COURSE",
+            "El curso cambió desde que abriste esta página. Recarga y revisa antes de continuar.",
+          );
         if (!target || target.status !== "PUBLISHED")
           throw new CourseDomainError(
             "INVALID_TRANSITION",
