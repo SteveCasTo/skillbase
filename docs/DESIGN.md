@@ -420,6 +420,13 @@ Verificar cada componente en ambos temas.
 - Mostrar feedback posterior.
 - No depender únicamente de asteriscos para explicar obligatoriedad.
 
+### Direcciones aprobadas pendientes de implementación
+
+- El alta/edición de instructor es un flujo administrativo responsive con nombre, apellido, email requerido normalizado y teléfono opcional; no incluir campo de descripción. Las tarjetas completas de instructores son un único enlace en desktop y mobile, accesible por teclado/foco y sin controles anidados. El detalle y selector deben nombrar personas con nombre completo.
+- La pantalla de acceso ofrece Google y email/password; los formularios de password no precargan ni conservan la contraseña inicial tras respuesta. Cambios y errores quedan visibles sin revelar secretos.
+- La UI de instructor expone perfil propio y cursos asignados únicamente, con autorización en servidor; no presentar asistencia/sesiones antes de Fase 6.
+- Un instructor no activo/asignado no debe aparecer en las opciones de asignación si esa regla se confirma con el tratamiento de activación aprobado; dicha regla aún está pendiente, no asumir estados/acciones en la UI.
+
 ## CONSISTENCIA
 
 Antes de crear un componente:
@@ -507,3 +514,7 @@ Antes de crear un componente:
 - La navegación pendiente hacia interesados reutiliza el ciclo real de skeleton privado: listado para el resumen y demanda/tarjetas para el detalle. El render inicial SSR no añade esperas ni skeletons artificiales; las mutaciones mantienen feedback local y no reemplazan datos existentes.
 - La UI está implementada y la cobertura responsive, de teclado y de fallback sin JavaScript está verificada; el E2E completo del release pasó 96/96. La secuencia local anterior de 95 escenarios requirió revalidaciones dirigidas; ver el historial exacto en `docs/TESTING.md`.
 - La lista de cursos permite wrapping de slugs largos y evita overflow horizontal en 320, 390, 768, 1024 y 1440 px. Las regresiones de viewport/toasts pasaron dentro del E2E de release (96/96).
+
+## Ajustes UI de interesados (PR independiente pendiente)
+
+Hay un cambio visual aprobado en implementación paralela, todavía no integrado: eliminar copy redundante del formulario público y dejar una sola aclaración de que el interés no reserva cupo; botón ancho completo, deshabilitado hasta completar obligatorios válidos solo como mejora JS, manteniendo POST/validación server-side utilizables sin JavaScript. En administración, hacer intro fluida a ancho disponible, eliminar métricas/copy irrelevante y usar cards responsivas en vez de tabla/lista densa; barras apiladas con etiqueta y conteo legibles, destacando ganador positivo también en «sin preferencia» y empates, con cero seguro. Cargas estructurales deben usar skeleton ligado a carga real. No marcar implementado hasta merge y revalidación responsive/teclado/contraste.

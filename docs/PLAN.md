@@ -449,7 +449,7 @@ En el baseline verificado para esta actualización: lint exitoso; 93 pruebas uni
 
 Una persona deja datos como interesada sin pagar ni ocupar cupo; administración puede consultar la demanda. No implica aceptación ni inscripción.
 
-## FASE 4 — GRUPOS
+## FASE 4 — GRUPOS, INSTRUCTORES Y ACCESO
 
 ### Estado y dependencias
 
@@ -461,9 +461,45 @@ Parte del alcance de Fase 4 fue anticipada: la gestión de grupos indicada como 
 - [x] Definir horario L–V independiente por grupo, sin solapamiento dentro del curso.
 - [x] Gestionar cancelación conservando historial y permitir grupos adicionales.
 - [x] Permitir grupos válidos también en cursos borrador; eliminar solo grupos nunca publicados y desactivar/reactivar los que ya tuvieron exposición pública, con historial protegido.
-- Asignar instructor real cuando exista el módulo de asignaciones; mientras tanto se conserva el instructor textual del curso.
-- Gestionar reemplazo por feriados cuando existan sesiones y calendario operativo.
-- Permitir expresar preferencia de grupo en Fase 3; asignar inscritos a grupos en Fase 5, sin tratar la preferencia como asignación.
+- [ ] Añadir perfiles y cuentas internas de instructores y asignar exactamente un instructor activo por curso; todos los grupos del curso heredan esa asignación.
+- [ ] Restringir acceso de instructor a su perfil y cursos propios, también en rutas y consultas server-side.
+- [ ] Habilitar email/password además de Google para los usuarios internos; aprovisionamiento y credenciales iniciales administrados exclusivamente en servidor.
+- [ ] Gestionar cambio de instructor sujeto a calendario y conflictos de horario entre cursos.
+- [ ] Resolver, antes de implementar, la regla de activar/desactivar instructores con cursos futuros asignados. No deducirla de una preferencia de UI.
+- [ ] Gestionar reemplazo por feriados cuando existan sesiones y calendario operativo (Fase 6).
+- [x] Permitir expresar preferencia de grupo en Fase 3; asignar inscritos a grupos en Fase 5, sin tratar la preferencia como asignación.
+
+#### Contrato acordado para el módulo de instructores (planificado, no implementado)
+
+- El ADMIN crea perfiles con nombre, apellido y email normalizado obligatorios; teléfono es opcional. El perfil público contiene únicamente nombre completo, sin descripción.
+- La cuenta se crea por acción server-side del ADMIN con contraseña inicial elegida por el administrador. No es una invitación ni incluye onboarding/cambio forzado de contraseña. El instructor puede cambiarla desde perfil; esta edición es opcional.
+- Un instructor puede vincular Google a la misma cuenta solo desde una sesión autenticada, mediante enlace explícito y correo verificado coincidente tras normalización. No se fusionan cuentas automáticamente. Un ADMIN existente conserva Google y puede configurar contraseña; no se incorpora gestión de creación de ADMIN.
+- Instructor posee únicamente acceso a su perfil y a cursos asignados en esta fase. No obtiene acceso a formatos, interesados, participantes, usuarios ni ajustes. Asistencia y sesiones permanecen en Fase 6.
+- Un curso tiene un único instructor asignado; la asignación es global al curso y la heredan todos sus grupos. Se elimina el nombre libre como fuente de identidad al completar el flujo.
+- Se puede cambiar el instructor de un curso publicado antes del inicio oficial del curso; desde el inicio, el cambio queda bloqueado. El servidor es autoritativo y se conservan reglas existentes de retiro/archivo e historial/auditoría.
+- Conflictos se comprueban para el mismo instructor entre cursos con calendario L–V que coincida en fecha y hora civil `America/La_Paz`; intervalos semiabiertos permiten turnos contiguos. Las escrituras concurrentes de asignaciones, cambios de fechas, creación/cambio de horario de grupos, estado y publicación deben compartir una estrategia transaccional de serialización para evitar carreras.
+- El perfil mantiene identidad estable y referencias históricas de curso; no se borra físicamente un instructor usado. La política de activación/desactivación con asignaciones futuras está pendiente de aprobación antes de implementar ese aspecto.
+
+#### Orden de entrega previsto
+
+1. Definir y revisar migración aditiva, perfil de instructor e identidad Auth sin guardar contraseñas en tablas/logs; acordar política pendiente de activación.
+2. Implementar dominio, repositorios y transacciones/auditoría para cuenta, perfil, asignación, ventana de cambio y conflictos concurrentes.
+3. Implementar autenticación combinada Google/email-password, enlace explícito Google a cuenta autenticada y cambio/recuperación de contraseña; comprobar configuración SMTP de recuperación en deployment sin hacerla prerrequisito del primer login.
+4. Añadir guards exactos para rutas de instructor y scoping por propiedad de curso en cada lectura/escritura server-side.
+5. Implementar administración de perfiles/asignaciones y la experiencia privada de instructor; selector por instructores activos registrados, sin texto libre.
+6. Actualizar seeds sintéticos/fixtures locales, ejecutar migración sin reset destructivo y completar validación antes de integrar PRs en `development`. PR 113 ya liberó Fase 3; no promocionar cambios de esta fase a `master` hasta la siguiente ventana de release.
+
+La petición aprobada de renovación de datos es exclusivamente local y para datos de aplicación sintéticos: preparar un seed antes de aplicarlo, reemplazar formatos/cursos y datos operativos fake requeridos para fixtures, conservando cuentas/identidades Auth locales y configuración de proveedor/OAuth. Preservar la identidad ADMIN legítima salvo decisión explícita distinta; no resetear producción ni ejecutar reset ahora. El reset de producción queda como operación manual con aprobación en la siguiente release, no como paso de cada deploy. El seed debe cubrir varios instructores sintéticos con credenciales solo provistas server-side, cursos activos/cancelados, preferencias distintas y curso sin preferencias; nunca hardcodear contraseñas/secretos.
+
+#### Pruebas y gate previstos
+
+- Unitarias: normalización/validación del perfil y email, rol y matriz de acceso, intervalo previo/al inicio, conflicto de rangos semiabiertos y límite de turnos contiguos.
+- Integración: transacciones de Auth + perfil interno, redacción de respuestas/logs, auditoría sin secretos, binding Google explícito con email verificado/mismatch, unicidad, ownership de consultas, conflicto entre cursos y carrera de escrituras concurrentes para asignación/fechas/grupos/publicación.
+- E2E: login y recuperación/cambio de contraseña, enlace Google a misma identidad y rechazo de enlace no verificado/no coincidente, ADMIN crea instructor/asigna curso, instructor accede solo a su perfil/cursos y URL directa ajena es denegada; responsive, teclado y fallback sin JavaScript de formularios.
+- Verificar datos de cuentas de fixtures sin credenciales hardcodeadas; revisar específicamente que ninguna respuesta o log transporte contraseña ni tokens. Confirmar configuración SMTP para recuperación en cloud antes de afirmar ese flujo listo.
+- Cerrar con formatter, lint, typecheck, unit/integration/E2E, build, revisión de migraciones/privilegios/RLS y CI del PR en `development`; dejar despliegue de producción para la siguiente release.
+
+La interfaz de análisis de interesados, sus métricas y el formulario público tienen además una corrección visual/UX en un PR independiente, actualmente en implementación paralela. Mantener ese checklist pendiente hasta que su PR se integre y verificarla contra `docs/DESIGN.md`; no atribuirla como terminada por estar especificada aquí.
 
 ### Resultado demostrable
 

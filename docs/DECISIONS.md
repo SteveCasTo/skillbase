@@ -574,3 +574,37 @@ El término «preinscripción» se reserva para el registro presencial que regis
 Implementación local de ADR-017 (2026-09-30): la carga estructural SSR se coordina con navegación, viewport y cancelación; grupos/formatos aplican actualización local. El alta de curso usa idempotencia actor + UUID + fingerprint persistida en la propia fila de curso (migración 0010), no una tabla de recibos separada ni limpieza automática. La foto sigue siendo una operación posterior al alta con recuperación del borrador, no una transacción atómica DB/Storage. Esta precisión no cambia reglas de negocio ni declara cerrado el gate de validación.
 
 Detalle de implementación local de ADR-017: los productores administrativos pasan por `src/lib/notifications.ts`, que crea un UUID por operación y reutiliza el ID para loading/success/error. El bridge adapta el `id` de runtime de Sileo 0.1.5 sin `any` ni patch en dependencias instaladas. Esto no cambia la decisión de mantener la mejora progresiva/fallback SSR ni la política existente de movimiento reducido.
+
+---
+
+## ADR-023 — PERFILES, CUENTAS Y ASIGNACIÓN DE INSTRUCTORES
+
+**Fecha:** 2026-10-01
+
+**Estado:** Accepted — contrato de Fase 4; implementación pendiente
+
+### Contexto
+
+Los grupos existen, pero la identidad del instructor aún es texto opcional del curso. Es necesario habilitar cuentas de instructor con acceso acotado y asignar una persona real sin confundir roles internos, datos públicos o credenciales.
+
+### Decisión
+
+- Mantener perfil de instructor y usuario interno/roles vinculados a identidad Supabase Auth; credenciales solo viven en Auth. ADMIN aprovisiona cuenta desde servidor y establece contraseña inicial, sin invitación ni paso forzado de cambio. Email/password se suma al Google vigente sin habilitar signup público.
+- Google se enlaza explícitamente a la misma cuenta autenticada únicamente con proveedor verificado y email normalizado coincidente; no realizar fusión automática. Los ADMIN existentes mantienen Google y pueden añadir contraseña; no se añade administración de creación de ADMIN.
+- Un curso tiene una única asignación de instructor, heredada por todos sus grupos. Instructor accede solo a perfil propio y cursos asignados; asistencia/sesiones siguen en Fase 6.
+- El cambio de instructor se permite en curso publicado solo antes del inicio oficial. Conflictos del mismo instructor entre cursos se calculan con fechas L–V y tiempo civil `America/La_Paz`; intervalos semiabiertos hacen válido el contacto exacto de turnos. Escrituras concurrentes que puedan alterar ese cálculo deben compartir serialización transaccional.
+- Conservar IDs e historial de perfiles usados y auditar asignaciones/mutaciones sin credenciales. La política de desactivación cuando haya asignaciones futuras queda expresamente sin decidir y debe resolverse antes de implementar esa transición.
+
+### Alternativas
+
+- Mantener nombre de instructor como texto libre.
+- Habilitar solo OAuth Google o crear una invitación con onboarding/cambio obligatorio.
+- Vincular Google automáticamente por email sin acción autenticada.
+- Asignar instructor por grupo o permitir varios instructores por curso.
+
+### Consecuencias
+
+- Se amplían los métodos visibles de login para cuentas internas, no el signup público; se deben preservar guardas, política exacta por ruta, CSRF/cookies/redirects y configuraciones de Auth.
+- Las decisiones de asignación/horario exigen pruebas de concurrencia compartidas con mutaciones de fechas, grupos y publicación; una comprobación en UI no basta.
+- El esquema concreto/migración y la política de activación deben revisarse durante implementación, no inferirse de este ADR. No se afirma que perfil, asignación o autenticación email/password existan ya.
+- Debe comprobarse configuración SMTP cloud antes de afirmar recuperación de contraseña disponible; esto no bloquea cuentas creadas con password por ADMIN ni su login inicial.
