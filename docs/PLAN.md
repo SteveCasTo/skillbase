@@ -238,7 +238,7 @@ La implementación local cubre skeleton SSR vinculado a carga real y viewport vi
 
 Grupos y formatos actualizan localmente con bloqueo contra acciones duplicadas y conservan foco/datos para recuperación. El alta admite `requestKey` UUID persistente por actor/fingerprint: repetir la solicitud devuelve el curso creado y cambiar los datos con la misma clave se rechaza. La carga de artwork permite recuperar el borrador sin sobrescritura silenciosa. El bloqueo de fila del repositorio protege las ediciones; fixtures históricos sin revisión opcional conservan compatibilidad. Migración 0010 añade metadatos a `courses`, sin limpieza automática de historial.
 
-Validación local: unit 108 PASS; integration 54 PASS; lint PASS; typecheck PASS (0 errores, 47 hints; helper full-check posterior también PASS); build PASS (20:55); drizzle-kit check, schema checks, formatter de archivos modificados y `git diff --check` PASS. E2E: primera corrida 76/82; tras corregir cinco selectores y un ID de biblioteca, rerun completo 81/82 con un fallo del selector toast de `public-courses`; prueba dirigida `public-courses` 4/4 PASS, incluido ese escenario. Hay cobertura colectiva de los 82 escenarios, pero no se afirma una corrida completa 82/82. El gate previo a Fase 3 queda implementado y validado localmente por la cobertura colectiva; PR 104 está listo para integración a `development`, que queda pendiente de ejecutar por el orquestador. No hay afirmación de CI/cloud remoto ni de aplicación de migración 0010 en desarrollo/cloud; solo se aplicó en el stack aislado de tests. Fase 3 permanece sin implementar y su checklist no cambia. El gate remoto/cloud histórico de Fase 2 tampoco cambia.
+Validación local registrada para el bloque privado (histórica): unit 108 PASS; integration 54 PASS; lint/typecheck/build y checks de schema/formatter PASS. E2E: rerun 81/82 y revalidación dirigida `public-courses` 4/4; no se afirma una corrida completa 82/82. PR 104 se integró en `development` como `6fc81da`. La migración 0010 se aplicó a la base Supabase local estándar en `127.0.0.1:54322` mediante migración sin reset, preservando datos; no se aplicó a cloud. Fase 3 está en progreso, no finalizada; el gate remoto/cloud histórico de Fase 2 no cambia.
 
 #### Alcance acordado para completar 2B (2026-09-24)
 
@@ -341,7 +341,7 @@ Administración crea y publica un curso; este aparece automáticamente en una ex
 
 ## GATE PREVIO A FASE 3 - EXPERIENCIA PRIVADA
 
-La experiencia privada existente está implementada y validada localmente para esta entrega; la integración de PR 104 hacia `development` queda pendiente. El registro público de interesados de Fase 3 sigue sin implementar.
+La experiencia privada existente está implementada y validada localmente. PR 104 se integró en `development` como `6fc81da`; esta integración no promueve cambios a `master` ni altera los gates remotos/cloud históricos de Fase 2. Fase 3 sigue en progreso.
 
 - [x] Incorporar skeletons reales durante las cargas estructurales de `/app`, vinculados al estado de carga y no a una demora decorativa.
 - [x] Usar Sileo para feedback transitorio de mutaciones, con estados pending, success y error, sin sustituir errores junto a campos.
@@ -350,7 +350,7 @@ La experiencia privada existente está implementada y validada localmente para e
 - [x] Prevenir acciones duplicadas y permitir recuperar errores/reintentar sin perder datos.
 - [x] Ubicar el toggle de tema en el sidebar expandido y menú móvil, oculto al cerrar el rail.
 - [x] Verificar responsive y teclado mediante cobertura E2E colectiva: full rerun 81/82 más prueba dirigida 4/4 de `public-courses`; no se afirma full 82/82.
-- [x] Completar implementación y validación local. La integración del PR hacia `development` queda pendiente; esto no implica gates remotos/cloud ni inicio de Fase 3.
+- [x] Completar implementación, validación local e integración de PR 104 a `development`; no implica promoción a `master`, gates remotos/cloud ni cierre de Fase 3.
 
 Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión final del gate de Fase 2B) siguen pendientes según su registro anterior. Este avance no los revalida ni declara cerrado ese gate.
 
@@ -363,7 +363,7 @@ Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión f
 - Prevención razonable de duplicados.
 - Listado administrativo.
 - Métricas de demanda.
-- Estados `ACTIVE`/`CANCELLED`, con cancelación/reactivación administrativa y métricas de activos aprobados (ADR-021); su implementación sigue pendiente.
+- Estados `ACTIVE`/`CANCELLED`, con cancelación/reactivación administrativa y métricas de activos aprobados (ADR-021); implementados en esta fase.
 
 ### Checklist de definición y contratos
 
@@ -375,46 +375,54 @@ Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión f
 
 ### Checklist de datos, dominio y persistencia
 
-- [ ] Implementar el registro de interesado como entidad autónoma, separada de `Participant` y de la preinscripción presencial; no usar email público no verificado para modificar identidad global ni crear entidades pagadas en Fase 3.
+- [x] Implementar el registro de interesado como entidad autónoma, separada de `Participant` y de la preinscripción presencial; no usar email público no verificado para modificar identidad global ni crear entidades pagadas en Fase 3.
 - [ ] La relación explícita y trazable entre el interesado y una preinscripción presencial es dependencia de Fase 5; no bloquea el cierre de Fase 3. Allí se implementará junto al prellenado editable; el registro presencial directo seguirá disponible.
-- [x] Especificar relaciones, restricciones e índices del agregado autónomo en el contrato técnico; implementarlos y verificarlos sigue pendiente.
-- [ ] Implementar validaciones y reglas de dominio independientes de HTTP/UI, con pruebas unitarias junto a cada regla.
-- [ ] Implementar casos de uso y repositorio, con escrituras transaccionales y prevención de duplicados conforme a la política confirmada.
-- [ ] Generar y verificar migración reproducible, constraints y comportamiento ante concurrencia, errores y reintentos mediante integración.
+- [x] Especificar e implementar relaciones, restricciones e índices del agregado autónomo; el detalle permanece en el contrato técnico.
+- [x] Implementar validaciones y reglas de dominio independientes de HTTP/UI; las pruebas unitarias específicas del backend pasan 9/9.
+- [x] Implementar casos de uso y repositorio con escrituras transaccionales y prevención de duplicados; las pruebas de integración dirigidas pasan 11/11.
+- [x] Versionar la migración reproducible, constraints e índices; la verificación dirigida de integración pasa. La suite completa de integración continúa ejecutándose y la migración 0011 aún no se ha aplicado al Supabase local estándar.
 
 ### Checklist de interfaz pública
 
-- [ ] Implementar formulario público y acceso desde la oferta elegible según los contratos confirmados.
-- [ ] Incorporar validación server-side, errores junto a los campos, conservación de valores y prevención de envíos duplicados.
-- [ ] Mostrar loading, empty, pending, success y error; usar Sileo para feedback transitorio de mutaciones y skeletons cuando exista carga estructural.
-- [ ] Validar responsive, teclado y foco; actualizar únicamente el contenido afectado sin recargar la vista completa.
+- [x] Implementar el formulario público únicamente en el detalle del curso y el acceso desde la oferta elegible.
+- [x] Implementar estados del formulario, errores junto a los campos, conservación de valores y prevención de dobles envíos; la validación autoritativa permanece en servidor.
+- [x] Implementar feedback persistente de éxito/error y feedback transitorio; no se presenta el interesado como inscripción ni reserva.
+- [x] Completar verificación responsive, teclado y foco con E2E completo más revalidaciones dirigidas; no se afirma una única corrida full 95/95.
 
 ### Checklist de administración y métricas
 
-- [ ] Implementar listado administrativo de interesados y operaciones según estados y permisos confirmados.
-- [ ] Implementar métricas de interesados activos por curso y preferencia de grupo, sin equiparar preferencia con grupo asignado o plazas/cupos.
-- [ ] Implementar métricas sobre datos persistidos, con estados vacíos/error y sin exponer datos personales en la experiencia pública.
-- [ ] Aplicar el patrón de mutaciones del gate previo: confirmación que cierra al aceptar, feedback independiente y recuperación de errores.
+- [x] Implementar listado/resumen administrativo y operaciones de estado bajo autorización `ADMIN`.
+- [x] Implementar métricas persistidas de interesados activos por curso y preferencia, sin equiparar preferencia con asignación ni plazas/cupos.
+- [x] Mostrar estados administrativos vacíos/error; los datos personales se mantienen en las vistas privadas autorizadas.
+- [x] Aplicar el patrón de mutaciones del gate previo: confirmación, feedback independiente y recuperación de errores.
 
 ### Checklist de seguridad, pruebas y documentación
 
-- [ ] Verificar permisos en servidor para cada operación administrativa y validar todas las entradas públicas.
-- [ ] Aplicar minimización de datos personales, protección frente a abuso y política de errores públicos sin filtraciones.
-- [ ] Implementar y probar el límite de body y el rate limiter persistente atómico de PostgreSQL conforme al contrato; configurar y validar origen de red confiable y secreto HMAC como gate para habilitar el POST en producción.
+- [x] Implementar permisos server-side para operaciones administrativas y validación de entradas públicas.
+- [x] Implementar minimización de datos, errores públicos sanitizados, límite de body y rate limiter persistente atómico; la suite backend dirigida está verde.
+- [ ] Configurar y verificar el origen de red confiable y el secreto HMAC en el entorno de producción antes de habilitar el POST; su configuración cloud no está acreditada.
 - [ ] Definir política de conservación y anonimización de interesados, incluido el plazo; el cierre de disponibilidad no elimina registros y no se presume retención perpetua.
-- [ ] Crear fixtures sintéticos y deterministas; cubrir dominio con unitarias y persistencia/autorización con integración mientras se implementa cada bloque.
-- [ ] Añadir E2E después de estabilizar el flujo público/administrativo, cubriendo disponibilidad, duplicados, recuperación, permisos y accesibilidad sin acoplamiento visual innecesario.
-- [ ] Actualizar requisitos, contratos, modelo de datos, seguridad, testing y documentación afectada con las decisiones realmente implementadas.
+- [x] Crear fixtures sintéticos y deterministas; unit e integración locales completos PASS.
+- [x] Añadir E2E público/administrativo para disponibilidad, duplicados, recuperación, permisos y accesibilidad; cobertura validada por corrida full y revalidaciones dirigidas descritas en `docs/TESTING.md`.
+- [x] Actualizar los documentos afectados al estado real; la política de retención/anónimización permanece pendiente.
 
 ### Checklist de PR y gate de cierre
 
 - [ ] Completar revisión por bloque y corrección conjunta de hallazgos antes de integrar los bloques dependientes.
-- [ ] Preparar PR por categoría hacia `development`, con alcance, evidencia y pendientes explícitos.
-- [ ] Ejecutar formatter, lint, typecheck, unitarias, integración, E2E y build correspondientes; demostrar el flujo completo y revisar documentación.
-- [ ] Registrar el estado real de validaciones locales y remotas, sin marcar como verificados resultados no ejecutados.
+- [x] Crear PR 105 como draft hacia `development` con el alcance y los pendientes explícitos; integración/merge siguen pendientes.
+- [x] Ejecutar formatter, lint, typecheck, unitarias, integración, E2E y build locales correspondientes; la cobertura E2E se compone de la corrida full 81/95 y las suites dirigidas, no de una corrida full 95/95.
+- [x] Registrar el estado real de validaciones locales y remotas; no se afirma resultado remoto/cloud.
 - [ ] Cerrar el milestone solo con contratos confirmados, flujo demostrado y gate revisado; promover a `master` mediante PR de release únicamente después de validar el milestone.
 
+### Estado actual y validación pendiente
+
+La implementación de Fase 3 y su validación local están completas. Full unit 129 PASS (793 assertions); full integration 65 PASS/0 FAIL (478 assertions, 9 archivos), después de corregir el cleanup de fixtures para incluir la tabla de interesados explícitamente, sin `CASCADE`; lint global PASS; typecheck PASS con 0 errores/0 warnings/70 hints; build y Drizzle checks PASS. E2E: corrida full 81/95 PASS, 14 fallos por fixtures de calendarios de cursos (12 respuestas 422) y carga de formatos (2). Después, sin cambios de código de producción, `courses` dirigido 2/2 PASS (47.9 s) y `interests` dirigido 13/13 PASS (1.1 min); las suites se solapan en un escenario de Auth. La evidencia combinada cubre escenarios que pasaron en full o dirigido; no se afirma un full run 95/95. Fallback sin JavaScript y navegación/animación mobile comprobados PASS. La migración 0011 solo se aplicó en el stack aislado de tests, no en Supabase local estándar ni cloud; no se requiere aplicarla allí para validar estas suites. La configuración cloud de `INTEREST_RATE_LIMIT_SECRET` server-only y la fuente confiable de `Astro.clientAddress` siguen sin verificarse, y son requisito antes de habilitar el POST en producción.
+
+PR 105 está abierto como draft hacia `development` (`https://github.com/SteveCasTo/skillbase/pull/105`). La rama publicada incluye los commits backend `3fea0df`, público `d8f714f`, administrativo `e903084` y ajuste de rutas Auth `6112080`. Su integración/merge queda pendiente del orquestador; no promover a `master`.
+
 ### Baseline verificado de calidad
+
+El siguiente baseline es histórico y precede al trabajo actual de Fase 3; no acredita las validaciones de esta implementación.
 
 En el baseline verificado para esta actualización: lint exitoso; 93 pruebas unitarias y 50 de integración exitosas; 62 E2E ejecutadas; typecheck con 0 errores y 41 hints; build exitoso. Durante E2E se observó un hydration mismatch relacionado con Sileo; su corrección está activa en otra rama y este baseline no cierra el gate de Fase 3. El formatter global solo reportó un aviso sobre `opencode.json`, ajeno a estos cambios; no modificar ese archivo.
 

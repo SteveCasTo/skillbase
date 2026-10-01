@@ -11,6 +11,7 @@ export const PRIVATE_ROUTE_POLICIES = {
   "/app/cursos/imagen": { access: "ROLES", roles: ["ADMIN"] },
   "/app/formatos": { access: "ROLES", roles: ["ADMIN"] },
   "/app/formatos/nuevo": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/interesados": { access: "ROLES", roles: ["ADMIN"] },
   "/app/asistencia": { access: "ROLES", roles: ["INSTRUCTOR"] },
 } as const satisfies Readonly<Record<string, PrivateRoutePolicy>>;
 
@@ -20,6 +21,8 @@ const COURSE_GROUPS_PATH =
   /^\/app\/cursos\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/grupos$/i;
 const FORMAT_DETAIL_PATH =
   /^\/app\/formatos\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+const INTEREST_DETAIL_PATH =
+  /^\/app\/interesados\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function getPrivateRoutePolicy(
   pathname: string,
@@ -35,7 +38,8 @@ export function getPrivateRoutePolicy(
   if (exact) return exact;
   if (
     COURSE_EDIT_PATH.test(normalizedPath) ||
-    COURSE_GROUPS_PATH.test(normalizedPath)
+    COURSE_GROUPS_PATH.test(normalizedPath) ||
+    INTEREST_DETAIL_PATH.test(normalizedPath)
   )
     return { access: "ROLES", roles: ["ADMIN"] };
   return FORMAT_DETAIL_PATH.test(normalizedPath)

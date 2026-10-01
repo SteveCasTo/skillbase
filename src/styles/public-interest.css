@@ -1,0 +1,202 @@
+@scope (.public-courses) {
+  .interest-anchor {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3rem;
+    margin-top: 1.75rem;
+    padding: 0.75rem 1.25rem;
+    border: 1px solid var(--blue);
+    border-radius: var(--radius);
+    color: var(--blue);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .interest-anchor:hover {
+    background: var(--field);
+  }
+  .interest-anchor[hidden] {
+    display: none;
+  }
+  .interest-anchor svg {
+    width: 1rem;
+    height: 1rem;
+  }
+  .public-interest {
+    --background: var(--paper);
+    --foreground: var(--ink);
+    --card: var(--paper);
+    --card-foreground: var(--ink);
+    --popover: var(--paper);
+    --popover-foreground: var(--ink);
+    --primary: var(--blue);
+    --primary-foreground: var(--paper);
+    --muted-foreground: var(--soft);
+    --accent: var(--field);
+    --accent-foreground: var(--ink);
+    --border: var(--rule);
+    --input: var(--rule);
+    --ring: var(--blue);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(2rem, 5vw, 5rem);
+    margin-top: 3.5rem;
+    padding-top: 3.5rem;
+    border-top: 1px solid var(--rule);
+    scroll-margin-top: 7rem;
+  }
+  .interest-introduction h2 {
+    font-size: clamp(1.7rem, 2.5vw, 2.4rem);
+    line-height: 1.2;
+  }
+  .interest-introduction > p {
+    max-width: 48ch;
+    margin-top: 1.25rem;
+    color: var(--soft);
+    line-height: 1.8;
+  }
+  .interest-form-column {
+    min-width: 0;
+    container-type: inline-size;
+  }
+  .interest-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .interest-required,
+  .interest-help {
+    color: var(--soft);
+    font-size: 0.85rem;
+    line-height: 1.65;
+  }
+  .interest-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem 1rem;
+  }
+  .interest-field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .interest-field label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .interest-field-email,
+  .interest-field-phone,
+  .interest-field-group {
+    grid-column: 1 / -1;
+  }
+  .interest-field :is(input, select, button) {
+    font-size: 1rem;
+    scroll-margin-top: 7rem;
+  }
+  .interest-field select {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-md);
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .interest-field select:focus-visible {
+    outline: 3px solid var(--blue);
+    outline-offset: 2px;
+  }
+  .interest-field [aria-invalid="true"] {
+    border-color: var(--destructive);
+  }
+  .interest-field-error {
+    color: var(--destructive);
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+  .interest-no-preference {
+    padding: 0.75rem 0;
+    font-weight: 500;
+  }
+  .interest-submit {
+    align-self: flex-start;
+    max-width: 100%;
+    height: auto;
+    padding: 0.8rem 1.25rem;
+    white-space: normal;
+    text-align: center;
+  }
+  .interest-submit + .interest-help {
+    margin-top: -0.75rem;
+  }
+  .interest-error-summary {
+    padding: 1rem;
+    border: 1px solid var(--destructive);
+    border-radius: var(--radius);
+    line-height: 1.65;
+    scroll-margin-top: 7rem;
+  }
+  .interest-error-summary > p {
+    font-weight: 600;
+  }
+  .interest-error-summary ul {
+    padding-left: 1.25rem;
+    margin-top: 0.5rem;
+    list-style: disc;
+    font-size: 0.85rem;
+  }
+  .interest-error-summary a {
+    color: var(--blue);
+    text-decoration: underline;
+  }
+  .interest-result {
+    padding: clamp(1.5rem, 3vw, 2rem);
+    border-radius: 16px;
+    background: var(--field);
+    scroll-margin-top: 7rem;
+  }
+  .interest-result h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+  }
+  .interest-result p {
+    margin-top: 0.75rem;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+  }
+  .interest-success > svg {
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-bottom: 1rem;
+    color: var(--blue);
+  }
+  .interest-result:focus-visible,
+  .interest-error-summary:focus-visible {
+    outline: 3px solid var(--blue);
+    outline-offset: 4px;
+  }
+  .interest-select-portal {
+    position: relative;
+    z-index: 1;
+  }
+  @container (max-width: 28rem) {
+    .interest-fields {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 900px) {
+    .public-interest {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+      margin-top: 2rem;
+      padding-top: 2.5rem;
+    }
+  }
+  @media (max-width: 700px) {
+    .interest-submit {
+      width: 100%;
+    }
+  }
+}

@@ -189,7 +189,11 @@ No es obligatorio que cada módulo sea un package independiente.
 
 El objetivo es separación lógica.
 
-Fase 3 introduce conceptualmente `InterestRegistrations` como agregado autónomo: no es `Participant` ni `PreRegistration`, y el email público no verificado no puede actualizar una identidad global. La preinscripción presencial/pagada permanece en Fase 5. El contrato técnico acordado (todavía no implementado) está en [`docs/INTEREST_REGISTRATION_CONTRACT.md`](INTEREST_REGISTRATION_CONTRACT.md); sus límites de dominio, persistencia y HTTP deben mantenerse separados al implementarlo.
+Fase 3 implementa `InterestRegistrations` como agregado autónomo: no es `Participant` ni `PreRegistration`, y el email público no verificado no puede actualizar identidad global. El formulario solo aparece en el detalle del curso; la administración (`/app/interesados` y sus detalles UUID) es solo ADMIN. La preinscripción presencial/pagada permanece en Fase 5. Dominio, aplicación, schema/migración y adaptadores viven separados en `src/domain/interests`, `src/application/interests`, `src/server/interests` y `src/server/db/repositories`. Implementación y validación local están completas; la evidencia E2E combina corrida full y revalidaciones dirigidas, sin afirmar full run 95/95. La integración de PR 105 a `development` queda pendiente; consultar `docs/PLAN.md` y [`docs/INTEREST_REGISTRATION_CONTRACT.md`](INTEREST_REGISTRATION_CONTRACT.md).
+
+Los contratos distinguen DTO de formulario público (disponibilidad y horarios elegibles, sin PII/capacidad) y DTOs administrativos de registros/métricas bajo autorización; las preferencias no asignan cupos ni grupos. La administración filtra estado sin derivar métricas del subconjunto mostrado.
+
+El POST público limita y parsea el body en el adaptador server-side, valida Origin y llama el caso de uso de interés. Un limiter persistente usa PostgreSQL y un HMAC server-only sobre `Astro.clientAddress`; no confía en forwarded headers. Sin secreto válido o dirección de cliente confiable, el flujo falla cerrado. Los defaults técnicos y requisitos de despliegue se describen en el contrato y en `docs/DEPLOYMENT.md`; no implican que los valores cloud estén configurados.
 
 ## ESTRUCTURA DE REFERENCIA
 

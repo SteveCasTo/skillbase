@@ -2,7 +2,7 @@
 
 ## ESTADO Y ALCANCE
 
-Contrato técnico de ejecución de Fase 3, basado en RF-PRE-001–004 y ADR-021/022. Describe la implementación prevista; **este documento no acredita código, tablas, migraciones ni pruebas implementadas**. Las propuestas operativas señaladas como pendientes no se convierten en políticas legales aprobadas.
+Contrato técnico de ejecución de Fase 3, basado en RF-PRE-001–004 y ADR-021/022. Backend, interfaz pública y administración están implementados y validados localmente. Las suites E2E se documentan con corrida full más revalidaciones dirigidas; no hubo una única corrida full 95/95. El merge de PR 105, la configuración cloud del rate limit y la aplicación de la migración en cloud siguen pendientes. Las propuestas operativas señaladas como pendientes no se convierten en políticas legales aprobadas.
 
 - El único acceso público es el detalle `/cursos/[slug]`. No cambiar landing, catálogo, tarjetas ni sus DTO para este flujo.
 - Nombre, apellidos y email obligatorios; teléfono y preferencia de grupo opcionales.
@@ -161,15 +161,15 @@ Con JavaScript actualizar fila, revisión, controles y métricas desde el DTO re
 
 ## PERSISTENCIA Y CONCURRENCIA
 
-### Modelo previsto, no migración implementada
+### Schema y migración versionados; validación/cierre pendientes
 
-En `src/server/db/schema/index.ts` definir `interestRegistrationStatus` (`ACTIVE`, `CANCELLED`) e `interestRegistrations`, tabla `interest_registrations`, con UUID `id`, FK `courseId`, `firstName`, `lastName`, `email`, `phone` nullable, `preferredGroupId` nullable, estado por defecto `ACTIVE` y `createdAt`/`updatedAt` `timestamptz(3)`. No FK a `users`/`participants` ni snapshot mutable compartido entre cursos.
+En `src/server/db/schema/index.ts` están definidos `interestRegistrationStatus` (`ACTIVE`, `CANCELLED`) e `interestRegistrations`, tabla `interest_registrations`, con UUID `id`, FK `courseId`, `firstName`, `lastName`, `email`, `phone` nullable, `preferredGroupId` nullable, estado por defecto `ACTIVE` y `createdAt`/`updatedAt` `timestamptz(3)`. No hay FK a `users`/`participants` ni snapshot mutable compartido entre cursos. La migración 0011 está versionada y se aplica en los stacks temporales de integración; no se ha aplicado al Supabase local estándar ni a cloud.
 
 - Unique **no parcial** `(course_id, email)` para todos los estados: cancelar nunca libera el email. Normalización y checks DB de email trim/lowercase, longitudes y no-blancos respaldan validación de aplicación.
 - FK simple `course_id -> courses.id`, `ON DELETE RESTRICT`.
 - Unique adicional `groups(course_id, id)` y FK compuesta `(course_id, preferred_group_id) -> groups(course_id, id)`, `ON DELETE RESTRICT`, `MATCH SIMPLE`. Con preferencia nula la FK compuesta no exige grupo; la FK simple sigue exigiendo curso. Evita referencias cruzadas incluso ante escritura directa; no usar `SET NULL` ni cascade que borre historia.
 - Índice `(course_id, status, created_at, id)` para filtro/listado determinista; `(course_id, preferred_group_id)` cubre FK/agrupación. Evitar índices redundantes: el unique ya cubre búsqueda curso/email; medir antes de agregar otro índice parcial para métricas.
-- Un solo origen: schema central + migraciones versionadas en `drizzle/`/metadata según `drizzle.config.ts`. Incluir constraints, índices, enum, RLS y revokes en la misma entrega; no crear otra fuente de schema en Supabase ni aplicar SQL manual sin versionar.
+- Un solo origen: schema central + migraciones versionadas en `drizzle/`/metadata según `drizzle.config.ts`. La migración 0011 incluye constraints, índices, enum, RLS y revokes para tablas nuevas; verificar aplicación reproducible antes de cerrar el gate. No crear otra fuente de schema en Supabase ni aplicar SQL manual sin versionar.
 - Activar RLS sin políticas de Data API y revocar todos los privilegios de tablas a `PUBLIC`, `anon`, `authenticated`, `service_role`. Hacer equivalente para tabla del limiter y revocar acceso directo a tipos/funciones nuevos cuando corresponda. Drizzle server-side sigue siendo responsable de autorización si su conexión bypassa RLS; no confiar en RLS como guard de aplicación.
 
 ### Transacción pública
@@ -198,12 +198,12 @@ Origen exacto mediante `requestHasExpectedOrigin` y `PUBLIC_SITE_URL` (también 
 Baseline técnico requerido para implementación, configurable y revisable con evidencia. Los valores iniciales son parámetros técnicos revisables según tráfico y efectos de NAT compartido, no cuotas comerciales ni políticas legales; no requieren aprobación adicional de negocio:
 
 - Máximo **8 KiB** reales por body público, antes de parsear; rechazar `Content-Length` excedido y además contar bytes del stream, incluso sin header o con header falso. Aplicar también un límite explícito al pequeño POST administrativo. Abortar lectura excedida, no hacer primero `formData()`/`json()` ilimitados.
-- Limiter persistente PostgreSQL de ventanas fijas: **20 intentos/10 minutos por origen de red y curso**, más **100 intentos/hora por origen de red**. Configuración server-side con enteros positivos y defaults documentados; no usar email como clave ni distinguir nuevos/duplicados. Contar solicitudes antes de deduplicar.
+- Limiter persistente PostgreSQL de ventanas fijas: **20 intentos/10 minutos por origen de red y curso**, más **100 intentos/hora por origen de red**. En la configuración actual los valores por defecto corresponden a `INTEREST_RATE_COURSE_LIMIT=20`, `INTEREST_RATE_COURSE_SECONDS=600`, `INTEREST_RATE_NETWORK_LIMIT=100` e `INTEREST_RATE_NETWORK_SECONDS=3600`; deben ser enteros positivos. No usar email como clave ni distinguir nuevos/duplicados. Contar solicitudes antes de deduplicar.
 - Tabla técnica `interest_registration_rate_limits` con clave de scope/origen/curso/ventana, contador y expiración. Incremento atómico `INSERT ... ON CONFLICT DO UPDATE ... RETURNING`, ventanas calculadas con reloj DB. Si hay varios scopes, comprobarlos en una transacción corta y orden estable; no permitir carreras de «read then increment». La prueba concurrente debe demostrar que nunca pasan más de los límites configurados.
-- Obtener IP solo de metadatos del adaptador/proxy confiable configurado en despliegue; no confiar en `X-Forwarded-For` arbitrario. Persistir HMAC con secreto exclusivamente servidor, no IP cruda; no registrar email/body. Si no hay origen fiable/configuración o falla el almacenamiento, responder 503 y no aceptar el registro (fail-closed).
+- Obtener IP solo de `Astro.clientAddress` proporcionada por el adaptador confiable; no confiar en `X-Forwarded-For` arbitrario. Persistir HMAC con `INTEREST_RATE_LIMIT_SECRET` exclusivamente server-side (mínimo 32 caracteres), no IP cruda; no registrar email/body. Si falta el secreto, no hay IP confiable o falla el almacenamiento, responder 503 y no aceptar el registro (fail-closed).
 - Exceso responde 429 con `Retry-After` calculado desde las ventanas limitantes. Expirar/limpiar buckets técnicos mediante tarea acotada o limpieza oportunista indexada; no acumular identificadores de red indefinidamente. Este TTL técnico no define retención de datos personales del interesado.
 
-Los límites indicados son defaults configurables que deben implementarse y probarse, y pueden ajustarse con evidencia de tráfico/NAT. El nombre de las variables y la programación/TTL de limpieza son decisiones de configuración de implementación, no requisitos de aprobación del usuario. La fuente confiable de IP disponible en la plataforma de despliegue y el secreto HMAC aún deben configurarse y validarse; son gate para habilitar el POST en producción, no para comenzar dominio/repositorio/UI. Este control persistente reduce abuso bajo los límites definidos, pero no promete bloquear todo ataque distribuido.
+Los límites indicados son defaults configurables y pueden ajustarse con evidencia de tráfico/NAT. La limpieza de buckets vencidos se realiza oportunistamente con límite acotado. La fuente confiable de IP disponible en la plataforma de despliegue y el secreto HMAC aún deben configurarse y validarse; son gate para habilitar el POST en producción, no para comenzar dominio/repositorio/UI. Este control persistente reduce abuso bajo los límites definidos, pero no promete bloquear todo ataque distribuido.
 
 Honeypot accesible (excluido de foco/lectores de pantalla) es defensa opcional adicional pendiente; si se aprueba, responde el mismo éxito neutro sin persistir. CAPTCHA, Redis, correo de verificación, listas de bloqueo y fingerprinting no se incorporan por defecto. Si se evidencia abuso que el baseline no controla, evaluar protección en el edge sin introducirla como requisito de negocio de Fase 3.
 
@@ -221,7 +221,7 @@ Usar las capas reales del árbol (`src/domain`, `src/application`, `src/server`,
 
 UI responsive con labels, foco/teclado, errores por campo y resumen, loading que evita dobles envíos y éxito persistente en el formulario (no solo toast). Texto visible: «Dejar mis datos de interés» y aclaración de que no reserva ni confirma inscripción. Mantener valores propios ante errores; limpiar al aceptar. Sin grupos, ofrecer «Sin preferencia» y no bloquear. No formularios extensos en modal ni PII en analytics/logs. La confirmación administrativa solo contiene la acción corta; mobile no depende de una tabla ancha.
 
-## ACEPTACIÓN Y PRUEBAS DEL FUTURO CAMBIO
+## ACEPTACIÓN Y PRUEBAS PARA CIERRE
 
 ### Unit
 

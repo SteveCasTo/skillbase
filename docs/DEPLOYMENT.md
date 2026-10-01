@@ -206,3 +206,11 @@ Antes de habilitar Auth cloud se debe verificar explícitamente:
 - variables públicas y privadas asignadas al entorno correcto sin exponer secretos.
 
 Estas comprobaciones quedaron aplicadas durante la Fase 1. La clave legacy `service_role` debe rotarse o deshabilitarse antes de operar con datos reales porque una inspección inicial del CLI la mostró completa aun sin solicitar `--reveal`.
+
+## REGISTRO PÚBLICO DE INTERESADOS: CONFIGURACIÓN PENDIENTE
+
+El POST público de interesados requiere `INTEREST_RATE_LIMIT_SECRET` server-only, generado fuera de la aplicación con al menos 32 caracteres; nunca debe tener prefijo `PUBLIC_`, registrarse en logs o llegar al navegador. `INTEREST_RATE_COURSE_LIMIT`/`INTEREST_RATE_COURSE_SECONDS` y `INTEREST_RATE_NETWORK_LIMIT`/`INTEREST_RATE_NETWORK_SECONDS` son enteros positivos opcionales; defaults técnicos: 20/600 y 100/3600. No son cuotas comerciales.
+
+El adaptador debe proporcionar una dirección confiable mediante `Astro.clientAddress`. La aplicación ignora `X-Forwarded-For` arbitrario, valida que el dato sea una IP y calcula HMAC para el limiter persistente. Si el secreto falta/es inválido o no hay IP confiable, el POST falla cerrado. Antes de habilitar el endpoint en cualquier entorno desplegado, configurar y probar ambas fuentes; esta documentación no confirma configuración cloud ni disponibilidad de trusted client address en producción. Los tests usan secreto efímero propio del stack temporal, no un secreto persistente.
+
+El estado de implementación de Fase 3 y de la migración 0011 se registra en `docs/PLAN.md`; no aplicar manualmente su SQL ni inferir que ya está desplegada por aparecer en el repositorio.
