@@ -204,6 +204,8 @@ const fields = [
   ></p>
   <script>
     import { navigate } from "astro:transitions/client";
+    import { notifications } from "@/lib/notifications";
+    import { isUuid } from "@/domain/courses/mutation-result";
     document.addEventListener("astro:page-load", () => {
       const form = document.querySelector<HTMLFormElement>(
         'form[aria-label="Crear formato"]',
@@ -216,9 +218,11 @@ const fields = [
           form.querySelectorAll<HTMLInputElement>('input[type="text"]'),
         );
         if (button) {
+          let pending = false;
           form.addEventListener("submit", (event) => {
             event.preventDefault();
-            if (!form.reportValidity() || button.disabled) return;
+            if (!form.reportValidity() || pending || button.disabled) return;
+            pending = true;
             button.disabled = true;
             button.setAttribute("aria-busy", "true");
             const error = document.querySelector<HTMLElement>(
@@ -232,78 +236,96 @@ const fields = [
               input.removeAttribute("aria-invalid");
               input.setAttribute("aria-describedby", `${input.name}-hint`);
             });
-            void (async () => {
-              try {
-                const response = await fetch("/app/formatos/nuevo", {
-                  method: "POST",
-                  body: new FormData(form),
-                  headers: { Accept: "application/json" },
-                });
-                if (
-                  response.redirected ||
-                  !response.headers
-                    .get("content-type")
-                    ?.includes("application/json")
-                )
-                  throw new Error(
-                    "La sesión cambió. Recarga la página e inténtalo de nuevo.",
-                  );
-                const result: unknown = await response.json();
-                if (
-                  !response.ok &&
-                  result &&
-                  typeof result === "object" &&
-                  "errors" in result &&
-                  result.errors &&
-                  typeof result.errors === "object"
-                ) {
-                  for (const [name, message] of Object.entries(result.errors)) {
-                    if (typeof message !== "string") continue;
-                    const input = inputs.find((item) => item.name === name);
-                    if (!input) continue;
-                    const hint = document.createElement("p");
-                    hint.dataset.asyncError = name;
-                    hint.id = `${name}-async-error`;
-                    hint.className = "mt-1 text-sm text-destructive";
-                    hint.textContent = message;
-                    input.parentElement?.append(hint);
-                    input.setAttribute("aria-invalid", "true");
-                    input.setAttribute(
-                      "aria-describedby",
-                      `${name}-hint ${hint.id}`,
-                    );
-                  }
-                }
-                if (
-                  !response.ok ||
-                  !result ||
-                  typeof result !== "object" ||
-                  !("id" in result) ||
-                  typeof result.id !== "string"
-                )
-                  throw new Error(
-                    result &&
+            void notifications
+              .promise(
+                async () => {
+                  try {
+                    const response = await fetch("/app/formatos/nuevo", {
+                      method: "POST",
+                      body: new FormData(form),
+                      headers: { Accept: "application/json" },
+                    });
+                    if (
+                      response.redirected ||
+                      !response.headers
+                        .get("content-type")
+                        ?.includes("application/json")
+                    )
+                      throw new Error(
+                        "La sesión cambió. Recarga la página e inténtalo de nuevo.",
+                      );
+                    const result: unknown = await response.json();
+                    if (
+                      !response.ok &&
+                      result &&
                       typeof result === "object" &&
-                      "message" in result &&
-                      typeof result.message === "string"
-                      ? result.message
-                      : "No se pudo crear el formato.",
-                  );
-                await navigate("/app/formatos?success=created");
-              } catch (failure) {
-                if (error) {
-                  error.textContent =
-                    failure instanceof Error
-                      ? failure.message
-                      : "No se pudo crear el formato.";
-                  error.hidden = false;
-                  error.focus();
-                }
-              } finally {
-                button.removeAttribute("aria-busy");
-                update();
-              }
-            })();
+                      "errors" in result &&
+                      result.errors &&
+                      typeof result.errors === "object"
+                    ) {
+                      for (const [name, message] of Object.entries(
+                        result.errors,
+                      )) {
+                        if (typeof message !== "string") continue;
+                        const input = inputs.find((item) => item.name === name);
+                        if (!input) continue;
+                        const hint = document.createElement("p");
+                        hint.dataset.asyncError = name;
+                        hint.id = `${name}-async-error`;
+                        hint.className = "mt-1 text-sm text-destructive";
+                        hint.textContent = message;
+                        input.parentElement?.append(hint);
+                        input.setAttribute("aria-invalid", "true");
+                        input.setAttribute(
+                          "aria-describedby",
+                          `${name}-hint ${hint.id}`,
+                        );
+                      }
+                    }
+                    if (
+                      !response.ok ||
+                      !result ||
+                      typeof result !== "object" ||
+                      !("id" in result) ||
+                      !isUuid(result.id)
+                    )
+                      throw new Error(
+                        result &&
+                          typeof result === "object" &&
+                          "message" in result &&
+                          typeof result.message === "string"
+                          ? result.message
+                          : "No se pudo crear el formato.",
+                      );
+                    await navigate("/app/formatos");
+                  } catch (failure) {
+                    if (error) {
+                      error.textContent =
+                        failure instanceof Error
+                          ? failure.message
+                          : "No se pudo crear el formato.";
+                      error.hidden = false;
+                      error.focus();
+                    }
+                    throw failure;
+                  } finally {
+                    pending = false;
+                    button.removeAttribute("aria-busy");
+                    update();
+                  }
+                },
+                {
+                  loading: { title: "Creando formato…" },
+                  success: { title: "Formato creado." },
+                  error: (failure) => ({
+                    title:
+                      failure instanceof Error
+                        ? failure.message
+                        : "No se pudo crear el formato.",
+                  }),
+                },
+              )
+              .catch(() => {});
           });
           const allowed = (kind: string, value: string) => {
             if (kind === "name")
@@ -328,12 +350,14 @@ const fields = [
             );
           };
           const update = () => {
-            button.disabled = !inputs.every(
-              (input) =>
-                input.value.trim() !== "" &&
-                input.checkValidity() &&
-                allowed(input.name, input.value),
-            );
+            button.disabled =
+              pending ||
+              !inputs.every(
+                (input) =>
+                  input.value.trim() !== "" &&
+                  input.checkValidity() &&
+                  allowed(input.name, input.value),
+              );
           };
           inputs.forEach((input) => {
             let previous = input.value;
