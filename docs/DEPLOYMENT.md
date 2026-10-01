@@ -200,12 +200,11 @@ En Vercel, `DATABASE_URL` debe apuntar al pooler de Supabase apropiado para runt
 
 Antes de habilitar Auth cloud se debe verificar explícitamente:
 
-- signup público por email/password deshabilitado;
-- únicamente Google entre los proveedores previstos;
+- signup público deshabilitado; email/password solo para cuentas internas preaprovisionadas y Google solo mediante identidad/invitación autorizada;
 - Site URL y callback allowlist exactos;
 - variables públicas y privadas asignadas al entorno correcto sin exponer secretos.
 
-Estas comprobaciones quedaron aplicadas durante la Fase 1. La clave legacy `service_role` debe rotarse o deshabilitarse antes de operar con datos reales porque una inspección inicial del CLI la mostró completa aun sin solicitar `--reveal`.
+La configuración de producción existente corresponde al release de Fase 1/3; no acredita que el despliegue de autenticación dual esté configurado. La activación de Fase 4 requiere además el hook y redirects descritos más abajo. La clave legacy `service_role` debe rotarse o deshabilitarse antes de operar con datos reales porque una inspección inicial del CLI la mostró completa aun sin solicitar `--reveal`.
 
 ## REGISTRO PÚBLICO DE INTERESADOS: LOCAL LISTO, CLOUD PENDIENTE
 
@@ -247,3 +246,17 @@ El secreto HMAC está presente en Production/Preview, con su contenido nunca le�
 - Cualquier reset de datos solicitado para preparar desarrollo es local y limitado a datos de aplicación sintéticos. No ejecutar reset de Auth ni de producción. Preservar identidad/cuenta ADMIN local válida y settings/secretos de proveedor; no automatizar reset de producción en deploy. Una futura renovación de demos cloud requiere gate manual y autorización explícita.
 - Recuperación de contraseña depende de configuración SMTP de Supabase Auth: verificar remitente, proveedor y entrega en cloud antes de declarar recuperación por email lista. La verificación SMTP no bloquea el login email/password de una cuenta aprovisionada por ADMIN.
 - Las claves de Google, service role y demás secretos permanecen server-only; no poner contraseña inicial de seed en Git. La provisión de cuentas de prueba debe obtener secretos por mecanismo local ignorado/proceso y no registrarlos.
+
+## AUTH DUAL: IMPLEMENTADO EN FEATURE, DESPLIEGUE PENDIENTE
+
+La rama `feat/dual-auth-and-profile` implementa login password interno, cambio/recovery, asociación Google con aprobación de aplicación y provisionamiento server-side de cuentas instructor. No tiene PR ni está integrada a `development`; no se ha desplegado ni habilitado en Supabase cloud. El release Fase 3 en `master` (`8f5bb2d`) permanece sin cambios.
+
+Antes de activar la feature en un entorno:
+
+1. Pasar migrations Drizzle `0012_dual_auth_security.sql` y `0013_google_link_requests.sql` mediante el flujo normal gated; no aplicar SQL a mano ni asumir que los archivos versionados equivalen a una migración aplicada.
+2. Configurar en la instancia Auth efectiva el `before_user_created` hook hacia `private_auth.allow_invited_google_signup`, tras aplicar 0012. La función solo permite altas OAuth Google con invitación vigente y roles; las cuentas de password se crean por Admin API desde servidor. El `supabase/config.toml` de la rama define el hook local, pero no hay verificación/aplicación en el stack persistente ni cloud.
+3. Proveer `AUTH_RATE_LIMIT_SECRET` como variable server-only con mínimo 32 caracteres, generada fuera de Git. Sin ella, limitación de intentos y pruebas firmadas fallan de forma segura; nunca imprimir ni entregar el valor al cliente.
+4. Configurar redirect allowlist exacta para `/auth/callback` y `/auth/recovery` en cada entorno. Configurar/verificar el proveedor de email/SMTP y la entrega real antes de declarar recovery por correo operativo. Email recovery no bloquea login inicial con contraseña asignada por ADMIN.
+5. Verificar rutas, guards, Auth hook, contadores y redacción mediante integración/CI y E2E; obtener la ventana de release posterior antes de cualquier promoción a `master`.
+
+Supabase puede asociar automáticamente proveedores con emails verificados coincidentes; no documentar una garantía de que ese comportamiento proveedor pueda deshabilitarse. El requisito de aprobación explícita se aplica en la capa de acceso de SkillBase: se persiste `approved_google_identity_id` y una autenticación OAuth Google no aprobada se rechaza, aunque la identidad aparezca en Supabase Auth. Una sesión de password de la misma cuenta permanece independiente. No se ha cambiado Auth/SMTP cloud, reiniciado el stack local, aplicado migraciones ni ejecutado reset/seed como parte de esta documentación.
