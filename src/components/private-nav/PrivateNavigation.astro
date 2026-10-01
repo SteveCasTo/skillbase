@@ -5,6 +5,7 @@ import {
   ChevronDown,
   LayoutDashboard,
   Layers3,
+  UsersRound,
 } from "lucide-react";
 
 interface Props {
@@ -18,6 +19,9 @@ const { mode, currentPath, isAdmin, isInstructor } = Astro.props;
 const courseActive =
   currentPath === "/app/cursos" || currentPath.startsWith("/app/cursos/");
 const formatActive = currentPath === "/app/formatos";
+const interestActive =
+  currentPath === "/app/interesados" ||
+  currentPath.startsWith("/app/interesados/");
 ---
 
 <nav
@@ -42,7 +46,8 @@ const formatActive = currentPath === "/app/formatos";
           <summary
             class:list={[
               "private-nav-link",
-              (courseActive || formatActive) && "private-parent-active",
+              (courseActive || formatActive || interestActive) &&
+                "private-parent-active",
             ]}
             title="Cursos"
           >
@@ -55,6 +60,16 @@ const formatActive = currentPath === "/app/formatos";
             />
           </summary>
           <ul class="private-subnav">
+            <li>
+              <a
+                href="/app/interesados"
+                aria-current={interestActive ? "page" : undefined}
+                class="private-subnav-link"
+              >
+                <UsersRound size={17} aria-hidden="true" />
+                <span>Interesados</span>
+              </a>
+            </li>
             <li>
               <a
                 href="/app/cursos"

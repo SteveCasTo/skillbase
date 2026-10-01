@@ -1,0 +1,141 @@
+---
+import AdminInterestManagement from "@/components/interests/admin-management.astro";
+import type { AdminInterestCourseDto } from "@/domain/interests/types";
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import { requireInternalUser } from "@/server/auth/context";
+import {
+  handleAdminInterestPost,
+  loadAdminInterestCourse,
+} from "@/server/interests/http";
+
+const actor = requireInternalUser(Astro.locals);
+const courseId = Astro.params.courseId ?? "";
+const requestedStatus = Astro.url.searchParams.get("status");
+const status =
+  requestedStatus === "ACTIVE" || requestedStatus === "CANCELLED"
+    ? requestedStatus
+    : undefined;
+Astro.response.headers.set("Cache-Control", "private, no-store");
+let pageError = "";
+let issues: Record<string, string> = {};
+if (Astro.request.method === "POST") {
+  const result = await handleAdminInterestPost({
+    request: Astro.request,
+    courseId,
+    actor,
+  });
+  if (Astro.request.headers.get("accept")?.includes("application/json")) {
+    return new Response(JSON.stringify(result.payload), {
+      status: result.status,
+      headers: {
+        ...result.headers,
+        "Content-Type": "application/json",
+        "Cache-Control": "private, no-store",
+      },
+    });
+  }
+  if (result.payload.ok) {
+    const query = new URLSearchParams({ success: "updated" });
+    if (status) query.set("status", status);
+    const redirect = Astro.redirect(
+      `/app/interesados/${courseId}?${query}`,
+      303,
+    );
+    redirect.headers.set("Cache-Control", "private, no-store");
+    return redirect;
+  }
+  Astro.response.status = result.status;
+  pageError = result.payload.message;
+  issues = result.payload.issues ?? {};
+}
+let data: AdminInterestCourseDto | null = null;
+let loadError = false;
+try {
+  data = await loadAdminInterestCourse(actor, courseId, status);
+  if (!data) Astro.response.status = 404;
+} catch {
+  loadError = true;
+  Astro.response.status = 503;
+}
+const success = Astro.url.searchParams.get("success") === "updated";
+---
+
+<PrivateLayout
+  title={data ? `Interesados · ${data.course.name}` : "Interesados"}
+>
+  <nav
+    aria-label="Ruta de navegación"
+    class="mb-5 text-sm text-muted-foreground"
+  >
+    <ol class="flex flex-wrap items-center gap-2">
+      <li>
+        <a href="/app" class="underline-offset-4 hover:underline">
+          Resumen
+        </a>
+      </li>
+      <li aria-hidden="true">/</li>
+      <li>
+        <a href="/app/interesados" class="underline-offset-4 hover:underline">
+          Interesados
+        </a>
+      </li>
+      <li aria-hidden="true">/</li>
+      <li aria-current="page">{data?.course.name ?? "Curso"}</li>
+    </ol>
+  </nav>
+  <header>
+    <h1 class="break-words text-3xl font-semibold tracking-tight sm:text-4xl">
+      {data?.course.name ?? "Interesados del curso"}
+    </h1>
+    <p class="mt-3 max-w-2xl leading-7 text-muted-foreground">
+      Registros de interés y demanda por preferencia. No equivalen a
+      inscripciones ni reservas.
+    </p>
+  </header>
+  {pageError && (
+    <section role="alert" class="mt-6 rounded-lg border bg-card p-4 text-sm">
+      <p>{pageError}</p>
+      {Object.entries(issues).map(([field, message]) => (
+        <p data-issue={field} class="mt-2">
+          {message}
+        </p>
+      ))}
+    </section>
+  )}
+  {success && (
+    <noscript>
+      <p role="status" class="mt-6 rounded-lg border bg-secondary p-4 text-sm">
+        Estado del interesado actualizado.
+      </p>
+    </noscript>
+  )}
+  {loadError ? (
+    <section
+      role="alert"
+      class="mt-8 rounded-xl border bg-card p-7 text-center"
+    >
+      <h2 class="text-lg font-semibold">No pudimos cargar los interesados</h2>
+      <p class="mt-2 text-sm text-muted-foreground">
+        Inténtalo nuevamente en unos minutos.
+      </p>
+      <a
+        href={Astro.url.pathname + Astro.url.search}
+        class="mt-5 inline-flex min-h-11 items-center rounded-lg border px-4 text-sm font-medium hover:bg-secondary"
+      >
+        Reintentar
+      </a>
+    </section>
+  ) : !data ? (
+    <section class="mt-8 rounded-xl border bg-card p-7">
+      <h2 class="text-lg font-semibold">Curso no encontrado</h2>
+      <a
+        href="/app/interesados"
+        class="mt-3 inline-flex min-h-11 items-center text-sm underline underline-offset-4"
+      >
+        Consultar otros cursos
+      </a>
+    </section>
+  ) : (
+    <AdminInterestManagement data={data} status={status} />
+  )}
+</PrivateLayout>
