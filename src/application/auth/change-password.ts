@@ -10,6 +10,7 @@ export interface PasswordGateway {
     authUserId: string,
   ): Promise<boolean>;
   updatePassword(password: string): Promise<boolean>;
+  recordPasswordChanged(actorId: string): Promise<void>;
 }
 
 export async function changeAccountPassword(
@@ -42,4 +43,14 @@ export async function changeAccountPassword(
     throw new Error(
       "No pudimos cambiar la contraseña. Confirma tu acceso e inténtalo nuevamente.",
     );
+  try {
+    await gateway.recordPasswordChanged(user.id);
+  } catch {
+    // Supabase Auth and PostgreSQL cannot share a transaction. Do not report a
+    // failed password change after the provider has already accepted it.
+    console.error({
+      event: "PASSWORD_CHANGE_AUDIT_WRITE_FAILED",
+      actorId: user.id,
+    });
+  }
 }

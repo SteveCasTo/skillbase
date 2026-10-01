@@ -111,6 +111,9 @@ export async function updateProfilePassword(
           const { error } = await supabase.auth.updateUser({ password });
           return !error;
         },
+        async recordPasswordChanged(actorId) {
+          await repository.recordPasswordChanged(actorId);
+        },
       },
     );
     context.cookies.delete("auth-password-proof", { path: "/" });

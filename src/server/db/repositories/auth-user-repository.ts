@@ -48,6 +48,15 @@ async function hydrateUser(
 export class DrizzleAuthUserRepository implements AuthUserRepository {
   constructor(private readonly db: Database) {}
 
+  async recordPasswordChanged(actorId: string): Promise<void> {
+    await this.db.insert(schema.auditEvents).values({
+      actorId,
+      entityType: "USER",
+      entityId: actorId,
+      action: "PASSWORD_CHANGED",
+    });
+  }
+
   async createGoogleLinkRequest(
     nonce: string,
     internalUserId: string,
