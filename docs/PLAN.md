@@ -341,7 +341,7 @@ Administración crea y publica un curso; este aparece automáticamente en una ex
 
 ## GATE PREVIO A FASE 3 - EXPERIENCIA PRIVADA
 
-La experiencia privada existente está implementada y validada localmente. PR 104 se integró en `development` como `6fc81da`; esta integración no promueve cambios a `master` ni altera los gates remotos/cloud históricos de Fase 2. Fase 3 sigue en progreso.
+La experiencia privada existente está implementada y validada localmente. PR 104 se integró en `development` como `6fc81da`; esta integración no altera los gates remotos/cloud históricos de Fase 2. En ese momento Fase 3 aún no se había iniciado; su implementación y release posteriores están registrados en su sección correspondiente.
 
 - [x] Incorporar skeletons reales durante las cargas estructurales de `/app`, vinculados al estado de carga y no a una demora decorativa.
 - [x] Usar Sileo para feedback transitorio de mutaciones, con estados pending, success y error, sin sustituir errores junto a campos.
@@ -401,8 +401,8 @@ Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión f
 - [x] Implementar permisos server-side para operaciones administrativas y validación de entradas públicas.
 - [x] Implementar minimización de datos, errores públicos sanitizados, límite de body y rate limiter persistente atómico; la suite backend dirigida está verde.
 - [x] Configurar presencia de `INTEREST_RATE_LIMIT_SECRET` server-only en Vercel Production/Preview y verificar estáticamente `Astro.clientAddress` mediante la cadena oficial Astro/Vercel. El valor no se registra.
-- [ ] Probar el POST y la resistencia a forwarded-header spoofing en runtime tras desplegar la versión nueva; producción aún sirve la versión anterior.
-- [ ] Definir política de conservación y anonimización de interesados, incluido el plazo; el cierre de disponibilidad no elimina registros y no se presume retención perpetua.
+- [x] Verificar POST público en runtime y que valores falsificados de `X-Forwarded-For` no alteran los buckets de red/curso; el detalle de smoke y límites de la prueba se registra abajo. No se hizo stress para forzar 429 ni se verificó el HMAC de una IP real.
+- [ ] Definir como seguimiento de gobierno de datos la política de conservación/anonimización y su plazo. La propuesta de 12 meses sigue sin aprobar; no hay borrado automático y este pendiente no bloquea el cierre técnico de Fase 3 ni la planificación de desarrollo de Fase 4.
 - [x] Crear fixtures sintéticos y deterministas; unit e integración locales completos PASS.
 - [x] Añadir E2E público/administrativo para disponibilidad, duplicados, recuperación, permisos y accesibilidad; cobertura validada por corrida full y revalidaciones dirigidas descritas en `docs/TESTING.md`.
 - [x] Actualizar los documentos afectados al estado real; la política de retención/anónimización permanece pendiente.
@@ -412,22 +412,32 @@ Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión f
 - [x] Resolver los hallazgos encontrados durante la validación del bloque; la corrección del cleanup de fixtures de cursos se hizo explícita y sin `CASCADE`.
 - [x] Integrar PR 105 a `development` (merge `0bf0979`, 2026-10-01). No implica promoción a `master`.
 - [x] Ejecutar formatter, lint, typecheck, unitarias, integración, E2E y build locales correspondientes; la cobertura E2E se compone de la corrida full 81/95 y las suites dirigidas, no de una corrida full 95/95.
-- [x] Registrar el estado real local/cloud: secreto configurado y origen confiable revisado estáticamente; migraciones cloud y POST runtime aún sin verificar.
-- [x] Completar implementación y validación local del milestone Fase 3. La migración cloud 0010/0011, prueba runtime en producción y PR de release a `master` permanecen pendientes.
+- [x] Registrar el estado real local/cloud y evidencia de release en `docs/TESTING.md`/`docs/DEPLOYMENT.md`.
+- [x] Completar implementación, validación local y release de Fase 3 en producción. No implica una revisión manual ADMIN en producción ni cierra la política de retención propuesta, que sigue pendiente.
 
-### Cierre de implementación local y pendientes de producción
+### Cierre de Fase 3: validación local y producción
 
 La implementación de Fase 3 y su validación local están completas. Full unit 129 PASS (793 assertions); full integration 65 PASS/0 FAIL (478 assertions, 9 archivos), después de corregir el cleanup de fixtures para incluir la tabla de interesados explícitamente, sin `CASCADE`; lint global PASS; typecheck PASS con 0 errores/0 warnings/70 hints; build y Drizzle checks PASS. E2E: corrida full 81/95 PASS, 14 fallos por fixtures de calendarios de cursos (12 respuestas 422) y carga de formatos (2). Después, sin cambios de código de producción, `courses` dirigido 2/2 PASS (47.9 s) y `interests` dirigido 13/13 PASS (1.1 min); las suites se solapan en un escenario de Auth. La evidencia combinada cubre los 95 escenarios mediante la corrida full y revalidaciones dirigidas; no se afirma un full run 95/95. Fallback sin JavaScript y navegación/animación mobile comprobados PASS.
 
 La migración 0011 se aplicó de forma idempotente al Supabase local estándar `127.0.0.1:54322` sin reset; el rerun verificó el checksum `377bb93ab34a1e9745ff69823ee065f11183b7db7f5881337dedd99e9dfa72b6` y el ledger avanzó de 11 a 12. Ambas tablas nuevas tienen RLS. Antes/después se conservaron 7 cursos, 9 grupos, 1 usuario y 34 eventos de auditoría. Los datos sintéticos de intereses se eliminaron al terminar el smoke (0 filas de interesados; 2 buckets técnicos con TTL). El secreto local se guardó en `.env` ignorado y no se registra su valor; no se requirieron cambios tracked al arranque (`bun run dev` sin cambios) y el servidor quedó activo en `http://127.0.0.1:4321`. Smoke local: GET `/`, `/cursos` y curso demo devolvieron 200; dos POST sintéticos devolvieron 200 con mensaje neutro y `no-store`; el rate limit usó loopback y no aceptó un header forwarded falsificado.
 
-Cloud: se verificó presencia del secreto server-only en Vercel Production y Preview (no se registra el valor; Preview no tiene credenciales DB ni un despliegue funcional). La cadena Astro/Vercel confía en `Astro.clientAddress`; la plataforma sobrescribe el primer `X-Forwarded-For`, y la aplicación valida que el valor sea IP. Esta es verificación estática/documental: el POST contra runtime cloud y el spoof test aún no se han ejecutado. La migración cloud sigue pendiente en 0000–0009; 0010 y 0011 no aplicadas. Por lo tanto no se afirma release, migración cloud ni funcionamiento runtime de producción.
+Cloud quedó migrado y desplegado en el release descrito abajo. El secreto permanece server-only y el flujo público se probó en producción. La configuración de backup/retención de datos personales sigue pendiente por separado; el plazo de 12 meses continúa siendo solo propuesta no aprobada.
 
-PR 105 (`https://github.com/SteveCasTo/skillbase/pull/105`) se integró en `development` como `0bf0979` el 2026-10-01. La rama de feature incluyó los commits backend `3fea0df`, público `d8f714f`, administrativo `e903084` y ajuste de rutas Auth `6112080`. La preparación restante para producción y cualquier promoción a `master` siguen pendientes.
+PR 105 (`https://github.com/SteveCasTo/skillbase/pull/105`) se integró en `development` como `0bf0979` el 2026-10-01. La rama de feature incluyó los commits backend `3fea0df`, público `d8f714f`, administrativo `e903084` y ajuste de rutas Auth `6112080`.
+
+### Cierre de release en producción (2026-10-02)
+
+La preparación documental de release se aceptó mediante PR 106. PR 112 corrigió en `development` una expectativa no determinista que asumía orden de eventos de auditoría; PR 113 integró el release a `master` como `8f5bb2dc45ad373ff12aefd6325456885b20d5c6`. El merge previo de PR 107 (`640d03`) tuvo el deploy bloqueado por esa prueba; el fallo quedó resuelto sin reducir las aserciones de auditoría.
+
+CI del PR 112: `36827391089`, jobs `quality` e `integration-e2e` PASS. CI del push a `master`: `36828194127`, `quality`, `integration-e2e` y `deploy` PASS. Full integration 65/65 y E2E 96/96, sin flaky tests. Vercel deployment `dpl_2kB2xrbE6ppxF4KYPVuR6cpfty9k` quedó `READY` y asociado a `https://skillbase-alpha.vercel.app`.
+
+El Supabase cloud canónico `SkillBase` (`fvzxqlezdrlzykyoevub`) quedó `ACTIVE_HEALTHY`; ledger Drizzle 0000–0011 con hashes y timestamps correspondientes al repositorio. Migraciones 0010/0011 se aplicaron por el pipeline de release; constraints/RLS/revocaciones de las tablas nuevas se verificaron. Smoke público en producción: landing, catálogo y detalle con formulario devolvieron 200; alta y duplicado devolvieron el mismo éxito neutro `200`/`no-store`, persistiendo una sola fila. Dos valores spoof de `X-Forwarded-For` produjeron el mismo resultado de bucket por red/curso (contador 2 en cada scope), confirmando que no sustituyen la dirección de cliente confiable. No fue un stress test 429 ni una verificación del HMAC de una IP real. Se eliminó el único registro sintético; quedaron 0 interesados y 2 buckets técnicos con TTL. La ruta privada sin sesión redirigió a login con 303; no se probó una interacción manual como ADMIN en producción.
+
+La cadena de confianza documentada es Vercel (sobrescribe `X-Forwarded-For`) → Astro/Vercel (`Astro.clientAddress`) → validación `net.isIP`; el secreto HMAC permanece server-only y no se registra su valor. El checklist de release Fase 3 queda completo por los gates automáticos y smoke público descritos; no se afirma validación manual del flujo administrativo en producción.
 
 #### Propuesta de conservación (no aprobada)
 
-Como propuesta de trabajo, anonimizar los datos de contacto doce meses después del cierre del curso y conservar solo métricas agregadas anónimas. El plazo y el tratamiento exacto no están aprobados por el usuario, no son requisito vigente ni están automatizados; la definición de gobierno de datos sigue pendiente para operación con datos reales. Esta propuesta no bloquea el cierre de implementación de Fase 3 en desarrollo.
+Como propuesta de trabajo, anonimizar los datos de contacto doce meses después del cierre del curso y conservar solo métricas agregadas anónimas. El plazo y el tratamiento exacto no están aprobados por el usuario, no son requisito vigente ni están automatizados; no hay borrado/anonimización automática. La definición de gobierno de datos sigue pendiente para operación con datos reales. Esta propuesta no bloquea el cierre de Fase 3 ni el desarrollo de Fase 4; aprobar una política será requisito antes de implementar ese comportamiento de retención.
 
 ### Baseline verificado de calidad
 
