@@ -10,7 +10,7 @@ Supabase Auth.
 
 ## GOOGLE
 
-Google OAuth es el mecanismo visible actualmente. El contrato aprobado para Fase 4 añade email/password para cuentas internas; no implica signup público.
+Google OAuth y email/password son mecanismos visibles para usuarios internos. El flujo de email/password y la asociación opcional de Google se integraron en `development` mediante PR 118; las migraciones en el stack local persistente/cloud y la habilitación efectiva siguen pendientes. No hay signup público abierto.
 
 La configuración requiere credenciales OAuth de Google y configuración correspondiente en Supabase.
 
@@ -79,7 +79,7 @@ No asumir que cualquier cuenta Google autenticada es automáticamente administra
 
 Deshabilitar un User interno debe impedir acceso incluso si su identidad Google continúa siendo válida.
 
-## IMPLEMENTACIÓN DE FASE 1
+## IMPLEMENTACIÓN INICIAL DE FASE 1
 
 El acceso visible usa Google OAuth con PKCE:
 
@@ -94,7 +94,7 @@ POST /auth/google
 → /app
 ```
 
-El callback acepta únicamente identidades que incluyan el proveedor `google`, correo y `email_confirmed_at`. Una invitación `INVITED` no tiene `authUserId`; el vínculo y el cambio a `ACTIVE` se realizan juntos bajo bloqueo de fila. Una invitación vinculada a otro UUID, una cuenta desconocida, deshabilitada o sin roles se rechaza y se cierra solamente la sesión local recién creada.
+El callback normal de OAuth acepta únicamente sesión cuyo método verificado sea OAuth, proveedor Google con correo verificado coincidente y usuario interno autorizado. Una invitación `INVITED` no tiene `authUserId`; el vínculo y el cambio a `ACTIVE` se realizan juntos bajo bloqueo de fila. Una invitación vinculada a otro UUID, una cuenta desconocida, deshabilitada o sin roles se rechaza y se cierra solamente la sesión local recién creada.
 
 En requests posteriores, el middleware crea un cliente `@supabase/ssr` ligado a las cookies del request, valida la identidad con `getUser()` y carga estado y roles desde PostgreSQL mediante Drizzle. No se usa `user_metadata`, dominio de correo ni navegación como autorización.
 
@@ -107,11 +107,11 @@ El parámetro de retorno permite solo rutas relativas locales. El siguiente dest
 - Callback que debe registrarse en Google para Supabase local: `http://127.0.0.1:54321/auth/v1/callback`.
 - Client ID y secret de Google se leen desde variables ignoradas por Git declaradas en `.env.example`.
 
-En el estado implementado actual, email/password no aparece en la aplicación. Los fixtures locales crean usuarios de Auth confirmados mediante Admin API y obtienen sesiones E2E con enlaces de un solo uso generados por esa misma API, sin automatizar la UI de Google ni habilitar login público por email. El cambio aprobado de Fase 4 está planificado abajo y todavía no está implementado.
+Los fixtures locales crean usuarios de Auth confirmados mediante Admin API y obtienen sesiones E2E controladas; Google real no es dependencia de la suite general.
 
-El signup público por email/password está deshabilitado tanto en Supabase local como en el proyecto cloud; esto no impide que la Admin API local cree fixtures. Google es el único proveedor visible habilitado actualmente.
+El signup público por email/password permanece deshabilitado tanto en Supabase local como en cloud. Para permitir invitaciones Google existentes, el stack de aplicación configura el hook `before_user_created` y la migración 0012 define `private_auth.allow_invited_google_signup`; el hook autoriza solo invitaciones Google preaprovisionadas con roles. Las cuentas email/password las crea la Admin API desde servidor, que no pasa por el hook. La aplicación no ofrece signup.
 
-Las rutas privadas tienen políticas exactas: `/app` permite cualquier usuario interno activo con al menos un rol, `/app/cursos` exige `ADMIN` y `/app/asistencia` exige `INSTRUCTOR`. Cualquier ruta futura bajo `/app` se rechaza hasta declarar su política.
+Las rutas privadas tienen políticas exactas: `/app` permite cualquier usuario interno activo con al menos un rol; rutas administrativas (cursos, formatos e interesados) exigen `ADMIN`; `/app/perfil` permite al usuario activo. No se concede acceso de instructor a asistencia/sesiones en esta etapa. Cualquier ruta futura bajo `/app` se rechaza hasta declarar su política.
 
 ### Configuración cloud
 
@@ -119,15 +119,18 @@ El proyecto `SkillBase` está enlazado con referencia `fvzxqlezdrlzykyoevub`. Go
 
 El flujo cloud fue verificado manualmente desde Vercel hasta Google y de regreso a `/app`. El primer administrador quedó vinculado a su identidad Auth, en estado `ACTIVE` y con rol `ADMIN`.
 
-## CONTRATO DE FASE 4 (pendiente de implementación)
+## AUTENTICACIÓN DUAL IMPLEMENTADA (Fase 4; integrada en development, habilitación pendiente)
 
-- Conservar login Google y añadir login por email/password únicamente para identidades internas provisionadas por ADMIN server-side. No abrir signup público ni gestión de altas ADMIN.
-- El ADMIN establece la contraseña inicial al crear instructor/cuenta; no se trata como invitación y no se exige cambio en el primer acceso. El usuario podrá cambiarla desde su perfil, de forma opcional.
-- Supabase Auth es la única fuente de credenciales. No persistir, registrar, devolver ni precargar contraseñas en almacenamiento de aplicación, DTOs, errores ni logs. El formulario debe quedar vacío al volver a mostrarse.
-- Un usuario autenticado puede enlazar Google explícitamente a su misma cuenta. Requerir identidad Google con email verificado y coincidencia tras normalización; no hacer auto-merge ni vincular por similitud sin consentimiento/autenticación.
-- Mantener los guards y roles internos como autoridad. Instructor tendrá rol `INSTRUCTOR`; autenticación válida no autoriza automáticamente y el acceso se acota a perfil propio/cursos asignados.
-- No conceder acceso de instructor a asistencia/sesiones en Fase 4; ajustar la política exacta de `/app/asistencia` que hoy está registrada para `INSTRUCTOR` para que no anticipe el alcance de Fase 6.
-- Mantener OAuth CSRF/state/PKCE y cookies seguras, redirect allowlist existente, validación de origen para mutaciones, `no-store`, limitación razonable de intentos y redacción de credenciales. No exponer Admin API/service role al browser.
-- El cambio/recuperación de contraseña usa mecanismos de Supabase Auth. Verificar y documentar configuración SMTP cloud para recuperación; recuperación no bloquea el aprovisionamiento y login inicial con contraseña elegida por ADMIN.
+- Login email/password convive con Google. Un identificador interno conserva UUID propio y referencia `auth.users.id`; correo y role/state se resuelven desde el usuario interno. La aplicación valida el usuario en vivo mediante `getUser()` y valida los claims firmados mediante `getClaims()` para determinar el método de la sesión actual; no deduce el método de una identidad vinculada.
+- `createInstructorAccount(actorAuthUserId, { email, name, password })` es operación de servidor, no endpoint público. Verifica ADMIN activo antes y después de llamar Supabase Admin API, normaliza/valida campos y provisiona usuario Auth confirmado. Después crea usuario interno `ACTIVE`, `authPrimaryProvider=EMAIL` y rol únicamente `INSTRUCTOR` en transacción. Si falla el registro interno, intenta borrar la identidad Auth recién creada como compensación. La contraseña nunca forma parte del input persistido, usuario interno, evento de auditoría ni respuesta `InternalUser`; no existe aún pantalla administrativa de alta/asignación de instructores.
+- El usuario autenticado puede actualizar su propia contraseña opcionalmente en `/app/perfil`. Acepta contraseña actual o confirmación por email; los campos no se repueblan. Flujo de recovery entrega respuesta neutra. La contraseña inicial de cuenta de instructor la elige y establece ADMIN en el aprovisionamiento, sin invitación ni obligación de cambiar al primer acceso.
+- El usuario puede solicitar asociación Google explícita desde `/app/perfil`. El intento se liga por cookie firmada y `HttpOnly`, nonce aleatorio almacenado como hash de un uso y expiración de cinco minutos, usuario interno, ID de sesión y `flowId` PKCE. La callback comprueba la sesión original, la identidad Auth resultante, OAuth vigente, Google verificado y coincidencia de email normalizada. Email/Supabase puede asociar automáticamente identidades Google de correo verificado y coincidente; Supabase no ofrece aquí una garantía de impedir esa asociación a nivel proveedor. Por ello la aplicación conserva `approved_google_identity_id` y **deniega autenticación OAuth** por Google no aprobada. En asociación rechazada intenta quitar únicamente la nueva identidad Google y restaura la sesión original; identidad ya asociada en Auth no constituye por sí sola autorización de la aplicación. No se auto-fusionan usuarios internos ni se cambia identidad primaria por una coincidencia de email.
+- Para una identidad interna preexistente `auth_primary_provider=GOOGLE`, el login Google vigente se conserva y la contraseña puede añadirse opcionalmente desde perfil. Cuenta provisionada con `auth_primary_provider=EMAIL` requiere asociación explícita aprobada para que OAuth funcione; el login por password sigue siendo independiente y válido aunque Auth haya añadido una identidad Google no aprobada.
+- Se mantienen guards, rol/estado internos y rutas fail-closed. Instructor aún no tiene gestión de perfil de instructor ni asignación/cursos propios; la ruta `/app/perfil` es la configuración de la cuenta autenticada, no CRUD administrativo de instructores. La autorización de asistencia y sesiones sigue fuera del alcance implementado.
+- Las migraciones 0012 y 0013 definen buckets de rate-limit/seguridad, aprobación de identidad y requests de asociación. Antes de habilitar el feature hay que aplicar ambas, configurar el hook `private_auth.allow_invited_google_signup` en el stack correspondiente y proveer `AUTH_RATE_LIMIT_SECRET` server-only de al menos 32 caracteres. La configuración local versionada contiene el hook, pero el estado de stack/configuración cloud no está aplicado/verificado.
+- Los endpoints de Auth validan origen y límites de intentos (bucket persistente por red y, cuando aplica, cuenta/acción; claves HMAC y no IP/email crudos), limitan y validan cuerpos, usan cookies seguras, callbacks allowlisted y `private, no-store`. Supabase Admin API/service role permanece solo en servidor.
+- Supabase Auth es el único almacén de passwords; no guardarlas en PostgreSQL, DTOs ni logs. SMTP/entrega real de email de recovery no ha sido configurada ni probada en local/cloud. El login inicial password no depende de recovery.
 
 La política de activación/desactivación cuando existen cursos futuros asignados está pendiente de aprobación; no implementar una regla de negocio inferida.
+
+Los commits `5613399`, `958053a` y `5ff585c`, sobre `cf601d8`, se integraron mediante [PR 118](https://github.com/SteveCasTo/skillbase/pull/118) como `f06b4fdf8f8c7691ffdd7937efb0f813a27666d4`. El full E2E aislado pasó 104/104 en el puerto canónico 4321; es evidencia local, no CI remoto. Las migraciones 0012/0013 solo se ejercitaron en stacks de test aislados; su aplicación al stack local persistente/cloud, hook efectivo, secreto server-only, SMTP y Google real siguen pendientes de habilitación/verificación. Producción continúa en el release Fase 3 de `master` (`8f5bb2d`); no se ha promovido ningún cambio Auth a `master`.

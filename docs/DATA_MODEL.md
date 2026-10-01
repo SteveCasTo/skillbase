@@ -37,6 +37,10 @@ Implementación de Fase 1:
 - las FK de `user_roles` están indexadas cuando la PK compuesta no cubre el acceso inverso.
 - todas las tablas públicas de Auth interno tienen RLS habilitado y los roles Data API `anon`/`authenticated`/`service_role` no reciben privilegios ni políticas.
 
+La implementación dual-auth de la rama Fase 4 extiende `users` con `auth_primary_provider` (`GOOGLE`/`EMAIL`, default histórico `GOOGLE`) y `approved_google_identity_id` nullable. Esta última es la aprobación a nivel aplicación de una identidad Google concreta, no una afirmación de que Supabase no pueda asociar proveedores automáticamente. La contraseña y las identidades proveedor se mantienen en `auth.users`; el modelo interno conserva solamente `authUserId` y las referencias de identidad/aprobación necesarias. Las migraciones 0012/0013 están versionadas en la rama pero no están aplicadas en el stack local persistente ni en cloud.
+
+`auth_attempt_buckets` (0012) persiste contador, inicio/expiración y clave HMAC para límites de intentos; no guarda IP/email en claro. `auth_google_link_requests` (0013) persiste hash del nonce de uso único, FK al usuario interno, ID de sesión y expiración de cinco minutos. Ambas tienen RLS habilitado y grants Data API revocados. La integración depende de `AUTH_RATE_LIMIT_SECRET` server-only (mínimo 32 caracteres) y del hook Auth descrito en `AUTHENTICATION.md`; no se ha escrito configuración secreta ni aplicado migración al entorno de desarrollo compartido.
+
 Fase 4 aprobada, pendiente de implementación: separar un perfil interno de instructor con nombre, apellido, email normalizado y teléfono opcional (nombre completo solamente para exposición pública). La identidad Auth permanece en Supabase Auth, nunca se copia contraseña al modelo de aplicación. Mantener ID estable para cursos e historial; perfiles referenciados no se borran físicamente. La forma final de migración y el tratamiento de desactivación con asignaciones futuras requieren implementación/revisión; esa regla de ciclo de vida aún no está aprobada.
 
 ### Course

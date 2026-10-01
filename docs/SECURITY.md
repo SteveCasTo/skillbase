@@ -40,19 +40,20 @@ Administrador:
 
 Instructor:
 
-- solo puede consultar grupos asignados;
-- solo puede registrar asistencia en grupos autorizados;
-- solo puede gestionar evaluaciones de grupos autorizados.
+- el objetivo posterior es operar únicamente sobre cursos/grupos asignados;
+- asistencia y evaluaciones requieren su módulo y autorización explícitos en fases posteriores; no se conceden por el mero rol `INSTRUCTOR` en el alcance actual.
 
 No confiar únicamente en ocultar botones.
 
-### Extensión de cuentas y asignación de Fase 4 (pendiente)
+### Autenticación dual (implementada en la rama de feature; no habilitada en cloud)
 
-- Email/password no habilita registro público. Solo ADMIN autenticado puede aprovisionar cuenta interna mediante operación server-side; la credencial inicial no debe aparecer en logs, respuestas posteriores ni base de datos de aplicación.
-- El enlace Google requiere usuario ya autenticado, acción explícita, email del proveedor verificado y coincidencia normalizada con la identidad interna. No fusionar automáticamente identidades ni cuentas.
-- Cada ruta y query de instructor debe revalidar `INSTRUCTOR` y ownership sobre el curso en servidor; filtrar navegación no es autorización. No ampliar su permiso a módulos ajenos al perfil/cursos en esta fase.
-- Asignación única por curso y conflicto horario se validan atómicamente en servidor. Operaciones concurrentes de asignación, cambio de fechas, edición/creación de grupo y transición de estado/publicación deben usar bloqueo/transacción compartidos; una comprobación previa solo en UI no evita carreras.
-- Registrar cambios de perfil/asignación y mutaciones de cuenta en auditoría, excluyendo passwords, tokens y secretos. Sin interfaz de consulta de auditoría como parte del alcance.
+- Email/password no habilita signup público. `createInstructorAccount` es una operación server-side, autorizada a ADMIN activo; crea identidad confirmada con Supabase Admin API, verifica de nuevo al actor, transacciona usuario interno y rol `INSTRUCTOR`, y compensa borrando la identidad nueva si la escritura interna falla. La contraseña no se persiste ni se registra.
+- La validación del método actual de autenticación combina `getUser()` (identidad/sesión vigente) con `getClaims()` (claims firmados y `amr` para PASSWORD/OAUTH/confirmación). No confiar en lista de identidades del usuario para inferir por cuál método se autenticó.
+- Supabase puede asociar automáticamente una identidad Google cuando verifica que su email coincide; la aplicación no afirma ni depende de que esa asociación de proveedor se pueda desactivar. Para usuarios cuyo proveedor primario legado es `GOOGLE`, se conserva su acceso Google verificado. Para cuentas `EMAIL`, la asociación nueva aprobada por la aplicación se registra en `approved_google_identity_id`; OAuth Google sin esa aprobación se deniega, mientras una sesión PASSWORD sigue siendo válida. Esto separa asociación Auth a nivel proveedor de aprobación de acceso de aplicación.
+- El flujo de asociación inicia desde cuenta autenticada, valida origen y aplica rate limit. La prueba está firmada con `AUTH_RATE_LIMIT_SECRET`, cookie `HttpOnly`/`SameSite=Lax`/`Secure` según HTTPS, nonce con hash almacenado en DB, un solo uso y cinco minutos, ligada a usuario interno y sesión original; callback valida PKCE `flowId`, sesión OAuth, proveedor Google, email verificado normalizado y la misma identidad Auth. Ante un resultado no aceptado, intenta eliminar solo la identidad Google recién agregada (sin afectar las preexistentes) y restaurar la sesión inicial. La identidad de Auth sola nunca concede aprobación interna.
+- Los intentos de login/recovery/callback/enlace usan bucket persistente atómico por acción y red, y por cuenta cuando hay email; claves HMAC con dirección y email no crudos. El secreto server-only debe tener al menos 32 caracteres. No se han aplicado aún migraciones 0012/0013 ni verificado la habilitación de hook/configuración cloud.
+- Los endpoints mantienen validación de origen, body form-urlencoded con límite/tamaño y campos únicos, `private, no-store`, redirects explícitos, errores neutros y sin credenciales. No exponer service-role secret/cliente privilegiado al browser.
+- Esta implementación no añade interfaz de administración de instructores ni asignación a cursos; por tanto, las reglas de ownership de curso e instructor siguen pendientes de su módulo posterior.
 
 ## RUTAS
 
@@ -240,8 +241,10 @@ Prohibido en Git:
 - access tokens;
 - Vercel token;
 - Supabase access token.
+- `AUTH_RATE_LIMIT_SECRET`.
 
 Usar GitHub Secrets y variables de entorno.
+`AUTH_RATE_LIMIT_SECRET` es server-only, requiere al menos 32 caracteres y no debe comenzar por `PUBLIC_` ni aparecer en logs.
 
 ## CI/CD
 
@@ -274,12 +277,12 @@ Si un secreto se expone:
 
 - Las cookies de sesión se leen y renuevan mediante un cliente Supabase nuevo por request; las cabeceras anti-cache entregadas por `@supabase/ssr` se copian a la respuesta.
 - La identidad se valida contra Supabase Auth con `getUser()`. Estado y roles se consultan siempre en las tablas internas mediante una conexión server-side.
-- El callback exige proveedor Google y correo verificado antes de vincular una invitación; los fixtures email/password ya se pre-vinculan y existen solo en tests.
+- El callback normal de OAuth exige Google y correo verificado; las rutas de autenticación dual también validan método con claims firmados y aprobación de identidad Google del usuario interno. La asociación de identidad Google que Supabase puede hacer automáticamente no equivale a aprobación de acceso.
 - Los endpoints mutables de inicio y cierre de sesión son `POST` y verifican el origen esperado.
 - Los redirects de retorno se restringen a paths relativos y la allowlist local contiene una URL exacta.
-- No existe service-role key en código de aplicación o browser. El setup E2E obtiene la key efímera local desde Supabase CLI, la conserva únicamente en el entorno del proceso de prueba y no la imprime.
+- Los valores de service-role key no se guardan en código/Git ni se entregan al browser. El aprovisionamiento del feature usa el valor configurado en `process.env` solo en un cliente Auth Admin server-side; setup E2E obtiene la key efímera local desde Supabase CLI, la conserva únicamente en el entorno del proceso de prueba y no la imprime.
 - `users`, `roles` y `user_roles` tienen RLS sin políticas para Data API y privilegios revocados a `anon`, `authenticated` y `service_role`. Los guards Astro/Drizzle siguen siendo autoritativos porque las conexiones owner/bypass RLS no quedan restringidas por esas políticas.
-- Supabase local deshabilita el signup público por email/password. La Admin API continúa disponible exclusivamente para crear fixtures controlados. La configuración cloud debe deshabilitar también signup público por email y cualquier proveedor no previsto antes de habilitar producción.
+- Supabase local conserva signup público deshabilitado y añade hook `before_user_created` para aceptar solo invitaciones Google permitidas. La migración 0012 crea la función segura del hook y restringe su ejecución. Las cuentas de email/password se provisionan con Admin API server-side; la configuración Auth cloud de esta feature no está aplicada/verificada.
 - Las cookies SSR declaran `HttpOnly`, `SameSite=Lax`, path `/` y `Secure` cuando `PUBLIC_SITE_URL` usa HTTPS.
 - Las respuestas de `/app`, `/app/**`, `/login`, `/unauthorized` y `/auth/**` usan `Cache-Control: private, no-store`.
 - Toda ruta bajo `/app` requiere una política exacta registrada. Las rutas futuras no declaradas fallan cerradas; los endpoints de operaciones sensibles deben seguir invocando guards propios aunque una página ya esté protegida.
