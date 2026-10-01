@@ -60,7 +60,9 @@ test("multi-role user accesses administration and profile without future attenda
   const navigation = page.getByRole("navigation", {
     name: "Navegación privada",
   });
-  await expect(navigation.getByRole("link", { name: "Cursos" })).toBeVisible();
+  await expect(
+    navigation.getByRole("link", { name: "Cursos", exact: true }),
+  ).toBeVisible();
   await expect(
     navigation.getByRole("link", { name: "Asistencia" }),
   ).toHaveCount(0);

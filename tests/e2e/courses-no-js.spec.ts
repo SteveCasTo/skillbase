@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
+import { registerCourseInstructor } from "./instructor-helper";
 
 test.use({ javaScriptEnabled: false });
 
@@ -11,6 +12,8 @@ test("stale HTML drafts and editorial confirmations retain their rejected revisi
   browser,
 }) => {
   await signInFixture(context, AUTH_FIXTURES.admin.email);
+  const initialInstructor = await registerCourseInstructor(page);
+  const peerInstructor = await registerCourseInstructor(page);
   const headers = {
     Origin: "http://127.0.0.1:4321",
     Accept: "application/json",
@@ -40,7 +43,7 @@ test("stale HTML drafts and editorial confirmations retain their rejected revisi
       endsAt: "2027-03-17T20:00",
       conditions: "Sujeto a cupo",
       minimumGrade: "70",
-      instructorName: "Instructor inicial",
+      instructorId: initialInstructor.id,
     },
   });
   expect(created.status()).toBe(201);
@@ -65,7 +68,7 @@ test("stale HTML drafts and editorial confirmations retain their rejected revisi
       form: {
         ...original,
         description: "Descripción guardada por otro admin",
-        instructorName: "Instructor guardado por otro admin",
+        instructorId: peerInstructor.id,
       },
     });
     expect(update.status()).toBe(200);
@@ -82,9 +85,9 @@ test("stale HTML drafts and editorial confirmations retain their rejected revisi
       await expect(form.getByLabel("Descripción")).toHaveValue(
         "Mi intento anterior",
       );
-      await expect(form.getByLabel("Instructor (opcional)")).toHaveValue(
-        "Instructor inicial",
-      );
+      await expect(
+        form.getByRole("combobox", { name: "Instructor", exact: true }),
+      ).toHaveValue(initialInstructor.id);
       await expect(form.locator('input[name="revision"]')).toHaveValue(
         rejectedRevision,
       );
@@ -105,9 +108,9 @@ test("stale HTML drafts and editorial confirmations retain their rejected revisi
     await expect(peerPage.getByLabel("Descripción")).toHaveValue(
       "Descripción guardada por otro admin",
     );
-    await expect(peerPage.getByLabel("Instructor (opcional)")).toHaveValue(
-      "Instructor guardado por otro admin",
-    );
+    await expect(
+      peerPage.getByRole("combobox", { name: "Instructor", exact: true }),
+    ).toHaveValue(peerInstructor.id);
     await expect(peerPage.locator("[data-course-status]")).toHaveText(
       "Borrador",
     );
@@ -115,9 +118,9 @@ test("stale HTML drafts and editorial confirmations retain their rejected revisi
     await expect(form.getByLabel("Descripción")).toHaveValue(
       "Descripción guardada por otro admin",
     );
-    await expect(form.getByLabel("Instructor (opcional)")).toHaveValue(
-      "Instructor guardado por otro admin",
-    );
+    await expect(
+      form.getByRole("combobox", { name: "Instructor", exact: true }),
+    ).toHaveValue(peerInstructor.id);
     await expect(form.locator('input[name="revision"]')).toHaveValue(
       peerRevision,
     );
@@ -134,6 +137,7 @@ test("new courses preserve values and can be corrected after server validation w
   context,
 }) => {
   await signInFixture(context, AUTH_FIXTURES.admin.email);
+  const instructor = await registerCourseInstructor(page);
   const formatName = `Formato curso sin JavaScript ${Date.now()}`;
   await page.goto("/app/formatos");
   await page.getByRole("link", { name: "Nuevo formato" }).click();
@@ -149,6 +153,7 @@ test("new courses preserve values and can be corrected after server validation w
   const course = page.locator("form.course-form");
   const courseName = `Curso sin JavaScript ${Date.now()}`;
   const uniqueFields = [
+    "instructorId",
     "startDate",
     "endDate",
     "registrationStartDate",
@@ -248,6 +253,11 @@ test("new courses preserve values and can be corrected after server validation w
   await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
   await expect(markdown).toBeVisible();
   await expect(markdown).toHaveValue("## Temario visible sin JavaScript");
+  await page
+    .getByRole("combobox", { name: "Instructor", exact: true })
+    .selectOption(instructor.id);
+  await page.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(page).toHaveURL(/success=updated/);
   await page.locator('[data-confirm-fallback="publish"] summary').click();
   await expect(
     page.getByRole("button", { name: "Confirmar publicación" }),

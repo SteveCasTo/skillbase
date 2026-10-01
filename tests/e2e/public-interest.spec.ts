@@ -11,6 +11,7 @@ import {
   interestCourseCalendar,
 } from "../fixtures/interest-course-calendar";
 import { signInFixture } from "./auth-helper";
+import { registerCourseInstructor } from "./instructor-helper";
 
 const successMessage =
   "Gracias por tu interés. Esta solicitud no reserva una plaza ni confirma una inscripción.";
@@ -60,6 +61,7 @@ async function publicCourse(
       name,
       description: "Curso sintético para comprobar el registro de interés.",
       courseTypeId,
+      instructorId: (await registerCourseInstructor(page)).id,
       level: "BASIC",
       ...calendar,
       conditions: "Condiciones del curso de prueba.",

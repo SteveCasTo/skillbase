@@ -1,6 +1,7 @@
 ---
 import type { CourseInput } from "@/domain/courses/validation";
 import type { CourseFormat } from "@/domain/courses/formats";
+import type { InstructorProfile } from "@/domain/instructors/profile";
 import CourseSelect from "./CourseSelect";
 import CourseImageEditor from "./CourseImageEditor";
 import CourseDateTimePicker from "./CourseDateTimePicker";
@@ -14,6 +15,7 @@ import { publicArtworkUrl } from "@/server/courses/artwork";
 interface Props {
   values: CourseInput;
   formats: readonly CourseFormat[];
+  instructors?: readonly InstructorProfile[];
   errors?: Readonly<Record<string, string>>;
   disabled?: boolean;
   submitLabel: string;
@@ -30,6 +32,7 @@ interface Props {
 const {
   values,
   formats,
+  instructors = [],
   errors = {},
   disabled = false,
   submitLabel,
@@ -55,7 +58,7 @@ const trackedFields = [
   "description",
   "level",
   "courseTypeId",
-  "instructorName",
+  "instructorId",
   "contentMarkdown",
   "schedule",
   "conditions",
@@ -282,22 +285,61 @@ const currentArtworkUrl = publicArtworkUrl(
             </select>
           </label>
         </noscript>
-        <label class="sm:col-span-2">
-          <span class="text-sm font-medium">Instructor (opcional)</span>
-          <input
-            class={control}
-            name="instructorName"
-            data-course-input="text"
-            value={values.instructorName ?? ""}
-            aria-invalid={Boolean(errors.instructorName)}
-            aria-describedby={errorId("instructorName")}
-          />
-          {errors.instructorName && (
-            <span id="instructorName-error" class="text-sm text-destructive">
-              {errors.instructorName}
-            </span>
-          )}
-        </label>
+        <div class="sm:col-span-2">
+          <CourseSelect
+            client:only="react"
+            name="instructorId"
+            label="Instructor"
+            value={values.instructorId || "unassigned"}
+            placeholder="Selecciona un instructor"
+            required={false}
+            disabled={disabled}
+            error={errors.instructorId ?? ""}
+            options={[
+              { value: "unassigned", label: "Sin asignar (solo borrador)" },
+              ...instructors
+                .filter((instructor) => instructor.status === "ACTIVE")
+                .map((instructor) => ({
+                  value: instructor.id,
+                  label: `${instructor.firstName} ${instructor.lastName}`,
+                })),
+            ]}
+          >
+            <div slot="fallback" class="flex flex-col gap-2">
+              <label for="instructorId-native" class="text-sm font-medium">
+                Instructor
+              </label>
+              <select
+                id="instructorId-native"
+                name="instructorId"
+                class={control}
+                disabled={disabled}
+                aria-invalid={Boolean(errors.instructorId)}
+              >
+                <option value="" selected={!values.instructorId}>
+                  Sin asignar (solo borrador)
+                </option>
+                {instructors
+                  .filter((instructor) => instructor.status === "ACTIVE")
+                  .map((instructor) => (
+                    <option
+                      value={instructor.id}
+                      selected={values.instructorId === instructor.id}
+                    >
+                      {instructor.firstName} {instructor.lastName}
+                    </option>
+                  ))}
+              </select>
+              {errors.instructorId && (
+                <p class="text-sm text-destructive">{errors.instructorId}</p>
+              )}
+            </div>
+          </CourseSelect>
+          <p class="mt-2 text-sm text-muted-foreground">
+            Todos los grupos heredan esta asignación. Obligatorio para publicar;
+            no se puede cambiar desde el inicio oficial.
+          </p>
+        </div>
         <div class="min-w-0 sm:col-span-2">
           <label for="contentMarkdown" class="text-sm font-medium">
             Contenido del curso (Markdown, opcional)
@@ -929,8 +971,14 @@ const currentArtworkUrl = publicArtworkUrl(
                   const values = current.getAll(name);
                   return (
                     values.length === 1 &&
-                    values[0] ===
-                      (baseline?.[name] ?? "").replace(/\r\n?/g, "\n")
+                    (name === "instructorId" && values[0] === "unassigned"
+                      ? ""
+                      : values[0]) ===
+                      (name === "instructorId" &&
+                      baseline?.[name] === "unassigned"
+                        ? ""
+                        : (baseline?.[name] ?? "")
+                      ).replace(/\r\n?/g, "\n")
                   );
                 })
               : false;

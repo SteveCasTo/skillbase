@@ -31,6 +31,9 @@ import { DrizzleCourseRepository } from "@/server/db/repositories/course-reposit
 import { DrizzleFormatRepository } from "@/server/db/repositories/format-repository";
 import { getPublicAuthEnvironment } from "@/server/environment";
 import { traceSlowOperation } from "@/server/observability/slow-operation";
+import { listInstructors } from "@/application/instructors/manage-instructors";
+import { DrizzleInstructorRepository } from "@/server/db/repositories/instructor-repository";
+import type { InstructorProfile } from "@/domain/instructors/profile";
 import {
   ArtworkValidationError,
   artworkKeyForCourse,
@@ -47,7 +50,12 @@ const repository = new DrizzleCourseRepository(getDatabase());
 let course: AdminCourseDto | null = null;
 let loadError = false;
 let formats: readonly CourseFormat[] = [];
+let instructors: readonly InstructorProfile[] = [];
 try {
+  instructors = await listInstructors(
+    new DrizzleInstructorRepository(getDatabase()),
+    user,
+  );
   course = await getAdminCourse(repository, user, id);
   if (course)
     formats = await traceSlowOperation("formats.listAdmin", () =>
@@ -77,7 +85,7 @@ const valuesFromCourse = (item: AdminCourseDto): CourseInput => ({
   level: item.level,
   courseTypeId: item.courseTypeId,
   contentMarkdown: item.contentMarkdown ?? "",
-  instructorName: item.instructorName ?? "",
+  instructorId: item.instructorId ?? "",
   artwork: item.artwork ?? "",
   schedule: item.schedule,
   ...(item.weekdaysMask === 31 ? { weekdays: "1,2,3,4,5" } : {}),
@@ -601,6 +609,7 @@ const statusLabel = {
         <CourseForm
           values={values}
           formats={formats}
+          instructors={instructors}
           errors={errors}
           disabled={course.status === "ARCHIVED"}
           submitLabel="Guardar cambios"

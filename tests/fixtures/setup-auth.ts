@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import type { AuthRole, UserStatus } from "@/domain/auth/types";
 import { createDatabase } from "@/server/db/client";
-import { userRoles, users } from "@/server/db/schema";
+import { instructorProfiles, userRoles, users } from "@/server/db/schema";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
 import { AUTH_FIXTURES } from "./auth-users";
@@ -91,6 +91,14 @@ export default async function setupAuthFixtures(): Promise<void> {
         })
         .returning({ id: users.id });
       if (!created) throw new Error("Internal fixture was not created");
+      if (fixture.roles.includes("INSTRUCTOR")) {
+        const [firstName, ...rest] = fixture.name.split(" ");
+        await database.db.insert(instructorProfiles).values({
+          id: created.id,
+          firstName: firstName || "Fixture",
+          lastName: rest.join(" ") || "Instructor",
+        });
+      }
       if (fixture.roles.length > 0)
         await database.db
           .insert(userRoles)

@@ -30,6 +30,7 @@ export interface CourseData {
   readonly minimumGrade: number;
   readonly contentMarkdown: string | null;
   readonly instructorName: string | null;
+  readonly instructorId?: string | null;
   readonly artwork: string | null;
 }
 

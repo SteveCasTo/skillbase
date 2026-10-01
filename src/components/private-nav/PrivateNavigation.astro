@@ -14,7 +14,7 @@ interface Props {
   isInstructor: boolean;
 }
 
-const { mode, currentPath, isAdmin } = Astro.props;
+const { mode, currentPath, isAdmin, isInstructor } = Astro.props;
 const courseActive =
   currentPath === "/app/cursos" || currentPath.startsWith("/app/cursos/");
 const formatActive = currentPath === "/app/formatos";
@@ -28,6 +28,36 @@ const interestActive =
   aria-label={mode === "desktop" ? "Navegación privada" : "Navegación móvil"}
 >
   <ul class="private-nav-list">
+    {isAdmin && (
+      <li>
+        <a
+          class="private-nav-link"
+          href="/app/instructores"
+          title="Instructores"
+          aria-current={
+            currentPath.startsWith("/app/instructores") ? "page" : undefined
+          }
+        >
+          <UsersRound size={19} aria-hidden="true" />
+          <span class="private-label">Instructores</span>
+        </a>
+      </li>
+    )}
+    {isInstructor && (
+      <li>
+        <a
+          class="private-nav-link"
+          href="/app/mis-cursos"
+          title="Mis cursos"
+          aria-current={
+            currentPath.startsWith("/app/mis-cursos") ? "page" : undefined
+          }
+        >
+          <BookOpen size={19} aria-hidden="true" />
+          <span class="private-label">Mis cursos</span>
+        </a>
+      </li>
+    )}
     <li>
       <a
         class="private-nav-link"
