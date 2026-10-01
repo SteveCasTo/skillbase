@@ -1,11 +1,11 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { linkAuthenticatedInvitation } from "@/application/auth/link-invitation";
 import { completeOAuthCallback } from "@/application/auth/complete-oauth-callback";
 import { createDatabase } from "@/server/db/client";
 import { DrizzleAuthUserRepository } from "@/server/db/repositories/auth-user-repository";
-import { roles, userRoles, users } from "@/server/db/schema";
+import { auditEvents, roles, userRoles, users } from "@/server/db/schema";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
 const connectionString = getTestSupabaseEnvironment().databaseUrl;
@@ -28,6 +28,31 @@ beforeEach(async () => {
 });
 
 describe("auth user repository", () => {
+  test("password change audit records only internal actor and target identifiers", async () => {
+    const user = await repository.createPasswordInstructor({
+      email: "password-audit@repository.test",
+      name: "Password Audit",
+      authUserId: "10000000-0000-4000-8000-000000000019",
+    });
+
+    await repository.recordPasswordChanged(user.id);
+    const [event] = await database.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, "PASSWORD_CHANGED"));
+
+    expect(event).toMatchObject({
+      actorId: user.id,
+      entityType: "USER",
+      entityId: user.id,
+      action: "PASSWORD_CHANGED",
+      metadata: {},
+    });
+    expect(JSON.stringify(event)).not.toContain(user.email);
+    expect(event?.metadata).toEqual({});
+    await database.db.delete(auditEvents).where(eq(auditEvents.id, event!.id));
+  });
+
   test("replaces invitation roles exactly and returns deterministic ordering", async () => {
     const invitation = await repository.preprovision({
       email: "  Multi@Repository.Test ",

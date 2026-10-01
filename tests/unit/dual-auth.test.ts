@@ -206,11 +206,15 @@ test("trusted AMR classifies the current session, not account providers or user-
 });
 test("password changes require old password verification or a bounded recovery confirmation", async () => {
   let changed = 0;
+  const auditActors: string[] = [];
   const gateway = {
     verifyCurrentPassword: async () => false,
     updatePassword: async () => {
       changed++;
       return true;
+    },
+    recordPasswordChanged: async (actorId: string) => {
+      auditActors.push(actorId);
     },
   };
   const input = {
@@ -223,17 +227,31 @@ test("password changes require old password verification or a bounded recovery c
     "Confirma",
   );
   expect(changed).toBe(0);
+  expect(auditActors).toHaveLength(0);
+  await expect(
+    changeAccountPassword(
+      user,
+      { ...input, hasRecoveryProof: true },
+      {
+        ...gateway,
+        updatePassword: async () => false,
+      },
+    ),
+  ).rejects.toThrow("No pudimos cambiar");
+  expect(auditActors).toHaveLength(0);
   await changeAccountPassword(
     user,
     { ...input, hasRecoveryProof: true },
     gateway,
   );
   expect(changed).toBe(1);
+  expect(auditActors).toEqual([user.id]);
   await changeAccountPassword(user, input, {
     ...gateway,
     verifyCurrentPassword: async () => true,
   });
   expect(changed).toBe(2);
+  expect(auditActors).toEqual([user.id, user.id]);
   await expect(
     changeAccountPassword(
       { ...user, status: "DISABLED" },
@@ -241,6 +259,29 @@ test("password changes require old password verification or a bounded recovery c
       gateway,
     ),
   ).rejects.toThrow();
+  expect(auditActors).toHaveLength(2);
+  const originalConsoleError = console.error;
+  const auditFailureLogs: unknown[] = [];
+  console.error = (...values: unknown[]) => auditFailureLogs.push(...values);
+  try {
+    await expect(
+      changeAccountPassword(
+        user,
+        { ...input, hasRecoveryProof: true },
+        {
+          ...gateway,
+          recordPasswordChanged: async () => {
+            throw new Error("DB failure");
+          },
+        },
+      ),
+    ).resolves.toBeUndefined();
+  } finally {
+    console.error = originalConsoleError;
+  }
+  expect(auditFailureLogs).toEqual([
+    { event: "PASSWORD_CHANGE_AUDIT_WRITE_FAILED", actorId: user.id },
+  ]);
   expect(() => requirePassword("short")).toThrow();
   expect(() => requirePassword(input.password, "different")).toThrow();
 });
