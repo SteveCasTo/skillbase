@@ -33,6 +33,14 @@ for (const theme of ["light", "dark", "system"] as const) {
       page.locator("[data-sileo-toast]").filter({ hasText: "Formato creado" }),
     ).toContainText("Formato creado");
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await expect(page.locator("[data-sileo-viewport]")).toHaveAttribute(
+      "data-position",
+      "bottom-right",
+    );
+    await expect(page.locator("[data-sileo-viewport]")).toHaveAttribute(
+      "data-theme",
+      theme === "system" ? "dark" : theme,
+    );
     const link = page
       .getByRole("navigation", { name: "Navegación privada" })
       .getByRole("link", { name: "Cursos", exact: true });
@@ -236,6 +244,11 @@ test("independent early notifications survive delayed hydration, concurrent load
     .locator("[data-sileo-toast]")
     .filter({ hasText: "Formato creado" });
   await expect(toast).toContainText("Formato creado");
+  await expect(page.locator("[data-sileo-viewport]")).toHaveCount(1);
+  await expect(page.locator("[data-sileo-viewport]")).toHaveAttribute(
+    "data-position",
+    "bottom-right",
+  );
   await expect(
     page
       .locator("[data-sileo-toast]")
@@ -310,6 +323,23 @@ test("independent early notifications survive delayed hydration, concurrent load
     .getByRole("link", { name: "Cursos", exact: true })
     .click();
   await expect(page).toHaveURL(/\/app\/cursos$/);
+  await expect(page.locator("[data-sileo-viewport]")).toHaveCount(1);
+  await expect(page.locator("[data-sileo-viewport]")).toHaveAttribute(
+    "data-position",
+    "bottom-right",
+  );
+  for (const [notice, stored] of [
+    [firstSuccess, "firstEarlyToast"],
+    [secondSuccess, "secondEarlyToast"],
+  ] as const) {
+    await expect(notice).toHaveCount(1);
+    expect(
+      await notice.evaluate(
+        (element, key) => Reflect.get(window, key) === element,
+        stored,
+      ),
+    ).toBe(true);
+  }
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page
     .locator(".private-sidebar")
@@ -445,6 +475,8 @@ test("private toast host persists across client-side navigation", async ({
   ).toContainText("Formato creado");
 
   const viewport = page.locator("[data-sileo-viewport]");
+  await expect(viewport).toHaveCount(1);
+  await expect(viewport).toHaveAttribute("data-position", "bottom-right");
   await expect(viewport).toBeAttached();
   await viewport.evaluate((element) => {
     (window as typeof window & { toastViewport?: Element }).toastViewport =
@@ -464,6 +496,8 @@ test("private toast host persists across client-side navigation", async ({
       .locator("[data-sileo-toast]")
       .filter({ hasText: "Curso creado como borrador." }),
   ).toContainText("Curso creado como borrador.");
+  await expect(viewport).toHaveCount(1);
+  await expect(viewport).toHaveAttribute("data-position", "bottom-right");
   expect(
     await viewport.evaluate(
       (element) =>

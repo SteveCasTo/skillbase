@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Toaster } from "sileo";
 
+import { notificationPosition } from "@/lib/notifications";
 import { currentTheme, type Theme } from "@/lib/theme";
 
 const toastOptions = { fill: "var(--card)" };
@@ -29,9 +30,13 @@ export function SileoHost() {
   }, []);
 
   // Mount after hydration: Sileo reads its external store on first render,
-  // including direct sileo calls made by page scripts before the island loads.
+  // including notifications made by page scripts before the island loads.
   // Hydrating an SSR-empty Toaster against that store can discard early toasts.
   return mounted ? (
-    <Toaster position="bottom-right" theme={theme} options={toastOptions} />
+    <Toaster
+      position={notificationPosition}
+      theme={theme}
+      options={toastOptions}
+    />
   ) : null;
 }
