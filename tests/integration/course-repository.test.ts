@@ -799,14 +799,33 @@ describe("course format persistence", () => {
       "courseTypeRevisionId",
     ])
       expect(dto).not.toHaveProperty(field);
+    const courseAuditEvents = await database.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.entityId, first.id));
+    // PostgreSQL does not guarantee row order without ORDER BY. These writes
+    // can share a transaction timestamp, so assert the exact event set/count,
+    // not an incidental order from the query plan.
+    expect(courseAuditEvents).toHaveLength(3);
+    expect(courseAuditEvents.map((row) => row.action).sort()).toEqual(
+      ["COURSE_CREATED", "COURSE_PUBLISHED", "COURSE_UPDATED"].sort(),
+    );
     expect(
-      (
-        await database.db
-          .select()
-          .from(auditEvents)
-          .where(eq(auditEvents.entityId, first.id))
-      ).map((row) => row.action),
-    ).toEqual(["COURSE_CREATED", "COURSE_UPDATED", "COURSE_PUBLISHED"]);
+      courseAuditEvents.every(
+        (row) =>
+          row.actorId === actorId &&
+          row.entityType === "COURSE" &&
+          row.entityId === first.id,
+      ),
+    ).toBe(true);
+    expect(
+      courseAuditEvents.find((row) => row.action === "COURSE_CREATED")
+        ?.metadata,
+    ).toEqual({ slug: first.slug });
+    expect(
+      courseAuditEvents.find((row) => row.action === "COURSE_PUBLISHED")
+        ?.metadata,
+    ).toEqual({ from: "DRAFT", to: "PUBLISHED" });
   });
 
   test("DB checks, RLS and grants protect format and featured tables", async () => {
