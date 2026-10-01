@@ -6,6 +6,10 @@ describe("private navigation skeleton structure", () => {
     expect(navigationSkeletonVariant("/app")).toBe("summary");
     expect(navigationSkeletonVariant("/app/formatos/")).toBe("list");
     expect(navigationSkeletonVariant("/app/cursos")).toBe("list");
+    expect(navigationSkeletonVariant("/app/interesados")).toBe("list");
+    expect(navigationSkeletonVariant("/app/interesados/fixture")).toBe(
+      "interests",
+    );
     expect(navigationSkeletonVariant("/app/cursos/nuevo")).toBe("form");
     expect(navigationSkeletonVariant("/app/formatos/nuevo")).toBe("form");
     expect(navigationSkeletonVariant("/app/formatos/fixture")).toBe("detail");
@@ -24,6 +28,7 @@ describe("private navigation skeleton structure", () => {
       "/app/unknown",
       "/app/cursos/fixture",
       "/app/formatos/fixture/unknown",
+      "/app/interesados/fixture/unknown",
     ]) {
       expect(navigationSkeletonVariant(path)).toBeNull();
     }

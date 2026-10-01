@@ -1,6 +1,6 @@
 ---
 import { Skeleton } from "./Skeleton";
-const variants = ["list", "form", "detail", "summary"] as const;
+const variants = ["list", "form", "detail", "summary", "interests"] as const;
 ---
 
 <div data-navigation-skeleton hidden aria-hidden="true"></div>
@@ -12,7 +12,29 @@ const variants = ["list", "form", "detail", "summary"] as const;
         <Skeleton className="h-10 w-56 max-w-full" />
         <Skeleton className="h-4 w-96 max-w-full" />
       </div>
-      {variant === "form" || variant === "detail" ? (
+      {variant === "interests" ? (
+        <>
+          <div class="mt-8 flex flex-col gap-5 rounded-xl border bg-card p-6">
+            <Skeleton className="h-6 w-48 max-w-full" />
+            {Array.from({ length: 3 }, () => (
+              <div class="flex flex-col gap-2">
+                <Skeleton className="h-4 w-2/5" />
+                <Skeleton className="h-2 w-full" />
+              </div>
+            ))}
+          </div>
+          <div class="mt-8 grid gap-4 sm:grid-cols-2">
+            {Array.from({ length: 4 }, () => (
+              <div class="flex flex-col gap-5 rounded-xl border bg-card p-6">
+                <Skeleton className="h-6 w-3/5" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-4/5" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ))}
+          </div>
+        </>
+      ) : variant === "form" || variant === "detail" ? (
         <div class="mt-8 grid gap-6 rounded-xl border bg-card p-6 sm:grid-cols-2">
           {Array.from({ length: 6 }, () => (
             <div class="flex flex-col gap-3">

@@ -2,6 +2,7 @@ import { notifications } from "@/lib/notifications";
 import {
   isAdminMetrics,
   isAdminRegistration,
+  preferenceDemand,
   visibleAfterMutation,
 } from "./admin-presentation";
 import type {
@@ -76,14 +77,29 @@ export function initializeAdminInterests(): void {
               : "¿Reactivar este registro de interés?";
         const total = root.querySelector("[data-active-total]");
         if (total) total.textContent = String(metrics.activeTotal);
+        const demand = preferenceDemand(metrics);
         root
           .querySelectorAll<HTMLElement>("[data-preference-id]")
           .forEach((node) => {
-            const bucket = metrics.byPreference.find(
+            const bucket = demand.find(
               (item) =>
                 (item.preferredGroupId ?? "") === node.dataset.preferenceId,
             );
-            if (bucket) node.textContent = String(bucket.activeCount);
+            if (!bucket) return;
+            node.textContent = String(bucket.activeCount);
+            const demandRow = node.closest<HTMLElement>("[data-demand-row]");
+            if (!demandRow) return;
+            demandRow.dataset.leading = String(bucket.leading);
+            const bar =
+              demandRow.querySelector<HTMLElement>("[data-demand-bar]");
+            if (bar) bar.style.width = `${bucket.share}%`;
+            const share = demandRow.querySelector("[data-demand-share]");
+            if (share)
+              share.textContent = `${Math.round(bucket.share)} % del total activo`;
+            const leading = demandRow.querySelector<HTMLElement>(
+              "[data-demand-leading]",
+            );
+            if (leading) leading.hidden = !bucket.leading;
           });
         if (
           !visibleAfterMutation(root.dataset.filter ?? "", registration.status)

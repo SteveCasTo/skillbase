@@ -5,6 +5,8 @@ export function navigationSkeletonVariant(path: string) {
   if (normalized === "/app" || normalized === "/app/asistencia")
     return "summary";
   if (/^\/app\/(cursos|formatos)$/.test(normalized)) return "list";
+  if (normalized === "/app/interesados") return "list";
+  if (/^\/app\/interesados\/[^/]+$/.test(normalized)) return "interests";
   if (/^\/app\/(cursos|formatos)\/nuevo$/.test(normalized)) return "form";
   if (/^\/app\/cursos\/[^/]+\/editar$/.test(normalized)) return "form";
   if (/^\/app\/cursos\/[^/]+\/grupos$/.test(normalized)) return "list";

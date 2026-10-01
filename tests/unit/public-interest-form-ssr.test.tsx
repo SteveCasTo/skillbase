@@ -39,6 +39,12 @@ describe("public interest SSR fallback", () => {
     expect(html).not.toContain("remainingPlaces");
     expect(html).not.toContain('name="payment"');
     expect(html).not.toContain("Bs ");
+    const submit = html.match(/<button\b[^>]*type="submit"[^>]*>/)?.[0];
+    expect(submit).toBeDefined();
+    expect(submit).not.toMatch(/\sdisabled(?:=|\s|>)/i);
+    expect(html).not.toContain("Nombre, apellidos y email son obligatorios.");
+    expect(html).not.toContain("Elegir un horario expresa una preferencia");
+    expect(html).not.toContain("Esta solicitud no reserva una plaza");
   });
   test("works without groups and never requires phone or a group", () => {
     const html = render({ groups: [] });
