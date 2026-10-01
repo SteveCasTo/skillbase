@@ -451,8 +451,6 @@ Antes de crear un componente:
 
 ### Jerarquía de información de cursos
 
-- El futuro registro de interesado se incorpora únicamente en el detalle `/cursos/[slug]`, sin añadir ni cambiar información en la landing ni en las tarjetas. El formulario solicita nombre, apellidos y email; teléfono y preferencia de grupo son opcionales. Debe aclarar que enviar datos expresa interés, no aceptación, pago, reserva de cupo ni inscripción. Mantener SSR/HTML funcional sin JavaScript, errores junto a campos y estados de envío/resultado accesibles; los detalles visuales se validan al implementar.
-
 - Las tarjetas de landing y del catálogo público no muestran rangos de fechas; conservan el nivel y la duración total del formato.
 - Las tarjetas no muestran los dos precios detallados ni el horario detallado.
 - El detalle `/cursos/[slug]` muestra inicio, fin y ventana de preinscripción como fechas civiles de Bolivia, sin horas; también muestra condiciones, precios diferenciados y contenido autorizado del curso. No presenta el horario informativo legado.
