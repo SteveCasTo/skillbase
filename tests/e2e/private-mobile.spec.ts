@@ -62,7 +62,7 @@ test("mobile drawer closes with Escape and restores keyboard focus", async ({
   await expect(page.locator("[data-mobile-drawer]")).toBeHidden();
 });
 
-test("mobile menu slides in and out, with logout on the left", async ({
+test("mobile menu slides in and out, with theme on the left and logout on the right", async ({
   context,
   page,
 }) => {
@@ -94,7 +94,7 @@ test("mobile menu slides in and out, with logout on the left", async ({
   });
   expect(positions.footerWidth).toBeGreaterThan(0);
   expect(positions.logoutWidth).toBeGreaterThan(0);
-  expect(positions.logoutX).toBeLessThan(positions.footerCenter);
+  expect(positions.logoutX).toBeGreaterThan(positions.footerCenter);
 
   await page.getByRole("button", { name: "Cerrar menú" }).click();
   await expect(drawer).toBeHidden();

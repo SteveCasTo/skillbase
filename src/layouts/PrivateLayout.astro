@@ -149,6 +149,7 @@ const currentPath = Astro.url.pathname;
               </span>
             </a>
             <div class="private-mobile-actions">
+              <ThemeToggle class="private-action private-theme-toggle" />
               <form method="post" action="/auth/logout" data-astro-reload>
                 <button
                   class="private-action"
@@ -159,7 +160,6 @@ const currentPath = Astro.url.pathname;
                   <LogOut size={19} aria-hidden="true" />
                 </button>
               </form>
-              <ThemeToggle class="private-action private-theme-toggle" />
             </div>
           </div>
         </aside>
