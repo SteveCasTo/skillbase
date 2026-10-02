@@ -11,11 +11,13 @@ export interface InternalUser {
   readonly name: string;
   readonly status: UserStatus;
   readonly roles: readonly AuthRole[];
+  readonly approvedGoogleIdentityId?: string | null;
+  readonly authPrimaryProvider?: "GOOGLE" | "EMAIL";
 }
 
 export interface VerifiedIdentity {
   readonly authUserId: string;
   readonly email: string;
   readonly emailVerified: boolean;
-  readonly provider: "google";
+  readonly provider: "google" | "email";
 }

@@ -1,0 +1,34 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import InstructorForm from "@/components/instructors/InstructorForm.astro";
+import { instructorEditor } from "@/server/instructors/editor";
+const editor = await instructorEditor(Astro, Astro.params.id ?? "");
+if (editor.response) return editor.response;
+---
+
+<PrivateLayout title="Editar instructor">
+  <a href="/app/instructores" class="text-sm underline underline-offset-4">
+    Instructores
+  </a>
+  <h1 class="mt-5 text-3xl font-semibold tracking-tight">Editar instructor</h1>
+  {editor.error && (
+    <p role="alert" class="mt-6 text-destructive">
+      {editor.error}
+    </p>
+  )}
+  {Astro.url.searchParams.get("success") === "saved" && (
+    <p role="status" class="mt-6">
+      Instructor guardado correctamente.
+    </p>
+  )}
+  {editor.previous ? (
+    <InstructorForm
+      values={editor.values}
+      errors={editor.errors}
+      revision={editor.revision}
+      editing
+    />
+  ) : (
+    <p class="mt-6">El instructor no existe.</p>
+  )}
+</PrivateLayout>

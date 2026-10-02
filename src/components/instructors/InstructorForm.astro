@@ -1,0 +1,223 @@
+---
+import { buttonVariants } from "@/components/ui/button";
+interface Props {
+  values: Readonly<Record<string, string>>;
+  errors: Readonly<Record<string, string>>;
+  revision?: string;
+  editing?: boolean;
+  action?: string;
+}
+const { values, errors, revision, editing = false, action } = Astro.props;
+const fields = [
+  {
+    key: "firstName",
+    label: "Nombre",
+    type: "text",
+    max: 100,
+    autocomplete: "given-name",
+    required: true,
+  },
+  {
+    key: "lastName",
+    label: "Apellidos",
+    type: "text",
+    max: 150,
+    autocomplete: "family-name",
+    required: true,
+  },
+  {
+    key: "email",
+    label: "Correo electrónico",
+    type: "email",
+    max: 254,
+    autocomplete: "email",
+    required: true,
+  },
+  {
+    key: "phone",
+    label: "Teléfono (opcional)",
+    type: "tel",
+    max: 32,
+    autocomplete: "tel",
+    required: false,
+  },
+] as const;
+---
+
+<form
+  method="post"
+  action={action}
+  class="mt-8 flex max-w-2xl flex-col gap-6"
+  data-instructor-form
+  data-astro-reload
+>
+  {revision && <input type="hidden" name="revision" value={revision} />}
+  <p role="alert" data-form-error class="hidden text-sm text-destructive"></p>
+  <fieldset class="grid gap-5 sm:grid-cols-2">
+    <legend class="mb-5 text-lg font-semibold">Datos del instructor</legend>
+    {fields.map((field) => (
+      <div
+        class="flex flex-col gap-2"
+        data-invalid={Boolean(errors[field.key])}
+      >
+        <label for={field.key} class="text-sm font-medium">
+          {field.label}
+        </label>
+        <input
+          id={field.key}
+          name={field.key}
+          type={field.type}
+          autocomplete={field.autocomplete}
+          maxlength={field.max}
+          required={field.required}
+          readonly={editing && field.key === "email"}
+          value={values[field.key] ?? ""}
+          aria-invalid={Boolean(errors[field.key])}
+          aria-describedby={`${field.key}-error`}
+          class="min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <p
+          id={`${field.key}-error`}
+          data-field-error={field.key}
+          class="text-sm text-destructive"
+        >
+          {errors[field.key]}
+        </p>
+      </div>
+    ))}
+  </fieldset>
+  {editing ? (
+    <p class="text-sm text-muted-foreground">
+      El correo de acceso se conserva para mantener la identidad de la cuenta.
+    </p>
+  ) : (
+    <fieldset class="flex flex-col gap-2">
+      <legend class="mb-3 text-lg font-semibold">Acceso inicial</legend>
+      <label for="password" class="text-sm font-medium">
+        Contraseña inicial
+      </label>
+      <input
+        id="password"
+        name="password"
+        type="password"
+        autocomplete="new-password"
+        required
+        minlength="12"
+        maxlength="128"
+        class="min-h-11 w-full rounded-lg border bg-background px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      <p class="text-sm text-muted-foreground">
+        Elige entre 12 y 128 caracteres. No se guarda en el perfil; cambiarla
+        después es opcional.
+      </p>
+    </fieldset>
+  )}
+  <button
+    type="submit"
+    class={buttonVariants({ className: "min-h-11 self-start" })}
+  >
+    {editing ? "Guardar cambios" : "Crear instructor"}
+  </button>
+</form>
+<script>
+  import { navigate } from "astro:transitions/client";
+  import { notifications } from "@/lib/notifications";
+  function initialize() {
+    document
+      .querySelectorAll<HTMLFormElement>("[data-instructor-form]")
+      .forEach((form) => {
+        if (form.dataset.bound) return;
+        form.dataset.bound = "true";
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          if (form.dataset.pending) return;
+          const data = new URLSearchParams();
+          new FormData(form).forEach((value, key) => {
+            if (typeof value === "string") data.set(key, value);
+          });
+          const button = form.querySelector<HTMLButtonElement>(
+            'button[type="submit"]',
+          );
+          form.dataset.pending = "true";
+          form.setAttribute("aria-busy", "true");
+          const fieldsets = [
+            ...form.querySelectorAll<HTMLFieldSetElement>("fieldset"),
+          ];
+          fieldsets.forEach((fieldset) => {
+            fieldset.disabled = true;
+          });
+          if (button) button.disabled = true;
+          const id = crypto.randomUUID();
+          notifications.loading({ id, title: "Guardando instructor" });
+          const alert = form.querySelector<HTMLElement>("[data-form-error]");
+          if (alert) {
+            alert.textContent = "";
+            alert.classList.add("hidden");
+          }
+          form
+            .querySelectorAll<HTMLElement>("[data-field-error]")
+            .forEach((el) => {
+              el.textContent = "";
+            });
+          try {
+            const response = await fetch(form.action, {
+              method: "POST",
+              headers: { Accept: "application/json" },
+              body: data,
+            });
+            const result: {
+              destination?: string;
+              error?: string;
+              fieldErrors?: Record<string, string>;
+            } = await response.json();
+            if (!response.ok || !result.destination) {
+              form
+                .querySelectorAll<HTMLElement>("[data-field-error]")
+                .forEach((el) => {
+                  el.textContent =
+                    result.fieldErrors?.[el.dataset.fieldError ?? ""] ?? "";
+                });
+              form
+                .querySelectorAll<HTMLInputElement>("input[name]")
+                .forEach((input) => {
+                  input.setAttribute(
+                    "aria-invalid",
+                    String(Boolean(result.fieldErrors?.[input.name])),
+                  );
+                });
+              throw new Error(
+                result.error ?? "No se pudo guardar. Inténtalo nuevamente.",
+              );
+            }
+            notifications.success({ id, title: "Instructor guardado" });
+            await navigate(result.destination);
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "No se pudo guardar. Inténtalo nuevamente.";
+            if (alert) {
+              alert.textContent = message;
+              alert.classList.remove("hidden");
+            }
+            notifications.error({ id, title: message });
+            const password =
+              form.querySelector<HTMLInputElement>('[name="password"]');
+            if (password) password.value = "";
+          } finally {
+            delete form.dataset.pending;
+            form.removeAttribute("aria-busy");
+            fieldsets.forEach((fieldset) => {
+              fieldset.disabled = false;
+            });
+            if (button) button.disabled = false;
+            form
+              .querySelector<HTMLInputElement>('[aria-invalid="true"]')
+              ?.focus();
+          }
+        });
+      });
+  }
+  initialize();
+  document.addEventListener("astro:page-load", initialize);
+</script>

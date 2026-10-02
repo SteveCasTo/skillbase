@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   isAdminMetrics,
   isAdminRegistration,
+  preferenceDemand,
   visibleAfterMutation,
 } from "@/components/interests/admin-presentation";
 
@@ -22,6 +23,50 @@ const registration = {
 };
 
 describe("admin interest presentation reconciliation", () => {
+  test("demand bars share the active total and highlight every positive leader, including no preference", () => {
+    const buckets = [
+      { preferredGroupId: groupId, activeCount: 3 },
+      { preferredGroupId: null, activeCount: 3 },
+      { preferredGroupId: id, activeCount: 0 },
+    ];
+    expect(
+      preferenceDemand({ courseId, activeTotal: 6, byPreference: buckets }),
+    ).toEqual([
+      { ...buckets[0]!, share: 50, leading: true },
+      { ...buckets[1]!, share: 50, leading: true },
+      { ...buckets[2]!, share: 0, leading: false },
+    ]);
+    const unequal = preferenceDemand({
+      courseId,
+      activeTotal: 4,
+      byPreference: [
+        { preferredGroupId: groupId, activeCount: 3 },
+        { preferredGroupId: null, activeCount: 1 },
+      ],
+    });
+    expect(unequal.map(({ share, leading }) => ({ share, leading }))).toEqual([
+      { share: 75, leading: true },
+      { share: 25, leading: false },
+    ]);
+  });
+
+  test("zero demand has zero-width bars and no winner", () => {
+    const demand = preferenceDemand({
+      courseId,
+      activeTotal: 0,
+      byPreference: [
+        { preferredGroupId: groupId, activeCount: 0 },
+        { preferredGroupId: null, activeCount: 0 },
+      ],
+    });
+    expect(
+      demand.every((bucket) => bucket.share === 0 && !bucket.leading),
+    ).toBe(true);
+    expect(
+      preferenceDemand({ courseId, activeTotal: 0, byPreference: [] }),
+    ).toEqual([]);
+  });
+
   test("accepts serializable current row and rejects another entity/course or malformed revision", () => {
     expect(isAdminRegistration(registration, courseId, id)).toBe(true);
     expect(

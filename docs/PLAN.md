@@ -341,7 +341,7 @@ Administración crea y publica un curso; este aparece automáticamente en una ex
 
 ## GATE PREVIO A FASE 3 - EXPERIENCIA PRIVADA
 
-La experiencia privada existente está implementada y validada localmente. PR 104 se integró en `development` como `6fc81da`; esta integración no promueve cambios a `master` ni altera los gates remotos/cloud históricos de Fase 2. Fase 3 sigue en progreso.
+La experiencia privada existente está implementada y validada localmente. PR 104 se integró en `development` como `6fc81da`; esta integración no altera los gates remotos/cloud históricos de Fase 2. En ese momento Fase 3 aún no se había iniciado; su implementación y release posteriores están registrados en su sección correspondiente.
 
 - [x] Incorporar skeletons reales durante las cargas estructurales de `/app`, vinculados al estado de carga y no a una demora decorativa.
 - [x] Usar Sileo para feedback transitorio de mutaciones, con estados pending, success y error, sin sustituir errores junto a campos.
@@ -401,8 +401,8 @@ Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión f
 - [x] Implementar permisos server-side para operaciones administrativas y validación de entradas públicas.
 - [x] Implementar minimización de datos, errores públicos sanitizados, límite de body y rate limiter persistente atómico; la suite backend dirigida está verde.
 - [x] Configurar presencia de `INTEREST_RATE_LIMIT_SECRET` server-only en Vercel Production/Preview y verificar estáticamente `Astro.clientAddress` mediante la cadena oficial Astro/Vercel. El valor no se registra.
-- [ ] Probar el POST y la resistencia a forwarded-header spoofing en runtime tras desplegar la versión nueva; producción aún sirve la versión anterior.
-- [ ] Definir política de conservación y anonimización de interesados, incluido el plazo; el cierre de disponibilidad no elimina registros y no se presume retención perpetua.
+- [x] Verificar POST público en runtime y que valores falsificados de `X-Forwarded-For` no alteran los buckets de red/curso; el detalle de smoke y límites de la prueba se registra abajo. No se hizo stress para forzar 429 ni se verificó el HMAC de una IP real.
+- [ ] Definir como seguimiento de gobierno de datos la política de conservación/anonimización y su plazo. La propuesta de 12 meses sigue sin aprobar; no hay borrado automático y este pendiente no bloquea el cierre técnico de Fase 3 ni la planificación de desarrollo de Fase 4.
 - [x] Crear fixtures sintéticos y deterministas; unit e integración locales completos PASS.
 - [x] Añadir E2E público/administrativo para disponibilidad, duplicados, recuperación, permisos y accesibilidad; cobertura validada por corrida full y revalidaciones dirigidas descritas en `docs/TESTING.md`.
 - [x] Actualizar los documentos afectados al estado real; la política de retención/anónimización permanece pendiente.
@@ -412,22 +412,32 @@ Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión f
 - [x] Resolver los hallazgos encontrados durante la validación del bloque; la corrección del cleanup de fixtures de cursos se hizo explícita y sin `CASCADE`.
 - [x] Integrar PR 105 a `development` (merge `0bf0979`, 2026-10-01). No implica promoción a `master`.
 - [x] Ejecutar formatter, lint, typecheck, unitarias, integración, E2E y build locales correspondientes; la cobertura E2E se compone de la corrida full 81/95 y las suites dirigidas, no de una corrida full 95/95.
-- [x] Registrar el estado real local/cloud: secreto configurado y origen confiable revisado estáticamente; migraciones cloud y POST runtime aún sin verificar.
-- [x] Completar implementación y validación local del milestone Fase 3. La migración cloud 0010/0011, prueba runtime en producción y PR de release a `master` permanecen pendientes.
+- [x] Registrar el estado real local/cloud y evidencia de release en `docs/TESTING.md`/`docs/DEPLOYMENT.md`.
+- [x] Completar implementación, validación local y release de Fase 3 en producción. No implica una revisión manual ADMIN en producción ni cierra la política de retención propuesta, que sigue pendiente.
 
-### Cierre de implementación local y pendientes de producción
+### Cierre de Fase 3: validación local y producción
 
 La implementación de Fase 3 y su validación local están completas. Full unit 129 PASS (793 assertions); full integration 65 PASS/0 FAIL (478 assertions, 9 archivos), después de corregir el cleanup de fixtures para incluir la tabla de interesados explícitamente, sin `CASCADE`; lint global PASS; typecheck PASS con 0 errores/0 warnings/70 hints; build y Drizzle checks PASS. E2E: corrida full 81/95 PASS, 14 fallos por fixtures de calendarios de cursos (12 respuestas 422) y carga de formatos (2). Después, sin cambios de código de producción, `courses` dirigido 2/2 PASS (47.9 s) y `interests` dirigido 13/13 PASS (1.1 min); las suites se solapan en un escenario de Auth. La evidencia combinada cubre los 95 escenarios mediante la corrida full y revalidaciones dirigidas; no se afirma un full run 95/95. Fallback sin JavaScript y navegación/animación mobile comprobados PASS.
 
 La migración 0011 se aplicó de forma idempotente al Supabase local estándar `127.0.0.1:54322` sin reset; el rerun verificó el checksum `377bb93ab34a1e9745ff69823ee065f11183b7db7f5881337dedd99e9dfa72b6` y el ledger avanzó de 11 a 12. Ambas tablas nuevas tienen RLS. Antes/después se conservaron 7 cursos, 9 grupos, 1 usuario y 34 eventos de auditoría. Los datos sintéticos de intereses se eliminaron al terminar el smoke (0 filas de interesados; 2 buckets técnicos con TTL). El secreto local se guardó en `.env` ignorado y no se registra su valor; no se requirieron cambios tracked al arranque (`bun run dev` sin cambios) y el servidor quedó activo en `http://127.0.0.1:4321`. Smoke local: GET `/`, `/cursos` y curso demo devolvieron 200; dos POST sintéticos devolvieron 200 con mensaje neutro y `no-store`; el rate limit usó loopback y no aceptó un header forwarded falsificado.
 
-Cloud: se verificó presencia del secreto server-only en Vercel Production y Preview (no se registra el valor; Preview no tiene credenciales DB ni un despliegue funcional). La cadena Astro/Vercel confía en `Astro.clientAddress`; la plataforma sobrescribe el primer `X-Forwarded-For`, y la aplicación valida que el valor sea IP. Esta es verificación estática/documental: el POST contra runtime cloud y el spoof test aún no se han ejecutado. La migración cloud sigue pendiente en 0000–0009; 0010 y 0011 no aplicadas. Por lo tanto no se afirma release, migración cloud ni funcionamiento runtime de producción.
+Cloud quedó migrado y desplegado en el release descrito abajo. El secreto permanece server-only y el flujo público se probó en producción. La configuración de backup/retención de datos personales sigue pendiente por separado; el plazo de 12 meses continúa siendo solo propuesta no aprobada.
 
-PR 105 (`https://github.com/SteveCasTo/skillbase/pull/105`) se integró en `development` como `0bf0979` el 2026-10-01. La rama de feature incluyó los commits backend `3fea0df`, público `d8f714f`, administrativo `e903084` y ajuste de rutas Auth `6112080`. La preparación restante para producción y cualquier promoción a `master` siguen pendientes.
+PR 105 (`https://github.com/SteveCasTo/skillbase/pull/105`) se integró en `development` como `0bf0979` el 2026-10-01. La rama de feature incluyó los commits backend `3fea0df`, público `d8f714f`, administrativo `e903084` y ajuste de rutas Auth `6112080`.
+
+### Cierre de release en producción (2026-10-02)
+
+La preparación documental de release se aceptó mediante PR 106. PR 112 corrigió en `development` una expectativa no determinista que asumía orden de eventos de auditoría; PR 113 integró el release a `master` como `8f5bb2dc45ad373ff12aefd6325456885b20d5c6`. El merge previo de PR 107 (`640d03`) tuvo el deploy bloqueado por esa prueba; el fallo quedó resuelto sin reducir las aserciones de auditoría.
+
+CI del PR 112: `36827391089`, jobs `quality` e `integration-e2e` PASS. CI del push a `master`: `36828194127`, `quality`, `integration-e2e` y `deploy` PASS. Full integration 65/65 y E2E 96/96, sin flaky tests. Vercel deployment `dpl_2kB2xrbE6ppxF4KYPVuR6cpfty9k` quedó `READY` y asociado a `https://skillbase-alpha.vercel.app`.
+
+El Supabase cloud canónico `SkillBase` (`fvzxqlezdrlzykyoevub`) quedó `ACTIVE_HEALTHY`; ledger Drizzle 0000–0011 con hashes y timestamps correspondientes al repositorio. Migraciones 0010/0011 se aplicaron por el pipeline de release; constraints/RLS/revocaciones de las tablas nuevas se verificaron. Smoke público en producción: landing, catálogo y detalle con formulario devolvieron 200; alta y duplicado devolvieron el mismo éxito neutro `200`/`no-store`, persistiendo una sola fila. Dos valores spoof de `X-Forwarded-For` produjeron el mismo resultado de bucket por red/curso (contador 2 en cada scope), confirmando que no sustituyen la dirección de cliente confiable. No fue un stress test 429 ni una verificación del HMAC de una IP real. Se eliminó el único registro sintético; quedaron 0 interesados y 2 buckets técnicos con TTL. La ruta privada sin sesión redirigió a login con 303; no se probó una interacción manual como ADMIN en producción.
+
+La cadena de confianza documentada es Vercel (sobrescribe `X-Forwarded-For`) → Astro/Vercel (`Astro.clientAddress`) → validación `net.isIP`; el secreto HMAC permanece server-only y no se registra su valor. El checklist de release Fase 3 queda completo por los gates automáticos y smoke público descritos; no se afirma validación manual del flujo administrativo en producción.
 
 #### Propuesta de conservación (no aprobada)
 
-Como propuesta de trabajo, anonimizar los datos de contacto doce meses después del cierre del curso y conservar solo métricas agregadas anónimas. El plazo y el tratamiento exacto no están aprobados por el usuario, no son requisito vigente ni están automatizados; la definición de gobierno de datos sigue pendiente para operación con datos reales. Esta propuesta no bloquea el cierre de implementación de Fase 3 en desarrollo.
+Como propuesta de trabajo, anonimizar los datos de contacto doce meses después del cierre del curso y conservar solo métricas agregadas anónimas. El plazo y el tratamiento exacto no están aprobados por el usuario, no son requisito vigente ni están automatizados; no hay borrado/anonimización automática. La definición de gobierno de datos sigue pendiente para operación con datos reales. Esta propuesta no bloquea el cierre de Fase 3 ni el desarrollo de Fase 4; aprobar una política será requisito antes de implementar ese comportamiento de retención.
 
 ### Baseline verificado de calidad
 
@@ -439,7 +449,7 @@ En el baseline verificado para esta actualización: lint exitoso; 93 pruebas uni
 
 Una persona deja datos como interesada sin pagar ni ocupar cupo; administración puede consultar la demanda. No implica aceptación ni inscripción.
 
-## FASE 4 — GRUPOS
+## FASE 4 — GRUPOS, INSTRUCTORES Y ACCESO
 
 ### Estado y dependencias
 
@@ -451,9 +461,69 @@ Parte del alcance de Fase 4 fue anticipada: la gestión de grupos indicada como 
 - [x] Definir horario L–V independiente por grupo, sin solapamiento dentro del curso.
 - [x] Gestionar cancelación conservando historial y permitir grupos adicionales.
 - [x] Permitir grupos válidos también en cursos borrador; eliminar solo grupos nunca publicados y desactivar/reactivar los que ya tuvieron exposición pública, con historial protegido.
-- Asignar instructor real cuando exista el módulo de asignaciones; mientras tanto se conserva el instructor textual del curso.
-- Gestionar reemplazo por feriados cuando existan sesiones y calendario operativo.
-- Permitir expresar preferencia de grupo en Fase 3; asignar inscritos a grupos en Fase 5, sin tratar la preferencia como asignación.
+- [x] Añadir perfiles y cuentas internas de instructores y asignar exactamente un instructor por curso; todos los grupos del curso heredan esa asignación.
+- [x] Restringir acceso de instructor a su perfil profesional y cursos propios, también en rutas y consultas server-side.
+- [x] Implementar login email/password junto con Google para usuarios internos, cambios/recovery de password y asociación Google explícita desde perfil.
+- [x] Implementar creación y edición administrativa de perfiles/cuentas INSTRUCTOR, con credencial solo en Supabase Auth y compensación ante fallo de persistencia interna.
+- [x] Gestionar cambio de instructor sujeto a calendario, validación de fechas ya iniciadas y conflictos de horario entre cursos.
+- La política de desactivar instructores con cursos futuros no está definida y no existe acción de desactivación. Se difiere cualquier operación de baja; no inventar comportamiento ni usar esta función fuera de alcance como bloqueo de alta/edición/asignación.
+- [ ] Gestionar reemplazo por feriados cuando existan sesiones y calendario operativo (Fase 6).
+- [x] Permitir expresar preferencia de grupo en Fase 3; asignar inscritos a grupos en Fase 5, sin tratar la preferencia como asignación.
+
+#### Contrato funcional del módulo de instructores
+
+- El ADMIN crea perfiles con nombre, apellido y email normalizado obligatorios; teléfono es opcional. El perfil público contiene únicamente nombre completo, sin descripción.
+- La cuenta se crea por acción server-side del ADMIN con contraseña inicial elegida por el administrador. No es una invitación ni incluye onboarding/cambio forzado de contraseña. El instructor puede cambiarla desde perfil; esta edición es opcional.
+- Un instructor puede vincular Google a la misma cuenta solo desde una sesión autenticada, mediante enlace explícito y correo verificado coincidente tras normalización. No se fusionan cuentas automáticamente. Un ADMIN existente conserva Google y puede configurar contraseña; no se incorpora gestión de creación de ADMIN.
+- Instructor posee únicamente acceso a su perfil y a cursos asignados en esta fase. No obtiene acceso a formatos, interesados, participantes, usuarios ni ajustes. Asistencia y sesiones permanecen en Fase 6.
+- Un curso tiene un único instructor asignado; la asignación es global al curso y la heredan todos sus grupos. Se elimina el nombre libre como fuente de identidad al completar el flujo.
+- Se puede cambiar el instructor de un curso publicado antes del inicio oficial del curso; desde el inicio, el cambio queda bloqueado. El servidor es autoritativo y se conservan reglas existentes de retiro/archivo e historial/auditoría.
+- Conflictos se comprueban para el mismo instructor entre cursos con calendario L–V que coincida en fecha y hora civil `America/La_Paz`; intervalos semiabiertos permiten turnos contiguos. Las escrituras concurrentes de asignaciones, cambios de fechas, creación/cambio de horario de grupos, estado y publicación deben compartir una estrategia transaccional de serialización para evitar carreras.
+- El perfil mantiene identidad estable y referencias históricas de curso; no se borra físicamente un instructor usado. La política de activación/desactivación con asignaciones futuras está pendiente de aprobación antes de implementar ese aspecto.
+
+PR 120 implementó e integró a `development` perfiles profesionales con ID estable, alta/edición, asignación a curso, ownership de `/app/mis-cursos`, guardas ADMIN/INSTRUCTOR y verificación de conflictos. PR 121 añadió y aplicó en local el seed/reset de demo. PR 122 añadió `PASSWORD_CHANGED` sin credenciales a `audit_events`. PR 123 reparó el guard de borrado de formatos con migración 0015 forward-only. No hay campo de descripción; el email del perfil es de solo lectura al editar. La publicación exige instructor registrado y `ACTIVE`, mientras que un borrador puede quedar sin asignar. Se conserva `instructor_name` histórico sin backfill automático; en cursos asignados el nombre completo deriva del perfil.
+
+#### Estado de implementación y datos
+
+PRs 118 y 120 integraron Auth, perfiles, asignación y ownership a `development`; PR 121 renovó datos sintéticos en Supabase local estándar; PR 122 añadió auditoría de cambios de password; PR 123 aplicó reparación forward-only de guard. El bloque funcional y el seed local están completos; el cierre del release de Fase 4 sigue pendiente de validación final, PR a `master` y comprobaciones posteriores a despliegue.
+
+La renovación local usa `bun run db:seed:renew-demo`: plan sin flags, `--apply` insert-only, `--apply --reset-application-data` para reset local autorizado. Solo acepta Supabase canónico loopback, requiere ADMIN activo y `SEED_INSTRUCTOR_PASSWORD`/`SEED_ADMIN_ID`; la CLI es local-only y bloquea CI/Vercel/production. El reset usa allowlist con `TRUNCATE ... RESTRICT` sin `CASCADE`; conserva Auth identities/sesiones, usuarios, roles, perfiles instructor, configuración Auth, Storage y migration ledger. Ownership sintético usa IDs estables, `DEMO_SEEDED` audit markers y `app_metadata.seed_owner` para cuentas; no es una validación por hash ni usa metadata de reset.
+
+Resultado local estándar verificado: 2 formatos/revisiones, 3 cuentas/perfiles `INSTRUCTOR`, 6 cursos (5 publicados, 1 draft), 12 grupos, 6 historiales de asignación, 35 interesados (30 `ACTIVE`, 5 `CANCELLED`) y 6 `DEMO_SEEDED` markers. Las reinserciones insert-only dejaron filas existentes sin cambios. Login password de los tres instructores y ownership (dos cursos propios por cuenta, denegación a rutas ADMIN) se probaron con sesiones temporales; sesiones cerradas al terminar. Valores `.env` no se imprimieron.
+
+La renovación de producción es manual, independiente y futura; el script local no se debe adaptar ni apuntar a cloud. Solo tras release autorizada, confirmar que todo dato objetivo es sintético, registrar conteos antes/después y operar con allowlist de datos de aplicación fake. Preservar identidades/sesiones Auth, ADMIN, usuarios/roles/perfiles, Auth config, Storage y migration ledger. Si no se puede distinguir un registro legítimo, detenerse y conservarlo. No forma parte de cada deployment.
+
+#### Validación local y gate de release
+
+- PR 120: 151 unit PASS, 84 integration PASS y full E2E 107/107 PASS en `127.0.0.1:4321` (evidencia previa a los cambios posteriores).
+- Validación local final de PR 123: 154 unit PASS (1123 assertions), 87 integration PASS (615 assertions), full E2E 107/107 PASS en el puerto canónico `127.0.0.1:4321`; lint/format/build/Drizzle y `git diff --check` PASS; typecheck 0 errores/0 warnings/98 hints.
+- Cronología Sharp: la corrida previa al arreglo tuvo 87 PASS/20 FAIL por error real de imagen. Se resolvió restaurando la dependencia opcional Astro Sharp con `bun install --frozen-lockfile`; la ruta final de imagen devolvió HTTP 200 con tamaño natural 1280×720. No requirió cambio de código ni actualización de dependencias del proyecto. El E2E final 107/107 corresponde a la fuente ya corregida; no se presenta como retry/flaky-pass de la fuente defectuosa.
+- La aplicación local estándar está migrada hasta 0015 (ledger de 16 entradas); `0012`–`0015` en stacks CI aislados también. Cloud sigue sin aplicar esas migraciones.
+- Supabase local tiene activo email provider, linking manual de Google y hook `before_user_created` tras aplicar 0012. No se verificaron SMTP, OAuth Google real, ni configuración/secrets cloud.
+- Smoke UI local final PASS en `http://127.0.0.1:4321` (servidor activo PID 23168): catálogo con 5 tarjetas, detalles, formulario/preferencias HTTP 200; páginas públicas muestran nombre completo del instructor, sin contacto. Perfiles synthetic INSTRUCTOR y sus 2 cursos/detalles dieron 200; rutas ADMIN directas denegadas con 303. Solo se usaron sesiones temporales, cerradas después. No apagar/reutilizar el proceso activo.
+- Release: la validación local final de fuente corregida ya pasó. Integrar primero este PR documental a `development`; después abrir PR a `master` con checks `quality` e `integration-e2e` válidos. Se permite bypass únicamente de aprobación manual si lo autoriza el proceso; nunca bypass de checks. El deploy de `master` aplica migraciones. Hacer smoke post-deploy antes de declarar release completado.
+
+El ajuste UX de interesados (copy del formulario, submit progresivo, tarjetas/barras de demanda y skeleton) se integró en PRs 116 y 117 a `development`; su verificación full previa al bloque de instructores cerró 98/98 E2E. La evidencia local comunicada incluye 133 unitarias y 65 de integración; este hito queda separado de los 107 E2E del PR 120.
+
+#### Estado de Fase 4 y release boundary
+
+El alcance implementado, seed local, full E2E y smoke frontend local están listos en `development`; se puede iniciar el PR documental a `development` y después el PR autorizado a `master`, sin esperar a otra fase. La aprobación manual es la única excepción autorizable; no omitir checks. Migraciones/Auth hook/secret Auth, SMTP y Google real cloud y smoke productivo siguen pendientes. No declarar producción desplegada/verificada hasta completar esa secuencia.
+
+La cuestión de desactivación con cursos futuros continúa sin decisión y sin UI/endpoint; queda explícitamente fuera de operaciones soportadas ahora y no impide cerrar el flujo inicial de instructor. Historial académico/carrera completa, sesiones y asistencia corresponden a Fase 6.
+
+#### Estado del bloque de autenticación dual
+
+Los commits `5613399`, `958053a` y `5ff585c` de `feat/dual-auth-and-profile`, sobre base `cf601d8`, se integraron mediante [PR 118](https://github.com/SteveCasTo/skillbase/pull/118) como `f06b4fdf8f8c7691ffdd7937efb0f813a27666d4`. El bloque de perfiles/asignaciones se integró después mediante PR 120 como `7509a659`. Ninguno implica promoción a `master`, aplicación de migraciones al stack local persistente/cloud ni activación efectiva de Auth allí. Los bloques Auth e Instructor están implementados en `development`, pero Fase 4 no se considera completada.
+
+- [x] Google y email/password en login, verificación del método de sesión y autorización por identidad interna activa.
+- [x] Perfil `/app/perfil` con cambio opcional de contraseña, confirmación por contraseña actual o correo, recovery y asociación Google opcional.
+- [x] Provisionamiento server-side mediante `createInstructorAccount(actorAuthUserId, { email, name, password, profile })`; crea cuenta confirmada y perfil interno ACTIVE con rol INSTRUCTOR en transacción y compensa si falla la persistencia.
+- [x] Full E2E Auth aislado 104/104 PASS en puerto canónico 4321 (PR 118). La fase siguiente añadió y validó el módulo de instructores, full E2E 107/107 reportado en PR 120.
+- [x] Integrar Auth mediante PR 118 y el módulo de instructores mediante PR 120 a `development`. Las validaciones locales finales pasaron; no hay checks remotos reportados ni se afirma CI PASS. Siguiente release autorizado: PR a `master` tras integrar esta documentación.
+- [x] En Supabase local estándar: 0012–0015 aplicadas, hook activo y `AUTH_RATE_LIMIT_SECRET` configurado server-only; no registrar valor.
+- [ ] Para producción: aplicar 0012–0015 por release gated, configurar hook/provider y secret server-only, validar redirect allowlist y SMTP/recovery y hacer Google OAuth real de smoke antes de declarar esos flujos disponibles.
+
+La suite completa Auth/instructores PR 118/120 (104/104 y luego 107/107 E2E) se conserva como cronología previa; la validación más reciente post-PR 123 pasó 107/107 y el smoke frontend también pasó localmente. No se afirma CI remota ni verificación de producción. El Supabase local estándar quedó migrado/seeded; el smoke se ejecutó en `127.0.0.1:4321` (PID 23168 al último reporte).
 
 ### Resultado demostrable
 

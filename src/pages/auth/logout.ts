@@ -5,10 +5,17 @@ import { requestHasExpectedOrigin } from "@/server/auth/redirects";
 import { privateNoStoreResponse } from "@/server/auth/route-policy";
 import { getPublicAuthEnvironment } from "@/server/environment";
 
-export const POST: APIRoute = async ({ request, locals, redirect }) => {
+export const POST: APIRoute = async ({
+  request,
+  locals,
+  redirect,
+  cookies,
+}) => {
   const environment = getPublicAuthEnvironment();
   if (!requestHasExpectedOrigin(request, environment.siteUrl))
     return privateNoStoreResponse("Invalid request origin", { status: 403 });
   await requireRequestSupabaseClient(locals).auth.signOut({ scope: "local" });
+  cookies.delete("auth-link-proof", { path: "/" });
+  cookies.delete("auth-password-proof", { path: "/" });
   return redirect("/login?status=signed_out", 303);
 };

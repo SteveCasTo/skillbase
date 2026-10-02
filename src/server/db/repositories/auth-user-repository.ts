@@ -1,4 +1,5 @@
-import { and, eq } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, eq, gt, lt } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import type {
@@ -14,6 +15,10 @@ import type {
 } from "@/domain/auth/types";
 import { AUTH_ROLES } from "@/domain/auth/types";
 import * as schema from "@/server/db/schema";
+import {
+  validateInstructor,
+  type InstructorProfileData,
+} from "@/domain/instructors/profile";
 
 type Database = PostgresJsDatabase<typeof schema>;
 
@@ -43,6 +48,142 @@ async function hydrateUser(
 export class DrizzleAuthUserRepository implements AuthUserRepository {
   constructor(private readonly db: Database) {}
 
+  async recordPasswordChanged(actorId: string): Promise<void> {
+    await this.db.insert(schema.auditEvents).values({
+      actorId,
+      entityType: "USER",
+      entityId: actorId,
+      action: "PASSWORD_CHANGED",
+    });
+  }
+
+  async createGoogleLinkRequest(
+    nonce: string,
+    internalUserId: string,
+    sessionId: string,
+  ): Promise<void> {
+    const now = new Date();
+    await this.db
+      .delete(schema.authGoogleLinkRequests)
+      .where(lt(schema.authGoogleLinkRequests.expiresAt, now));
+    await this.db.insert(schema.authGoogleLinkRequests).values({
+      nonceHash: createHash("sha256").update(nonce).digest("hex"),
+      userId: internalUserId,
+      sessionId,
+      expiresAt: new Date(now.getTime() + 300_000),
+    });
+  }
+
+  async consumeGoogleLinkRequest(
+    nonce: string,
+    internalUserId: string,
+    sessionId: string,
+  ): Promise<boolean> {
+    const rows = await this.db
+      .delete(schema.authGoogleLinkRequests)
+      .where(
+        and(
+          eq(
+            schema.authGoogleLinkRequests.nonceHash,
+            createHash("sha256").update(nonce).digest("hex"),
+          ),
+          eq(schema.authGoogleLinkRequests.userId, internalUserId),
+          eq(schema.authGoogleLinkRequests.sessionId, sessionId),
+          gt(schema.authGoogleLinkRequests.expiresAt, new Date()),
+        ),
+      )
+      .returning({ nonceHash: schema.authGoogleLinkRequests.nonceHash });
+    return rows.length === 1;
+  }
+
+  async createPasswordInstructor(input: {
+    email: string;
+    name: string;
+    authUserId: string;
+    profile?: InstructorProfileData;
+    actorId?: string;
+  }): Promise<InternalUser> {
+    return this.db.transaction(async (tx) => {
+      if (input.profile) {
+        if (!input.actorId) throw new Error("Provisioning actor missing");
+        const [actor] = await tx
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.id, input.actorId))
+          .for("update");
+        const [role] = await tx
+          .select()
+          .from(schema.userRoles)
+          .where(
+            and(
+              eq(schema.userRoles.userId, input.actorId),
+              eq(schema.userRoles.roleCode, "ADMIN"),
+            ),
+          );
+        if (actor?.status !== "ACTIVE" || !role)
+          throw new AuthorizationError(
+            "FORBIDDEN",
+            "Provisioning is forbidden",
+          );
+      }
+      const [user] = await tx
+        .insert(schema.users)
+        .values({
+          email: normalizeEmail(input.email),
+          name: input.name.trim(),
+          authUserId: input.authUserId,
+          status: "ACTIVE",
+          authPrimaryProvider: "EMAIL",
+        })
+        .returning();
+      if (!user) throw new Error("Account was not created");
+      await tx
+        .insert(schema.userRoles)
+        .values({ userId: user.id, roleCode: "INSTRUCTOR" });
+      if (input.profile) {
+        const profile = validateInstructor({
+          ...input.profile,
+          phone: input.profile.phone ?? "",
+          email: input.email,
+        });
+        await tx.insert(schema.instructorProfiles).values({
+          id: user.id,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          phone: profile.phone,
+        });
+        if (!input.actorId) throw new Error("Provisioning actor missing");
+        await tx.insert(schema.auditEvents).values({
+          actorId: input.actorId,
+          entityType: "INSTRUCTOR",
+          entityId: user.id,
+          action: "INSTRUCTOR_CREATED",
+        });
+      }
+      const result = await hydrateUser(tx, user.id);
+      if (!result) throw new Error("Account was not created");
+      return result;
+    });
+  }
+
+  async approveGoogleIdentity(
+    authUserId: string,
+    identityId: string,
+  ): Promise<void> {
+    const user = await this.findByAuthUserId(authUserId);
+    if (!user || user.status !== "ACTIVE" || user.roles.length === 0)
+      throw new AuthorizationError("FORBIDDEN", "Account is not active");
+    await this.db
+      .update(schema.users)
+      .set({ approvedGoogleIdentityId: identityId, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.users.authUserId, authUserId),
+          eq(schema.users.status, "ACTIVE"),
+        ),
+      );
+  }
+
   async findByAuthUserId(authUserId: string): Promise<InternalUser | null> {
     const [row] = await this.db
       .select({ id: schema.users.id })
@@ -67,6 +208,11 @@ export class DrizzleAuthUserRepository implements AuthUserRepository {
         throw new AuthorizationError("NOT_INVITED", "No matching invitation");
       if (invitation.status === "DISABLED")
         throw new AuthorizationError("DISABLED", "User is disabled");
+      if (identity.provider !== "google" && invitation.status === "INVITED")
+        throw new AuthorizationError(
+          "FORBIDDEN",
+          "Only Google can claim a legacy invitation",
+        );
       if (
         invitation.authUserId !== null &&
         invitation.authUserId !== identity.authUserId

@@ -11,12 +11,14 @@ import {
   interestCourseCalendar,
 } from "../fixtures/interest-course-calendar";
 import { signInFixture } from "./auth-helper";
+import { registerCourseInstructor } from "./instructor-helper";
 
 const headers = { Origin: "http://127.0.0.1:4321", Accept: "application/json" };
 
 // Only the isolated E2E server is used. Auth helper obtains the temporary
 // environment and signs in through the existing Supabase Admin API.
 async function interestCourse(page: Page, context: BrowserContext) {
+  const instructor = await registerCourseInstructor(page);
   await signInFixture(context, AUTH_FIXTURES.admin.email);
   const name = `Interés sintético ${crypto.randomUUID()}`;
   const format = await page.request.post("/app/formatos/nuevo", {
@@ -35,6 +37,7 @@ async function interestCourse(page: Page, context: BrowserContext) {
       description: "Curso sintético para interesados.",
       level: "BASIC",
       courseTypeId,
+      instructorId: instructor.id,
       ...interestCourseCalendar(),
       conditions: "Solicitud de interés, sin reserva.",
       requestKey: crypto.randomUUID(),
@@ -131,6 +134,25 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
     page.locator(`[data-preference-id="${course.groupId}"]`),
   ).toHaveText("1");
   await expect(page.locator('[data-preference-id=""]')).toHaveText("1");
+  await expect(
+    page.getByText(
+      "Cada barra muestra la proporción del total de interesados activos.",
+    ),
+  ).toHaveCount(0);
+  await expect(
+    page.locator('[data-demand-row][data-leading="true"]'),
+  ).toHaveCount(2);
+  for (const demand of await page.locator("[data-demand-row]").all()) {
+    expect(
+      await demand
+        .locator("[data-demand-bar]")
+        .evaluate(
+          (bar) =>
+            bar.getBoundingClientRect().width /
+            bar.parentElement!.getBoundingClientRect().width,
+        ),
+    ).toBeCloseTo(0.5);
+  }
   const row = rowFor(page);
   await row.locator("summary").focus();
   await row.locator("summary").press("Enter");
@@ -162,12 +184,22 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
   release();
   await expect(row.locator("[data-interest-status]")).toHaveText("Cancelado");
   await expect(page.locator("[data-active-total]")).toHaveText("1");
+  await expect(
+    page.locator(`[data-demand-row="${course.groupId}"]`),
+  ).toHaveAttribute("data-leading", "false");
+  await expect(page.locator('[data-demand-row=""]')).toHaveAttribute(
+    "data-leading",
+    "true",
+  );
   await expect(row.locator('input[name="revision"]')).not.toHaveValue(revision);
   expect(await originalRow?.evaluate((node) => node.isConnected)).toBe(true);
   await expect(row.locator("summary")).toBeFocused();
   await confirmAction(page, row, "Reactivar interés");
   await expect(row.locator("[data-interest-status]")).toHaveText("Activo");
   await expect(page.locator("[data-active-total]")).toHaveText("2");
+  await expect(
+    page.locator('[data-demand-row][data-leading="true"]'),
+  ).toHaveCount(2);
   expect(
     await page.evaluate(
       () => (window as Window & { interestMarker?: number }).interestMarker,
@@ -236,6 +268,12 @@ test("status filter removes changed rows, preserves filter and shows local empty
   await expect(page.locator("[data-interests-empty]")).toBeVisible();
   await expect(page.locator("[data-active-total]")).toHaveText("0");
   await expect(
+    page.locator('[data-demand-row][data-leading="true"]'),
+  ).toHaveCount(0);
+  for (const bar of await page.locator("[data-demand-bar]").all()) {
+    expect((await bar.boundingBox())!.width).toBe(0);
+  }
+  await expect(
     page.getByRole("heading", { name: "Registros de interés" }),
   ).toBeFocused();
   expect(
@@ -243,6 +281,98 @@ test("status filter removes changed rows, preserves filter and shows local empty
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("interest cards and demand use the available width across mobile, tablet and desktop", async ({
+  page,
+  context,
+}) => {
+  const course = await interestCourse(page, context);
+  await page.goto(course.path);
+  for (const width of [320, 390, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    ).toBe(true);
+    // Sidebar/scrollbar layout may settle after a breakpoint change. Check the
+    // observable full-width relationship, not a fixed wait or animation timing.
+    await expect
+      .poll(async () => {
+        const root = await page.locator("[data-admin-interests]").boundingBox();
+        const demand = await page
+          .getByRole("region", { name: "Interesados activos" })
+          .boundingBox();
+        return Math.abs(root!.width - demand!.width);
+      })
+      .toBeLessThanOrEqual(1);
+    const root = await page.locator("[data-admin-interests]").boundingBox();
+    const first = await page.locator("[data-interest-id]").nth(0).boundingBox();
+    const second = await page
+      .locator("[data-interest-id]")
+      .nth(1)
+      .boundingBox();
+    if (width < 768) {
+      expect(first!.x).toBe(second!.x);
+      expect(first!.width).toBeCloseTo(root!.width);
+      expect(second!.y).toBeGreaterThan(first!.y);
+    } else {
+      await expect
+        .poll(async () => {
+          const [a, b] = await Promise.all([
+            page.locator("[data-interest-id]").nth(0).boundingBox(),
+            page.locator("[data-interest-id]").nth(1).boundingBox(),
+          ]);
+          return a && b ? b.y - a.y : null;
+        })
+        .toBe(0);
+      expect(second!.x).not.toBe(first!.x);
+    }
+    await expect(rowFor(page).getByRole("link")).toHaveCount(0);
+    await rowFor(page).locator("summary").focus();
+    await expect(rowFor(page).locator("summary")).toBeFocused();
+  }
+});
+
+test("pending interest navigation uses its structural skeleton, then restores the real cards", async ({
+  page,
+  context,
+}) => {
+  const course = await interestCourse(page, context);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/app/interesados");
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(`**${course.path}`, async (route) => {
+    const response = await route.fetch();
+    await pending;
+    await route.fulfill({ response });
+  });
+  try {
+    await page.getByRole("link", { name: new RegExp(course.name) }).click();
+    const skeleton = page.locator("[data-navigation-skeleton]");
+    await expect(skeleton).toBeVisible();
+    await expect(skeleton.locator("[data-loading-layout]")).toHaveAttribute(
+      "data-loading-layout",
+      "interests",
+    );
+    await expect(page.getByRole("main")).toHaveAttribute("aria-busy", "true");
+    expect(
+      await skeleton
+        .locator('[data-slot="skeleton"]')
+        .first()
+        .evaluate((element) => getComputedStyle(element).animationName),
+    ).toBe("none");
+  } finally {
+    release();
+  }
+  await expect(page).toHaveURL(course.path);
+  await expect(rowFor(page)).toBeVisible();
+  await expect(page.locator("[data-navigation-skeleton]")).toBeHidden();
+  await expect(page.getByRole("main")).not.toHaveAttribute("aria-busy", "true");
 });
 
 test("expired-session redirect is not reported as a successful mutation", async ({

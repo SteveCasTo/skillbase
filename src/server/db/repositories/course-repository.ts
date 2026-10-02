@@ -23,6 +23,12 @@ import type {
 import * as schema from "@/server/db/schema";
 import { traceSlowOperation } from "@/server/observability/slow-operation";
 import { CourseInfrastructureError } from "./course-infrastructure-error";
+import { assertInstructorChange } from "@/domain/instructors/assignment";
+import {
+  lockInstructorSchedules,
+  assertActiveInstructor,
+  assertInstructorSchedule,
+} from "./instructor-schedule";
 
 type Database = PostgresJsDatabase<typeof schema>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -132,6 +138,32 @@ function revisionFor(row: Row, found: Map<string, Revision>): Revision {
   return revision;
 }
 
+async function assignedNames(
+  db: Database | Transaction,
+  rows: readonly Row[],
+): Promise<Row[]> {
+  const ids = rows.flatMap((row) =>
+    row.instructorId ? [row.instructorId] : [],
+  );
+  if (!ids.length) return [...rows];
+  const profiles = await db
+    .select({
+      id: schema.instructorProfiles.id,
+      firstName: schema.instructorProfiles.firstName,
+      lastName: schema.instructorProfiles.lastName,
+    })
+    .from(schema.instructorProfiles)
+    .where(inArray(schema.instructorProfiles.id, ids));
+  const names = new Map(
+    profiles.map((p) => [p.id, `${p.firstName} ${p.lastName}`]),
+  );
+  return rows.map((row) =>
+    row.instructorId
+      ? { ...row, instructorName: names.get(row.instructorId) ?? null }
+      : row,
+  );
+}
+
 async function currentRevision(
   db: Transaction,
   id: string,
@@ -179,6 +211,7 @@ function values(input: CourseData) {
     minimumGrade: input.minimumGrade,
     contentMarkdown: input.contentMarkdown,
     instructorName: input.instructorName,
+    instructorId: input.instructorId ?? null,
     artwork: input.artwork,
   };
 }
@@ -265,7 +298,8 @@ export class DrizzleCourseRepository implements CourseRepository {
   ): Promise<AdminCourseDto & { creationRevision?: Date }> {
     return persistence("create", () =>
       this.db.transaction(async (tx) => {
-        await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+        await lockInstructorSchedules(tx, undefined, input.instructorId);
+        await assertActiveInstructor(tx, input.instructorId);
         if (request) {
           const [receipt] = await tx
             .select()
@@ -330,6 +364,12 @@ export class DrizzleCourseRepository implements CourseRepository {
           })
           .returning();
         if (!row) throw new Error("Course insert failed");
+        if (row.instructorId)
+          await tx.insert(schema.courseInstructorHistory).values({
+            courseId: row.id,
+            instructorId: row.instructorId,
+            actorId,
+          });
         await tx.insert(schema.auditEvents).values({
           actorId,
           entityType: "COURSE",
@@ -353,7 +393,7 @@ export class DrizzleCourseRepository implements CourseRepository {
   ): Promise<AdminCourseDto> {
     return persistence("update", () =>
       this.db.transaction(async (tx) => {
-        await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+        await lockInstructorSchedules(tx, id, input.instructorId);
         const [previous] = await tx
           .select()
           .from(schema.courses)
@@ -374,6 +414,29 @@ export class DrizzleCourseRepository implements CourseRepository {
             "STALE_COURSE",
             "El curso cambió desde que abriste esta página.",
           );
+        const nextInstructorId = input.instructorId ?? null;
+        if (
+          previous.instructorId &&
+          previous.startsAt <= new Date() &&
+          (input.startsAt.getTime() !== previous.startsAt.getTime() ||
+            input.endsAt.getTime() !== previous.endsAt.getTime())
+        )
+          throw new CourseDomainError(
+            "VALIDATION_FAILED",
+            "No se pueden cambiar las fechas de un curso iniciado.",
+            { startsAt: "El curso ya inició." },
+          );
+        assertInstructorChange(
+          previous.instructorId,
+          nextInstructorId,
+          previous.startsAt,
+        );
+        await assertActiveInstructor(
+          tx,
+          nextInstructorId,
+          previous.status === "PUBLISHED",
+        );
+        await assertInstructorSchedule(tx, id, nextInstructorId);
         const existing = revisionFor(previous, await revisions(tx, [previous]));
         const [group] = await tx
           .select({ id: schema.groups.id })
@@ -406,7 +469,12 @@ export class DrizzleCourseRepository implements CourseRepository {
             { weekdays: "Usa el horario calculado." },
           );
         assertSchedule(input, revision);
-        const fields = changed(previous, input, revision.id);
+        // The retired free-text column is historical data, not an identity source.
+        const persistedInput = {
+          ...input,
+          instructorName: input.instructorName ?? previous.instructorName,
+        };
+        const fields = changed(previous, persistedInput, revision.id);
         if (
           group &&
           fields.some((field) =>
@@ -428,7 +496,7 @@ export class DrizzleCourseRepository implements CourseRepository {
         const [row] = await tx
           .update(schema.courses)
           .set({
-            ...values(input),
+            ...values(persistedInput),
             courseTypeRevisionId: revision.id,
             updatedAt: nextVersion(previous.updatedAt),
           })
@@ -444,6 +512,20 @@ export class DrizzleCourseRepository implements CourseRepository {
             "STALE_COURSE",
             "El curso cambió antes de completar el guardado.",
           );
+        if (previous.instructorId !== row.instructorId) {
+          if (row.instructorId)
+            await tx
+              .insert(schema.courseInstructorHistory)
+              .values({ courseId: id, instructorId: row.instructorId, actorId })
+              .onConflictDoNothing();
+          await tx.insert(schema.auditEvents).values({
+            actorId,
+            entityType: "COURSE",
+            entityId: id,
+            action: "COURSE_INSTRUCTOR_CHANGED",
+            metadata: { from: previous.instructorId, to: row.instructorId },
+          });
+        }
         await tx.insert(schema.auditEvents).values({
           actorId,
           entityType: "COURSE",
@@ -464,7 +546,7 @@ export class DrizzleCourseRepository implements CourseRepository {
   ): Promise<AdminCourseDto> {
     return persistence("transition", () =>
       this.db.transaction(async (tx) => {
-        await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+        await lockInstructorSchedules(tx, id);
         const [previous] = await tx
           .select()
           .from(schema.courses)
@@ -484,6 +566,10 @@ export class DrizzleCourseRepository implements CourseRepository {
             "El curso cambió desde que abriste esta página. Recarga y revisa antes de continuar.",
           );
         assertTransition(previous.status, next);
+        if (next === "PUBLISHED") {
+          await assertActiveInstructor(tx, previous.instructorId, true);
+          await assertInstructorSchedule(tx, id, previous.instructorId);
+        }
         const existing = revisionFor(previous, await revisions(tx, [previous]));
         // Withdrawal is allowed even when the format was deactivated; publishing is not.
         const [group] = await tx
@@ -561,6 +647,7 @@ export class DrizzleCourseRepository implements CourseRepository {
     return persistence("setFeatured", () =>
       this.db.transaction(async (tx) => {
         // Serialize competing selections; the partial unique index also protects direct writes.
+        await lockInstructorSchedules(tx, id);
         await tx.execute(sql`select pg_advisory_xact_lock(20260915, 2)`);
         const [target] = await tx
           .select()
@@ -640,7 +727,9 @@ export class DrizzleCourseRepository implements CourseRepository {
         .where(eq(schema.courses.status, "PUBLISHED"))
         .orderBy(desc(schema.courses.featured), asc(schema.courses.startsAt));
       const found = await revisions(this.db, rows);
-      return rows.map((row) => publicDto(row, revisionFor(row, found), now));
+      return (await assignedNames(this.db, rows)).map((row) =>
+        publicDto(row, revisionFor(row, found), now),
+      );
     });
   }
   async getPublic(
@@ -666,7 +755,11 @@ export class DrizzleCourseRepository implements CourseRepository {
         )
         .limit(1);
       return row
-        ? publicDto(row, revisionFor(row, await revisions(this.db, [row])), now)
+        ? publicDto(
+            (await assignedNames(this.db, [row]))[0]!,
+            revisionFor(row, await revisions(this.db, [row])),
+            now,
+          )
         : null;
     });
   }

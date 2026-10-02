@@ -14,7 +14,9 @@ test("redirects unauthenticated private requests to login safely", async ({
   await expect(
     page.getByRole("button", { name: "Continuar con Google" }),
   ).toBeVisible();
-  await expect(page.getByRole("textbox")).toHaveCount(0);
+  await expect(
+    page.getByLabel("Correo electrónico", { exact: true }),
+  ).toBeVisible();
 });
 
 test("admin accesses administration but direct instructor URL is denied", async ({
@@ -34,20 +36,22 @@ test("admin accesses administration but direct instructor URL is denied", async 
   ).toBeVisible();
 });
 
-test("instructor accesses attendance and is denied the admin URL", async ({
+test("instructor accesses own profile and attendance remains unavailable", async ({
   context,
   page,
 }) => {
   await signInFixture(context, AUTH_FIXTURES.instructor.email);
-  await page.goto("/app/asistencia");
+  await page.goto("/app/perfil");
   await expect(
-    page.getByRole("heading", { level: 1, name: "Asistencia" }),
+    page.getByRole("heading", { level: 1, name: "Mi perfil" }),
   ).toBeVisible();
+  await page.goto("/app/asistencia");
+  await expect(page).toHaveURL(/\/unauthorized\?reason=forbidden$/u);
   await page.goto("/app/cursos");
   await expect(page).toHaveURL(/\/unauthorized\?reason=forbidden$/u);
 });
 
-test("multi-role user sees and accesses both sections", async ({
+test("multi-role user accesses administration and profile without future attendance", async ({
   context,
   page,
 }) => {
@@ -56,17 +60,19 @@ test("multi-role user sees and accesses both sections", async ({
   const navigation = page.getByRole("navigation", {
     name: "Navegación privada",
   });
-  await expect(navigation.getByRole("link", { name: "Cursos" })).toBeVisible();
+  await expect(
+    navigation.getByRole("link", { name: "Cursos", exact: true }),
+  ).toBeVisible();
   await expect(
     navigation.getByRole("link", { name: "Asistencia" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.goto("/app/cursos");
   await expect(
     page.getByRole("heading", { level: 1, name: "Cursos" }),
   ).toBeVisible();
-  await page.goto("/app/asistencia");
+  await page.goto("/app/perfil");
   await expect(
-    page.getByRole("heading", { level: 1, name: "Asistencia" }),
+    page.getByRole("heading", { level: 1, name: "Mi perfil" }),
   ).toBeVisible();
 });
 

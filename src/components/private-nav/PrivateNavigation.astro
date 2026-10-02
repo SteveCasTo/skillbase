@@ -1,7 +1,6 @@
 ---
 import {
   BookOpen,
-  CalendarCheck,
   ChevronDown,
   LayoutDashboard,
   Layers3,
@@ -29,6 +28,36 @@ const interestActive =
   aria-label={mode === "desktop" ? "Navegación privada" : "Navegación móvil"}
 >
   <ul class="private-nav-list">
+    {isAdmin && (
+      <li>
+        <a
+          class="private-nav-link"
+          href="/app/instructores"
+          title="Instructores"
+          aria-current={
+            currentPath.startsWith("/app/instructores") ? "page" : undefined
+          }
+        >
+          <UsersRound size={19} aria-hidden="true" />
+          <span class="private-label">Instructores</span>
+        </a>
+      </li>
+    )}
+    {isInstructor && (
+      <li>
+        <a
+          class="private-nav-link"
+          href="/app/mis-cursos"
+          title="Mis cursos"
+          aria-current={
+            currentPath.startsWith("/app/mis-cursos") ? "page" : undefined
+          }
+        >
+          <BookOpen size={19} aria-hidden="true" />
+          <span class="private-label">Mis cursos</span>
+        </a>
+      </li>
+    )}
     <li>
       <a
         class="private-nav-link"
@@ -92,19 +121,6 @@ const interestActive =
             </li>
           </ul>
         </details>
-      </li>
-    )}
-    {isInstructor && (
-      <li>
-        <a
-          class="private-nav-link"
-          href="/app/asistencia"
-          aria-current={currentPath === "/app/asistencia" ? "page" : undefined}
-          title="Asistencia"
-        >
-          <CalendarCheck size={19} aria-hidden="true" />
-          <span class="private-label">Asistencia</span>
-        </a>
       </li>
     )}
   </ul>

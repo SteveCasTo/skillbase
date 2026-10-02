@@ -2,7 +2,7 @@
 
 ## ESTADO Y ALCANCE
 
-Contrato técnico de ejecución de Fase 3, basado en RF-PRE-001–004 y ADR-021/022. Backend, interfaz pública y administración están implementados y validados localmente; PR 105 se integró en `development` como `0bf0979`. Las suites E2E se documentan con corrida full más revalidaciones dirigidas; no hubo una única corrida full 95/95. La presencia del secreto cloud y el origen confiable se verificaron estáticamente; migraciones cloud y POST runtime siguen pendientes. Las propuestas operativas señaladas como pendientes no se convierten en políticas legales aprobadas.
+Contrato técnico de ejecución de Fase 3, basado en RF-PRE-001–004 y ADR-021/022. Backend e interfaces están implementados, validados localmente y desplegados en producción tras PR 113 (`8f5bb2dc45ad373ff12aefd6325456885b20d5c6`). La cobertura E2E local de 95 escenarios se documentó con corrida full más revalidaciones dirigidas; el release CI pasó el full E2E 96/96. Migraciones cloud aplicadas por el pipeline y smoke público de producción completado con los límites de verificación descritos en `docs/TESTING.md`. No hubo prueba manual de ADMIN en producción ni stress 429/HMAC de IP real. Las propuestas operativas señaladas como pendientes no se convierten en políticas legales aprobadas.
 
 - El único acceso público es el detalle `/cursos/[slug]`. No cambiar landing, catálogo, tarjetas ni sus DTO para este flujo.
 - Nombre, apellidos y email obligatorios; teléfono y preferencia de grupo opcionales.

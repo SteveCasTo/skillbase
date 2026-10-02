@@ -43,6 +43,11 @@ export const users = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     authUserId: uuid("auth_user_id"),
+    approvedGoogleIdentityId: text("approved_google_identity_id"),
+    authPrimaryProvider: text("auth_primary_provider")
+      .$type<"GOOGLE" | "EMAIL">()
+      .notNull()
+      .default("GOOGLE"),
     email: text("email").notNull(),
     name: text("name").notNull(),
     status: userStatus("status").notNull().default("INVITED"),
@@ -57,6 +62,10 @@ export const users = pgTable(
     uniqueIndex("users_email_unique").on(table.email),
     uniqueIndex("users_auth_user_id_unique").on(table.authUserId),
     index("users_status_idx").on(table.status),
+    check(
+      "users_auth_primary_provider_check",
+      sql`${table.authPrimaryProvider} in ('GOOGLE', 'EMAIL')`,
+    ),
     check(
       "users_email_normalized_check",
       sql`${table.email} = lower(btrim(${table.email})) and position('@' in ${table.email}) > 1`,
@@ -82,6 +91,37 @@ export const roles = pgTable(
   ],
 );
 
+export const authAttemptBuckets = pgTable(
+  "auth_attempt_buckets",
+  {
+    key: text("key").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    attempts: integer("attempts").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.key, table.windowStart] }),
+    index("auth_attempt_buckets_expiry_idx").on(table.expiresAt),
+    check("auth_attempt_buckets_attempts_check", sql`${table.attempts} > 0`),
+  ],
+).enableRLS();
+
+export const authGoogleLinkRequests = pgTable(
+  "auth_google_link_requests",
+  {
+    nonceHash: text("nonce_hash").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("auth_google_link_requests_user_idx").on(table.userId),
+    index("auth_google_link_requests_expiry_idx").on(table.expiresAt),
+  ],
+).enableRLS();
+
 export const userRoles = pgTable(
   "user_roles",
   {
@@ -100,6 +140,35 @@ export const userRoles = pgTable(
     index("user_roles_role_code_idx").on(table.roleCode),
   ],
 );
+
+export const instructorProfiles = pgTable(
+  "instructor_profiles",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "restrict" }),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name").notNull(),
+    phone: text("phone"),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      "instructor_profiles_first_name_check",
+      sql`char_length(${table.firstName}) between 1 and 100 and ${table.firstName} = btrim(${table.firstName}) and ${table.firstName} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      "instructor_profiles_last_name_check",
+      sql`char_length(${table.lastName}) between 1 and 150 and ${table.lastName} = btrim(${table.lastName}) and ${table.lastName} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      "instructor_profiles_phone_check",
+      sql`${table.phone} is null or (char_length(${table.phone}) between 1 and 32 and ${table.phone} = btrim(${table.phone}) and ${table.phone} !~ '[[:cntrl:]]')`,
+    ),
+  ],
+).enableRLS();
 
 export const courseTypes = pgTable(
   "course_types",
@@ -180,6 +249,10 @@ export const courses = pgTable(
       .references(() => courseTypeRevisions.id, { onDelete: "restrict" }),
     contentMarkdown: text("content_markdown"),
     instructorName: text("instructor_name"),
+    instructorId: uuid("instructor_id").references(
+      () => instructorProfiles.id,
+      { onDelete: "restrict" },
+    ),
     artwork: text("artwork"),
     featured: boolean("featured").notNull().default(false),
     schedule: text("schedule").notNull(),
@@ -218,6 +291,7 @@ export const courses = pgTable(
       sql`(${table.createActorId} is null and ${table.createRequestKey} is null and ${table.createFingerprint} is null) or (${table.createActorId} is not null and ${table.createRequestKey} is not null and ${table.createFingerprint} is not null and ${table.createFingerprint} ~ '^[0-9a-f]{64}$')`,
     ),
     index("courses_status_idx").on(table.status),
+    index("courses_instructor_id_idx").on(table.instructorId),
     index("courses_status_created_at_idx").on(table.status, table.createdAt),
     index("courses_course_type_revision_idx").on(table.courseTypeRevisionId),
     unique("courses_id_course_type_revision_id_unique").on(
@@ -266,6 +340,32 @@ export const courses = pgTable(
     ),
   ],
 );
+
+export const courseInstructorHistory = pgTable(
+  "course_instructor_history",
+  {
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "restrict" }),
+    instructorId: uuid("instructor_id").notNull(),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    firstAssignedAt: timestamp("first_assigned_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.courseId, table.instructorId] }),
+    foreignKey({
+      name: "course_instructor_history_profile_fk",
+      columns: [table.instructorId],
+      foreignColumns: [instructorProfiles.id],
+    }).onDelete("restrict"),
+    index("course_instructor_history_instructor_idx").on(table.instructorId),
+    index("course_instructor_history_actor_idx").on(table.actorId),
+  ],
+).enableRLS();
 
 export const groupStatus = pgEnum("group_status", ["PLANNED", "CANCELLED"]);
 

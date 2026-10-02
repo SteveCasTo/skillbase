@@ -1,6 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
+import { registerCourseInstructor } from "./instructor-helper";
 
 const origin = "http://127.0.0.1:4321";
 const headers = { Origin: origin, Accept: "application/json" };
@@ -14,6 +15,7 @@ function deferred() {
 }
 
 async function publishedCourse(page: Page, context: BrowserContext) {
+  const instructor = await registerCourseInstructor(page);
   await signInFixture(context, AUTH_FIXTURES.admin.email);
   const format = await page.request.post("/app/formatos/nuevo", {
     headers,
@@ -34,6 +36,7 @@ async function publishedCourse(page: Page, context: BrowserContext) {
       description: "Curso para gestión de grupos.",
       level: "BASIC",
       courseTypeId,
+      instructorId: instructor.id,
       schedule: "Lunes a viernes, 08:00–09:30",
       conditions: "Cupos limitados.",
       requestKey: crypto.randomUUID(),

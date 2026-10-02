@@ -1,0 +1,76 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { listInstructors } from "@/application/instructors/manage-instructors";
+import { requireInternalUser } from "@/server/auth/context";
+import { getDatabase } from "@/server/db/client";
+import { DrizzleInstructorRepository } from "@/server/db/repositories/instructor-repository";
+import {
+  instructorFullName,
+  type InstructorProfile,
+} from "@/domain/instructors/profile";
+let instructors: readonly InstructorProfile[] = [];
+let error = false;
+try {
+  instructors = await listInstructors(
+    new DrizzleInstructorRepository(getDatabase()),
+    requireInternalUser(Astro.locals),
+  );
+} catch {
+  error = true;
+  Astro.response.status = 503;
+}
+---
+
+<PrivateLayout title="Instructores">
+  <header class="flex flex-wrap items-start justify-between gap-5">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight">Instructores</h1>
+      <p class="mt-3 text-muted-foreground">
+        Perfiles del equipo y acceso a sus cursos asignados.
+      </p>
+    </div>
+    <a
+      href="/app/instructores/nuevo"
+      class={buttonVariants({ className: "min-h-11" })}
+    >
+      Crear instructor
+    </a>
+  </header>
+  {error ? (
+    <p role="alert" class="mt-8 text-destructive">
+      No se pudieron cargar los instructores. Recarga para intentarlo
+      nuevamente.
+    </p>
+  ) : instructors.length === 0 ? (
+    <section class="mt-8 rounded-xl border p-6">
+      <h2 class="text-lg font-semibold">Todavía no hay instructores</h2>
+      <p class="mt-2 text-muted-foreground">
+        Crea el primer perfil para asignarlo a un curso.
+      </p>
+    </section>
+  ) : (
+    <ul class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {instructors.map((instructor) => (
+        <li>
+          <a
+            href={`/app/instructores/${instructor.id}/editar`}
+            class="flex h-full flex-col gap-3 rounded-xl border bg-card p-6 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <h2 class="break-words text-xl font-semibold">
+              {instructorFullName(instructor)}
+            </h2>
+            <p class="break-all text-sm text-muted-foreground">
+              {instructor.email}
+            </p>
+            <p class="text-sm">
+              {instructor.status === "ACTIVE"
+                ? "Cuenta activa"
+                : "Acceso no habilitado"}
+            </p>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )}
+</PrivateLayout>

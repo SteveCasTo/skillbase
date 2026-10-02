@@ -10,6 +10,7 @@ import {
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { e2ePort, e2eSiteUrl } from "./e2e-port";
 
 import {
   getLocalSupabaseEnvironment,
@@ -56,11 +57,11 @@ export async function assertE2ePortAvailable(): Promise<void> {
     server.once("error", () =>
       reject(
         new Error(
-          "E2E requires free port 127.0.0.1:4321; stop the existing Astro server yourself before running tests.",
+          `E2E requires free port ${e2eSiteUrl()}; choose another E2E_SERVER_PORT or stop your own server.`,
         ),
       ),
     );
-    server.listen(4321, "127.0.0.1", () => server.close(() => resolve()));
+    server.listen(e2ePort(), "127.0.0.1", () => server.close(() => resolve()));
   });
 }
 
@@ -72,6 +73,7 @@ export async function runWithTestStack(command: string[]): Promise<number> {
     SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID: "local-test-placeholder",
     SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET: "local-test-placeholder",
     INTEREST_RATE_LIMIT_SECRET: randomBytes(32).toString("hex"),
+    AUTH_RATE_LIMIT_SECRET: randomBytes(32).toString("hex"),
     INTEREST_RATE_COURSE_LIMIT: "20",
     INTEREST_RATE_COURSE_SECONDS: "600",
     INTEREST_RATE_NETWORK_LIMIT: "100",
@@ -99,7 +101,8 @@ export async function runWithTestStack(command: string[]): Promise<number> {
     const ports = new Set<number>();
     while (ports.size < 9) {
       const port = await freePort();
-      if (port !== 4321 && (port < 54320 || port > 54329)) ports.add(port);
+      if (port !== e2ePort() && port !== 4321 && (port < 54320 || port > 54329))
+        ports.add(port);
     }
     const [api, db, shadow, pooler, studio, smtp, analytics, inspector, edge] =
       [...ports];
@@ -120,6 +123,10 @@ export async function runWithTestStack(command: string[]): Promise<number> {
     const config = original.replace(/^.*$/gmu, (line) => {
       if (/^\[[^\]]+\]$/u.test(line)) section = line;
       if (/^project_id = /u.test(line)) return `project_id = "${projectId}"`;
+      if (section === "[auth]" && /^site_url = /u.test(line))
+        return `site_url = "${e2eSiteUrl()}"`;
+      if (section === "[auth]" && /^additional_redirect_urls = /u.test(line))
+        return `additional_redirect_urls = ["${e2eSiteUrl()}/auth/callback", "${e2eSiteUrl()}/auth/recovery"]`;
       if (section === "[db]" && /^shadow_port = /u.test(line))
         return `shadow_port = ${shadow}`;
       if (section === "[edge_runtime]" && /^inspector_port = /u.test(line))
@@ -140,7 +147,7 @@ export async function runWithTestStack(command: string[]): Promise<number> {
       TEST_SUPABASE_PROJECT_ID: projectId,
       // Public application configuration must target this isolated test stack,
       // never a URL/key inherited from a developer or CI environment.
-      PUBLIC_SITE_URL: "http://127.0.0.1:4321",
+      PUBLIC_SITE_URL: e2eSiteUrl(),
       PUBLIC_SUPABASE_URL: local.apiUrl,
       PUBLIC_SUPABASE_PUBLISHABLE_KEY: local.publishableKey,
       TEST_SUPABASE_URL: local.apiUrl,

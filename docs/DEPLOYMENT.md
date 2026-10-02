@@ -200,12 +200,11 @@ En Vercel, `DATABASE_URL` debe apuntar al pooler de Supabase apropiado para runt
 
 Antes de habilitar Auth cloud se debe verificar explícitamente:
 
-- signup público por email/password deshabilitado;
-- únicamente Google entre los proveedores previstos;
+- signup público deshabilitado; email/password solo para cuentas internas preaprovisionadas y Google solo mediante identidad/invitación autorizada;
 - Site URL y callback allowlist exactos;
 - variables públicas y privadas asignadas al entorno correcto sin exponer secretos.
 
-Estas comprobaciones quedaron aplicadas durante la Fase 1. La clave legacy `service_role` debe rotarse o deshabilitarse antes de operar con datos reales porque una inspección inicial del CLI la mostró completa aun sin solicitar `--reveal`.
+La configuración de producción existente corresponde al release de Fase 1/3; no acredita que el despliegue de autenticación dual esté configurado. La activación de Fase 4 requiere además el hook y redirects descritos más abajo. La clave legacy `service_role` debe rotarse o deshabilitarse antes de operar con datos reales porque una inspección inicial del CLI la mostró completa aun sin solicitar `--reveal`.
 
 ## REGISTRO PÚBLICO DE INTERESADOS: LOCAL LISTO, CLOUD PENDIENTE
 
@@ -227,3 +226,50 @@ El estado local/cloud de Fase 3 y la migración 0011 se registra en `docs/PLAN.m
 - `master` requiere checks `quality` e `integration-e2e`, una aprobación y resolución lineal; enforcement a administradores está desactivado. Un administrador puede omitir la aprobación, pero no saltarse checks fallidos. Esta es la configuración observada, no una recomendación de bypass ni evidencia de release.
 
 La configuración cloud de secreto y cadena confiable queda preparada/verificada de forma estática, pero la migración cloud y la verificación runtime continúan pendientes. No afirmar que la feature está operativa en producción hasta aplicar migraciones mediante el flujo autorizado, desplegar y comprobar GET/POST, `no-store`, limitación y rechazo de spoofing.
+
+### Cierre de release Fase 3 (2026-10-02)
+
+Esta actualización supersede el estado pendiente registrado el 2026-10-01, sin reescribirlo como si las verificaciones ya hubieran ocurrido entonces.
+
+- PR 112 (normalización del test de auditoría) se integró a `development`; PR 113 se integró a `master` como `8f5bb2dc45ad373ff12aefd6325456885b20d5c6`.
+- CI del PR 112, run `36827391089`: `quality` e `integration-e2e` PASS. CI de push a `master`, run `36828194127`: `quality`, `integration-e2e` y `deploy` PASS; integration 65/65, E2E 96/96 sin flaky.
+- Vercel deploy `dpl_2kB2xrbE6ppxF4KYPVuR6cpfty9k` terminó `READY` y asignó el alias `https://skillbase-alpha.vercel.app`.
+- Supabase `SkillBase` (`fvzxqlezdrlzykyoevub`) está `ACTIVE_HEALTHY`; ledger Drizzle 0000–0011 con hashes y timestamps coincidentes con el repositorio. 0010/0011 se aplicaron por el pipeline; tablas de interesados y rate limits con RLS/revocaciones verificados.
+- Smoke público: landing, catálogo y detalle/formulario respondieron 200. Alta y duplicado devolvieron el mismo 200 neutro con `no-store`, dejando una fila. Dos `X-Forwarded-For` falsificados usaron el mismo bucket por red/curso (contador 2 por scope), mostrando que el header no anula `Astro.clientAddress`. No se realizó stress 429 ni verificación de HMAC con una IP real. Se eliminó el único interesado sintético; quedan 0 filas y 2 buckets técnicos con TTL.
+- Una petición privada anónima a `/app/interesados` redirigió 303 a login. No se hizo sesión ni prueba manual de interfaz como ADMIN en producción.
+
+El secreto HMAC está presente en Production/Preview, con su contenido nunca leído ni registrado. Preview no tiene credenciales DB ni despliegue funcional. El smoke confirma únicamente los flujos públicos descritos; no afirmar una prueba manual administrativa en producción.
+
+## FASE 4 — PREPARACIÓN DE RELEASE
+
+PRs 118 (Auth), 120 (instructores/asignación), 121 (seed local), 122 (audit password) y 123 (guard 0015) están integrados en `development`; HEAD al corte es `850c1ca`. Validación final local: 154 unit/1123 assertions, 87 integration/615 assertions, full E2E 107/107, lint/format/build/Drizzle/diff PASS, typecheck 0 errores/0 warnings/98 hints y smoke frontend PASS. No hay checks remotos reportados. Producción continúa en Fase 3 (`8f5bb2d`); el siguiente paso autorizado es PR de documentación a `development`, seguido de PR de release a `master` con checks `quality`/`integration-e2e` válidos. Solo la aprobación manual puede omitirse si el responsable lo autoriza; nunca saltar, sustituir o declarar PASS para checks fallidos/pendientes. El workflow de push a `master` aplica migraciones y despliega; producción aún no está verificada para Phase 4.
+
+### Requisitos de Auth cloud
+
+Antes de habilitar los flujos Auth dual en el release:
+
+- aplicar 0012–0015 por el workflow gated, con 0015 restableciendo el guard de borrado de revisiones;
+- habilitar en el proyecto Auth efectivo el hook `before_user_created` a `private_auth.allow_invited_google_signup`, conservar signup público deshabilitado y permitir solo cuentas internas provisionadas/password y Google autorizado;
+- configurar redirect allowlist exacta para callback y recovery y un `AUTH_RATE_LIMIT_SECRET` propio server-only de al menos 32 caracteres; no leer ni imprimir el valor. El secreto `INTEREST_RATE_LIMIT_SECRET` existente no sustituye este secreto Auth;
+- comprobar configuración del proveedor Google/linking y entrega de email recovery. Google real no está probado y no hay SMTP personalizado configurado; tampoco se verificaron permisos/límites del remitente predeterminado. No afirmar Forgot password/recovery por email disponible en producción hasta configurar/probar entrega. El login inicial password y cuenta provisionada por ADMIN sí funcionan sin SMTP; usuarios Google-only que quieran establecer password a través de confirmación email dependen de correo entregable;
+- después del deploy, verificar login permitido/denegado, roles/ownership, perfil y cursos, no-store y redirects; hacer una prueba OAuth Google real y recovery solo si su proveedor/SMTP se habilitaron.
+
+La asociación automática de Google por email verificado coincidente puede ocurrir en Supabase y no se documenta como deshabilitable. SkillBase aplica aprobación OAuth a nivel de aplicación (`approved_google_identity_id`); una identidad de proveedor presente no equivale a consentimiento/acceso, y una sesión PASSWORD sigue siendo independiente.
+
+Configuración observada antes del release: Supabase cloud canónico `fvzxqlezdrlzykyoevub` está `ACTIVE_HEALTHY`, conserva el ledger Phase 3 hasta 0011 (12 entradas, hashes/timestamps coincidentes con esa release), una cuenta ADMIN y cinco cursos demo; 0012–0015 están pendientes en cloud. En Vercel Production están presentes `AUTH_RATE_LIMIT_SECRET` (longitud comprobada de 64) y el secret de interesados, además de service-role/database runtime requeridos; ningún valor fue leído o impreso. Preview permanece sin tocar. La presencia del Auth secret no significa que la nueva configuración/schema Auth esté habilitada.
+
+### Seed y reset de desarrollo
+
+`bun run db:seed:renew-demo` tiene tres modos: sin flags muestra el plan, `--apply` inserta solo entidades faltantes y `--apply --reset-application-data` renueva datos sintéticos. La CLI de mutación es exclusivamente local: exige el Supabase canónico `127.0.0.1:54322`/API `127.0.0.1:54321`, se niega en CI/Vercel/`NODE_ENV=production` y requiere ID de ADMIN interno activo más password externo de seed. No ejecutarla contra cloud ni quitar el guard local-only.
+
+El reset local usa una allowlist explícita de tablas de aplicación (`interest_registrations`, `interest_registration_rate_limits`, `course_instructor_history`, `audit_events`, `groups`, `courses`, `course_type_revisions`, `course_types`) y `TRUNCATE ... RESTRICT`, nunca `CASCADE`. Preflight de colisiones de email/Auth ownership se hace antes del reset; los IDs de entidades/eventos son deterministas y las cuentas instructor se identifican mediante `app_metadata.seed_owner`. No usa hashes de reset ni una tabla de metadata de reset. Preserva `auth.users`/identidades/sesiones, `users`, roles, perfiles instructor, configuración Auth, migration ledger y Storage. Credenciales/ID del actor solo desde `.env` ignorado (`SEED_INSTRUCTOR_PASSWORD`, `SEED_ADMIN_ID`); no documentar ni imprimir sus valores.
+
+### Renovación de datos en producción
+
+No existe un modo cloud del seed y la CLI local lo bloquea deliberadamente. La renovación de producción, autorizada para la siguiente release, se hace como operación **manual y separada del deploy**: revisar el inventario antes de borrar, confirmar que los registros objetivo sean sintéticos y registrar conteos antes/después. Registrar explícitamente antes/después los conteos de `auth.users`, `users`, `user_roles`, `instructor_profiles` y Storage; deben permanecer idénticos junto con sesiones/roles/configuración Auth y migration ledger. El alcance candidato coincide con datos de aplicación de la allowlist local: interesados y sus rate buckets, historial de asignación de cursos demo, grupos, cursos, revisiones y formatos; de `audit_events` retirar únicamente los marcadores `DEMO_SEEDED` confirmados. No truncar indiscriminadamente audit history ni eliminar una fila cuya propiedad sintética no esté clara. Si no se puede reconciliar conteos/propiedad, detenerse. No ejecutar reset, no crear SQL/script cloud ni modificar el bloqueo local como parte de esta documentación.
+
+### Reparación local del guard y migraciones
+
+PR 123 añadió `0015_restore-format-deletion-guard.sql`, aplicado al Supabase local estándar. El ledger Drizzle quedó en 16 entradas. 0012–0015 están aplicadas allí; no están aplicadas en cloud. La migración forward vuelve a crear `public.reject_course_type_revision_mutation`: `UPDATE`/`DELETE` de revisión se rechaza salvo borrado autorizado dentro de transacción con `app.delete_unused_format_id` igual al formato y sin cursos que referencien sus revisiones.
+
+La revisión comparativa del ledger local detectó hashes históricos distintos para 0003/0005/0008. No se modificaron esos SQL ni hashes ni se forzó ledger repair. El artefacto local anterior de 0003 contenía `DROP TABLE course_prices CASCADE` y no tenía newline final; el archivo actualmente versionado omite `CASCADE`. La función 0005 que se encontró instalada era anterior y no contenía la condición `app.delete_unused_format_id`; la 0015 corrige estado live sin editar 0005. El bloqueo que se observó al intentar preparar el seed procedía de ese guard de borrado incompleto, no de una verificación por hash del seed: la propiedad de datos sintéticos se comprueba mediante IDs/markers y metadata de Auth. El texto 0008 previamente aplicado no se recuperó; solo se constató equivalencia de schema. No inventar contenido de 0008 ni atribuir una causa no probada a las diferencias.

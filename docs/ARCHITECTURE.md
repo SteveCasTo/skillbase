@@ -170,6 +170,7 @@ Módulos iniciales:
 
 - Auth
 - Users
+- Instructors
 - Courses
 - Groups
 - InterestRegistrations
@@ -189,7 +190,15 @@ No es obligatorio que cada módulo sea un package independiente.
 
 El objetivo es separación lógica.
 
-Fase 3 implementa `InterestRegistrations` como agregado autónomo: no es `Participant` ni `PreRegistration`, y el email público no verificado no puede actualizar identidad global. El formulario solo aparece en el detalle del curso; la administración (`/app/interesados` y sus detalles UUID) es solo ADMIN. La preinscripción presencial/pagada permanece en Fase 5. Dominio, aplicación, schema/migración y adaptadores viven separados en `src/domain/interests`, `src/application/interests`, `src/server/interests` y `src/server/db/repositories`. Implementación y validación local están completas; la evidencia E2E combina corrida full y revalidaciones dirigidas, sin afirmar full run 95/95. La integración de PR 105 a `development` queda pendiente; consultar `docs/PLAN.md` y [`docs/INTEREST_REGISTRATION_CONTRACT.md`](INTEREST_REGISTRATION_CONTRACT.md).
+Fase 3 implementa `InterestRegistrations` como agregado autónomo: no es `Participant` ni `PreRegistration`, y el email público no verificado no puede actualizar identidad global. El formulario solo aparece en el detalle del curso; la administración (`/app/interesados` y sus detalles UUID) es solo ADMIN. La preinscripción presencial/pagada permanece en Fase 5. Dominio, aplicación, schema/migración y adaptadores viven separados en `src/domain/interests`, `src/application/interests`, `src/server/interests` y `src/server/db/repositories`. PR 105 se integró en `development` y el flujo se liberó posteriormente como parte del cierre de Fase 3; el registro de validación está en `docs/PLAN.md`/`docs/TESTING.md`.
+
+### Instructores y asignación (Fase 4, integrada en development)
+
+El módulo usa límites del monolito modular (`src/domain/instructors`, `src/application/instructors`, `src/server/instructors` y repositorios Drizzle). El perfil comparte ID estable con `users`; Supabase Auth posee credenciales. ADMIN crea/edita instructor y asigna instructor a un curso; los grupos heredan esa relación desde `courses.instructor_id`. Cursos draft admiten asignación opcional; publicar requiere perfil registrado activo. El nombre público de un instructor asignado se proyecta como nombre completo, sin correo/teléfono. La migración aditiva 0014 conserva texto `instructor_name` histórico sin autocorrelación. Las migraciones 0012–0015 están aplicadas en el Supabase local estándar (ledger 16) y todavía pendientes de cloud.
+
+Las rutas administrativas de instructor/curso permanecen limitadas a ADMIN. La ruta profesional `/app/perfil` y `/app/mis-cursos`/detalle pertenecen a INSTRUCTOR; consultas filtran además por el ID interno autenticado, de modo que una URL directa ajena no revela el curso. En Fase 4 no se concede acceso a asistencia/sesiones, formatos, interesados ni gestión de participantes.
+
+La validación del horario del instructor usa el calendario L–V de cada grupo y fechas civiles Bolivia inclusivas, con intervalos diarios semiabiertos. Solo grupos `PLANNED` compiten por el horario, también si el curso está en borrador; cancelar el grupo libera el intervalo. Para evitar carreras entre asignación, edición de fechas, publicación/transiciones y cambios/altas/cancelaciones/reactivaciones de grupos, los repositorios toman una barrera transaccional compartida, adquieren advisory locks de IDs previos/nuevos de instructor en orden estable y después bloquean la fila del curso. La revisión optimista y auditoría/historial se conservan. La política de desactivar instructor con asignaciones futuras sigue pendiente; no hay acción de baja implementada ni se infiere una regla, y esto no limita los flujos ya aprobados de alta/edición/asignación.
 
 Los contratos distinguen DTO de formulario público (disponibilidad y horarios elegibles, sin PII/capacidad) y DTOs administrativos de registros/métricas bajo autorización; las preferencias no asignan cupos ni grupos. La administración filtra estado sin derivar métricas del subconjunto mostrado.
 

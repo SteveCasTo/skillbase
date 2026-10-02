@@ -1,0 +1,57 @@
+<script>
+  const restoreAuthForms = () => {
+    document
+      .querySelectorAll<HTMLFormElement>("form[data-auth-form]")
+      .forEach((form) => {
+        form.removeAttribute("aria-busy");
+        const button = form.querySelector<HTMLButtonElement>(
+          'button[type="submit"]',
+        );
+        if (button?.dataset.label) {
+          button.disabled = false;
+          button.textContent = button.dataset.label;
+        }
+      });
+  };
+  const initializeAuthForms = () => {
+    document
+      .querySelectorAll<HTMLFormElement>("form[data-auth-form]")
+      .forEach((form) => {
+        if (form.dataset.initialized) return;
+        form.dataset.initialized = "true";
+        const submit = form.querySelector<HTMLButtonElement>(
+          'button[type="submit"]',
+        );
+        if (submit && !submit.dataset.label)
+          submit.dataset.label = submit.textContent?.trim() ?? "Continuar";
+        form.addEventListener("submit", () => {
+          form.setAttribute("aria-busy", "true");
+          const button = form.querySelector<HTMLButtonElement>(
+            'button[type="submit"]',
+          );
+          if (button) {
+            button.disabled = true;
+            button.textContent = "Procesando…";
+          }
+        });
+      });
+  };
+  initializeAuthForms();
+  document.addEventListener("astro:page-load", initializeAuthForms);
+  window.addEventListener("pageshow", restoreAuthForms);
+  document.addEventListener("astro:before-preparation", (event) => {
+    if (!event.formData) return;
+    const loader = event.loader;
+    event.signal.addEventListener("abort", restoreAuthForms, { once: true });
+    event.loader = async () => {
+      try {
+        await loader();
+      } catch (error) {
+        restoreAuthForms();
+        throw error;
+      } finally {
+        if (event.defaultPrevented || event.signal.aborted) restoreAuthForms();
+      }
+    };
+  });
+</script>

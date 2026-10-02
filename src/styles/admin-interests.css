@@ -1,0 +1,15 @@
+[data-admin-interests] {
+  .interest-registration-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: 1rem;
+  }
+
+  .interest-demand-bar {
+    background: var(--muted-foreground);
+  }
+
+  .interest-demand-row[data-leading="true"] .interest-demand-bar {
+    background: var(--accent);
+  }
+}

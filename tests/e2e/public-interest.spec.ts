@@ -11,6 +11,7 @@ import {
   interestCourseCalendar,
 } from "../fixtures/interest-course-calendar";
 import { signInFixture } from "./auth-helper";
+import { registerCourseInstructor } from "./instructor-helper";
 
 const successMessage =
   "Gracias por tu interés. Esta solicitud no reserva una plaza ni confirma una inscripción.";
@@ -60,6 +61,7 @@ async function publicCourse(
       name,
       description: "Curso sintético para comprobar el registro de interés.",
       courseTypeId,
+      instructorId: (await registerCourseInstructor(page)).id,
       level: "BASIC",
       ...calendar,
       conditions: "Condiciones del curso de prueba.",
@@ -301,22 +303,29 @@ test("native group selector has one successful UUID field without JavaScript", a
   }
 });
 
-test("server field issues preserve input and focus first invalid field; preference can be cleared", async ({
+test("required validity gates submit; server field issues preserve input and focus, preference can be cleared", async ({
   page,
   context,
 }) => {
   const { path } = await publicCourse(page, context, { group: true });
+  const emptyForm = page.getByRole("form", { name: submitName });
+  await expect(emptyForm).toHaveAttribute("novalidate", "");
+  const submit = emptyForm.getByRole("button", { name: submitName });
+  await expect(submit).toBeDisabled();
   const { form, email } = await fillContact(page);
   await expect(form).toHaveAttribute("novalidate", "");
+  await expect(submit).toBeEnabled();
   await form.getByLabel("Nombre", { exact: true }).fill("   ");
-  await form.getByRole("button", { name: submitName }).click();
-  await expect(form.getByLabel("Nombre", { exact: true })).toBeFocused();
-  await expect(form.getByLabel("Nombre", { exact: true })).toHaveAttribute(
-    "aria-invalid",
-    "true",
-  );
+  await expect(submit).toBeDisabled();
   await expect(form.getByLabel("Email", { exact: true })).toHaveValue(email);
   await form.getByLabel("Nombre", { exact: true }).fill("María José");
+  await form.getByLabel("Apellidos", { exact: true }).fill("   ");
+  await expect(submit).toBeDisabled();
+  await form.getByLabel("Apellidos", { exact: true }).fill("Pérez García");
+  await form.getByLabel("Email", { exact: true }).fill("not-an-email");
+  await expect(submit).toBeDisabled();
+  await form.getByLabel("Email", { exact: true }).fill(email);
+  await expect(submit).toBeEnabled();
   await form.getByLabel("Teléfono (opcional)").evaluate((element) => {
     (element as HTMLInputElement).value = "1".repeat(33);
   });
@@ -416,6 +425,7 @@ test("pending is local, network failures preserve contact and can retry without 
   release();
   await expect(form.locator(".interest-error-summary")).toBeFocused();
   await expect(form.getByLabel("Email", { exact: true })).toHaveValue(email);
+  await expect(form.getByRole("button", { name: submitName })).toBeEnabled();
   await page.unroute(`**${path}`);
   await form.getByRole("button", { name: submitName }).click();
   await expect(page.locator(".interest-success")).toContainText(successMessage);
@@ -428,13 +438,20 @@ test("mobile, tablet and desktop keep readable controls, keyboard access and bot
   await publicCourse(page, context, { group: true });
   const form = page.getByRole("form", { name: submitName });
   await expect(form).toHaveAttribute("novalidate", "");
-  for (const width of [390, 768, 1440]) {
+  for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth + 1,
       ),
     ).toBe(true);
+    const formBounds = await form.boundingBox();
+    const submitBounds = await form
+      .getByRole("button", { name: submitName })
+      .boundingBox();
+    expect(
+      Math.abs(formBounds!.width - submitBounds!.width),
+    ).toBeLessThanOrEqual(1);
     await form.getByLabel("Nombre", { exact: true }).focus();
     await page.keyboard.press("Tab");
     await expect(form.getByLabel("Apellidos", { exact: true })).toBeFocused();

@@ -40,11 +40,28 @@ Administrador:
 
 Instructor:
 
-- solo puede consultar grupos asignados;
-- solo puede registrar asistencia en grupos autorizados;
-- solo puede gestionar evaluaciones de grupos autorizados.
+- el objetivo posterior es operar únicamente sobre cursos/grupos asignados;
+- asistencia y evaluaciones requieren su módulo y autorización explícitos en fases posteriores; no se conceden por el mero rol `INSTRUCTOR` en el alcance actual.
 
 No confiar únicamente en ocultar botones.
+
+### Auth dual e instructores (integrado en development; cloud pendiente)
+
+- Email/password no habilita signup público. `createInstructorAccount` se invoca solo desde alta server-side autorizada a ADMIN activo; crea identidad confirmada con Supabase Admin API, verifica de nuevo al actor, transacciona usuario interno/rol `INSTRUCTOR`/perfil profesional, y compensa borrando la identidad nueva si la escritura interna falla. La contraseña no se persiste ni se registra.
+- La validación del método actual de autenticación combina `getUser()` (identidad/sesión vigente) con `getClaims()` (claims firmados y `amr` para PASSWORD/OAUTH/confirmación). No confiar en lista de identidades del usuario para inferir por cuál método se autenticó.
+- Supabase puede asociar automáticamente una identidad Google cuando verifica que su email coincide; la aplicación no afirma ni depende de que esa asociación de proveedor se pueda desactivar. Para usuarios cuyo proveedor primario legado es `GOOGLE`, se conserva su acceso Google verificado. Para cuentas `EMAIL`, la asociación nueva aprobada por la aplicación se registra en `approved_google_identity_id`; OAuth Google sin esa aprobación se deniega, mientras una sesión PASSWORD sigue siendo válida. Esto separa asociación Auth a nivel proveedor de aprobación de acceso de aplicación.
+- El flujo de asociación inicia desde cuenta autenticada, valida origen y aplica rate limit. La prueba está firmada con `AUTH_RATE_LIMIT_SECRET`, cookie `HttpOnly`/`SameSite=Lax`/`Secure` según HTTPS, nonce con hash almacenado en DB, un solo uso y cinco minutos, ligada a usuario interno y sesión original; callback valida PKCE `flowId`, sesión OAuth, proveedor Google, email verificado normalizado y la misma identidad Auth. Ante un resultado no aceptado, intenta eliminar solo la identidad Google recién agregada (sin afectar las preexistentes) y restaurar la sesión inicial. La identidad de Auth sola nunca concede aprobación interna.
+- Los intentos de login/recovery/callback/enlace usan bucket persistente atómico por acción y red, y por cuenta cuando hay email; claves HMAC con dirección y email no crudos. El secreto server-only debe tener al menos 32 caracteres. En Supabase local estándar, 0012–0015 y el hook están aplicados; cloud sigue sin migraciones/hook/secret Auth verificados.
+- Los endpoints mantienen validación de origen, body form-urlencoded con límite/tamaño y campos únicos, `private, no-store`, redirects explícitos, errores neutros y sin credenciales. No exponer service-role secret/cliente privilegiado al browser.
+- Las rutas `/app/instructores` y edición UUID son `ADMIN`; `/app/mis-cursos` y detalle UUID son `INSTRUCTOR`; perfil requiere usuario activo. El caso de uso y repositorio scopian cada lectura por el usuario interno autenticado, no solo por navegación o middleware. Las mutaciones de perfil propio restringen el actor al mismo ID, mantienen el email de cuenta read-only y verifican revisión; cursos/grupos siguen siendo mutaciones únicamente `ADMIN`.
+- El selector/servidor permite asignar perfiles `INSTRUCTOR` con estado `ACTIVE`. Publicar curso exige esa asignación; drafts pueden tenerla opcional. Instructor no obtiene por este rol acceso a formatos, interesados, participantes, asistencia ni sesiones.
+- Asignaciones, fechas y grupos se validan bajo la misma barrera transaccional/advisory-lock, IDs de instructor anterior/nuevo en orden estable y luego bloqueo de curso. Las validaciones incluyen cursos con calendarios L–V que intersectan; la comprobación de grupos cuenta solo estados `PLANNED` (la cancelación libera intervalo). Cambio de instructor de curso iniciado y cambio de fechas de curso iniciado con asignación se rechazan server-side. Creación/edición de perfil y asignación tienen eventos no secretos e historial. Un password update exitoso intenta escribir `PASSWORD_CHANGED` con actor/target internos y sin metadata; como Auth y PostgreSQL no comparten transacción, el evento es posterior y un fallo solo genera `PASSWORD_CHANGE_AUDIT_WRITE_FAILED` con actor ID, sin revertir el cambio Auth confirmado.
+- El perfil profesional no recopila descripción; su nombre completo es la única proyección pública del instructor asignado. Correo y teléfono permanecen en vistas privadas autorizadas.
+- PR 121/122/123 están integrados en `development`. El Supabase local estándar ya aplicó 0012–0015, pero cloud no tiene Auth dual/instructores habilitados. SMTP/entrega recovery y Google OAuth real no se han probado; no presentar recovery/Google como verificados en producción.
+
+### Renovación de demos sintéticos
+
+La herramienta `renew-demo` es desarrollo local only: valida URL/puertos canónicos antes de conectar, requiere ADMIN interno `ACTIVE`, secret/contraseña solo desde `.env` ignorado y bloquea ejecución en CI/Vercel/`NODE_ENV=production`. El modo de reset usa allowlist y `TRUNCATE ... RESTRICT`, no `CASCADE`; conserva `auth.users`, sesiones, `users`, roles/perfiles, Auth config, Storage y ledger. Preflight valida ownership de cuentas/IDs antes del reset y se niega ante colisiones no reconocidas. Nunca remover esos guards ni usar la CLI contra cloud.
 
 ## RUTAS
 
@@ -232,8 +249,12 @@ Prohibido en Git:
 - access tokens;
 - Vercel token;
 - Supabase access token.
+- `AUTH_RATE_LIMIT_SECRET`.
+- `SEED_INSTRUCTOR_PASSWORD` (solo seed local; tratar como credencial).
 
 Usar GitHub Secrets y variables de entorno.
+`AUTH_RATE_LIMIT_SECRET` es server-only, requiere al menos 32 caracteres y no debe comenzar por `PUBLIC_` ni aparecer en logs.
+`SEED_ADMIN_ID` selecciona una identidad interna, no contiene contraseña; su valor tampoco se registra junto con datos de seed. Ningún valor de `.env` se incluye en esta documentación.
 
 ## CI/CD
 
@@ -266,12 +287,12 @@ Si un secreto se expone:
 
 - Las cookies de sesión se leen y renuevan mediante un cliente Supabase nuevo por request; las cabeceras anti-cache entregadas por `@supabase/ssr` se copian a la respuesta.
 - La identidad se valida contra Supabase Auth con `getUser()`. Estado y roles se consultan siempre en las tablas internas mediante una conexión server-side.
-- El callback exige proveedor Google y correo verificado antes de vincular una invitación; los fixtures email/password ya se pre-vinculan y existen solo en tests.
+- El callback normal de OAuth exige Google y correo verificado; las rutas de autenticación dual también validan método con claims firmados y aprobación de identidad Google del usuario interno. La asociación de identidad Google que Supabase puede hacer automáticamente no equivale a aprobación de acceso.
 - Los endpoints mutables de inicio y cierre de sesión son `POST` y verifican el origen esperado.
 - Los redirects de retorno se restringen a paths relativos y la allowlist local contiene una URL exacta.
-- No existe service-role key en código de aplicación o browser. El setup E2E obtiene la key efímera local desde Supabase CLI, la conserva únicamente en el entorno del proceso de prueba y no la imprime.
+- Los valores de service-role key no se guardan en código/Git ni se entregan al browser. El aprovisionamiento del feature usa el valor configurado en `process.env` solo en un cliente Auth Admin server-side; setup E2E obtiene la key efímera local desde Supabase CLI, la conserva únicamente en el entorno del proceso de prueba y no la imprime.
 - `users`, `roles` y `user_roles` tienen RLS sin políticas para Data API y privilegios revocados a `anon`, `authenticated` y `service_role`. Los guards Astro/Drizzle siguen siendo autoritativos porque las conexiones owner/bypass RLS no quedan restringidas por esas políticas.
-- Supabase local deshabilita el signup público por email/password. La Admin API continúa disponible exclusivamente para crear fixtures controlados. La configuración cloud debe deshabilitar también signup público por email y cualquier proveedor no previsto antes de habilitar producción.
+- Supabase local conserva signup público deshabilitado y añade hook `before_user_created` para aceptar solo invitaciones Google permitidas. La migración 0012 crea la función segura del hook y restringe su ejecución. Las cuentas de email/password se provisionan con Admin API server-side; la configuración Auth cloud de esta feature no está aplicada/verificada.
 - Las cookies SSR declaran `HttpOnly`, `SameSite=Lax`, path `/` y `Secure` cuando `PUBLIC_SITE_URL` usa HTTPS.
 - Las respuestas de `/app`, `/app/**`, `/login`, `/unauthorized` y `/auth/**` usan `Cache-Control: private, no-store`.
 - Toda ruta bajo `/app` requiere una política exacta registrada. Las rutas futuras no declaradas fallan cerradas; los endpoints de operaciones sensibles deben seguir invocando guards propios aunque una página ya esté protegida.
@@ -279,3 +300,7 @@ Si un secreto se expone:
 ### Idempotencia y recuperación del alta
 
 La clave de idempotencia del curso se vincula en servidor al actor autenticado y al fingerprint de la carga validada; no se acepta identidad de actor del cliente y reutilizar la clave con datos distintos falla. Los metadatos no salen en DTOs. El artwork se asocia después de crear el borrador; ante fallo se ofrece recuperar/reintentar sobre ese borrador. No se sustituye silenciosamente la asociación existente ni se asume una transacción distribuida entre PostgreSQL y Storage. La migración aditiva 0010 no automatiza borrado de historial.
+
+### Contraseñas de cuentas internas (implementadas; habilitación cloud pendiente)
+
+Las credenciales pertenecen exclusivamente a Supabase Auth. Crear cuenta y asignar contraseña inicial requiere API privilegiada exclusivamente server-side; no versionar secretos ni retornar/registrar la contraseña después de la respuesta inicial necesaria para entregarla al ADMIN. Nunca persistirla en PostgreSQL, auditarla, incluirla en telemetría, devolverla en cargas de navegación ni repoblar el formulario. Mantener signup público deshabilitado, protección CSRF/origen, cookies seguras, `Cache-Control: private, no-store`, redirects permitidos y rate limiting del proveedor/endpoint. Configurar y comprobar SMTP antes de prometer recuperación por correo en cloud.

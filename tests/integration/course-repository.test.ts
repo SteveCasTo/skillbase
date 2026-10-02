@@ -22,6 +22,7 @@ import {
 } from "@/domain/courses/weekday-schedule";
 import { COURSE_FIXTURES } from "../fixtures/courses";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
+import { createInstructorFixture } from "../fixtures/instructors";
 
 const connection = getTestSupabaseEnvironment().databaseUrl;
 const database = createDatabase(connection);
@@ -29,10 +30,12 @@ const repository = new DrizzleCourseRepository(database.db);
 const formats = new DrizzleFormatRepository(database.db);
 let actorId: string;
 let formatId: string;
+let instructorId: string;
 const input = () =>
   validateCourseData({
     ...COURSE_FIXTURES.publishedOpenRegistration,
     courseTypeId: formatId,
+    instructorId,
   });
 const failure = async (promise: Promise<unknown>) => {
   try {
@@ -50,7 +53,7 @@ async function clear() {
       sql`${auditEvents.entityType} in ('COURSE', 'COURSE_TYPE') or (${auditEvents.entityType} = 'GROUP' and ${auditEvents.actorId} in (select id from users where email = 'course.actor@repository.test'))`,
     );
   await database.db.execute(
-    sql`truncate interest_registrations, groups, courses, course_type_revisions, course_types`,
+    sql`truncate interest_registrations, course_instructor_history, groups, courses, course_type_revisions, course_types`,
   );
   await database.db
     .delete(users)
@@ -64,6 +67,7 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   await clear();
+  instructorId = (await createInstructorFixture(database.db)).id;
   const [actor] = await database.db
     .insert(users)
     .values({ email: "course.actor@repository.test", name: "Course Actor" })
@@ -372,6 +376,7 @@ describe("course format persistence", () => {
       ...COURSE_FIXTURES.publishedOpenRegistration,
       courseTypeId: formatId,
       weekdays: "1,2,3,4,5",
+      instructorId,
       schedule: "Lunes a viernes, 18:00–19:30",
       startsAt: "2027-03-01T18:00",
       endsAt: "2027-03-17T19:30",

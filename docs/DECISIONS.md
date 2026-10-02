@@ -574,3 +574,69 @@ El término «preinscripción» se reserva para el registro presencial que regis
 Implementación local de ADR-017 (2026-09-30): la carga estructural SSR se coordina con navegación, viewport y cancelación; grupos/formatos aplican actualización local. El alta de curso usa idempotencia actor + UUID + fingerprint persistida en la propia fila de curso (migración 0010), no una tabla de recibos separada ni limpieza automática. La foto sigue siendo una operación posterior al alta con recuperación del borrador, no una transacción atómica DB/Storage. Esta precisión no cambia reglas de negocio ni declara cerrado el gate de validación.
 
 Detalle de implementación local de ADR-017: los productores administrativos pasan por `src/lib/notifications.ts`, que crea un UUID por operación y reutiliza el ID para loading/success/error. El bridge adapta el `id` de runtime de Sileo 0.1.5 sin `any` ni patch en dependencias instaladas. Esto no cambia la decisión de mantener la mejora progresiva/fallback SSR ni la política existente de movimiento reducido.
+
+---
+
+## ADR-023 — PERFILES, CUENTAS Y ASIGNACIÓN DE INSTRUCTORES
+
+**Fecha:** 2026-10-01
+
+**Estado:** Accepted — flujos aprobados integrados en `development`; release de producción pendiente
+
+### Contexto
+
+Los grupos existen, pero la identidad del instructor aún es texto opcional del curso. Es necesario habilitar cuentas de instructor con acceso acotado y asignar una persona real sin confundir roles internos, datos públicos o credenciales.
+
+### Decisión
+
+- Mantener perfil de instructor y usuario interno/roles vinculados a identidad Supabase Auth; credenciales solo viven en Auth. ADMIN aprovisiona cuenta desde servidor y establece contraseña inicial, sin invitación ni paso forzado de cambio. Email/password se suma al Google vigente sin habilitar signup público.
+- Google se enlaza explícitamente a la misma cuenta autenticada únicamente con proveedor verificado y email normalizado coincidente; no realizar fusión automática. Los ADMIN existentes mantienen Google y pueden añadir contraseña; no se añade administración de creación de ADMIN.
+- Un curso tiene una única asignación de instructor, heredada por todos sus grupos. Instructor accede solo a perfil propio y cursos asignados; asistencia/sesiones siguen en Fase 6.
+- El cambio de instructor se permite en curso publicado solo antes del inicio oficial. Conflictos del mismo instructor entre cursos se calculan con fechas L–V y tiempo civil `America/La_Paz`; intervalos semiabiertos hacen válido el contacto exacto de turnos. Escrituras concurrentes que puedan alterar ese cálculo deben compartir serialización transaccional.
+- Conservar IDs e historial de perfiles usados y auditar asignaciones/mutaciones sin credenciales. No se añade flujo de desactivación de instructor con cursos futuros; esa política queda sin definir y fuera de la operación cubierta por esta decisión.
+
+### Alternativas
+
+- Mantener nombre de instructor como texto libre.
+- Habilitar solo OAuth Google o crear una invitación con onboarding/cambio obligatorio.
+- Vincular Google automáticamente por email sin acción autenticada.
+- Asignar instructor por grupo o permitir varios instructores por curso.
+
+### Consecuencias
+
+- Se amplían los métodos visibles de login para cuentas internas, no el signup público; se deben preservar guardas, política exacta por ruta, CSRF/cookies/redirects y configuraciones de Auth.
+- Las decisiones de asignación/horario exigen pruebas de concurrencia compartidas con mutaciones de fechas, grupos y publicación; una comprobación en UI no basta.
+- Perfiles estables, asignación `courses.instructor_id`, tabla de historial, guards de perfil/cursos y validaciones de calendario se añadieron mediante PR 120/migración 0014 y están integrados en `development`; 0014 está aplicada en el Supabase local estándar, no en cloud. La política de desactivación no forma parte de los flujos aprobados aquí y permanece sin decisión.
+- Para evitar carreras, el repositorio usa una barrera advisory-lock transaccional común; adquiere locks de IDs de instructor previo/nuevo en orden estable y después la fila del curso. La misma serialización cubre cambios de asignación/fechas/publicación y escrituras de horario/estado de grupos. Conserva auditoría, revisión optimista e historial; no cambia el límite modular ni introduce un calendario separado.
+- Debe comprobarse configuración SMTP cloud antes de afirmar recuperación de contraseña disponible; esto no bloquea cuentas creadas con password por ADMIN ni su login inicial.
+
+---
+
+## ADR-024 — APROBACIÓN DE GOOGLE EN LA CAPA DE APLICACIÓN
+
+**Fecha:** 2026-10-01
+
+**Estado:** Accepted — implementado e integrado a `development` mediante PR 118; habilitación de entorno pendiente
+
+### Contexto
+
+Supabase Auth puede asociar automáticamente una identidad Google cuando el proveedor verifica que su correo coincide con el correo de una cuenta existente. Ese comportamiento de asociación a nivel proveedor no se puede usar como prueba de consentimiento explícito ni se documenta como configurable para impedirlo. Sin otra comprobación, que Google aparezca en `auth.users.identities` podría convertir una sesión OAuth no solicitada en login de SkillBase.
+
+### Decisión
+
+- Mantener `auth_primary_provider` y `approved_google_identity_id` en el usuario interno. Autorizar OAuth Google solo si el método actual de la sesión, validado desde claims firmados, es OAuth y la identidad Google es admisible: identidad vigente del usuario legado `GOOGLE` o identidad asociada explícitamente/aprobada para cuenta `EMAIL`, siempre con correo verificado normalizado coincidente.
+- Permitir sesiones PASSWORD y confirmación de email según su flujo validado, sin exigir que una asociación Google de proveedor exista o esté aprobada. Así una identidad Google autoasociada no deshabilita el acceso por contraseña.
+- La asociación explícita usa flujo ligado a usuario interno y sesión originales, PKCE/flowId, nonce de un uso y expiración breve; valida identidad Auth y email tras el callback. Al rechazo se intenta quitar solo la nueva identidad agregada y restaurar la sesión original. La autorización sigue dependiendo del estado persistido de aprobación, no del éxito de unlink.
+- No fusionar usuarios internos automáticamente por email; el vínculo proveedor en Auth no equivale a merge de cuentas de dominio.
+
+### Alternativas
+
+- Confiar en que Supabase no asocie automáticamente identidades coincidentes.
+- Considerar cualquier identidad Google visible en `getUser()` como prueba de consentimiento.
+- Deshabilitar el login password si aparece una identidad no aprobada.
+
+### Consecuencias
+
+- La frontera de confianza de proveedor y la aprobación de acceso de SkillBase quedan separadas; tanto ingreso normal como callback de asociación deben validar método de sesión y estado interno.
+- El comportamiento está integrado en `development`; 0012/0013 y el hook están activos en local estándar, junto con 0014/0015. Cloud sigue pendiente de migraciones, hook, `AUTH_RATE_LIMIT_SECRET` y verificación provider/SMTP. PR 118 no tuvo checks remotos reportados y la autenticación dual no se ha promocionado a `master`.
+- Este ADR implementa el requerimiento de asociación explícita a nivel de la aplicación y no reemplaza ni debilita ADR-023 sobre no fusionar usuarios internos automáticamente.

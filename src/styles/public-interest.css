@@ -65,12 +65,6 @@
     flex-direction: column;
     gap: 1.5rem;
   }
-  .interest-required,
-  .interest-help {
-    color: var(--soft);
-    font-size: 0.85rem;
-    line-height: 1.65;
-  }
   .interest-fields {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -121,15 +115,12 @@
     font-weight: 500;
   }
   .interest-submit {
-    align-self: flex-start;
-    max-width: 100%;
+    width: 100%;
     height: auto;
     padding: 0.8rem 1.25rem;
     white-space: normal;
     text-align: center;
-  }
-  .interest-submit + .interest-help {
-    margin-top: -0.75rem;
+    transition-property: background-color, color, border-color, box-shadow;
   }
   .interest-error-summary {
     padding: 1rem;
@@ -194,9 +185,13 @@
       padding-top: 2.5rem;
     }
   }
-  @media (max-width: 700px) {
-    .interest-submit {
-      width: 100%;
+  @media (prefers-reduced-motion: reduce) {
+    .interest-submit,
+    .interest-field :is(input, select, button) {
+      transition: none;
+    }
+    .interest-submit svg {
+      animation: none;
     }
   }
 }

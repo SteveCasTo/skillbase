@@ -17,6 +17,22 @@ const instant = (value: unknown): value is string =>
 const count = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 
+/** Each bar is a share of all active interest, never of the largest bucket. */
+export function preferenceDemand(metrics: AdminInterestMetricsDto) {
+  const highest = Math.max(
+    0,
+    ...metrics.byPreference.map((item) => item.activeCount),
+  );
+  return metrics.byPreference.map((bucket) => ({
+    ...bucket,
+    share:
+      metrics.activeTotal > 0
+        ? (bucket.activeCount / metrics.activeTotal) * 100
+        : 0,
+    leading: highest > 0 && bucket.activeCount === highest,
+  }));
+}
+
 export function isAdminRegistration(
   value: unknown,
   courseId: string,

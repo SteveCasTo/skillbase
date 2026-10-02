@@ -32,9 +32,20 @@ const user = requireInternalUser(Astro.locals);
     <article class="rounded-xl border bg-card p-6 shadow-sm">
       <h2 class="text-lg font-semibold">Estado operativo</h2>
       <p class="mt-4 text-sm leading-6 text-muted-foreground">
-        La estructura privada está lista. Los flujos de cursos y asistencia se
-        incorporarán en las siguientes fases.
+        {user.roles.includes("ADMIN")
+          ? "Administra cursos, grupos e instructores."
+          : "Consulta tus cursos asignados y administra tu perfil."}
       </p>
+      <a
+        href={
+          user.roles.includes("ADMIN") ? "/app/instructores" : "/app/mis-cursos"
+        }
+        class="mt-4 inline-block text-sm font-semibold underline underline-offset-4"
+      >
+        {user.roles.includes("ADMIN")
+          ? "Gestionar instructores"
+          : "Ver mis cursos"}
+      </a>
     </article>
   </section>
 </PrivateLayout>

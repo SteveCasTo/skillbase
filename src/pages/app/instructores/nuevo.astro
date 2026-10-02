@@ -1,0 +1,23 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import InstructorForm from "@/components/instructors/InstructorForm.astro";
+import { instructorEditor } from "@/server/instructors/editor";
+const editor = await instructorEditor(Astro);
+if (editor.response) return editor.response;
+---
+
+<PrivateLayout title="Nuevo instructor">
+  <a href="/app/instructores" class="text-sm underline underline-offset-4">
+    Instructores
+  </a>
+  <h1 class="mt-5 text-3xl font-semibold tracking-tight">Crear instructor</h1>
+  <p class="mt-3 max-w-2xl text-muted-foreground">
+    Registra su perfil y una cuenta activa para consultar sus cursos asignados.
+  </p>
+  {editor.error && (
+    <p role="alert" class="mt-6 text-destructive">
+      {editor.error}
+    </p>
+  )}
+  <InstructorForm values={editor.values} errors={editor.errors} />
+</PrivateLayout>

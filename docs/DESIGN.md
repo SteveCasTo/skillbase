@@ -420,6 +420,16 @@ Verificar cada componente en ambos temas.
 - Mostrar feedback posterior.
 - No depender únicamente de asteriscos para explicar obligatoriedad.
 
+### Perfiles y cursos de instructores (implementado en development)
+
+- El listado ADMIN `/app/instructores` usa grilla responsive de tarjetas completas: cada tarjeta es un único enlace semántico a edición, incluye nombre completo, correo/status, y mantiene foco visible sin enlaces/controles anidados. No presenta descripción porque el perfil no la recopila.
+- El formulario de alta/edición tiene nombre y apellidos requeridos, email `type=email` requerido/normalizado (solo lectura al editar), teléfono opcional `type=tel` y password inicial solo al crear. La password nunca se repuebla ante fallo; límites y reglas se vuelven a validar en servidor. La cuenta se activa con el password asignado por ADMIN, sin paso forzado de cambio.
+- La sección «Perfil profesional» dentro de `/app/perfil` solo se presenta a usuarios con rol `INSTRUCTOR`; permite editar nombre, apellidos y teléfono, manteniendo email de cuenta como solo lectura. El perfil de acceso/password sigue siendo una sección distinta.
+- Administración puede elegir instructor registrado activo al crear/editar el curso; draft puede permanecer sin asignación, pero publicación no. El nombre completo asignado es el único dato del instructor proyectado en el detalle público; correo/teléfono no se exponen. Cursos históricos sin asignación conservan su texto libre.
+- Instructor navega a «Mis cursos» y ve únicamente listas/detalles de cursos que le pertenecen; no se exponen acciones ADMIN, interesados, formatos, asistencia ni sesiones. `/app/mis-cursos/[id]` muestra fechas/grupos/cupo/estado como consulta, no una vista de mutación.
+- Formularios conservan HTML/POST y validación de servidor sin JavaScript; con JS la mutación muestra pending/success/error con el mismo ID de notificación, bloquea doble submit y sitúa foco en el error. La contraseña se limpia al fallar.
+- El skeleton de navegación conoce `/app/instructores` y `/app/mis-cursos` como listas, `/app/instructores/nuevo` y edición como formularios, y `/app/mis-cursos/[id]` como detalle; usa el ciclo real de navegación, no un retraso decorativo. Las reglas de activación/desactivación con cursos futuros continúan sin definir y no se exponen controles para inventar ese flujo.
+
 ## CONSISTENCIA
 
 Antes de crear un componente:
@@ -490,6 +500,7 @@ Antes de crear un componente:
 ### Cargas y mutaciones de la aplicación privada
 
 - Todos los productores de notificaciones administrativas usan la fachada `src/lib/notifications.ts`. Cada operación tiene ID UUID propio; una notificación promise conserva su ID entre loading, success y error para actualizar el aviso correcto.
+- El host Sileo compartido muestra avisos abajo a la derecha; el host privado los posiciona para no tapar las acciones superiores. Ambos layouts coordinan un solo host/viewport activo por documento. Los avisos previos a montar el host quedan encolados y se presentan al activarlo; loading→success/error conserva el mismo ID.
 - JavaScript sigue habilitado como mejora progresiva en la aplicación. Los tests sin JavaScript validan fallbacks HTML/SSR, no una política de desactivar JavaScript. Las animaciones del sidebar siguen activas salvo las reglas existentes de movimiento reducido; no se suprimen globalmente.
 
 - La carga estructural de vistas privadas usa skeleton SSR según variante (lista, formulario, detalle o resumen), se muestra mientras el loader está pendiente y el contenido entra en viewport, y se cancela al resolver, abortar o fallar la navegación. Respeta foco/teclado y `prefers-reduced-motion`; no es una demora decorativa.
@@ -500,5 +511,13 @@ Antes de crear un componente:
 
 - El formulario aparece únicamente en el detalle del curso elegible; no modifica landing, tarjetas ni catálogo. La presentación separa expresamente expresar interés de reservar cupo, pagar o inscribirse.
 - La estructura SSR conserva el fallback HTML y los valores/errores ante respuesta del servidor. La mejora React usa estados pending/éxito/error, foco en el resultado o primer campo inválido y selector del design system para preferencia de grupo. Sin preferencia disponible, el flujo no fuerza selección.
-- `/app/interesados` resume registros activos por curso; el detalle administrativo presenta registros y buckets por preferencia con filtros de estado, confirmación de cancelación/reactivación y actualización local. En móvil la información usa tarjetas/lista, no una tabla horizontal crítica.
-- La UI está implementada y la cobertura responsive, de teclado y de fallback sin JavaScript está verificada mediante corrida full y revalidaciones dirigidas; ver resultados exactos en `docs/TESTING.md` (no hubo una única corrida full 95/95).
+- `/app/interesados` resume registros activos por curso; el detalle administrativo presenta registros en una grilla de tarjetas de ancho fluido, tanto en desktop como en mobile, con filtros de estado, confirmación de cancelación/reactivación y actualización local. No hay destino individual de registro: las tarjetas no simulan navegación y sus acciones conservan foco/teclado y fallback HTML.
+- La demanda ocupa todo el ancho en filas apiladas de nombre, conteo y barra. Cada barra representa el conteo dividido por el total activo del curso (no por el máximo ni por el filtro). Todos los máximos positivos, incluido «Sin preferencia», usan el token `accent` y el texto «Mayor demanda»; un empate destaca a todos y cero no genera ganador. Los conteos y proporciones permanecen disponibles como texto.
+- El encabezado del detalle administrativo no impone una anchura artificial al texto introductorio. El formulario público conserva una sola aclaración bajo el título; el submit ocupa todo el ancho del formulario. Con JavaScript solo se habilita cuando nombre y apellidos no están en blanco tras `trim` y los campos obligatorios cumplen la validez HTML. Sin JavaScript sigue habilitado con restricciones HTML y validación autoritativa del servidor; errores recuperables conservan valores y permiten reintento.
+- La navegación pendiente hacia interesados reutiliza el ciclo real de skeleton privado: listado para el resumen y demanda/tarjetas para el detalle. El render inicial SSR no añade esperas ni skeletons artificiales; las mutaciones mantienen feedback local y no reemplazan datos existentes.
+- La UI está implementada y la cobertura responsive, de teclado y de fallback sin JavaScript está verificada; el E2E completo del release pasó 96/96. La secuencia local anterior de 95 escenarios requirió revalidaciones dirigidas; ver el historial exacto en `docs/TESTING.md`.
+- La lista de cursos permite wrapping de slugs largos y evita overflow horizontal en 320, 390, 768, 1024 y 1440 px. Las regresiones de viewport/toasts pasaron dentro del E2E de release (96/96).
+
+## Estado de los ajustes de interesados
+
+El ajuste compacto/responsive del panel y formulario de interesados quedó integrado mediante PRs 116 y 117 a `development`; ver el comportamiento y accesibilidad implementados en la sección «Registro público de interesados» arriba. Su verificación full anterior al módulo de instructores pasó 98/98 E2E. Este hito UX no cierra la gestión de cursos/instructores de Fase 4.

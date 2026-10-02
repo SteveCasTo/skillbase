@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import type { AuthRole, UserStatus } from "@/domain/auth/types";
 import { createDatabase } from "@/server/db/client";
-import { userRoles, users } from "@/server/db/schema";
+import { instructorProfiles, userRoles, users } from "@/server/db/schema";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
 import { AUTH_FIXTURES } from "./auth-users";
@@ -16,6 +16,23 @@ interface InternalFixture {
 }
 
 const internalFixtures: readonly InternalFixture[] = [
+  { ...AUTH_FIXTURES.googleLegacyAdmin, roles: ["ADMIN"], status: "ACTIVE" },
+  {
+    ...AUTH_FIXTURES.associationOwner,
+    roles: ["INSTRUCTOR"],
+    status: "ACTIVE",
+  },
+  {
+    ...AUTH_FIXTURES.associationStale,
+    roles: ["INSTRUCTOR"],
+    status: "ACTIVE",
+  },
+  { ...AUTH_FIXTURES.passwordAdmin, roles: ["ADMIN"], status: "ACTIVE" },
+  {
+    ...AUTH_FIXTURES.passwordInstructor,
+    roles: ["INSTRUCTOR"],
+    status: "ACTIVE",
+  },
   { ...AUTH_FIXTURES.admin, roles: ["ADMIN"], status: "ACTIVE" },
   {
     ...AUTH_FIXTURES.instructor,
@@ -51,6 +68,7 @@ export default async function setupAuthFixtures(): Promise<void> {
       const { data, error } = await admin.auth.admin.createUser({
         email: fixture.email,
         email_confirm: true,
+        ...("password" in fixture ? { password: fixture.password } : {}),
       });
       if (error) throw error;
       authIds.set(fixture.email, data.user.id);
@@ -61,9 +79,26 @@ export default async function setupAuthFixtures(): Promise<void> {
       if (!authUserId) throw new Error("Auth fixture was not created");
       const [created] = await database.db
         .insert(users)
-        .values({ ...fixture, authUserId })
+        .values({
+          email: fixture.email,
+          name: fixture.name,
+          status: fixture.status,
+          authUserId,
+          authPrimaryProvider:
+            fixture.email === AUTH_FIXTURES.googleLegacyAdmin.email
+              ? "GOOGLE"
+              : "EMAIL",
+        })
         .returning({ id: users.id });
       if (!created) throw new Error("Internal fixture was not created");
+      if (fixture.roles.includes("INSTRUCTOR")) {
+        const [firstName, ...rest] = fixture.name.split(" ");
+        await database.db.insert(instructorProfiles).values({
+          id: created.id,
+          firstName: firstName || "Fixture",
+          lastName: rest.join(" ") || "Instructor",
+        });
+      }
       if (fixture.roles.length > 0)
         await database.db
           .insert(userRoles)

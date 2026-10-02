@@ -14,13 +14,14 @@ test("desktop sidebar respects roles and marks nested courses and formats", asyn
     "aria-current",
     "page",
   );
-  await expect(nav.getByRole("link", { name: "Cursos" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Asistencia" })).toBeVisible();
-  await nav.getByRole("link", { name: "Cursos" }).click();
-  await expect(nav.getByRole("link", { name: "Cursos" })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await expect(
+    nav.getByRole("link", { name: "Cursos", exact: true }),
+  ).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Asistencia" })).toHaveCount(0);
+  await nav.getByRole("link", { name: "Cursos", exact: true }).click();
+  await expect(
+    nav.getByRole("link", { name: "Cursos", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
 });
 
 test("collapsed rail expands on hover without shifting main and persists across navigation", async ({
@@ -236,8 +237,13 @@ test("keyboard focus previews rail, Escape closes it; instructor sees no admin l
   await page.goto("/app");
   const shell = page.locator("[data-private-shell]");
   const nav = page.getByRole("navigation", { name: "Navegación privada" });
-  await expect(nav.getByRole("link", { name: "Cursos" })).toHaveCount(0);
-  await expect(nav.getByRole("link", { name: "Asistencia" })).toBeVisible();
+  await expect(
+    nav.getByRole("link", { name: "Cursos", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    nav.getByRole("link", { name: "Mis cursos", exact: true }),
+  ).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Asistencia" })).toHaveCount(0);
   await page.getByRole("button", { name: "Contraer barra lateral" }).click();
   await page.locator(".private-main-scroll").hover();
   await page.keyboard.press("Shift+Tab");

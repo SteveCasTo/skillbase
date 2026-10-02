@@ -21,6 +21,9 @@ import { CourseInfrastructureError } from "@/server/db/repositories/course-infra
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
 import { DrizzleFormatRepository } from "@/server/db/repositories/format-repository";
 import { getPublicAuthEnvironment } from "@/server/environment";
+import { listInstructors } from "@/application/instructors/manage-instructors";
+import { DrizzleInstructorRepository } from "@/server/db/repositories/instructor-repository";
+import type { InstructorProfile } from "@/domain/instructors/profile";
 
 const user = requireInternalUser(Astro.locals);
 const jsonRequested =
@@ -43,7 +46,12 @@ let errors: Readonly<Record<string, string>> = {};
 let pageError: string | null = null;
 let requestKey: string = randomUUID();
 let formats: readonly CourseFormat[] = [];
+let instructors: readonly InstructorProfile[] = [];
 try {
+  instructors = await listInstructors(
+    new DrizzleInstructorRepository(getDatabase()),
+    user,
+  );
   formats = await listFormats(new DrizzleFormatRepository(getDatabase()), user);
 } catch (error) {
   Astro.response.status = COURSE_INFRASTRUCTURE_STATUS;
@@ -149,6 +157,7 @@ if (Astro.request.method === "POST" && !pageError) {
       requestKey={requestKey}
       errors={errors}
       formats={formats}
+      instructors={instructors}
       disabled={
         Astro.response.status === COURSE_INFRASTRUCTURE_STATUS ||
         formats.length === 0

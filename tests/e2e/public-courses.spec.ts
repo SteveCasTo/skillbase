@@ -4,6 +4,14 @@ import { createClient } from "@supabase/supabase-js";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { signInFixture } from "./auth-helper";
+import {
+  registerCourseInstructor,
+  chooseCourseInstructor,
+  courseInstructor,
+} from "./instructor-helper";
+test.beforeEach(async ({ page }) => {
+  await registerCourseInstructor(page);
+});
 
 test("published course is public end-to-end and withdrawal removes every public view", async ({
   page,
@@ -39,7 +47,7 @@ test("published course is public end-to-end and withdrawal removes every public 
     await page.getByRole("option", { name: "Medio" }).click();
     await page.getByRole("combobox", { name: "Formato de curso" }).click();
     await page.getByRole("option", { name: new RegExp(formatName) }).click();
-    await page.getByLabel("Instructor (opcional)").fill("Docente público E2E");
+    await chooseCourseInstructor(page);
     await page
       .getByLabel("Contenido del curso (Markdown, opcional)")
       .fill(
@@ -200,7 +208,7 @@ test("published course is public end-to-end and withdrawal removes every public 
         .getByText("20 horas"),
     ).toBeVisible();
     await expect(
-      page.getByText("Docente público E2E", { exact: true }),
+      page.getByText(courseInstructor(page).name, { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { level: 2, name: "Temario público" }),

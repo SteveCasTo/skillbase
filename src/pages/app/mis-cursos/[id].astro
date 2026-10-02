@@ -1,0 +1,74 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import { getAssignedCourse } from "@/application/instructors/assigned-courses";
+import { requireInternalUser } from "@/server/auth/context";
+import { getDatabase } from "@/server/db/client";
+import { DrizzleAssignedCourseRepository } from "@/server/db/repositories/assigned-course-repository";
+import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+if (Astro.request.method !== "GET")
+  return new Response(null, { status: 405, headers: { Allow: "GET" } });
+let assigned: Awaited<ReturnType<typeof getAssignedCourse>> = null;
+let loadError = false;
+try {
+  assigned = await getAssignedCourse(
+    new DrizzleAssignedCourseRepository(getDatabase()),
+    requireInternalUser(Astro.locals),
+    Astro.params.id ?? "",
+  );
+} catch {
+  loadError = true;
+  Astro.response.status = 503;
+}
+if (!assigned && !loadError) Astro.response.status = 404;
+---
+
+<PrivateLayout title={assigned?.course.name ?? "Curso no disponible"}>
+  <a href="/app/mis-cursos" class="text-sm underline underline-offset-4">
+    Mis cursos
+  </a>
+  {assigned ? (
+    <>
+      <h1 class="mt-5 text-3xl font-semibold tracking-tight">
+        {assigned.course.name}
+      </h1>
+      <p class="mt-3 max-w-2xl text-muted-foreground">
+        {assigned.course.description}
+      </p>
+      <p class="mt-5">
+        {instantToBoliviaCivil(assigned.course.startsAt).slice(0, 10)} —{" "}
+        {instantToBoliviaCivil(assigned.course.endsAt).slice(0, 10)} · Hora de
+        Bolivia
+      </p>
+      <h2 class="mt-8 text-xl font-semibold">Grupos</h2>
+      {assigned.groups.length === 0 ? (
+        <p class="mt-4">Todavía no hay grupos.</p>
+      ) : (
+        <ul class="mt-4 grid gap-4 sm:grid-cols-2">
+          {assigned.groups.map((group, index) => (
+            <li class="rounded-xl border bg-card p-5">
+              <h3 class="font-semibold">Grupo {index + 1}</h3>
+              <p class="mt-2">
+                Lunes a viernes,{" "}
+                {instantToBoliviaCivil(group.startsAt).slice(11)}–
+                {instantToBoliviaCivil(group.endsAt).slice(11)}
+              </p>
+              <p class="mt-2 text-sm text-muted-foreground">
+                Cupo máximo: {group.capacity} ·{" "}
+                {group.status === "PLANNED" ? "Planificado" : "Cancelado"}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  ) : (
+    <>
+      <h1 class="mt-5 text-3xl font-semibold">Curso no disponible</h1>
+      {loadError && (
+        <p role="alert" class="mt-5 text-destructive">
+          No se pudo cargar el curso. Recarga para intentarlo nuevamente.
+        </p>
+      )}
+    </>
+  )}
+</PrivateLayout>

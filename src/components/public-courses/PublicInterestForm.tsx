@@ -79,6 +79,7 @@ export default function PublicInterestForm({
   const groupTriggerRef = useRef<HTMLButtonElement>(null);
   const submitting = useRef(false);
   const [hydrated, setHydrated] = useState(false);
+  const [requiredValid, setRequiredValid] = useState(false);
   const [enhancedSelect, setEnhancedSelect] = useState(false);
   const [preferredGroupId, setPreferredGroupId] = useState(
     initialValues.preferredGroupId,
@@ -99,8 +100,35 @@ export default function PublicInterestForm({
     preferredGroupId !== "" &&
     !groups.some((group) => group.id === preferredGroupId);
 
+  function requiredInputsValid(form: HTMLFormElement): boolean {
+    return fields
+      .filter((field) => field.required)
+      .every((field) => {
+        const input = form.elements.namedItem(field.name);
+        return (
+          input instanceof HTMLInputElement &&
+          input.value.trim() !== "" &&
+          input.validity.valid
+        );
+      });
+  }
+
   useEffect(() => {
+    // SSR stays submittable without JS. Once enhanced, gate the real DOM before
+    // the frame that reconciles hydration/autofill and the native group selector.
+    const form = formRef.current;
+    const updateValidity = () => {
+      if (form) setRequiredValid(requiredInputsValid(form));
+    };
+    const button = form?.querySelector<HTMLButtonElement>(
+      'button[type="submit"]',
+    );
+    if (form && button) button.disabled = !requiredInputsValid(form);
+    form?.addEventListener("input", updateValidity, true);
+    form?.addEventListener("change", updateValidity, true);
     const frame = requestAnimationFrame(() => {
+      if (formRef.current)
+        setRequiredValid(requiredInputsValid(formRef.current));
       setHydrated(true);
       const native = nativeSelectRef.current;
       if (native) {
@@ -108,7 +136,11 @@ export default function PublicInterestForm({
         if (document.activeElement !== native) setEnhancedSelect(true);
       }
     });
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      form?.removeEventListener("input", updateValidity, true);
+      form?.removeEventListener("change", updateValidity, true);
+    };
   }, []);
 
   useEffect(() => {
@@ -158,12 +190,17 @@ export default function PublicInterestForm({
       {};
     for (const field of fields) {
       const input = form.elements.namedItem(field.name);
-      if (input instanceof HTMLInputElement && !input.validity.valid) {
-        browserIssues[field.name] = input.validity.valueMissing
-          ? "Completa este campo."
-          : input.validity.typeMismatch
-            ? "Introduce un email válido."
-            : "Revisa el valor de este campo.";
+      if (
+        input instanceof HTMLInputElement &&
+        (!input.validity.valid || (field.required && input.value.trim() === ""))
+      ) {
+        browserIssues[field.name] =
+          input.validity.valueMissing ||
+          (field.required && input.value.trim() === "")
+            ? "Completa este campo."
+            : input.validity.typeMismatch
+              ? "Introduce un email válido."
+              : "Revisa el valor de este campo.";
       }
     }
     if (Object.keys(browserIssues).length) {
@@ -261,10 +298,6 @@ export default function PublicInterestForm({
       onSubmit={submit}
       className="interest-form"
     >
-      <p className="interest-required">
-        Nombre, apellidos y email son obligatorios. Los demás campos son
-        opcionales.
-      </p>
       {result?.ok === false && (
         <div
           ref={resultRef}
@@ -358,7 +391,11 @@ export default function PublicInterestForm({
                   id="interest-preferredGroupId"
                   aria-labelledby="interest-group-label"
                   aria-invalid={Boolean(issues.preferredGroupId)}
-                  aria-describedby={`interest-group-help${issues.preferredGroupId ? " interest-preferredGroupId-error" : ""}`}
+                  aria-describedby={
+                    issues.preferredGroupId
+                      ? "interest-preferredGroupId-error"
+                      : undefined
+                  }
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -386,7 +423,11 @@ export default function PublicInterestForm({
               name="preferredGroupId"
               defaultValue={initialValues.preferredGroupId}
               aria-invalid={Boolean(issues.preferredGroupId)}
-              aria-describedby={`interest-group-help${issues.preferredGroupId ? " interest-preferredGroupId-error" : ""}`}
+              aria-describedby={
+                issues.preferredGroupId
+                  ? "interest-preferredGroupId-error"
+                  : undefined
+              }
               onChange={(event) =>
                 setPreferredGroupId(event.currentTarget.value)
               }
@@ -408,10 +449,6 @@ export default function PublicInterestForm({
               ))}
             </select>
           )}
-          <p id="interest-group-help" className="interest-help">
-            Elegir un horario expresa una preferencia; no asigna grupo ni
-            reserva plaza.
-          </p>
           {issues.preferredGroupId && (
             <p
               className="interest-field-error"
@@ -424,9 +461,8 @@ export default function PublicInterestForm({
       </div>
       <Button
         type="submit"
-        disabled={pending}
+        disabled={pending || (hydrated && !requiredValid)}
         className="interest-submit min-h-11"
-        aria-describedby="interest-submit-help"
       >
         {pending && (
           <LoaderCircle
@@ -437,9 +473,6 @@ export default function PublicInterestForm({
         )}
         {pending ? "Enviando…" : "Dejar mis datos de interés"}
       </Button>
-      <p id="interest-submit-help" className="interest-help">
-        Esta solicitud no reserva una plaza ni confirma una inscripción.
-      </p>
       <p className="sr-only" role="status">
         {pending ? "Enviando tus datos de interés." : ""}
       </p>

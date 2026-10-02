@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
+import { registerCourseInstructor } from "./instructor-helper";
 
 test.use({ javaScriptEnabled: false });
 
@@ -9,6 +10,7 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
   context,
 }) => {
   await signInFixture(context, AUTH_FIXTURES.admin.email);
+  const instructor = await registerCourseInstructor(page);
   const headers = {
     Origin: "http://127.0.0.1:4321",
     Accept: "application/json",
@@ -31,6 +33,7 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
       description: "Curso de prueba sin JavaScript.",
       level: "BASIC",
       courseTypeId,
+      instructorId: instructor.id,
       schedule: "Lunes a viernes, 08:00–09:30",
       conditions: "Cupo limitado.",
       requestKey: crypto.randomUUID(),
