@@ -1,5 +1,9 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { eq } from "drizzle-orm";
+import { createDatabase } from "@/server/db/client";
+import { authAttemptBuckets } from "@/server/db/schema";
+import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
 
@@ -62,6 +66,22 @@ test("ADMIN lifecycle preserves credentials on reactivation, denies existing ses
   page,
   browser,
 }) => {
+  // Each scenario owns its rate-limit fixture. Earlier login/recovery scenarios must
+  // not spend this scenario's network budget; account limits and runtime guards stay unchanged.
+  const secret = process.env.AUTH_RATE_LIMIT_SECRET;
+  if (!secret || secret.length < 32)
+    throw new Error("Isolated Auth fixture configuration unavailable");
+  const networkKey = createHmac("sha256", secret)
+    .update("network:127.0.0.1:login")
+    .digest("hex");
+  const database = createDatabase(getTestSupabaseEnvironment().databaseUrl);
+  try {
+    await database.db
+      .delete(authAttemptBuckets)
+      .where(eq(authAttemptBuckets.key, networkKey));
+  } finally {
+    await database.close();
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   await signInFixture(context, AUTH_FIXTURES.admin.email);
   await page.goto("/app/instructores/nuevo");
