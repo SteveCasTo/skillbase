@@ -12,6 +12,18 @@ interface RequestClientContext {
   readonly responseHeaders: Headers;
 }
 
+/** Astro's context includes lazy getters; forward only the cookie adapter's inputs. */
+export function requestClientContext(
+  context: Pick<RequestClientContext, "request" | "cookies">,
+  responseHeaders: Headers,
+): RequestClientContext {
+  return {
+    request: context.request,
+    cookies: context.cookies,
+    responseHeaders,
+  };
+}
+
 export function getSupabaseCookieOptions(siteUrl: URL) {
   return {
     httpOnly: true,

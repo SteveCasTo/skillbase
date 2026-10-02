@@ -85,7 +85,7 @@ const fields = [
           maxLength={field.max}
           required={field.required}
           readOnly={editing && field.key === "email"}
-          value={values[field.key] ?? ""}
+          defaultValue={values[field.key] ?? ""}
           aria-invalid={Boolean(errors[field.key])}
           aria-describedby={`${field.key}-error`}
           className="min-h-11"
