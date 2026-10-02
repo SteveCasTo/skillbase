@@ -1,4 +1,5 @@
 import { notifications } from "@/lib/notifications";
+import { initializeInterestFilters } from "./admin-filter-client";
 import {
   isAdminMetrics,
   isAdminRegistration,
@@ -24,6 +25,7 @@ export function initializeAdminInterests(): void {
       // Metrics have no revision token. Apply this view's requests in order so
       // overlapping rows cannot replace a newer aggregate with an older response.
       let mutations = Promise.resolve();
+      initializeInterestFilters(root, () => mutations);
       let selected: HTMLFormElement | null = null;
       let trigger: HTMLElement | null = null;
       const error = root.querySelector<HTMLElement>("[data-interests-error]");
@@ -234,34 +236,50 @@ export function initializeAdminInterests(): void {
         }
       }
 
-      root
-        .querySelectorAll<HTMLFormElement>("[data-interest-form]")
-        .forEach((form) => {
-          const summary = form
-            .closest("details")
-            ?.querySelector<HTMLElement>("summary");
-          function confirm(event: Event) {
-            event.preventDefault();
-            const id = input(form, "interestRegistrationId").value;
-            if (locks.has(id) || dialog?.open) return;
-            selected = form;
-            trigger = summary ?? null;
-            const cancelling = input(form, "intent").value === "cancel";
-            const title = dialog?.querySelector("h2");
-            const description = dialog?.querySelector("p");
-            if (title)
-              title.textContent = cancelling
-                ? "Cancelar interés"
-                : "Reactivar interés";
-            if (description)
-              description.textContent = cancelling
-                ? "El registro dejará de contar como activo y se conservará en el historial."
-                : "El registro volverá a contar entre los interesados activos.";
-            dialog?.showModal();
-          }
-          summary?.addEventListener("click", confirm);
-          form.addEventListener("submit", confirm);
-        });
+      function confirm(event: Event, form: HTMLFormElement) {
+        const summary = form
+          .closest("details")
+          ?.querySelector<HTMLElement>("summary");
+        event.preventDefault();
+        const id = input(form, "interestRegistrationId").value;
+        if (
+          locks.has(id) ||
+          dialog?.open ||
+          root.dataset.filterPending === "true"
+        )
+          return;
+        selected = form;
+        trigger = summary ?? null;
+        const cancelling = input(form, "intent").value === "cancel";
+        const title = dialog?.querySelector("h2");
+        const description = dialog?.querySelector("p");
+        if (title)
+          title.textContent = cancelling
+            ? "Cancelar interés"
+            : "Reactivar interés";
+        if (description)
+          description.textContent = cancelling
+            ? "El registro dejará de contar como activo y se conservará en el historial."
+            : "El registro volverá a contar entre los interesados activos.";
+        dialog?.showModal();
+      }
+      root.addEventListener("click", (event) => {
+        const summary =
+          event.target instanceof Element
+            ? event.target.closest("summary")
+            : null;
+        const form = summary
+          ?.closest("details")
+          ?.querySelector<HTMLFormElement>("[data-interest-form]");
+        if (form) confirm(event, form);
+      });
+      root.addEventListener("submit", (event) => {
+        if (
+          event.target instanceof HTMLFormElement &&
+          event.target.matches("[data-interest-form]")
+        )
+          confirm(event, event.target);
+      });
       root
         .querySelector("[data-dialog-confirm]")
         ?.addEventListener("click", () => {

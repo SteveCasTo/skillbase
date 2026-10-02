@@ -44,7 +44,12 @@ export const POST: APIRoute = async ({
   const redirectTo = new URL("/auth/callback", environment.siteUrl).toString();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo },
+    options: {
+      redirectTo,
+      ...(form.get("reauthenticate") === "true"
+        ? { queryParams: { prompt: "select_account" } }
+        : {}),
+    },
   });
   if (error || !data.url) return redirect("/login?error=oauth_start", 303);
   return redirect(data.url, 303);

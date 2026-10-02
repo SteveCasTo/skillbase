@@ -1,7 +1,12 @@
 ---
 import AdminInterestManagement from "@/components/interests/admin-management.astro";
-import type { AdminInterestCourseDto } from "@/domain/interests/types";
+import type {
+  AdminInterestCourseDto,
+  InterestStatus,
+} from "@/domain/interests/types";
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import { InterestError } from "@/domain/interests/rules";
+import { parseInterestFilter } from "@/server/interests/filter";
 import { requireInternalUser } from "@/server/auth/context";
 import {
   handleAdminInterestPost,
@@ -10,11 +15,25 @@ import {
 
 const actor = requireInternalUser(Astro.locals);
 const courseId = Astro.params.courseId ?? "";
-const requestedStatus = Astro.url.searchParams.get("status");
-const status =
-  requestedStatus === "ACTIVE" || requestedStatus === "CANCELLED"
-    ? requestedStatus
-    : undefined;
+const fragment =
+  Astro.request.method === "GET" &&
+  Astro.request.headers.get("X-Interest-Fragment") === "1";
+let status: InterestStatus | undefined;
+try {
+  status = parseInterestFilter(Astro.url.searchParams);
+} catch (error) {
+  if (!(error instanceof InterestError)) throw error;
+  return new Response(
+    JSON.stringify({ ok: false, code: error.code, message: error.message }),
+    {
+      status: error.status,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "private, no-store",
+      },
+    },
+  );
+}
 Astro.response.headers.set("Cache-Control", "private, no-store");
 let pageError = "";
 let issues: Record<string, string> = {};
@@ -53,89 +72,115 @@ let loadError = false;
 try {
   data = await loadAdminInterestCourse(actor, courseId, status);
   if (!data) Astro.response.status = 404;
-} catch {
+} catch (error) {
   loadError = true;
-  Astro.response.status = 503;
+  Astro.response.status = error instanceof InterestError ? error.status : 503;
+}
+if (fragment) {
+  if (!data)
+    return new Response(
+      JSON.stringify({
+        ok: false,
+        message: loadError
+          ? "No pudimos cargar los interesados. Reintenta la consulta."
+          : "Curso no encontrado. Consulta otros cursos.",
+      }),
+      {
+        status: Astro.response.status,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "private, no-store",
+        },
+      },
+    );
+  Astro.response.headers.set("X-Interest-Fragment", "1");
 }
 const success = Astro.url.searchParams.get("success") === "updated";
 ---
 
-<PrivateLayout
-  title={data ? `Interesados · ${data.course.name}` : "Interesados"}
->
-  <nav
-    aria-label="Ruta de navegación"
-    class="mb-5 text-sm text-muted-foreground"
+{fragment && data ? (
+  <AdminInterestManagement data={data} status={status} />
+) : (
+  <PrivateLayout
+    title={data ? `Interesados · ${data.course.name}` : "Interesados"}
   >
-    <ol class="flex flex-wrap items-center gap-2">
-      <li>
-        <a href="/app" class="underline-offset-4 hover:underline">
-          Resumen
-        </a>
-      </li>
-      <li aria-hidden="true">/</li>
-      <li>
-        <a href="/app/interesados" class="underline-offset-4 hover:underline">
-          Interesados
-        </a>
-      </li>
-      <li aria-hidden="true">/</li>
-      <li aria-current="page">{data?.course.name ?? "Curso"}</li>
-    </ol>
-  </nav>
-  <header>
-    <h1 class="break-words text-3xl font-semibold tracking-tight sm:text-4xl">
-      {data?.course.name ?? "Interesados del curso"}
-    </h1>
-    <p class="mt-3 leading-7 text-muted-foreground">
-      Registros de interés y demanda por preferencia. No equivalen a
-      inscripciones ni reservas.
-    </p>
-  </header>
-  {pageError && (
-    <section role="alert" class="mt-6 rounded-lg border bg-card p-4 text-sm">
-      <p>{pageError}</p>
-      {Object.entries(issues).map(([field, message]) => (
-        <p data-issue={field} class="mt-2">
-          {message}
-        </p>
-      ))}
-    </section>
-  )}
-  {success && (
-    <noscript>
-      <p role="status" class="mt-6 rounded-lg border bg-secondary p-4 text-sm">
-        Estado del interesado actualizado.
-      </p>
-    </noscript>
-  )}
-  {loadError ? (
-    <section
-      role="alert"
-      class="mt-8 rounded-xl border bg-card p-7 text-center"
+    <nav
+      aria-label="Ruta de navegación"
+      class="mb-5 text-sm text-muted-foreground"
     >
-      <h2 class="text-lg font-semibold">No pudimos cargar los interesados</h2>
-      <p class="mt-2 text-sm text-muted-foreground">
-        Inténtalo nuevamente en unos minutos.
+      <ol class="flex flex-wrap items-center gap-2">
+        <li>
+          <a href="/app" class="underline-offset-4 hover:underline">
+            Resumen
+          </a>
+        </li>
+        <li aria-hidden="true">/</li>
+        <li>
+          <a href="/app/interesados" class="underline-offset-4 hover:underline">
+            Interesados
+          </a>
+        </li>
+        <li aria-hidden="true">/</li>
+        <li aria-current="page">{data?.course.name ?? "Curso"}</li>
+      </ol>
+    </nav>
+    <header>
+      <h1 class="break-words text-3xl font-semibold tracking-tight sm:text-4xl">
+        {data?.course.name ?? "Interesados del curso"}
+      </h1>
+      <p class="mt-3 leading-7 text-muted-foreground">
+        Registros de interés y demanda por preferencia. No equivalen a
+        inscripciones ni reservas.
       </p>
-      <a
-        href={Astro.url.pathname + Astro.url.search}
-        class="mt-5 inline-flex min-h-11 items-center rounded-lg border px-4 text-sm font-medium hover:bg-secondary"
+    </header>
+    {pageError && (
+      <section role="alert" class="mt-6 rounded-lg border bg-card p-4 text-sm">
+        <p>{pageError}</p>
+        {Object.entries(issues).map(([field, message]) => (
+          <p data-issue={field} class="mt-2">
+            {message}
+          </p>
+        ))}
+      </section>
+    )}
+    {success && (
+      <noscript>
+        <p
+          role="status"
+          class="mt-6 rounded-lg border bg-secondary p-4 text-sm"
+        >
+          Estado del interesado actualizado.
+        </p>
+      </noscript>
+    )}
+    {loadError ? (
+      <section
+        role="alert"
+        class="mt-8 rounded-xl border bg-card p-7 text-center"
       >
-        Reintentar
-      </a>
-    </section>
-  ) : !data ? (
-    <section class="mt-8 rounded-xl border bg-card p-7">
-      <h2 class="text-lg font-semibold">Curso no encontrado</h2>
-      <a
-        href="/app/interesados"
-        class="mt-3 inline-flex min-h-11 items-center text-sm underline underline-offset-4"
-      >
-        Consultar otros cursos
-      </a>
-    </section>
-  ) : (
-    <AdminInterestManagement data={data} status={status} />
-  )}
-</PrivateLayout>
+        <h2 class="text-lg font-semibold">No pudimos cargar los interesados</h2>
+        <p class="mt-2 text-sm text-muted-foreground">
+          Inténtalo nuevamente en unos minutos.
+        </p>
+        <a
+          href={Astro.url.pathname + Astro.url.search}
+          class="mt-5 inline-flex min-h-11 items-center rounded-lg border px-4 text-sm font-medium hover:bg-secondary"
+        >
+          Reintentar
+        </a>
+      </section>
+    ) : !data ? (
+      <section class="mt-8 rounded-xl border bg-card p-7">
+        <h2 class="text-lg font-semibold">Curso no encontrado</h2>
+        <a
+          href="/app/interesados"
+          class="mt-3 inline-flex min-h-11 items-center text-sm underline underline-offset-4"
+        >
+          Consultar otros cursos
+        </a>
+      </section>
+    ) : (
+      <AdminInterestManagement data={data} status={status} />
+    )}
+  </PrivateLayout>
+)}

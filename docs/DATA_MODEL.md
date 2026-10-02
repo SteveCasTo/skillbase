@@ -141,16 +141,17 @@ La creación está disponible para cursos `DRAFT` o `PUBLISHED` con plan L–V y
 
 ### Participant
 
-La entidad representa a una persona incorporada al proceso administrativo de inscripción (Fase 5), no a quien únicamente dejó sus datos de interés en Fase 3. La necesidad y momento de persistir CI se confirmarán antes de incorporarlo.
+Alcance conceptual confirmado de Fase 5 (todavía no implementado): persona global ADMIN, sin cuenta de acceso, no equivalente a un interesado público. CI es ID único normalizado con trim/case/espacios, preservando ceros, letras y sufijos; no cast numérico, formato nacional, checksum ni escaneo. Una persona puede tener una preinscripción vigente por curso y participar en varios cursos. CI no se expone al roster.
 
 - id
 - names
 - lastNames
-- document data only if formally required
-- email
-- phone if required
-- type
+- CI (identificador principal; formato pendiente)
+- email (requerido)
+- phone (nullable)
 - createdAt
+
+Nombre/apellidos y email requerido, más teléfono opcional, pertenecen a ficha global. El tipo `STUDENT`/`EXTERNAL`/`AUXILIARY` se decide por preinscripción; `AUXILIARY` aplica 50 % a tarifa `STUDENT` por elección ADMIN, sin evidencia adicional. Snapshot de precio/descuento pertenece al registro. No fusionar por email público no verificado.
 
 ### InterestRegistration (Fase 3, implementado)
 
@@ -164,7 +165,17 @@ La migración `0011_interest_registrations.sql` añade el enum `interest_registr
 
 En este proyecto el término se refiere a la preinscripción administrativa presencial que registra pago parcial o total y ocupa cupo. Puede iniciarse directamente o prellenarse desde un interesado de forma editable. La relación con ese registro debe ser explícita y trazable; no debe inferirse identidad global, pago ni equivalencia entre interesado y persona participante. Su modelo persistido y campos aún están por definir; la lista histórica de `Participant`/`PreRegistration` no debe interpretarse como contrato vigente. Esta entidad no implica por sí misma una transición a inscripción definitiva.
 
+Contrato conceptual confirmado, aún no schema: referencia `Participant`, curso y grupo; una sola vigente por persona/curso; `PREINSCRITO` hasta inicio oficial. Con saldo cubierto en inicio pasa a `INSCRITO`; con saldo pendiente conserva `PREINSCRITO` hasta cierre del primer día y pasa a `SALDOVENCIDO`, sin perder cupo ni cancelarse automáticamente. ADMIN resuelve después.
+
+Conservar snapshot de revisión/precio de curso, tipo/base, porcentajes y montos aplicados. Configuración global ADMIN (mínimo default 25 %, descuento AUXILIARY default 50 %, porcentajes enteros) afecta solo registros nuevos. Precio y descuento de histórico nunca se recalculan. El primer pago debe alcanzar mínimo calculado sobre total final con descuento, redondeando hacia arriba al centavo. Cantidades monetarias BOB exactas, no float.
+
+Pagos separados como ledger de abonos en efectivo; fecha efectiva civil Bolivia permite pasado/no futuro, con hoy por defecto; actor y `recordedAt` aparte. Devoluciones se registran, no se liquidan bancariamente, no superan lo pagado. Cancelación voluntaria reembolsa total solo hasta cutoff; cancelación de grupo reembolsa total pagado independientemente del cutoff. No pasarela, evidencia upload, recibo o PDF de boleta.
+
+El prellenado desde `InterestRegistration` es editable, pero el origen se muestra readonly y se conserva solo como traza interna; no hay control de vinculación ni fusión por correo. Las métricas de interés no cambian. Alta requiere curso publicado, instructor activo, grupo activo/cupo; excepción de primer día solo ADMIN, pago total, auditoría y cupo. Cambio de grupo limitado al mismo curso/cutoff, preserva precio snapshot; pagos/config/cancelaciones y movimiento entre dos cupos requieren consistencia transaccional. Mecanismo concreto es decisión de diseño posterior, ahora habilitado por el contrato cerrado en `docs/PLAN.md`.
+
 ### Enrollment
+
+El boceto a continuación es histórico/no aprobado, no esquema implementado ni contrato de Fase 5. La definición vigente es `PreRegistration` arriba; debe reemplazarse por un diseño coherente de inscripciones y movimientos de pago/devolución conforme al contrato cerrado en `docs/PLAN.md`.
 
 - id
 - participantId

@@ -41,6 +41,12 @@ const lifecycle = editor.previous
       values={editor.values}
       errors={editor.errors}
       revision={editor.revision}
+      baseline={{
+        firstName: editor.previous.firstName,
+        lastName: editor.previous.lastName,
+        email: editor.previous.email,
+        phone: editor.previous.phone ?? "",
+      }}
       editing
     />
   ) : (

@@ -85,13 +85,14 @@ Los niveles iniciales son:
 - Cada instructor interno tiene rol `INSTRUCTOR` y una cuenta Supabase Auth aprovisionada por el ADMIN desde servidor. El ADMIN establece la contraseña inicial; no se envía invitación ni se fuerza un paso adicional de cambio de contraseña. El instructor puede cambiarla desde su perfil opcionalmente.
 - Email/password complementa Google para cuentas internas. Un instructor autenticado puede enlazar Google explícitamente a la misma cuenta solo tras verificar el correo y confirmar coincidencia normalizada. No se permite fusión automática. ADMIN existentes conservan Google y pueden añadir contraseña; esta fase no añade gestión de creación de ADMIN.
 - Instructor solo puede consultar/editar su propio perfil y consultar los cursos que tiene asignados. Formatos, interesados, participantes, usuarios y configuración quedan fuera de su autorización en Fase 4. Sesiones y asistencia permanecen en Fase 6.
-- Cada curso tiene exactamente un instructor asignado; todos los grupos heredan esa asignación. El texto libre `instructorName` deja de ser la fuente de asignación real.
+- Cada curso publicado tiene exactamente un instructor asignado; todos los grupos heredan esa asignación. Un `DRAFT` puede quedar sin asignar. El texto libre `instructorName` deja de ser la fuente de asignación real.
+- Corrección autorizada, todavía no implementada: un curso `PUBLISHED` debe conservar al menos un grupo activo además del instructor activo. Un curso `DRAFT` puede permanecer sin instructor; «Sin asignar…» será placeholder deshabilitado. Editar otros datos de draft no obliga a asignar instructor ni permite seleccionar el placeholder.
 - Cambiar instructor en curso publicado se permite antes del inicio oficial; desde el inicio queda bloqueado. Las validaciones se hacen en servidor y se mantienen las reglas actuales de retiro/archivo e historial.
 - Una asignación no puede hacer que un instructor esté en dos cursos cuyos calendarios L–V coincidan en fecha y horario civil de Bolivia (`America/La_Paz`). Se usan intervalos semiabiertos, por lo que turnos contiguos no se consideran conflicto. Mutaciones concurrentes de asignación, fecha de curso, horario/grupo, estado o publicación deben serializar conflicto y escritura para evitar carreras.
-- Los perfiles usados conservan identificadores estables e historial referencial; no se borran físicamente. No hay operación para desactivar un instructor con cursos futuros: su comportamiento sigue sin definirse y queda fuera de los flujos liberados, sin bloquear alta/edición/asignación.
+- El release de Fase 4 no incorporó desactivación. Regla correctiva aprobada, aún no implementada: instructor con historial asignado no se elimina físicamente y solo se activa/desactiva si no tiene cursos no archivados asignados; mostrar esos cursos y requerir resolver asignación antes de desactivar. Se permite desactivar si sus asignaciones restantes son a cursos archivados. Sin historial, eliminación solo cuando tiene rol único `INSTRUCTOR` y carece de dependencias, con eliminación Auth consistente. Desactivado pierde acceso en todas las rutas/acciones server-side incluso con sesión vigente. Ver `docs/AUTHENTICATION.md` para los límites de identidad.
 - Incluir eventos de auditoría para creación/actualización de asignación y mutaciones de cuenta, sin credenciales. Auditoría como UI/reportes no es parte de este flujo.
 
-La migración 0014 agrega perfiles y asignación preservando cursos legados sin mapear automáticamente `instructorName`; las migraciones 0012–0015 se aplicaron a local y cloud mediante PR 126. La implementación incluye CRUD ADMIN de perfiles/asignaciones, edición propia de datos profesionales (correo no editable) y consulta instructor de `/app/mis-cursos` filtrada por ownership server-side; los flujos aprobados se liberaron a producción. Se auditan `INSTRUCTOR_CREATED`, `INSTRUCTOR_UPDATED`, cambios de asignación y `PASSWORD_CHANGED`, sin credenciales/tokens. El evento de password se escribe después de éxito Auth; si PostgreSQL falla, el cambio no se revierte y se registra un fallback sanitizado. La política para una eventual baja de instructor con cursos futuros permanece indefinida y no hay endpoint/UI para ella.
+La migración 0014 agrega perfiles y asignación preservando cursos legados sin mapear automáticamente `instructorName`; las migraciones 0012–0015 se aplicaron a local y cloud mediante PR 126. La implementación incluye CRUD ADMIN de perfiles/asignaciones, edición propia de datos profesionales (correo no editable) y consulta instructor de `/app/mis-cursos` filtrada por ownership server-side; los flujos aprobados se liberaron a producción. Se auditan `INSTRUCTOR_CREATED`, `INSTRUCTOR_UPDATED`, cambios de asignación y `PASSWORD_CHANGED`, sin credenciales/tokens. El evento de password se escribe después de éxito Auth; si PostgreSQL falla, el cambio no se revierte y se registra un fallback sanitizado. La baja no tenía política ni endpoint/UI en dicho release; la política correctiva aprobada para implementar se describe arriba.
 
 ### Reglas implementadas de formatos e imágenes
 
@@ -107,7 +108,7 @@ La migración 0014 agrega perfiles y asignación preservando cursos legados sin 
 - En cursos nuevos con planificación L–V, la fecha inicial debe ser futura y hábil; las fechas/horas de calendario heredadas impiden fines de semana y fechas pasadas cuando corresponde. La preinscripción exige apertura y cierre juntos, con cierre posterior a apertura y ambos previos al inicio del curso; al editar ofertas históricas se conservan las horas civiles.
 - El upload de artwork opcional se limita a administradores autorizados, y al faltar imagen se conserva fallback gráfico Cota Activa.
 - Con JavaScript, el administrador recorta la foto en una ventana emergente: el área que quedará visible se muestra normal y el exterior oscurecido. «Guardar recorte» prepara una vista previa WebP; solo al guardar el formulario se sube mediante el endpoint autorizado. Al crear se persiste primero el borrador y después se asocia la imagen con revisión optimista; al editar, la carga y asociación ocurren al pulsar «Guardar cambios». Si falla el proceso después de crear el borrador se puede reintentar sin duplicarlo o abrir su edición. Sin JavaScript se puede crear sin foto.
-- El descuento del 50 % para auxiliares no está implementado: no existe elegibilidad validada ni tercer precio; permanece para fases de inscripción/descuentos posteriores.
+- Antes de Fase 5 no existía descuento auxiliar implementado. El contrato aprobado para Fase 5 aplica 50 % inmediato sobre la tarifa `STUDENT` al participante `AUXILIARY` seleccionado manualmente por ADMIN; configuración global por defecto y alcance están detallados abajo.
 
 ## PREINSCRIPCIÓN
 
@@ -119,6 +120,8 @@ Una persona debe poder dejar sus datos como interesada desde el detalle público
 
 Datos obligatorios: nombre, apellidos y email. Teléfono y preferencia de grupo son opcionales. Se permite una solicitud por curso y email normalizado. La disponibilidad comienza al publicarse el curso y termina con el cierre presencial configurado cuando existe una ventana; si no existe ventana, termina al inicio oficial del curso. El servidor valida disponibilidad y duplicados, y no acepta solicitudes para cursos retirados o archivados.
 
+Al recibir un duplicado, la respuesta pública conserva el mismo resultado neutro de éxito que una solicitud nueva; nunca confirma si el email ya está registrado. Integridad y detección de duplicados siguen siendo autoritativas en servidor.
+
 ### RF-PRE-002
 
 Administración debe poder consultar interesados y cancelar/reactivar registros, conservando su historial. Los estados son `ACTIVE` y `CANCELLED`.
@@ -129,7 +132,7 @@ El sistema debe mostrar métricas de interesados `ACTIVE` por curso y por prefer
 
 ### RF-PRE-004
 
-Un registro de interesado no equivale a preinscripción presencial pagada, no ocupa cupo y no constituye aceptación de la persona. La transición posterior a inscripción definitiva está por definir.
+Un registro de interesado no equivale a preinscripción presencial pagada, no ocupa cupo y no constituye aceptación de la persona. Cualquier preinscripción posterior es una operación administrativa independiente conforme a las reglas de Fase 5; no es transición automática desde el formulario público.
 
 ## GRUPOS
 
@@ -150,6 +153,8 @@ El instructor sigue siendo un dato global del curso hasta que exista asignación
 
 Durante el alta pueden configurarse cero o varios grupos en un mismo formulario. Primero se guarda el borrador y luego se crean sus grupos; ante un fallo parcial se muestra el enlace al borrador y se reintentan únicamente los pasos pendientes. También pueden añadirse grupos en la pestaña «Grupos» mientras el curso sea `DRAFT` o `PUBLISHED`, nunca `ARCHIVED`, siempre que disponga de calendario L–V y duración de sesión conocida. La existencia de grupos fija las fechas del curso y su revisión de formato. Un grupo que nunca fue publicado puede eliminarse; después de su primera publicación se conserva y solo puede desactivarse/cancelarse o reactivarse.
 
+Un curso `PUBLISHED` debe tener como mínimo un grupo activo; no se puede desactivar el último grupo activo mientras el curso siga publicado. Retirar editorialmente el curso sí se permite y no equivale a desactivar grupo.
+
 ### RF-GRP-003
 
 Administración puede cancelar un grupo por demanda insuficiente sin borrarlo ni perder su historial; la cantidad de inscritos no determina automáticamente el cierre.
@@ -168,11 +173,28 @@ La reprogramación de sesiones individuales, las preinscripciones/inscripciones 
 
 ## PREINSCRIPCIÓN PRESENCIAL E INSCRIPCIÓN DEFINITIVA
 
-La preinscripción presencial de Fase 5 registra pago parcial o total y ocupa cupo. No se asume que sea ya una inscripción definitiva: la transición y sus condiciones requieren definición explícita.
+La preinscripción presencial de Fase 5 registra pago parcial o total y ocupa cupo. Permanece `PREINSCRITO` hasta la fecha de inicio oficial; desde el inicio pasa a `INSCRITO` si el saldo está cubierto. La condición `INSCRITO` del proceso administrativo no significa culminación académica ni habilita módulos posteriores por sí sola.
+
+### Reglas confirmadas para Fase 5 (pendientes de implementación)
+
+- La persona participante es ficha global ADMIN, sin cuenta de acceso, con CI como identidad única normalizada conservadoramente (trim/espacios/case, preserva ceros iniciales, letras y sufijos; no cast numérico, formato/checksum nacional ni escaneo documental). Nombre/apellidos y email son obligatorios; teléfono opcional. Máximo una preinscripción vigente por persona/curso; puede participar en varios cursos. CI nunca se publica.
+- ADMIN puede registrar directamente o buscar interesados del mismo curso por nombre/correo y prellenar datos editables para completar ficha. El origen se informa readonly y se conserva trazabilidad interna, sin selector de asociación/fusión. Email público no verificado no identifica a Participant ni modifica métricas de interesados.
+- Tipos `STUDENT`, `EXTERNAL` y `AUXILIARY` se asignan manualmente por ADMIN. `AUXILIARY` recibe 50 % de descuento inmediato sobre tarifa base `STUDENT`; no requiere evidencia/categoría adicional ni certificado previo. Configuración ADMIN global mínima, con porcentajes enteros editables: mínimo 1–100 % (default 25 %) y descuento auxiliar 0–100 % (default 50 %). Se aplican solo a preinscripciones nuevas.
+- Se guarda snapshot de revisión de precio/tarifa, tipo/base, porcentajes y valores aplicados; los cambios de configuración o precio no recalculan registros ni pagos previos. Montos en `BOB`, enteros de centavos/decimal exacto y no `float`. El primer pago debe alcanzar el mínimo configurado; mínimo = ceil al centavo del precio final descontado multiplicado por porcentaje mínimo. Abonos posteriores no pueden exceder saldo.
+- Pagos manuales en efectivo, con abonos múltiples; no hay pasarela, upload de evidencia, emisión de recibos ni boleta/valorado automático. No se admiten montos negativos o sobrepago. Fecha efectiva de pago en `America/La_Paz`, default hoy; permite fechas pasadas, prohíbe futuras. Guardar aparte timestamp/actor que registraron el movimiento. Devolución es movimiento auditable, no ejecución de transferencia bancaria; suma reembolsada no supera pagos registrados.
+- Registro ordinario en curso `PUBLISHED`, grupo `PLANNED` con instructor `ACTIVE` y cupo, hasta cierre inclusivo de ventana o inicio oficial si no hay ventana. Excepción ADMIN limitada al primer día civil del curso, solo pago total y destino/cupo elegibles; dejar auditoría, no aceptar después de ese día por esa excepción.
+- Estado `PREINSCRITO` hasta el inicio aunque haya pagado todo. Al inicio, si saldo está cubierto, pasa a `INSCRITO`. Si queda saldo, mantiene `PREINSCRITO` durante el primer día y al terminar ese día pasa a `SALDOVENCIDO`; no cancelación, liberación de cupo ni devolución automática. ADMIN resuelve. Estos estados no habilitan sesiones/asistencia/evaluación.
+- Cancelación voluntaria permite reembolso total de lo pagado solo hasta cutoff inclusivo. Cancelar un grupo exige registrar reembolso total de todo pago asociado sin límite por cutoff. Preservar persona, registro y movimientos; reembolso no representa liquidación bancaria.
+- Cambio de grupo solo dentro del mismo curso, hasta cutoff, con destino activo y cupo; sin transferir entre cursos ni recalcular precio snapshot porque los grupos del curso comparten revisión/tarifa. Garantizar consistencia de cupos entre origen y destino.
+- Solo `ADMIN` crea/cambia participantes, preinscripciones, pagos, configuración y devoluciones. Instructor lee únicamente cursos/grupos propios y roster desde inicio oficial, solo nombre/apellidos; sin CI/email/finanzas ni exportación. Listados CSV/PDF solo ADMIN y deben neutralizar formula injection; no son recibos/boletas. Sesiones, asistencia, notas y certificados no se adelantan (Fase 6+).
+
+### Límite de definición
+
+El alcance funcional está confirmado. Los detalles físicos del schema, estados/movimientos internos, contratos HTTP y mecanismo transaccional para concurrencia son trabajo de diseño técnico posterior, no requisitos aún implementados.
 
 ### RF-ENR-001
 
-Administración debe poder registrar la preinscripción presencial y gestionar la eventual transición a inscripción definitiva cuando se haya definido su regla.
+Administración debe poder registrar la preinscripción presencial y resolver estados/pagos conforme a las reglas aprobadas de esta sección.
 
 ### RF-ENR-002
 
@@ -220,22 +242,11 @@ Estos importes se usan como valores iniciales de ejemplo en el seed de desarroll
 
 ### RN-DIS-001
 
-La regla conocida plantea un descuento del 50 % para auxiliares que resulten elegibles; la elegibilidad y la aplicación todavía no están implementadas.
-
-Casos iniciales mencionados:
-
-- ad-honorem;
-- cómputo;
-- mantenimiento;
-- laboratorio de desarrollo.
-
-La lista definitiva debe mantenerse configurable y confirmarse antes de implementar elegibilidad. No se publica un tercer precio ni se promete el descuento en el catálogo actual.
+Para Fase 5, ADMIN selecciona manualmente el tipo `AUXILIARY` y se aplica de inmediato el porcentaje auxiliar global configurado (default 50 %) sobre la tarifa `STUDENT`. No se solicita evidencia digital ni se define una taxonomía adicional de categorías. Esta regla se aplica al registro administrativo, no se publica como tercer precio en el catálogo.
 
 ### RN-DIS-002
 
-El descuento aplica a cursos bajo las condiciones administrativas definidas.
-
-La interpretación exacta de “una vez sacado el certificado de finalización” debe confirmarse antes de automatizar esta regla.
+El descuento auxiliar descrito arriba no espera ni depende de obtener un certificado de finalización. No se automatiza un beneficio distinto posterior al certificado.
 
 ## SESIONES
 
