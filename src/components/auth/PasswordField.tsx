@@ -9,6 +9,7 @@ interface Props {
   autoComplete: "current-password" | "new-password";
   required?: boolean;
   minLength?: number;
+  error?: string | undefined;
 }
 
 export default function PasswordField({
@@ -17,6 +18,7 @@ export default function PasswordField({
   autoComplete,
   required = true,
   minLength,
+  error,
 }: Props) {
   const [visible, setVisible] = useState(false);
   const hydrated = useSyncExternalStore(
@@ -38,6 +40,8 @@ export default function PasswordField({
           required={required}
           minLength={minLength}
           maxLength={128}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={`${name}-error`}
         />
         <Button
           type="button"
@@ -52,6 +56,14 @@ export default function PasswordField({
           {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
         </Button>
       </div>
+      <p
+        id={`${name}-error`}
+        data-auth-field-error={name}
+        className="text-destructive text-sm"
+        hidden={!error}
+      >
+        {error}
+      </p>
     </div>
   );
 }

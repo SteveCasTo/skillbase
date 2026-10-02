@@ -106,13 +106,18 @@ test("mismatched Google restores the owner; unsolicited attachment leaves passwo
 
   const replacement = "Synthetic-Association-New-Password-2026";
   await page
-    .getByLabel("Contraseña actual (si tienes una)", { exact: true })
+    .getByRole("link", { name: "Cambiar contraseña", exact: true })
+    .click();
+  await page
+    .getByLabel("Contraseña actual", { exact: true })
     .fill(fixture.password);
   await page.getByLabel("Nueva contraseña", { exact: true }).fill(replacement);
   await page
-    .getByLabel("Confirmar nueva contraseña", { exact: true })
+    .getByLabel("Repetir nueva contraseña", { exact: true })
     .fill(replacement);
-  await page.getByRole("button", { name: "Guardar contraseña" }).click();
+  await page
+    .getByRole("button", { name: "Cambiar contraseña", exact: true })
+    .click();
   await expect(page.getByRole("status")).toContainText(
     "Contraseña actualizada",
   );
@@ -185,7 +190,7 @@ test("switched password sessions and forged link cookies cannot approve Google o
   ).toBeVisible();
 });
 
-test("legacy Google-only ADMIN keeps access and can optionally set a password after provider confirmation", async ({
+test("Google-only ADMIN creates a password with recent approved OAuth, then recovery uses a bounded session proof", async ({
   page,
   context,
   baseURL,
@@ -199,6 +204,10 @@ test("legacy Google-only ADMIN keeps access and can optionally set a password af
     await database.db.execute(
       sql`delete from auth.identities where user_id = ${id}::uuid and provider = 'email'`,
     );
+    // Model actual OAuth-only credentials; Admin API fixtures otherwise have a password.
+    await database.db.execute(
+      sql`update auth.users set encrypted_password = '' where id = ${id}::uuid`,
+    );
   } finally {
     await database.close();
   }
@@ -208,25 +217,58 @@ test("legacy Google-only ADMIN keeps access and can optionally set a password af
   await expect(
     page.getByRole("button", { name: "Asociar Google" }),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Enviar enlace de confirmación" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("link", { name: "Crear contraseña", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Contraseña actual", { exact: true }),
+  ).toHaveCount(0);
   const password = "Synthetic-Optional-Google-Password-2026";
   await page.getByLabel("Nueva contraseña", { exact: true }).fill(password);
   await page
-    .getByLabel("Confirmar nueva contraseña", { exact: true })
+    .getByLabel("Repetir nueva contraseña", { exact: true })
     .fill(password);
-  await page.getByRole("button", { name: "Guardar contraseña" }).click();
-  await expect(page.getByRole("alert")).toContainText(
-    "Confirma tu contraseña actual",
+  await page
+    .getByRole("button", { name: "Crear contraseña", exact: true })
+    .click();
+  await expect(page).toHaveURL("/app/perfil?status=password_changed");
+  await expect(
+    page.getByRole("link", { name: "Cambiar contraseña", exact: true }),
+  ).toBeVisible();
+  // A historical Google identity/current OAuth session must not bypass the old
+  // password once Auth reports that a credential exists.
+  const bypass = await context.request.post("/app/perfil/contrasena", {
+    headers: { origin: new URL(baseURL!).origin, accept: "application/json" },
+    form: {
+      password: "Synthetic-Unauthorized-Change-2026",
+      confirmation: "Synthetic-Unauthorized-Change-2026",
+    },
+  });
+  expect(bypass.status()).toBe(422);
+  expect((await bypass.json()).fields.currentPassword).toContain(
+    "actual es incorrecta",
   );
   const recovery = await prepareBrowserRecoveryFixture(context, id, baseURL!);
   await page.goto(
     `/auth/recovery?code=${encodeURIComponent(recovery.code)}&sb_flow_id=${encodeURIComponent(recovery.flowId)}`,
   );
-  await expect(page).toHaveURL("/app/perfil?status=confirmed");
-  await page.getByLabel("Nueva contraseña", { exact: true }).fill(password);
+  await expect(page).toHaveURL("/app/perfil/contrasena?status=confirmed");
+  await expect(
+    page.getByLabel("Contraseña actual", { exact: true }),
+  ).toHaveCount(0);
+  const recoveredPassword = "Synthetic-Recovered-Google-Password-2026";
   await page
-    .getByLabel("Confirmar nueva contraseña", { exact: true })
-    .fill(password);
-  await page.getByRole("button", { name: "Guardar contraseña" }).click();
+    .getByLabel("Nueva contraseña", { exact: true })
+    .fill(recoveredPassword);
+  await page
+    .getByLabel("Repetir nueva contraseña", { exact: true })
+    .fill(recoveredPassword);
+  await page
+    .getByRole("button", { name: "Restablecer contraseña", exact: true })
+    .click();
   await expect(page.getByRole("status")).toContainText(
     "Contraseña actualizada",
   );
@@ -234,6 +276,6 @@ test("legacy Google-only ADMIN keeps access and can optionally set a password af
     .getByRole("button", { name: "Cerrar sesión", exact: true })
     .first()
     .click();
-  await login(page, { email: fixture.email, password });
+  await login(page, { email: fixture.email, password: recoveredPassword });
   await expect(page.getByText("Administrador", { exact: true })).toBeVisible();
 });

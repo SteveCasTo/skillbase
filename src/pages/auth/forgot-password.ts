@@ -18,6 +18,7 @@ export const POST: APIRoute = async ({
   clientAddress,
 }) => {
   const environment = getPublicAuthEnvironment();
+  const json = request.headers.get("accept")?.includes("application/json");
   if (!requestHasExpectedOrigin(request, environment.siteUrl))
     return privateNoStoreResponse("Invalid request origin", { status: 403 });
   let returnToProfile = false;
@@ -32,6 +33,21 @@ export const POST: APIRoute = async ({
     }
     const email = normalizeEmail(form.get("email") ?? "");
     if (
+      !email ||
+      email.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email)
+    ) {
+      if (json)
+        return privateNoStoreResponse(
+          JSON.stringify({
+            error: "Introduce un correo electrónico válido.",
+            fields: { email: "Introduce un correo electrónico válido." },
+          }),
+          { status: 422, headers: { "Content-Type": "application/json" } },
+        );
+      return redirect("/recuperar-contrasena?error=email", 303);
+    }
+    if (
       email.length <= 254 &&
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email) &&
       (await consumeAuthAttempt(clientAddress, "recovery", email))
@@ -45,10 +61,18 @@ export const POST: APIRoute = async ({
   } catch {
     /* Identical result for unknown, throttled and provider failures. */
   }
+  if (json)
+    return privateNoStoreResponse(
+      JSON.stringify({
+        message:
+          "Si podemos procesar la solicitud para una cuenta habilitada, enviaremos un enlace. Revisa también spam.",
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
   return redirect(
     returnToProfile
       ? "/app/perfil?status=recovery_sent"
-      : "/login?status=recovery_sent",
+      : "/recuperar-contrasena?status=recovery_sent",
     303,
   );
 };

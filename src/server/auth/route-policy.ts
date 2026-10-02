@@ -13,6 +13,7 @@ export const PRIVATE_ROUTE_POLICIES = {
   "/app/formatos/nuevo": { access: "ROLES", roles: ["ADMIN"] },
   "/app/interesados": { access: "ROLES", roles: ["ADMIN"] },
   "/app/perfil": { access: "ACTIVE_USER" },
+  "/app/perfil/contrasena": { access: "ACTIVE_USER" },
   "/app/instructores": { access: "ROLES", roles: ["ADMIN"] },
   "/app/instructores/nuevo": { access: "ROLES", roles: ["ADMIN"] },
   "/app/mis-cursos": { access: "ROLES", roles: ["INSTRUCTOR"] },
@@ -70,7 +71,8 @@ export type AuthRouteContext = "NONE" | "CLIENT" | "FULL";
 
 export function getAuthRouteContext(pathname: string): AuthRouteContext {
   if (isPrivatePath(pathname) || pathname === "/login") return "FULL";
-  if (pathname.startsWith("/auth/")) return "CLIENT";
+  if (pathname.startsWith("/auth/") || pathname === "/recuperar-contrasena")
+    return "CLIENT";
   return "NONE";
 }
 
@@ -78,6 +80,7 @@ export function isSessionDependentPath(pathname: string): boolean {
   return (
     isPrivatePath(pathname) ||
     pathname === "/login" ||
+    pathname === "/recuperar-contrasena" ||
     pathname === "/unauthorized" ||
     pathname.startsWith("/auth/")
   );

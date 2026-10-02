@@ -1,4 +1,3 @@
-import { requirePassword } from "@/domain/auth/identity";
 import { canAccessPrivateApp } from "@/domain/auth/policies";
 import type { InternalUser } from "@/domain/auth/types";
 import { AuthorizationError } from "@/domain/auth/errors";
@@ -13,6 +12,15 @@ export interface PasswordGateway {
   recordPasswordChanged(actorId: string): Promise<void>;
 }
 
+export class PasswordChangeError extends Error {
+  constructor(
+    message: string,
+    readonly field?: "currentPassword" | "password" | "confirmation",
+  ) {
+    super(message);
+  }
+}
+
 export async function changeAccountPassword(
   user: InternalUser,
   input: {
@@ -20,14 +28,25 @@ export async function changeAccountPassword(
     confirmation: string;
     currentPassword: string;
     hasRecoveryProof: boolean;
+    hasGoogleProof?: boolean;
   },
   gateway: PasswordGateway,
 ): Promise<void> {
   if (!canAccessPrivateApp(user) || !user.authUserId)
     throw new AuthorizationError("FORBIDDEN", "Account is not active");
-  requirePassword(input.password, input.confirmation);
+  if (input.password.length < 12 || input.password.length > 128)
+    throw new PasswordChangeError(
+      "Usa entre 12 y 128 caracteres para la nueva contraseña.",
+      "password",
+    );
+  if (input.password !== input.confirmation)
+    throw new PasswordChangeError(
+      "Las contraseñas no coinciden. Repite la nueva contraseña.",
+      "confirmation",
+    );
   if (
     !input.hasRecoveryProof &&
+    !input.hasGoogleProof &&
     (!input.currentPassword ||
       input.currentPassword.length > 128 ||
       !(await gateway.verifyCurrentPassword(
@@ -36,8 +55,14 @@ export async function changeAccountPassword(
         user.authUserId,
       )))
   )
-    throw new Error(
-      "Confirma tu contraseña actual o utiliza el enlace enviado a tu correo.",
+    throw new PasswordChangeError(
+      "La contraseña actual es incorrecta. Inténtalo nuevamente.",
+      "currentPassword",
+    );
+  if (input.currentPassword && input.password === input.currentPassword)
+    throw new PasswordChangeError(
+      "La nueva contraseña debe ser diferente de la actual.",
+      "password",
     );
   if (!(await gateway.updatePassword(input.password)))
     throw new Error(

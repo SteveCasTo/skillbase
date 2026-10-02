@@ -9,6 +9,9 @@ test("email login, keyboard password toggle, own profile and secure password cha
   page,
 }) => {
   await page.goto("/login");
+  await expect(
+    page.getByRole("button", { name: "Iniciar sesión", exact: true }),
+  ).toBeDisabled();
   await page
     .getByLabel("Correo electrónico", { exact: true })
     .fill(fixture.email);
@@ -33,22 +36,50 @@ test("email login, keyboard password toggle, own profile and secure password cha
     .first()
     .click();
   await expect(page.getByRole("heading", { name: "Mi perfil" })).toBeVisible();
+  await page
+    .getByRole("link", { name: "Cambiar contraseña", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Cambiar contraseña", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByLabel("Contraseña actual", { exact: true })
+    .fill("incorrect-password");
   await page.getByLabel("Nueva contraseña", { exact: true }).fill(replacement);
   await page
-    .getByLabel("Confirmar nueva contraseña", { exact: true })
+    .getByLabel("Repetir nueva contraseña", { exact: true })
     .fill(replacement);
-  await page.getByRole("button", { name: "Guardar contraseña" }).click();
-  await expect(page.getByRole("alert")).toContainText(
-    "Confirma tu contraseña actual",
-  );
   await page
-    .getByLabel("Contraseña actual (si tienes una)", { exact: true })
+    .getByRole("button", { name: "Cambiar contraseña", exact: true })
+    .click();
+  await expect(
+    page.locator("form[data-auth-enhanced]").getByRole("alert"),
+  ).toContainText("La contraseña actual es incorrecta");
+  await page
+    .getByLabel("Contraseña actual", { exact: true })
+    .fill(fixture.password);
+  await page
+    .getByLabel("Nueva contraseña", { exact: true })
+    .fill(fixture.password);
+  await page
+    .getByLabel("Repetir nueva contraseña", { exact: true })
+    .fill(fixture.password);
+  await page
+    .getByRole("button", { name: "Cambiar contraseña", exact: true })
+    .click();
+  await expect(
+    page.locator("form[data-auth-enhanced]").getByRole("alert"),
+  ).toContainText("diferente de la actual");
+  await page
+    .getByLabel("Contraseña actual", { exact: true })
     .fill(fixture.password);
   await page.getByLabel("Nueva contraseña", { exact: true }).fill(replacement);
   await page
-    .getByLabel("Confirmar nueva contraseña", { exact: true })
+    .getByLabel("Repetir nueva contraseña", { exact: true })
     .fill(replacement);
-  await page.getByRole("button", { name: "Guardar contraseña" }).click();
+  await page
+    .getByRole("button", { name: "Cambiar contraseña", exact: true })
+    .click();
   await expect(page.getByRole("status")).toContainText(
     "Contraseña actualizada",
   );
@@ -88,21 +119,24 @@ test("login and profile work without JavaScript and do not overflow on mobile", 
   await expect(page).toHaveURL("/app");
   await page.goto("/app/perfil");
   await expect(page.getByRole("heading", { name: "Mi perfil" })).toBeVisible();
+  await page
+    .getByRole("link", { name: "Cambiar contraseña", exact: true })
+    .click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
   await page
-    .getByLabel("Contraseña actual (si tienes una)", { exact: true })
+    .getByLabel("Contraseña actual", { exact: true })
     .fill(fixture.password);
   await page.getByLabel("Nueva contraseña", { exact: true }).fill(replacement);
   await page
-    .getByLabel("Confirmar nueva contraseña", { exact: true })
+    .getByLabel("Repetir nueva contraseña", { exact: true })
     .fill(replacement);
   await page.keyboard.press("Tab");
   await expect(
-    page.getByRole("button", { name: "Guardar contraseña" }),
+    page.getByRole("button", { name: "Cambiar contraseña", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("status")).toContainText(
@@ -135,7 +169,9 @@ test("forgot password is confidential; invalid redirect, origin, passwords and r
       maxRedirects: 0,
     });
     expect(response.status()).toBe(303);
-    expect(response.headers().location).toBe("/login?status=recovery_sent");
+    expect(response.headers().location).toBe(
+      "/recuperar-contrasena?status=recovery_sent",
+    );
   }
   const response = await request.post("/auth/password", {
     headers: { origin },
@@ -147,9 +183,68 @@ test("forgot password is confidential; invalid redirect, origin, passwords and r
     maxRedirects: 0,
   });
   expect(response.headers().location).toBe("/login?error=credentials");
+  const invalidEmail = await request.post("/auth/forgot-password", {
+    headers: { origin, accept: "application/json" },
+    form: { email: "invalid-email" },
+  });
+  expect(invalidEmail.status()).toBe(422);
+  expect((await invalidEmail.json()).fields.email).toBe(
+    "Introduce un correo electrónico válido.",
+  );
   await page.goto("/auth/recovery?code=invalid");
   await expect(page).toHaveURL("/login?error=recovery");
   await expect(page.getByRole("alert")).not.toContainText("wrong");
+});
+
+test("dedicated recovery validates inline and locks submit until a neutral pending result", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  await page.getByRole("link", { name: "¿Olvidaste tu contraseña?" }).click();
+  await expect(page).toHaveURL("/recuperar-contrasena");
+  const submit = page.getByRole("button", {
+    name: "Enviar enlace",
+    exact: true,
+  });
+  await expect(submit).toBeDisabled();
+  await page
+    .getByLabel("Correo electrónico", { exact: true })
+    .fill("invalid-email");
+  await expect(
+    page.getByText("Introduce un correo electrónico válido."),
+  ).toBeVisible();
+  await expect(submit).toBeDisabled();
+  await page
+    .getByLabel("Correo electrónico", { exact: true })
+    .fill("synthetic@example.test");
+  await expect(submit).toBeEnabled();
+  let release: (() => void) | undefined;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/auth/forgot-password", async (route) => {
+    await pending;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        message:
+          "Si podemos procesar la solicitud para una cuenta habilitada, enviaremos un enlace. Revisa también spam.",
+      }),
+    });
+  });
+  await submit.click();
+  await expect(
+    page.getByRole("button", { name: "Procesando…" }),
+  ).toBeDisabled();
+  release!();
+  await expect(page.locator("[data-auth-result]")).toContainText(
+    "Si podemos procesar",
+  );
+  await expect(
+    page.getByRole("button", { name: "Enviar enlace", exact: true }),
+  ).toBeEnabled();
+  await expect(page).toHaveURL("/recuperar-contrasena");
 });
 
 test.afterAll(async () => {
