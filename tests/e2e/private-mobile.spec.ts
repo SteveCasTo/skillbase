@@ -81,11 +81,20 @@ test("mobile menu slides in and out, with logout on the left", async ({
 
   const footer = page.locator(".private-mobile-footer");
   const logout = footer.getByRole("button", { name: "Cerrar sesión" });
-  const footerBox = await footer.boundingBox();
-  const logoutBox = await logout.boundingBox();
-  expect(footerBox).not.toBeNull();
-  expect(logoutBox).not.toBeNull();
-  expect(logoutBox!.x).toBeLessThan(footerBox!.x + footerBox!.width / 2);
+  const positions = await logout.evaluate((element) => {
+    const footer = element.closest(".private-mobile-footer")!;
+    const footerBox = footer.getBoundingClientRect();
+    const logoutBox = element.getBoundingClientRect();
+    return {
+      logoutX: logoutBox.x,
+      footerCenter: footerBox.x + footerBox.width / 2,
+      footerWidth: footerBox.width,
+      logoutWidth: logoutBox.width,
+    };
+  });
+  expect(positions.footerWidth).toBeGreaterThan(0);
+  expect(positions.logoutWidth).toBeGreaterThan(0);
+  expect(positions.logoutX).toBeLessThan(positions.footerCenter);
 
   await page.getByRole("button", { name: "Cerrar menú" }).click();
   await expect(drawer).toBeHidden();
