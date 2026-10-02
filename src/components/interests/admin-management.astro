@@ -1,6 +1,7 @@
 ---
 import type { AdminInterestCourseDto } from "@/domain/interests/types";
 import { buttonVariants } from "@/components/ui/button";
+import { Skeleton } from "@/components/private-nav/Skeleton";
 import { preferenceDemand } from "./admin-presentation";
 import "@/styles/admin-interests.css";
 
@@ -35,6 +36,7 @@ const filters = [
   data-filter={status ?? ""}
 >
   <section
+    data-interest-metrics
     aria-labelledby="interest-metrics-title"
     class="mt-6 rounded-xl border bg-card p-4 sm:p-5"
   >
@@ -95,23 +97,28 @@ const filters = [
       <h2 id="interest-list-title" tabindex="-1" class="text-xl font-semibold">
         Registros de interés
       </h2>
-      <nav
+      <form
+        method="get"
+        action={path}
+        data-interest-filter
         aria-label="Filtrar interesados por estado"
         class="flex flex-wrap gap-2"
       >
         {filters.map((filter) => (
-          <a
-            href={filter.value ? `${path}?status=${filter.value}` : path}
-            aria-current={status === filter.value ? "page" : undefined}
+          <button
+            type="submit"
+            name="status"
+            value={filter.value ?? "ALL"}
+            aria-pressed={status === filter.value}
             class={buttonVariants({
               variant: status === filter.value ? "secondary" : "outline",
               className: "min-h-11",
             })}
           >
             {filter.label}
-          </a>
+          </button>
         ))}
-      </nav>
+      </form>
     </div>
     <p
       data-interests-error
@@ -119,6 +126,29 @@ const filters = [
       role="alert"
       class="mt-4 rounded-lg border bg-card p-4 text-sm"
     ></p>
+    <button
+      data-filter-retry
+      hidden
+      type="button"
+      class={buttonVariants({ variant: "outline", className: "mt-2 min-h-11" })}
+    >
+      Reintentar filtro
+    </button>
+    <p data-filter-announcement aria-live="polite" class="sr-only"></p>
+    <div
+      data-filter-skeleton
+      hidden
+      aria-hidden="true"
+      class="interest-registration-grid mt-5"
+    >
+      {[0, 1, 2].map(() => (
+        <div class="flex flex-col gap-4 rounded-xl border bg-card p-6">
+          <Skeleton className="h-5 w-2/3" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      ))}
+    </div>
     <a
       data-session-login
       hidden
