@@ -581,7 +581,7 @@ Detalle de implementación local de ADR-017: los productores administrativos pas
 
 **Fecha:** 2026-10-01
 
-**Estado:** Accepted — flujos aprobados integrados en `development`; release de producción pendiente
+**Estado:** Accepted — flujos aprobados desplegados/verificados mediante PR 126; baja de instructor no incluida
 
 ### Contexto
 
@@ -606,7 +606,7 @@ Los grupos existen, pero la identidad del instructor aún es texto opcional del 
 
 - Se amplían los métodos visibles de login para cuentas internas, no el signup público; se deben preservar guardas, política exacta por ruta, CSRF/cookies/redirects y configuraciones de Auth.
 - Las decisiones de asignación/horario exigen pruebas de concurrencia compartidas con mutaciones de fechas, grupos y publicación; una comprobación en UI no basta.
-- Perfiles estables, asignación `courses.instructor_id`, tabla de historial, guards de perfil/cursos y validaciones de calendario se añadieron mediante PR 120/migración 0014 y están integrados en `development`; 0014 está aplicada en el Supabase local estándar, no en cloud. La política de desactivación no forma parte de los flujos aprobados aquí y permanece sin decisión.
+- Perfiles estables, asignación `courses.instructor_id`, tabla de historial, guards de perfil/cursos y validaciones de calendario se añadieron mediante PR 120/migración 0014. PR 126 aplicó la migración en producción y verificó el flujo. La política de desactivación no forma parte de los flujos aprobados aquí y permanece sin decisión.
 - Para evitar carreras, el repositorio usa una barrera advisory-lock transaccional común; adquiere locks de IDs de instructor previo/nuevo en orden estable y después la fila del curso. La misma serialización cubre cambios de asignación/fechas/publicación y escrituras de horario/estado de grupos. Conserva auditoría, revisión optimista e historial; no cambia el límite modular ni introduce un calendario separado.
 - Debe comprobarse configuración SMTP cloud antes de afirmar recuperación de contraseña disponible; esto no bloquea cuentas creadas con password por ADMIN ni su login inicial.
 
@@ -616,7 +616,7 @@ Los grupos existen, pero la identidad del instructor aún es texto opcional del 
 
 **Fecha:** 2026-10-01
 
-**Estado:** Accepted — implementado e integrado a `development` mediante PR 118; habilitación de entorno pendiente
+**Estado:** Accepted — implementado, integrado y desplegado mediante PRs 118/126; Google real pendiente de verificación
 
 ### Contexto
 
@@ -638,5 +638,5 @@ Supabase Auth puede asociar automáticamente una identidad Google cuando el prov
 ### Consecuencias
 
 - La frontera de confianza de proveedor y la aprobación de acceso de SkillBase quedan separadas; tanto ingreso normal como callback de asociación deben validar método de sesión y estado interno.
-- El comportamiento está integrado en `development`; 0012/0013 y el hook están activos en local estándar, junto con 0014/0015. Cloud sigue pendiente de migraciones, hook, `AUTH_RATE_LIMIT_SECRET` y verificación provider/SMTP. PR 118 no tuvo checks remotos reportados y la autenticación dual no se ha promocionado a `master`.
+- Las migraciones 0012–0015, hook/provider config y secret Auth se desplegaron mediante PR 126; el release pasó CI/deploy. Google OAuth real y SMTP/entrega recovery no se probaron. El fallback de recuperación email no se debe describir como operativo.
 - Este ADR implementa el requerimiento de asociación explícita a nivel de la aplicación y no reemplaza ni debilita ADR-023 sobre no fusionar usuarios internos automáticamente.
