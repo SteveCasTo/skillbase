@@ -420,7 +420,7 @@ Verificar cada componente en ambos temas.
 - Mostrar feedback posterior.
 - No depender únicamente de asteriscos para explicar obligatoriedad.
 
-### Perfiles y cursos de instructores (implementado en development)
+### Perfiles y cursos de instructores (released en Fase 4)
 
 - El listado ADMIN `/app/instructores` usa grilla responsive de tarjetas completas: cada tarjeta es un único enlace semántico a edición, incluye nombre completo, correo/status, y mantiene foco visible sin enlaces/controles anidados. No presenta descripción porque el perfil no la recopila.
 - El formulario de alta/edición tiene nombre y apellidos requeridos, email `type=email` requerido/normalizado (solo lectura al editar), teléfono opcional `type=tel` y password inicial solo al crear. La password nunca se repuebla ante fallo; límites y reglas se vuelven a validar en servidor. La cuenta se activa con el password asignado por ADMIN, sin paso forzado de cambio.
