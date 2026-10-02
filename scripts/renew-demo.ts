@@ -35,7 +35,7 @@ export async function renewDemo(
   reset: boolean,
   now = new Date(),
 ) {
-  if (environment.apiUrl === "http://127.0.0.1:54321") {
+  if (environment.apiUrl === "http://127.0.0.1:55321") {
     assertCanonicalLocalTarget(environment.databaseUrl, environment.apiUrl);
   } else {
     const isolated = getTestSupabaseEnvironment();

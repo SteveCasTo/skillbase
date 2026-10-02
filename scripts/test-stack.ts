@@ -101,7 +101,12 @@ export async function runWithTestStack(command: string[]): Promise<number> {
     const ports = new Set<number>();
     while (ports.size < 9) {
       const port = await freePort();
-      if (port !== e2ePort() && port !== 4321 && (port < 54320 || port > 54329))
+      if (
+        port !== e2ePort() &&
+        port !== 4321 &&
+        (port < 54320 || port > 54329) &&
+        (port < 55320 || port > 55329)
+      )
         ports.add(port);
     }
     const [api, db, shadow, pooler, studio, smtp, analytics, inspector, edge] =
