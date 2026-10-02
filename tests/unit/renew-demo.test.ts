@@ -39,26 +39,33 @@ test("CLI rejects cloud before discovery, suppresses supplied secrets and disall
 test("renewal rejects noncanonical/cloud targets without touching a client", () => {
   for (const db of [
     "postgres://postgres:secret@cloud.example:54322/postgres",
-    "postgres://postgres:secret@localhost:54322/postgres",
+    "postgres://postgres:secret@localhost:55322/postgres",
     "postgres://postgres:secret@127.0.0.1:5432/postgres",
-    "postgres://postgres:secret@127.0.0.1:54322/other",
-    "postgres://postgres:secret@127.0.0.1:54322/postgres?host=cloud.example",
+    "postgres://postgres:secret@127.0.0.1:54322/postgres",
+    "postgres://postgres:secret@127.0.0.1:55322/other",
+    "postgres://postgres:secret@127.0.0.1:55322/postgres?host=cloud.example",
     "invalid",
   ]) {
     expect(() =>
-      assertCanonicalLocalTarget(db, "http://127.0.0.1:54321"),
+      assertCanonicalLocalTarget(db, "http://127.0.0.1:55321"),
     ).toThrow("canonical local");
   }
   expect(() =>
     assertCanonicalLocalTarget(
-      "postgres://postgres:secret@127.0.0.1:54322/postgres",
+      "postgres://postgres:secret@127.0.0.1:55322/postgres",
       "https://cloud.supabase.co",
     ),
   ).toThrow();
   expect(() =>
     assertCanonicalLocalTarget(
-      "postgres://postgres:secret@127.0.0.1:54322/postgres",
+      "postgres://postgres:secret@127.0.0.1:55322/postgres",
       "http://127.0.0.1:54321",
+    ),
+  ).toThrow("canonical local");
+  expect(() =>
+    assertCanonicalLocalTarget(
+      "postgres://postgres:secret@127.0.0.1:55322/postgres",
+      "http://127.0.0.1:55321",
     ),
   ).not.toThrow();
   expect(RESET_TABLES).not.toContain("users");
