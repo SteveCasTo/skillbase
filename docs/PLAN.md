@@ -461,16 +461,16 @@ Parte del alcance de Fase 4 fue anticipada: la gestión de grupos indicada como 
 - [x] Definir horario L–V independiente por grupo, sin solapamiento dentro del curso.
 - [x] Gestionar cancelación conservando historial y permitir grupos adicionales.
 - [x] Permitir grupos válidos también en cursos borrador; eliminar solo grupos nunca publicados y desactivar/reactivar los que ya tuvieron exposición pública, con historial protegido.
-- [ ] Añadir perfiles y cuentas internas de instructores y asignar exactamente un instructor activo por curso; todos los grupos del curso heredan esa asignación.
-- [ ] Restringir acceso de instructor a su perfil y cursos propios, también en rutas y consultas server-side.
+- [x] Añadir perfiles y cuentas internas de instructores y asignar exactamente un instructor por curso; todos los grupos del curso heredan esa asignación.
+- [x] Restringir acceso de instructor a su perfil profesional y cursos propios, también en rutas y consultas server-side.
 - [x] Implementar login email/password junto con Google para usuarios internos, cambios/recovery de password y asociación Google explícita desde perfil.
-- [x] Implementar el caso server-only de provisionamiento de cuenta INSTRUCTOR por ADMIN, con credencial solo en Supabase Auth y compensación ante fallo de persistencia interna; la UI ADMIN de altas/perfiles/asignaciones aún está pendiente.
-- [ ] Gestionar cambio de instructor sujeto a calendario y conflictos de horario entre cursos.
-- [ ] Resolver, antes de implementar, la regla de activar/desactivar instructores con cursos futuros asignados. No deducirla de una preferencia de UI.
+- [x] Implementar creación y edición administrativa de perfiles/cuentas INSTRUCTOR, con credencial solo en Supabase Auth y compensación ante fallo de persistencia interna.
+- [x] Gestionar cambio de instructor sujeto a calendario, validación de fechas ya iniciadas y conflictos de horario entre cursos.
+- La política de desactivar instructores con cursos futuros no está definida y no existe acción de desactivación. Se difiere cualquier operación de baja; no inventar comportamiento ni usar esta función fuera de alcance como bloqueo de alta/edición/asignación.
 - [ ] Gestionar reemplazo por feriados cuando existan sesiones y calendario operativo (Fase 6).
 - [x] Permitir expresar preferencia de grupo en Fase 3; asignar inscritos a grupos en Fase 5, sin tratar la preferencia como asignación.
 
-#### Contrato acordado para el módulo de instructores (planificado, no implementado)
+#### Contrato funcional del módulo de instructores
 
 - El ADMIN crea perfiles con nombre, apellido y email normalizado obligatorios; teléfono es opcional. El perfil público contiene únicamente nombre completo, sin descripción.
 - La cuenta se crea por acción server-side del ADMIN con contraseña inicial elegida por el administrador. No es una invitación ni incluye onboarding/cambio forzado de contraseña. El instructor puede cambiarla desde perfil; esta edición es opcional.
@@ -481,39 +481,49 @@ Parte del alcance de Fase 4 fue anticipada: la gestión de grupos indicada como 
 - Conflictos se comprueban para el mismo instructor entre cursos con calendario L–V que coincida en fecha y hora civil `America/La_Paz`; intervalos semiabiertos permiten turnos contiguos. Las escrituras concurrentes de asignaciones, cambios de fechas, creación/cambio de horario de grupos, estado y publicación deben compartir una estrategia transaccional de serialización para evitar carreras.
 - El perfil mantiene identidad estable y referencias históricas de curso; no se borra físicamente un instructor usado. La política de activación/desactivación con asignaciones futuras está pendiente de aprobación antes de implementar ese aspecto.
 
-#### Orden de entrega previsto
+PR 120 implementó e integró a `development` perfiles profesionales con ID estable, alta/edición, asignación a curso, ownership de `/app/mis-cursos`, guardas ADMIN/INSTRUCTOR y verificación de conflictos. PR 121 añadió y aplicó en local el seed/reset de demo. PR 122 añadió `PASSWORD_CHANGED` sin credenciales a `audit_events`. PR 123 reparó el guard de borrado de formatos con migración 0015 forward-only. No hay campo de descripción; el email del perfil es de solo lectura al editar. La publicación exige instructor registrado y `ACTIVE`, mientras que un borrador puede quedar sin asignar. Se conserva `instructor_name` histórico sin backfill automático; en cursos asignados el nombre completo deriva del perfil.
 
-1. Definir y revisar migración aditiva, perfil de instructor e identidad Auth sin guardar contraseñas en tablas/logs; acordar política pendiente de activación.
-2. Implementar dominio, repositorios y transacciones/auditoría para cuenta, perfil, asignación, ventana de cambio y conflictos concurrentes.
-3. [x] Implementar autenticación combinada Google/email-password, enlace explícito Google a cuenta autenticada y cambio/recuperación de contraseña. Pendiente verificar SMTP real para recuperar por email; no bloquea aprovisionamiento/login inicial.
-4. Añadir guards exactos para rutas de instructor y scoping por propiedad de curso en cada lectura/escritura server-side.
-5. Implementar administración de perfiles/asignaciones y la experiencia privada de instructor; selector por instructores activos registrados, sin texto libre.
-6. Actualizar seeds sintéticos/fixtures locales, ejecutar migración sin reset destructivo y completar validación antes de integrar PRs en `development`. PR 113 ya liberó Fase 3; no promocionar cambios de esta fase a `master` hasta la siguiente ventana de release.
+#### Estado de implementación y datos
 
-La petición aprobada de renovación de datos es exclusivamente local y para datos de aplicación sintéticos: preparar un seed antes de aplicarlo, reemplazar formatos/cursos y datos operativos fake requeridos para fixtures, conservando cuentas/identidades Auth locales y configuración de proveedor/OAuth. Preservar la identidad ADMIN legítima salvo decisión explícita distinta; no resetear producción ni ejecutar reset ahora. El reset de producción queda como operación manual con aprobación en la siguiente release, no como paso de cada deploy. El seed debe cubrir varios instructores sintéticos con credenciales solo provistas server-side, cursos activos/cancelados, preferencias distintas y curso sin preferencias; nunca hardcodear contraseñas/secretos.
+PRs 118 y 120 integraron Auth, perfiles, asignación y ownership a `development`; PR 121 renovó datos sintéticos en Supabase local estándar; PR 122 añadió auditoría de cambios de password; PR 123 aplicó reparación forward-only de guard. El bloque funcional y el seed local están completos; el cierre del release de Fase 4 sigue pendiente de validación final, PR a `master` y comprobaciones posteriores a despliegue.
 
-#### Pruebas y gate previstos
+La renovación local usa `bun run db:seed:renew-demo`: plan sin flags, `--apply` insert-only, `--apply --reset-application-data` para reset local autorizado. Solo acepta Supabase canónico loopback, requiere ADMIN activo y `SEED_INSTRUCTOR_PASSWORD`/`SEED_ADMIN_ID`; la CLI es local-only y bloquea CI/Vercel/production. El reset usa allowlist con `TRUNCATE ... RESTRICT` sin `CASCADE`; conserva Auth identities/sesiones, usuarios, roles, perfiles instructor, configuración Auth, Storage y migration ledger. Ownership sintético usa IDs estables, `DEMO_SEEDED` audit markers y `app_metadata.seed_owner` para cuentas; no es una validación por hash ni usa metadata de reset.
 
-- Unitarias: normalización/validación del perfil y email, rol y matriz de acceso, intervalo previo/al inicio, conflicto de rangos semiabiertos y límite de turnos contiguos.
-- Integración: transacciones de Auth + perfil interno, redacción de respuestas/logs, auditoría sin secretos, binding Google explícito con email verificado/mismatch, unicidad, ownership de consultas, conflicto entre cursos y carrera de escrituras concurrentes para asignación/fechas/grupos/publicación.
-- E2E: login y recuperación/cambio de contraseña, enlace Google a misma identidad y rechazo de enlace no verificado/no coincidente, ADMIN crea instructor/asigna curso, instructor accede solo a su perfil/cursos y URL directa ajena es denegada; responsive, teclado y fallback sin JavaScript de formularios.
-- Verificar datos de cuentas de fixtures sin credenciales hardcodeadas; revisar específicamente que ninguna respuesta o log transporte contraseña ni tokens. Confirmar configuración SMTP para recuperación en cloud antes de afirmar ese flujo listo.
-- Cerrar con formatter, lint, typecheck, unit/integration/E2E, build, revisión de migraciones/privilegios/RLS y CI del PR en `development`; dejar despliegue de producción para la siguiente release.
+Resultado local estándar verificado: 2 formatos/revisiones, 3 cuentas/perfiles `INSTRUCTOR`, 6 cursos (5 publicados, 1 draft), 12 grupos, 6 historiales de asignación, 35 interesados (30 `ACTIVE`, 5 `CANCELLED`) y 6 `DEMO_SEEDED` markers. Las reinserciones insert-only dejaron filas existentes sin cambios. Login password de los tres instructores y ownership (dos cursos propios por cuenta, denegación a rutas ADMIN) se probaron con sesiones temporales; sesiones cerradas al terminar. Valores `.env` no se imprimieron.
 
-El ajuste UX de interesados (copy del formulario, submit progresivo, tarjetas/barras de demanda y skeleton) se integró en PRs 116 y 117 a `development`; la verificación del frontend completo cerró 98/98 E2E. La evidencia local comunicada incluye 133 unitarias y 65 de integración. Esta mejora no completa los módulos pendientes de instructor/asignación.
+La renovación de producción es manual, independiente y futura; el script local no se debe adaptar ni apuntar a cloud. Solo tras release autorizada, confirmar que todo dato objetivo es sintético, registrar conteos antes/después y operar con allowlist de datos de aplicación fake. Preservar identidades/sesiones Auth, ADMIN, usuarios/roles/perfiles, Auth config, Storage y migration ledger. Si no se puede distinguir un registro legítimo, detenerse y conservarlo. No forma parte de cada deployment.
+
+#### Validación local y gate de release
+
+- PR 120: 151 unit PASS, 84 integration PASS y full E2E 107/107 PASS en `127.0.0.1:4321` (evidencia previa a los cambios posteriores).
+- Validación local final de PR 123: 154 unit PASS (1123 assertions), 87 integration PASS (615 assertions), full E2E 107/107 PASS en el puerto canónico `127.0.0.1:4321`; lint/format/build/Drizzle y `git diff --check` PASS; typecheck 0 errores/0 warnings/98 hints.
+- Cronología Sharp: la corrida previa al arreglo tuvo 87 PASS/20 FAIL por error real de imagen. Se resolvió restaurando la dependencia opcional Astro Sharp con `bun install --frozen-lockfile`; la ruta final de imagen devolvió HTTP 200 con tamaño natural 1280×720. No requirió cambio de código ni actualización de dependencias del proyecto. El E2E final 107/107 corresponde a la fuente ya corregida; no se presenta como retry/flaky-pass de la fuente defectuosa.
+- La aplicación local estándar está migrada hasta 0015 (ledger de 16 entradas); `0012`–`0015` en stacks CI aislados también. Cloud sigue sin aplicar esas migraciones.
+- Supabase local tiene activo email provider, linking manual de Google y hook `before_user_created` tras aplicar 0012. No se verificaron SMTP, OAuth Google real, ni configuración/secrets cloud.
+- Smoke UI local final PASS en `http://127.0.0.1:4321` (servidor activo PID 23168): catálogo con 5 tarjetas, detalles, formulario/preferencias HTTP 200; páginas públicas muestran nombre completo del instructor, sin contacto. Perfiles synthetic INSTRUCTOR y sus 2 cursos/detalles dieron 200; rutas ADMIN directas denegadas con 303. Solo se usaron sesiones temporales, cerradas después. No apagar/reutilizar el proceso activo.
+- Release: la validación local final de fuente corregida ya pasó. Integrar primero este PR documental a `development`; después abrir PR a `master` con checks `quality` e `integration-e2e` válidos. Se permite bypass únicamente de aprobación manual si lo autoriza el proceso; nunca bypass de checks. El deploy de `master` aplica migraciones. Hacer smoke post-deploy antes de declarar release completado.
+
+El ajuste UX de interesados (copy del formulario, submit progresivo, tarjetas/barras de demanda y skeleton) se integró en PRs 116 y 117 a `development`; su verificación full previa al bloque de instructores cerró 98/98 E2E. La evidencia local comunicada incluye 133 unitarias y 65 de integración; este hito queda separado de los 107 E2E del PR 120.
+
+#### Estado de Fase 4 y release boundary
+
+El alcance implementado, seed local, full E2E y smoke frontend local están listos en `development`; se puede iniciar el PR documental a `development` y después el PR autorizado a `master`, sin esperar a otra fase. La aprobación manual es la única excepción autorizable; no omitir checks. Migraciones/Auth hook/secret Auth, SMTP y Google real cloud y smoke productivo siguen pendientes. No declarar producción desplegada/verificada hasta completar esa secuencia.
+
+La cuestión de desactivación con cursos futuros continúa sin decisión y sin UI/endpoint; queda explícitamente fuera de operaciones soportadas ahora y no impide cerrar el flujo inicial de instructor. Historial académico/carrera completa, sesiones y asistencia corresponden a Fase 6.
 
 #### Estado del bloque de autenticación dual
 
-Los commits `5613399`, `958053a` y `5ff585c` de `feat/dual-auth-and-profile`, sobre base `cf601d8`, se integraron mediante [PR 118](https://github.com/SteveCasTo/skillbase/pull/118) como `f06b4fdf8f8c7691ffdd7937efb0f813a27666d4`. No implica promoción a `master`, aplicación de migraciones al stack local persistente/cloud ni activación efectiva de Auth allí. Se considera completado únicamente el bloque de autenticación dual/cuenta interna, no Fase 4 en conjunto; instructor/perfil administrativo/asignaciones siguen pendientes de implementación.
+Los commits `5613399`, `958053a` y `5ff585c` de `feat/dual-auth-and-profile`, sobre base `cf601d8`, se integraron mediante [PR 118](https://github.com/SteveCasTo/skillbase/pull/118) como `f06b4fdf8f8c7691ffdd7937efb0f813a27666d4`. El bloque de perfiles/asignaciones se integró después mediante PR 120 como `7509a659`. Ninguno implica promoción a `master`, aplicación de migraciones al stack local persistente/cloud ni activación efectiva de Auth allí. Los bloques Auth e Instructor están implementados en `development`, pero Fase 4 no se considera completada.
 
 - [x] Google y email/password en login, verificación del método de sesión y autorización por identidad interna activa.
 - [x] Perfil `/app/perfil` con cambio opcional de contraseña, confirmación por contraseña actual o correo, recovery y asociación Google opcional.
-- [x] Provisionamiento server-side de cuenta de instructor mediante `createInstructorAccount(actorAuthUserId, { email, name, password })`; crea usuario Auth confirmado y usuario interno ACTIVE con rol INSTRUCTOR, con compensación si falla la transacción interna. Aún no hay pantalla ADMIN de alta ni asignación de instructores.
-- [x] Completar full E2E aislado: 104/104 PASS en el puerto canónico 4321. La corrida anterior en 4323 obtuvo 73 PASS/31 FAIL por `Origin` hardcodeado a 4321 en tests heredados; se corrigió únicamente la invocación, sin cambios de código/tests ni retries.
-- [x] Integrar mediante PR 118 a `development`; sin checks remotos reportados, no se afirma CI PASS. Los cambios siguientes continúan únicamente en `development` hasta la próxima release autorizada.
-- [ ] Antes de habilitarlo en cualquier entorno: aplicar Drizzle 0012/0013, habilitar hook `private_auth.allow_invited_google_signup` en la configuración Auth efectiva y configurar `AUTH_RATE_LIMIT_SECRET` server-only de al menos 32 caracteres. Configuración cloud y SMTP no están verificadas/aplicadas.
+- [x] Provisionamiento server-side mediante `createInstructorAccount(actorAuthUserId, { email, name, password, profile })`; crea cuenta confirmada y perfil interno ACTIVE con rol INSTRUCTOR en transacción y compensa si falla la persistencia.
+- [x] Full E2E Auth aislado 104/104 PASS en puerto canónico 4321 (PR 118). La fase siguiente añadió y validó el módulo de instructores, full E2E 107/107 reportado en PR 120.
+- [x] Integrar Auth mediante PR 118 y el módulo de instructores mediante PR 120 a `development`. Las validaciones locales finales pasaron; no hay checks remotos reportados ni se afirma CI PASS. Siguiente release autorizado: PR a `master` tras integrar esta documentación.
+- [x] En Supabase local estándar: 0012–0015 aplicadas, hook activo y `AUTH_RATE_LIMIT_SECRET` configurado server-only; no registrar valor.
+- [ ] Para producción: aplicar 0012–0015 por release gated, configurar hook/provider y secret server-only, validar redirect allowlist y SMTP/recovery y hacer Google OAuth real de smoke antes de declarar esos flujos disponibles.
 
-Estado local comunicado por el implementador: 146 unit PASS, 71 integration PASS, 27 E2E dirigidos PASS, lint PASS, typecheck PASS (0 errores/0 warnings/83 hints), build, Drizzle y formatter PASS; `git diff --check` PASS. La validación posterior full aislada pasó 104/104 E2E y PR 118 quedó integrado. No se certifican CI remota, migración local compartida/cloud, configuración efectiva de hook/secreto, SMTP/Google real ni despliegue. El servidor de desarrollo original quedó apagado por autorización del usuario para validar; no se reinició.
+La suite completa Auth/instructores PR 118/120 (104/104 y luego 107/107 E2E) se conserva como cronología previa; la validación más reciente post-PR 123 pasó 107/107 y el smoke frontend también pasó localmente. No se afirma CI remota ni verificación de producción. El Supabase local estándar quedó migrado/seeded; el smoke se ejecutó en `127.0.0.1:4321` (PID 23168 al último reporte).
 
 ### Resultado demostrable
 

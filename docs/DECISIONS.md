@@ -581,7 +581,7 @@ Detalle de implementación local de ADR-017: los productores administrativos pas
 
 **Fecha:** 2026-10-01
 
-**Estado:** Accepted — contrato de Fase 4; implementación pendiente
+**Estado:** Accepted — flujos aprobados integrados en `development`; release de producción pendiente
 
 ### Contexto
 
@@ -593,7 +593,7 @@ Los grupos existen, pero la identidad del instructor aún es texto opcional del 
 - Google se enlaza explícitamente a la misma cuenta autenticada únicamente con proveedor verificado y email normalizado coincidente; no realizar fusión automática. Los ADMIN existentes mantienen Google y pueden añadir contraseña; no se añade administración de creación de ADMIN.
 - Un curso tiene una única asignación de instructor, heredada por todos sus grupos. Instructor accede solo a perfil propio y cursos asignados; asistencia/sesiones siguen en Fase 6.
 - El cambio de instructor se permite en curso publicado solo antes del inicio oficial. Conflictos del mismo instructor entre cursos se calculan con fechas L–V y tiempo civil `America/La_Paz`; intervalos semiabiertos hacen válido el contacto exacto de turnos. Escrituras concurrentes que puedan alterar ese cálculo deben compartir serialización transaccional.
-- Conservar IDs e historial de perfiles usados y auditar asignaciones/mutaciones sin credenciales. La política de desactivación cuando haya asignaciones futuras queda expresamente sin decidir y debe resolverse antes de implementar esa transición.
+- Conservar IDs e historial de perfiles usados y auditar asignaciones/mutaciones sin credenciales. No se añade flujo de desactivación de instructor con cursos futuros; esa política queda sin definir y fuera de la operación cubierta por esta decisión.
 
 ### Alternativas
 
@@ -606,7 +606,8 @@ Los grupos existen, pero la identidad del instructor aún es texto opcional del 
 
 - Se amplían los métodos visibles de login para cuentas internas, no el signup público; se deben preservar guardas, política exacta por ruta, CSRF/cookies/redirects y configuraciones de Auth.
 - Las decisiones de asignación/horario exigen pruebas de concurrencia compartidas con mutaciones de fechas, grupos y publicación; una comprobación en UI no basta.
-- El esquema concreto/migración y la política de activación deben revisarse durante implementación, no inferirse de este ADR. No se afirma que perfil, asignación o autenticación email/password existan ya.
+- Perfiles estables, asignación `courses.instructor_id`, tabla de historial, guards de perfil/cursos y validaciones de calendario se añadieron mediante PR 120/migración 0014 y están integrados en `development`; 0014 está aplicada en el Supabase local estándar, no en cloud. La política de desactivación no forma parte de los flujos aprobados aquí y permanece sin decisión.
+- Para evitar carreras, el repositorio usa una barrera advisory-lock transaccional común; adquiere locks de IDs de instructor previo/nuevo en orden estable y después la fila del curso. La misma serialización cubre cambios de asignación/fechas/publicación y escrituras de horario/estado de grupos. Conserva auditoría, revisión optimista e historial; no cambia el límite modular ni introduce un calendario separado.
 - Debe comprobarse configuración SMTP cloud antes de afirmar recuperación de contraseña disponible; esto no bloquea cuentas creadas con password por ADMIN ni su login inicial.
 
 ---
@@ -615,7 +616,7 @@ Los grupos existen, pero la identidad del instructor aún es texto opcional del 
 
 **Fecha:** 2026-10-01
 
-**Estado:** Accepted — implementado en feature branch; despliegue pendiente
+**Estado:** Accepted — implementado e integrado a `development` mediante PR 118; habilitación de entorno pendiente
 
 ### Contexto
 
@@ -637,5 +638,5 @@ Supabase Auth puede asociar automáticamente una identidad Google cuando el prov
 ### Consecuencias
 
 - La frontera de confianza de proveedor y la aprobación de acceso de SkillBase quedan separadas; tanto ingreso normal como callback de asociación deben validar método de sesión y estado interno.
-- El comportamiento está implementado en la rama dual-auth pero requiere migraciones 0012/0013, hook y secreto server-only antes de habilitarse; no está aplicado en local persistente ni en cloud.
+- El comportamiento está integrado en `development`; 0012/0013 y el hook están activos en local estándar, junto con 0014/0015. Cloud sigue pendiente de migraciones, hook, `AUTH_RATE_LIMIT_SECRET` y verificación provider/SMTP. PR 118 no tuvo checks remotos reportados y la autenticación dual no se ha promocionado a `master`.
 - Este ADR implementa el requerimiento de asociación explícita a nivel de la aplicación y no reemplaza ni debilita ADR-023 sobre no fusionar usuarios internos automáticamente.
