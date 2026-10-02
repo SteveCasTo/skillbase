@@ -1,4 +1,8 @@
 [data-admin-interests] {
+  [hidden] {
+    display: none;
+  }
+
   .interest-registration-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
@@ -11,5 +15,11 @@
 
   .interest-demand-row[data-leading="true"] .interest-demand-bar {
     background: var(--accent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-filter-skeleton] [data-slot="skeleton"] {
+      animation: none;
+    }
   }
 }

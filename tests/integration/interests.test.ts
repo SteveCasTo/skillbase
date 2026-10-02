@@ -27,6 +27,7 @@ import {
   handlePublicInterestPost,
 } from "@/server/interests/http";
 import { getPublicAuthEnvironment } from "@/server/environment";
+import { parseInterestFilter } from "@/server/interests/filter";
 import type { InternalUser } from "@/domain/auth/types";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 const url = getTestSupabaseEnvironment().databaseUrl;
@@ -329,8 +330,32 @@ test("interests metrics include historical zero buckets and null independently o
     interestRegistrationId: initial.id,
     revision: initial.updatedAt,
   });
-  const active = await repo.course(course.id, "ACTIVE");
-  const cancelled = await repo.course(course.id, "CANCELLED");
+  const active = await getInterestCourse(
+    repo,
+    actor,
+    course.id,
+    parseInterestFilter(new URLSearchParams("status=ACTIVE")),
+  );
+  const cancelled = await getInterestCourse(
+    repo,
+    actor,
+    course.id,
+    parseInterestFilter(new URLSearchParams("status=CANCELLED")),
+  );
+  const all = await getInterestCourse(
+    repo,
+    actor,
+    course.id,
+    parseInterestFilter(new URLSearchParams("status=ALL")),
+  );
+  expect(all!.registrations).toHaveLength(2);
+  expect(all!.metrics).toEqual(active!.metrics);
+  await expect(
+    getInterestCourse(repo, actor, "invalid-course", "ACTIVE"),
+  ).rejects.toMatchObject({ status: 404, code: "COURSE_NOT_FOUND" });
+  expect(() =>
+    parseInterestFilter(new URLSearchParams("status=INVALID")),
+  ).toThrow("El filtro no es válido");
   expect(active!.registrations).toHaveLength(1);
   expect(cancelled!.registrations).toHaveLength(1);
   expect(cancelled!.metrics).toEqual(active!.metrics);
