@@ -26,7 +26,7 @@ test("ADMIN creates and edits a registered instructor with a semantic full-card 
   await page.getByLabel("Nombre", { exact: true }).fill(name);
   await page.getByLabel("Apellidos").fill("Sintético");
   await page.getByLabel("Correo electrónico").fill(email);
-  await page.getByLabel("Contraseña inicial").fill(password);
+  await page.getByLabel("Contraseña inicial", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Crear instructor" }).click();
   await expect(page).toHaveURL(
     /\/app\/instructores\/[0-9a-f-]+\/editar\?success=saved$/u,
@@ -193,7 +193,7 @@ test("instructor creation and validation work without JavaScript and never echo 
     await page
       .getByLabel("Correo electrónico")
       .fill(`nojs-${randomUUID()}@e2e.test`);
-    await page.getByLabel("Contraseña inicial").fill(password);
+    await page.getByLabel("Contraseña inicial", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Crear instructor" }).click();
     await expect(page).toHaveURL(
       /\/app\/instructores\/[0-9a-f-]+\/editar\?success=saved$/u,
