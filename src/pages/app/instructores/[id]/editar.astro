@@ -2,8 +2,16 @@
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
 import InstructorForm from "@/components/instructors/InstructorForm.astro";
 import { instructorEditor } from "@/server/instructors/editor";
+import InstructorLifecyclePanel from "@/components/instructors/InstructorLifecyclePanel.astro";
+import { DrizzleInstructorLifecycleRepository } from "@/server/db/repositories/instructor-lifecycle-repository";
+import { getDatabase } from "@/server/db/client";
 const editor = await instructorEditor(Astro, Astro.params.id ?? "");
 if (editor.response) return editor.response;
+const lifecycle = editor.previous
+  ? await new DrizzleInstructorLifecycleRepository(getDatabase()).inspect(
+      editor.previous.id,
+    )
+  : null;
 ---
 
 <PrivateLayout title="Editar instructor">
@@ -21,6 +29,13 @@ if (editor.response) return editor.response;
       Instructor guardado correctamente.
     </p>
   )}
+  {["activate", "deactivate"].includes(
+    Astro.url.searchParams.get("success") ?? "",
+  ) && (
+    <p role="status" class="mt-6">
+      Acceso de la cuenta actualizado correctamente.
+    </p>
+  )}
   {editor.previous ? (
     <InstructorForm
       values={editor.values}
@@ -30,5 +45,13 @@ if (editor.response) return editor.response;
     />
   ) : (
     <p class="mt-6">El instructor no existe.</p>
+  )}
+  {lifecycle && (
+    <InstructorLifecyclePanel
+      state={lifecycle}
+      revision={editor.revision}
+      endpoint={Astro.url.pathname}
+      error={editor.error}
+    />
   )}
 </PrivateLayout>

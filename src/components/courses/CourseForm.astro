@@ -296,7 +296,11 @@ const currentArtworkUrl = publicArtworkUrl(
             disabled={disabled}
             error={errors.instructorId ?? ""}
             options={[
-              { value: "unassigned", label: "Sin asignar (solo borrador)" },
+              {
+                value: "unassigned",
+                label: "Sin asignar (solo borrador)",
+                disabled: Boolean(courseId),
+              },
               ...instructors
                 .filter((instructor) => instructor.status === "ACTIVE")
                 .map((instructor) => ({
@@ -316,7 +320,11 @@ const currentArtworkUrl = publicArtworkUrl(
                 disabled={disabled}
                 aria-invalid={Boolean(errors.instructorId)}
               >
-                <option value="" selected={!values.instructorId}>
+                <option
+                  value=""
+                  selected={!values.instructorId}
+                  disabled={Boolean(courseId)}
+                >
                   Sin asignar (solo borrador)
                 </option>
                 {instructors
