@@ -122,6 +122,30 @@ export class DrizzleGroupRepository implements GroupRepository {
     });
   }
 
+  private async assertCanRemovePlannedGroup(
+    tx: Transaction,
+    course: Pick<typeof schema.courses.$inferSelect, "id" | "status">,
+    group: Pick<Row, "id" | "status">,
+  ): Promise<void> {
+    if (course.status !== "PUBLISHED" || group.status !== "PLANNED") return;
+    const [other] = await tx
+      .select({ id: schema.groups.id })
+      .from(schema.groups)
+      .where(
+        and(
+          eq(schema.groups.courseId, course.id),
+          eq(schema.groups.status, "PLANNED"),
+          ne(schema.groups.id, group.id),
+        ),
+      )
+      .limit(1);
+    if (!other)
+      throw new GroupError(
+        "COURSE_UNAVAILABLE",
+        "No se puede desactivar el último grupo de un curso publicado. Añade o reactiva otro grupo, o retira el curso primero.",
+      );
+  }
+
   async create(
     courseId: string,
     startTime: string,
@@ -236,7 +260,10 @@ export class DrizzleGroupRepository implements GroupRepository {
             previous.publishedAt ??
             (course.status === "PUBLISHED" ? new Date() : null),
         };
-      } else changes = { status: "CANCELLED" };
+      } else {
+        await this.assertCanRemovePlannedGroup(tx, course, previous);
+        changes = { status: "CANCELLED" };
+      }
       const [row] = await tx
         .update(schema.groups)
         .set({ ...changes, updatedAt: nextVersion(previous.updatedAt) })
@@ -331,6 +358,7 @@ export class DrizzleGroupRepository implements GroupRepository {
           "GROUP_PUBLISHED",
           "Un grupo que ya fue publicado no puede eliminarse; desactívalo.",
         );
+      await this.assertCanRemovePlannedGroup(tx, course, previous);
       const [deleted] = await tx
         .delete(schema.groups)
         .where(

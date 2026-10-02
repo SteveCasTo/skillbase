@@ -76,7 +76,7 @@ async function publicCourse(
     revision: string;
   };
   let groupId: string | undefined;
-  if (options.group) {
+  {
     const group = await page.request.post(`/app/cursos/${id}/grupos`, {
       headers,
       form: { intent: "create", startTime: "18:00", capacity: "1" },
@@ -212,7 +212,7 @@ test("interest is available before presencial opening; JS submits optional group
   await expect(page.locator(".interest-success")).toContainText(successMessage);
 });
 
-test("without a registration window or groups, native HTML still preserves errors and reaches neutral success", async ({
+test("without a registration window or selected preference, native HTML still preserves errors and reaches neutral success", async ({
   browser,
   baseURL,
 }) => {
@@ -226,9 +226,8 @@ test("without a registration window or groups, native HTML still preserves error
     const { form } = await fillContact(page);
     await expect(form).not.toHaveAttribute("novalidate");
     await expect(
-      form.getByText("Sin preferencia", { exact: true }),
-    ).toBeVisible();
-    await expect(form.locator('[name="preferredGroupId"]')).toHaveCount(0);
+      form.getByLabel("Preferencia de grupo (opcional)"),
+    ).toHaveValue("");
     await form.getByLabel("Nombre", { exact: true }).fill("   ");
     const rejected = page.waitForResponse(
       (response) =>

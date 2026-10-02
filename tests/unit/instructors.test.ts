@@ -8,6 +8,18 @@ import { boliviaCivilToInstant } from "@/domain/courses/bolivia-time";
 import { getPrivateRoutePolicy } from "@/server/auth/route-policy";
 import { assertInstructorChange } from "@/domain/instructors/assignment";
 
+test("assigned courses cannot clear their instructor; initially unassigned drafts preserve null", () => {
+  const future = new Date("2099-03-01T04:00:00Z");
+  expect(() => assertInstructorChange("assigned", null, future)).toThrow(
+    "conservar un instructor",
+  );
+  expect(() => assertInstructorChange(null, null, future)).not.toThrow();
+  expect(() => assertInstructorChange(null, "assigned", future)).not.toThrow();
+  expect(() =>
+    assertInstructorChange("assigned", "replacement", future),
+  ).not.toThrow();
+});
+
 test("official Bolivia start boundary is strict; same-instructor edits are not reassignment", () => {
   const start = boliviaCivilToInstant("2027-03-01T00:00");
   expect(() =>

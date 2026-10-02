@@ -203,6 +203,15 @@ test("interests preferences require same-course published planned group, includi
       })
       .execute(),
   ).rejects.toThrow();
+  const [remainingGroup] = await db
+    .insert(groups)
+    .values({
+      ...group,
+      id: crypto.randomUUID(),
+      startsAt: new Date(group.startsAt.getTime() + 2 * 60 * 60 * 1000),
+      endsAt: new Date(group.endsAt.getTime() + 2 * 60 * 60 * 1000),
+    })
+    .returning();
   await new DrizzleGroupRepository(db).cancel(
     group.id,
     actor.id,
@@ -215,7 +224,10 @@ test("interests preferences require same-course published planned group, includi
     byPreference: [
       { preferredGroupId: null, activeCount: 0 },
       { preferredGroupId: group.id, activeCount: 1 },
-    ],
+      { preferredGroupId: remainingGroup!.id, activeCount: 0 },
+    ].sort((a, b) =>
+      (a.preferredGroupId ?? "").localeCompare(b.preferredGroupId ?? ""),
+    ),
   });
   await expect(
     registerInterest(repo, course.slug, {

@@ -120,6 +120,17 @@ test("published course is public end-to-end and withdrawal removes every public 
       page.getByRole("button", { name: "Guardar cambios" }),
     ).toBeDisabled();
 
+    const prerequisite = await page.request.post(
+      `/app/cursos/${courseId}/grupos`,
+      {
+        headers: {
+          Origin: "http://127.0.0.1:4321",
+          Accept: "application/json",
+        },
+        form: { intent: "create", startTime: "08:00", capacity: "10" },
+      },
+    );
+    expect(prerequisite.status()).toBe(200);
     await page.getByRole("button", { name: "Publicar curso" }).click();
     await page.getByRole("button", { name: "Confirmar publicación" }).click();
     await expect(

@@ -258,6 +258,14 @@ test("new courses preserve values and can be corrected after server validation w
     .selectOption(instructor.id);
   await page.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(page).toHaveURL(/success=updated/);
+  const prerequisite = await page.request.post(
+    new URL(page.url()).pathname.replace(/\/editar$/u, "/grupos"),
+    {
+      headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
+      form: { intent: "create", startTime: "08:00", capacity: "10" },
+    },
+  );
+  expect(prerequisite.status()).toBe(200);
   await page.locator('[data-confirm-fallback="publish"] summary').click();
   await expect(
     page.getByRole("button", { name: "Confirmar publicación" }),

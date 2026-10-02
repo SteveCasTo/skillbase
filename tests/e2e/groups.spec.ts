@@ -14,7 +14,12 @@ function deferred() {
   return { promise, release };
 }
 
-async function publishedCourse(page: Page, context: BrowserContext) {
+async function courseFixture(
+  page: Page,
+  context: BrowserContext,
+  published = true,
+  assigned = true,
+) {
   const instructor = await registerCourseInstructor(page);
   await signInFixture(context, AUTH_FIXTURES.admin.email);
   const format = await page.request.post("/app/formatos/nuevo", {
@@ -36,7 +41,7 @@ async function publishedCourse(page: Page, context: BrowserContext) {
       description: "Curso para gestión de grupos.",
       level: "BASIC",
       courseTypeId,
-      instructorId: instructor.id,
+      instructorId: assigned ? instructor.id : "",
       schedule: "Lunes a viernes, 08:00–09:30",
       conditions: "Cupos limitados.",
       requestKey: crypto.randomUUID(),
@@ -52,31 +57,148 @@ async function publishedCourse(page: Page, context: BrowserContext) {
     revision: string;
   };
   const edit = `/app/cursos/${id}/editar`;
-  const published = await page.request.post(edit, {
+  if (!published) return { edit, path: `/app/cursos/${id}/grupos` };
+  const prerequisite = await page.request.post(`/app/cursos/${id}/grupos`, {
+    headers,
+    form: { intent: "create", startTime: "20:00", capacity: "1" },
+  });
+  expect(prerequisite.status()).toBe(200);
+  const publication = await page.request.post(edit, {
     headers,
     form: { intent: "publish", revision },
   });
-  expect(published.status()).toBe(200);
+  expect(publication.status()).toBe(200);
   return { edit, path: `/app/cursos/${id}/grupos` };
 }
 
-async function currentCourseRevision(page: Page, edit: string) {
+test("initially unassigned draft edits preserve one null value and keep the disabled placeholder", async ({
+  page,
+  context,
+}) => {
+  const { edit } = await courseFixture(page, context, false, false);
   await page.goto(edit);
-  return page.locator('.course-form input[name="revision"]').inputValue();
-}
+  const instructor = page.getByRole("combobox", {
+    name: "Instructor",
+    exact: true,
+  });
+  await instructor.click();
+  await expect(
+    page.getByRole("option", {
+      name: "Sin asignar (solo borrador)",
+      exact: true,
+    }),
+  ).toHaveAttribute("data-disabled", "");
+  await page.keyboard.press("Escape");
+  expect(
+    await page
+      .locator(".course-form")
+      .evaluate((form) =>
+        new FormData(form as HTMLFormElement).getAll("instructorId"),
+      ),
+  ).toEqual(["unassigned"]);
+  await page
+    .getByLabel("Descripción")
+    .fill("Metadata edited without assigning an instructor.");
+  await expect(
+    page.getByRole("button", { name: "Guardar cambios", exact: true }),
+  ).toBeEnabled();
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === edit,
+  );
+  await page
+    .getByRole("button", { name: "Guardar cambios", exact: true })
+    .click();
+  expect((await saved).status()).toBe(200);
+  await page.reload();
+  await expect(page.getByLabel("Descripción")).toHaveValue(
+    "Metadata edited without assigning an instructor.",
+  );
+  await expect(instructor).toContainText("Sin asignar (solo borrador)");
+  await expect(
+    page.getByRole("button", { name: "Guardar cambios", exact: true }),
+  ).toBeDisabled();
+});
+
+test("publication without an assigned instructor shows its actual cause inline and in the toast", async ({
+  page,
+  context,
+}) => {
+  const { edit } = await courseFixture(page, context, false, false);
+  await page.goto(edit);
+  await page
+    .getByRole("button", { name: "Publicar curso", exact: true })
+    .click();
+  const result = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === edit,
+  );
+  await page
+    .getByRole("dialog", { name: "Publicar curso" })
+    .getByRole("button", { name: "Confirmar publicación" })
+    .click();
+  expect((await result).status()).toBe(422);
+  await expect(page.locator("[data-save-error]")).toContainText(
+    "Selecciona un instructor activo registrado.",
+  );
+  await expect(
+    page
+      .locator("[data-sileo-toast]")
+      .filter({ hasText: "Selecciona un instructor activo registrado." }),
+  ).toBeVisible();
+});
+
+test("last planned group cannot be cancelled while published; withdrawing preserves the cancellation flow", async ({
+  page,
+  context,
+}) => {
+  const { edit, path } = await courseFixture(page, context);
+  await page.goto(path);
+  const group = page.locator("[data-group-id]").first();
+  await group.getByRole("button", { name: "Desactivar grupo 1" }).click();
+  const result = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === path,
+  );
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Sí, desactivar grupo" })
+    .click();
+  expect((await result).status()).toBe(409);
+  await expect(page.locator("[data-group-error]")).toContainText(
+    "último grupo de un curso publicado",
+  );
+  await expect(
+    group.getByRole("button", { name: "Desactivar grupo 1" }),
+  ).toBeVisible();
+  await page.goto(edit);
+  const withdrawn = await page.request.post(edit, {
+    headers,
+    form: {
+      intent: "withdraw",
+      revision: await page
+        .locator('.course-form input[name="revision"]')
+        .inputValue(),
+    },
+  });
+  expect(withdrawn.status()).toBe(200);
+  await page.goto(path);
+  await group.getByRole("button", { name: "Desactivar grupo 1" }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Sí, desactivar grupo" })
+    .click();
+  await expect(group.getByText("Inactivo", { exact: true })).toBeVisible();
+});
 
 test("admin creates and edits groups in place, validates conflicts, and deletes an unpublished group", async ({
   page,
   context,
 }) => {
-  const { edit, path } = await publishedCourse(page, context);
-  await page.request.post(edit, {
-    headers,
-    form: {
-      intent: "withdraw",
-      revision: await currentCourseRevision(page, edit),
-    },
-  });
+  const { edit, path } = await courseFixture(page, context, false);
   await page.goto(edit);
   await page.getByRole("link", { name: "Grupos", exact: true }).click();
   await expect(page).toHaveURL(path);
@@ -205,24 +327,24 @@ test("published groups retain history when deactivated and can reactivate", asyn
   page,
   context,
 }) => {
-  const { path } = await publishedCourse(page, context);
+  const { path } = await courseFixture(page, context);
   const first = await page.request.post(path, {
     headers,
     form: { intent: "create", startTime: "08:00", capacity: "10" },
   });
   expect(first.status()).toBe(200);
   await page.goto(path);
-  const group = page.locator("[data-group-id]").first();
+  const group = page.locator("[data-group-id]").nth(1);
   await expect(
-    group.getByRole("button", { name: "Eliminar grupo 1" }),
+    group.getByRole("button", { name: "Eliminar grupo 2" }),
   ).toHaveCount(0);
-  await group.getByRole("button", { name: "Desactivar grupo 1" }).click();
+  await group.getByRole("button", { name: "Desactivar grupo 2" }).click();
   await page
     .getByRole("alertdialog")
     .getByRole("button", { name: "Sí, desactivar grupo" })
     .click();
   await expect(group).toContainText("Inactivo");
-  await group.getByRole("button", { name: "Reactivar grupo 1" }).click();
+  await group.getByRole("button", { name: "Reactivar grupo 2" }).click();
   await page
     .getByRole("alertdialog")
     .getByRole("button", { name: "Sí, reactivar grupo" })
@@ -234,7 +356,7 @@ test("groups are admin-only, validate origin, course and revision, and fit mobil
   page,
   context,
 }) => {
-  const { path } = await publishedCourse(page, context);
+  const { path } = await courseFixture(page, context);
   expect(
     (
       await page.request.post(path, {
@@ -295,7 +417,7 @@ test("confirmation closes while pending; failure and retry preserve other cards 
   page,
   context,
 }) => {
-  const { path } = await publishedCourse(page, context);
+  const { path } = await courseFixture(page, context);
   for (const startTime of ["08:00", "10:00"]) {
     const response = await page.request.post(path, {
       headers,
@@ -304,11 +426,11 @@ test("confirmation closes while pending; failure and retry preserve other cards 
     expect(response.ok()).toBe(true);
   }
   await page.goto(path);
-  const first = page.locator("[data-group-id]").first();
-  const second = page.locator("[data-group-id]").nth(1);
+  const first = page.locator("[data-group-id]").nth(1);
+  const second = page.locator("[data-group-id]").nth(2);
   const firstNode = await first.elementHandle();
   const otherNode = await second.elementHandle();
-  await second.getByLabel("Editar capacidad del grupo 2").click();
+  await second.getByLabel("Editar capacidad del grupo 3").click();
   const otherInput = second.getByLabel("Nueva capacidad");
   await otherInput.fill("17");
   let getCount = 0;
@@ -333,7 +455,7 @@ test("confirmation closes while pending; failure and retry preserve other cards 
       });
     else await route.continue();
   });
-  await first.getByRole("button", { name: "Desactivar grupo 1" }).click();
+  await first.getByRole("button", { name: "Desactivar grupo 2" }).click();
   const confirmation = page.getByRole("alertdialog");
   await confirmation
     .getByRole("button", { name: "Sí, desactivar grupo" })
@@ -362,7 +484,7 @@ test("confirmation closes while pending; failure and retry preserve other cards 
   await expect(otherInput).toHaveValue("17");
   expect(await otherNode!.evaluate((node) => node.isConnected)).toBe(true);
   fail = false;
-  await first.getByRole("button", { name: "Desactivar grupo 1" }).click();
+  await first.getByRole("button", { name: "Desactivar grupo 2" }).click();
   await confirmation
     .getByRole("button", { name: "Sí, desactivar grupo" })
     .click();
@@ -380,7 +502,7 @@ test("stale revision is recovered with an authorized JSON read, preserving an un
   page,
   context,
 }) => {
-  const { path } = await publishedCourse(page, context);
+  const { path } = await courseFixture(page, context);
   const firstResponse = await page.request.post(path, {
     headers,
     form: { intent: "create", startTime: "08:00", capacity: "10" },
@@ -394,10 +516,10 @@ test("stale revision is recovered with an authorized JSON read, preserving an un
     form: { intent: "create", startTime: "10:00", capacity: "10" },
   });
   await page.goto(path);
-  const first = page.locator("[data-group-id]").first();
-  const second = page.locator("[data-group-id]").nth(1);
+  const first = page.locator("[data-group-id]").nth(1);
+  const second = page.locator("[data-group-id]").nth(2);
   const otherNode = await second.elementHandle();
-  await second.getByLabel("Editar capacidad del grupo 2").click();
+  await second.getByLabel("Editar capacidad del grupo 3").click();
   await second.getByLabel("Nueva capacidad").fill("19");
   const concurrent = await page.request.post(path, {
     headers,
@@ -409,9 +531,9 @@ test("stale revision is recovered with an authorized JSON read, preserving an un
     },
   });
   expect(concurrent.ok()).toBe(true);
-  await first.getByLabel("Editar capacidad del grupo 1").click();
+  await first.getByLabel("Editar capacidad del grupo 2").click();
   await first.getByLabel("Nueva capacidad").fill("15");
-  await first.getByLabel("Guardar capacidad del grupo 1").click();
+  await first.getByLabel("Guardar capacidad del grupo 2").click();
   await expect(page.locator("[data-group-error]")).toBeVisible();
   const requests: string[] = [];
   page.on("request", (request) => {
@@ -426,14 +548,14 @@ test("stale revision is recovered with an authorized JSON read, preserving an un
   await expect(first.getByLabel("Nueva capacidad")).toHaveValue("15");
   await first
     .getByRole("button", {
-      name: "Cancelar edición de capacidad del grupo 1",
+      name: "Cancelar edición de capacidad del grupo 2",
       exact: true,
     })
     .click();
-  await first.getByLabel("Editar capacidad del grupo 1").click();
+  await first.getByLabel("Editar capacidad del grupo 2").click();
   await expect(first.getByLabel("Nueva capacidad")).toHaveValue("12");
   await first.getByLabel("Nueva capacidad").fill("15");
-  await first.getByLabel("Guardar capacidad del grupo 1").click();
+  await first.getByLabel("Guardar capacidad del grupo 2").click();
   await expect(
     first.locator('[data-group-field="capacity"] dd > span'),
   ).toHaveText("15");
@@ -446,7 +568,7 @@ test("recovery locks only its entity and keeps a sibling's newer schedule after 
   page,
   context,
 }) => {
-  const { path } = await publishedCourse(page, context);
+  const { path } = await courseFixture(page, context);
   const created = await page.request.post(path, {
     headers,
     form: { intent: "create", startTime: "08:00", capacity: "10" },
@@ -457,8 +579,8 @@ test("recovery locks only its entity and keeps a sibling's newer schedule after 
     form: { intent: "create", startTime: "10:00", capacity: "10" },
   });
   await page.goto(path);
-  const first = page.locator("[data-group-id]").first();
-  const second = page.locator("[data-group-id]").nth(1);
+  const first = page.locator("[data-group-id]").nth(1);
+  const second = page.locator("[data-group-id]").nth(2);
   await page.request.post(path, {
     headers,
     form: {
@@ -468,9 +590,9 @@ test("recovery locks only its entity and keeps a sibling's newer schedule after 
       capacity: "12",
     },
   });
-  await first.getByLabel("Editar capacidad del grupo 1").click();
+  await first.getByLabel("Editar capacidad del grupo 2").click();
   await first.getByLabel("Nueva capacidad").fill("15");
-  await first.getByLabel("Guardar capacidad del grupo 1").click();
+  await first.getByLabel("Guardar capacidad del grupo 2").click();
   await expect(page.locator("[data-group-error]")).toBeVisible();
   const snapshot = deferred();
   const resume = deferred();
@@ -489,34 +611,34 @@ test("recovery locks only its entity and keeps a sibling's newer schedule after 
   await snapshot.promise;
   await expect(first).toHaveAttribute("aria-busy", "true");
   await expect(
-    first.getByLabel("Guardar capacidad del grupo 1"),
+    first.getByLabel("Guardar capacidad del grupo 2"),
   ).toBeDisabled();
   await expect(
-    first.getByRole("button", { name: "Desactivar grupo 1" }),
+    first.getByRole("button", { name: "Desactivar grupo 2" }),
   ).toBeDisabled();
   await first
-    .getByRole("form", { name: "Cambiar capacidad del grupo 1" })
+    .getByRole("form", { name: "Cambiar capacidad del grupo 2" })
     .evaluate((form: HTMLFormElement) =>
       form.dispatchEvent(
         new Event("submit", { bubbles: true, cancelable: true }),
       ),
     );
-  await second.getByLabel("Editar horario del grupo 2").click();
+  await second.getByLabel("Editar horario del grupo 3").click();
   await second.getByLabel("Hora de inicio").fill("12:00");
-  await second.getByLabel("Guardar horario del grupo 2").click();
+  await second.getByLabel("Guardar horario del grupo 3").click();
   await expect(second).toContainText("12:00–13:30");
   expect(posts).toBe(1);
   resume.release();
   await expect(page.locator("[data-group-error]")).toBeHidden();
-  await expect(first.getByLabel("Guardar capacidad del grupo 1")).toBeEnabled();
+  await expect(first.getByLabel("Guardar capacidad del grupo 2")).toBeEnabled();
   await expect(first.getByLabel("Nueva capacidad")).toHaveValue("15");
   await first
     .getByRole("button", {
-      name: "Cancelar edición de capacidad del grupo 1",
+      name: "Cancelar edición de capacidad del grupo 2",
       exact: true,
     })
     .click();
-  await first.getByLabel("Editar capacidad del grupo 1").click();
+  await first.getByLabel("Editar capacidad del grupo 2").click();
   await expect(first.getByLabel("Nueva capacidad")).toHaveValue("12");
   await page.getByRole("button", { name: "Nuevo grupo" }).click();
   const dialog = page.getByRole("dialog", { name: "Nuevo grupo" });
@@ -532,14 +654,7 @@ test("a delayed create-recovery snapshot cannot resurrect a sibling deleted afte
   page,
   context,
 }) => {
-  const { path, edit } = await publishedCourse(page, context);
-  await page.request.post(edit, {
-    headers,
-    form: {
-      intent: "withdraw",
-      revision: await currentCourseRevision(page, edit),
-    },
-  });
+  const { path } = await courseFixture(page, context, false);
   await page.request.post(path, {
     headers,
     form: { intent: "create", startTime: "08:00", capacity: "10" },
@@ -600,7 +715,7 @@ test("two groups can confirm concurrently through the shared dialog", async ({
   page,
   context,
 }) => {
-  const { path } = await publishedCourse(page, context);
+  const { path } = await courseFixture(page, context);
   for (const startTime of ["08:00", "10:00"])
     await page.request.post(path, {
       headers,
@@ -615,17 +730,17 @@ test("two groups can confirm concurrently through the shared dialog", async ({
     await gate.promise;
     await route.continue();
   });
-  const first = page.locator("[data-group-id]").first();
-  const second = page.locator("[data-group-id]").nth(1);
+  const first = page.locator("[data-group-id]").nth(1);
+  const second = page.locator("[data-group-id]").nth(2);
   const dialog = page.getByRole("alertdialog");
-  await first.getByRole("button", { name: "Desactivar grupo 1" }).click();
+  await first.getByRole("button", { name: "Desactivar grupo 2" }).click();
   await dialog.getByRole("button", { name: "Sí, desactivar grupo" }).click();
   await expect.poll(() => gates.length).toBe(1);
   await expect(dialog).toBeHidden();
   await expect(
-    first.getByRole("button", { name: "Desactivar grupo 1" }),
+    first.getByRole("button", { name: "Desactivar grupo 2" }),
   ).toBeDisabled();
-  await second.getByRole("button", { name: "Desactivar grupo 2" }).click();
+  await second.getByRole("button", { name: "Desactivar grupo 3" }).click();
   await expect(
     dialog.getByRole("button", { name: "Sí, desactivar grupo" }),
   ).toBeEnabled();
@@ -639,7 +754,7 @@ test("two groups can confirm concurrently through the shared dialog", async ({
   gates[0]!.release();
   await expect(first).toContainText("Inactivo");
   await expect(
-    second.getByRole("button", { name: "Reactivar grupo 2" }),
+    second.getByRole("button", { name: "Reactivar grupo 3" }),
   ).toBeEnabled();
 });
 
@@ -647,16 +762,16 @@ test("pending saves freeze only submitted inputs and validation restores field f
   page,
   context,
 }) => {
-  const { path } = await publishedCourse(page, context);
+  const { path } = await courseFixture(page, context);
   for (const startTime of ["08:00", "10:00"])
     await page.request.post(path, {
       headers,
       form: { intent: "create", startTime, capacity: "10" },
     });
   await page.goto(path);
-  const first = page.locator("[data-group-id]").first();
-  const second = page.locator("[data-group-id]").nth(1);
-  await second.getByLabel("Editar capacidad del grupo 2").click();
+  const first = page.locator("[data-group-id]").nth(1);
+  const second = page.locator("[data-group-id]").nth(2);
+  await second.getByLabel("Editar capacidad del grupo 3").click();
   await second.getByLabel("Nueva capacidad").fill("19");
   const gates: ReturnType<typeof deferred>[] = [];
   await page.route(`**${path}`, async (route) => {
@@ -666,10 +781,10 @@ test("pending saves freeze only submitted inputs and validation restores field f
     await gate.promise;
     await route.continue();
   });
-  await first.getByLabel("Editar horario del grupo 1").click();
+  await first.getByLabel("Editar horario del grupo 2").click();
   const time = first.getByLabel("Hora de inicio");
   await time.fill("10:00");
-  await first.getByLabel("Guardar horario del grupo 1").click();
+  await first.getByLabel("Guardar horario del grupo 2").click();
   await expect.poll(() => gates.length).toBe(1);
   await expect(time).toBeDisabled();
   await expect(second.getByLabel("Nueva capacidad")).toBeEnabled();
@@ -681,14 +796,14 @@ test("pending saves freeze only submitted inputs and validation restores field f
   await expect(second.getByLabel("Nueva capacidad")).toHaveValue("19");
   await first
     .getByRole("button", {
-      name: "Cancelar edición de horario del grupo 1",
+      name: "Cancelar edición de horario del grupo 2",
       exact: true,
     })
     .click();
-  await first.getByLabel("Editar capacidad del grupo 1").click();
+  await first.getByLabel("Editar capacidad del grupo 2").click();
   const capacity = first.getByLabel("Nueva capacidad");
   await capacity.fill("12");
-  await first.getByLabel("Guardar capacidad del grupo 1").click();
+  await first.getByLabel("Guardar capacidad del grupo 2").click();
   await expect.poll(() => gates.length).toBe(2);
   await expect(capacity).toBeDisabled();
   await expect(second.getByLabel("Nueva capacidad")).toBeEnabled();
@@ -696,7 +811,7 @@ test("pending saves freeze only submitted inputs and validation restores field f
   await expect(
     first.locator('[data-group-field="capacity"] dd > span'),
   ).toHaveText("12");
-  await first.getByLabel("Editar capacidad del grupo 1").click();
+  await first.getByLabel("Editar capacidad del grupo 2").click();
   await expect(capacity).toHaveValue("12");
   await expect(capacity).toBeEnabled();
   await page.getByRole("button", { name: "Nuevo grupo" }).click();

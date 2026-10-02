@@ -274,8 +274,7 @@ if (course && Astro.request.method === "POST") {
           error.code === "STALE_COURSE" || Boolean(error.fieldErrors.revision);
         Astro.response.status = courseDomainStatus(error);
         errors = error.fieldErrors;
-        pageError =
-          errors.revision || !Object.keys(errors).length ? error.message : null;
+        pageError = error.message;
       } else if (error instanceof ArtworkValidationError) {
         Astro.response.status = 400;
         errors = { artwork: error.message };

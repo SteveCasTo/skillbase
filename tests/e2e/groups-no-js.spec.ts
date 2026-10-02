@@ -46,14 +46,10 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
     },
   });
   expect(course.status()).toBe(201);
-  const { id, revision } = (await course.json()) as {
+  const { id } = (await course.json()) as {
     id: string;
     revision: string;
   };
-  await page.request.post(`/app/cursos/${id}/editar`, {
-    headers,
-    form: { intent: "publish", revision },
-  });
   await page.goto(`/app/cursos/${id}/grupos`);
   const invalidResponse = await page.request.post(`/app/cursos/${id}/grupos`, {
     headers: { Origin: "http://127.0.0.1:4321", Accept: "text/html" },
@@ -134,27 +130,41 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
   await expect(page.locator('[name="registrationEndAt"]')).toHaveValue(
     "2027-02-20T18:00",
   );
+  const prerequisite = await page.request.post(`/app/cursos/${id}/grupos`, {
+    headers,
+    form: { intent: "create", startTime: "20:00", capacity: "1" },
+  });
+  expect(prerequisite.status()).toBe(200);
+  const publication = await page.request.post(`/app/cursos/${id}/editar`, {
+    headers,
+    form: {
+      intent: "publish",
+      revision: await page
+        .locator('.course-form input[name="revision"]')
+        .inputValue(),
+    },
+  });
+  expect(publication.status()).toBe(200);
   await page.goto(`/app/cursos/${id}/grupos`);
-  await page.locator("[data-action-fallback] summary").click();
+  const target = page.locator("[data-group-id]").first();
+  await target.locator("[data-action-fallback] summary").click();
   await expect(
     page.getByRole("button", { name: "Sí, desactivar grupo" }),
   ).toBeVisible();
-  await page.locator("[data-action-fallback] summary").click();
+  await target.locator("[data-action-fallback] summary").click();
   await expect(
     page.getByRole("button", { name: "Sí, desactivar grupo" }),
   ).toBeHidden();
-  await page.locator("[data-action-fallback] summary").click();
-  await page.getByRole("button", { name: "Sí, desactivar grupo" }).click();
+  await target.locator("[data-action-fallback] summary").click();
+  await target.getByRole("button", { name: "Sí, desactivar grupo" }).click();
   await expect(page).toHaveURL(/success=cancelled/);
   await expect(page.getByText("Inactivo", { exact: true })).toBeVisible();
-  await expect(
-    page.locator("[data-group-id] [data-edit-fallback]:visible"),
-  ).toHaveCount(0);
-  await page.locator("[data-action-fallback] summary").click();
-  await page.getByRole("button", { name: "Sí, reactivar grupo" }).click();
+  await expect(target.locator("[data-edit-fallback]:visible")).toHaveCount(0);
+  await target.locator("[data-action-fallback] summary").click();
+  await target.getByRole("button", { name: "Sí, reactivar grupo" }).click();
   await expect(page).toHaveURL(/success=reactivated/);
   await expect(page.getByText("Inactivo", { exact: true })).toHaveCount(0);
   await expect(
-    page.locator('[data-group-id] [data-group-field="capacity"] summary'),
+    target.locator('[data-group-field="capacity"] summary'),
   ).toBeVisible();
 });

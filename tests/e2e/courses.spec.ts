@@ -979,6 +979,14 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     "Lunes a viernes · horario por grupo",
   );
   await expect(save).toBeDisabled();
+  const prerequisite = await page.request.post(
+    savePath.replace(/\/editar$/u, "/grupos"),
+    {
+      headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
+      form: { intent: "create", startTime: "08:00", capacity: "10" },
+    },
+  );
+  expect(prerequisite.status()).toBe(200);
   await page.getByRole("button", { name: "Publicar curso" }).click();
   const publishAfterSave = page.waitForResponse(
     (response) =>
