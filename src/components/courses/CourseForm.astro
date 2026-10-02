@@ -290,6 +290,7 @@ const currentArtworkUrl = publicArtworkUrl(
             client:only="react"
             name="instructorId"
             label="Instructor"
+            preserveDisabledValue={Boolean(courseId) && !values.instructorId}
             value={values.instructorId || "unassigned"}
             placeholder="Selecciona un instructor"
             required={false}
@@ -313,6 +314,9 @@ const currentArtworkUrl = publicArtworkUrl(
               <label for="instructorId-native" class="text-sm font-medium">
                 Instructor
               </label>
+              {courseId && !values.instructorId && (
+                <input type="hidden" name="instructorId" value="" />
+              )}
               <select
                 id="instructorId-native"
                 name="instructorId"

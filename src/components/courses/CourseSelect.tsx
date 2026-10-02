@@ -17,6 +17,7 @@ interface Props {
   disabled?: boolean;
   error?: string;
   required?: boolean;
+  preserveDisabledValue?: boolean;
 }
 
 /** A form-associated Radix Select, scoped to the course editor island. */
@@ -29,8 +30,13 @@ export default function CourseSelect({
   disabled,
   error,
   required = true,
+  preserveDisabledValue = false,
 }: Props) {
   const [selectedValue, setSelectedValue] = useState(value);
+  const preservesValue =
+    preserveDisabledValue &&
+    !disabled &&
+    options.some((option) => option.value === selectedValue && option.disabled);
 
   return (
     <div
@@ -40,6 +46,9 @@ export default function CourseSelect({
       <label id={`${name}-label`} htmlFor={`${name}-select`}>
         {label}
       </label>
+      {preservesValue && (
+        <input type="hidden" name={name} value={selectedValue} />
+      )}
       <Select.Root
         name={name}
         value={selectedValue}
