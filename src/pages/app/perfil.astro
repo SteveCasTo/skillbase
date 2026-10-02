@@ -38,16 +38,19 @@ const status = Astro.url.searchParams.get("status");
 ---
 
 <PrivateLayout title="Mi perfil">
-  <header class="max-w-2xl">
+  <header class="min-w-0">
     <h1 class="text-3xl font-semibold tracking-tight">Mi perfil</h1>
     <p class="mt-3 leading-7 text-muted-foreground">
       Administra el acceso a tu cuenta. Tus roles y tu correo los gestiona el
       equipo administrador.
     </p>
   </header>
-  <div class="mt-8 flex max-w-2xl flex-col gap-6">
+  <div class="mt-8 grid min-w-0 gap-6 xl:grid-cols-2 xl:items-start">
     {professional?.previous && (
-      <section aria-labelledby="professional-title">
+      <section
+        class="min-w-0 xl:col-span-2"
+        aria-labelledby="professional-title"
+      >
         <h2 id="professional-title" class="text-xl font-semibold">
           Perfil profesional
         </h2>
@@ -65,13 +68,22 @@ const status = Astro.url.searchParams.get("status");
           values={professional.values}
           errors={professional.errors}
           revision={professional.revision}
+          baseline={{
+            firstName: professional.previous.firstName,
+            lastName: professional.previous.lastName,
+            email: professional.previous.email,
+            phone: professional.previous.phone ?? "",
+          }}
           editing
           action="/app/perfil?edit=professional"
         />
       </section>
     )}
     {status === "recovery_sent" && (
-      <p class="rounded-lg border bg-muted p-4 text-sm" role="status">
+      <p
+        class="rounded-lg border bg-muted p-4 text-sm xl:col-span-2"
+        role="status"
+      >
         Si podemos procesar la solicitud para una cuenta habilitada, enviaremos
         un enlace para confirmar tu acceso. Revisa también spam.
       </p>
@@ -79,7 +91,10 @@ const status = Astro.url.searchParams.get("status");
     {(status === "password_changed" ||
       status === "linked" ||
       status === "confirmed") && (
-      <p class="rounded-lg border bg-muted p-4 text-sm" role="status">
+      <p
+        class="rounded-lg border bg-muted p-4 text-sm xl:col-span-2"
+        role="status"
+      >
         {status === "password_changed"
           ? "Contraseña actualizada."
           : status === "linked"
@@ -89,7 +104,7 @@ const status = Astro.url.searchParams.get("status");
     )}
     {(error || Astro.url.searchParams.get("error")) && (
       <p
-        class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm"
+        class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm xl:col-span-2"
         role="alert"
       >
         {error ??
@@ -97,13 +112,13 @@ const status = Astro.url.searchParams.get("status");
       </p>
     )}
     <section
-      class="rounded-xl border bg-card p-5 sm:p-6"
+      class="min-w-0 rounded-xl border bg-card p-5 sm:p-6"
       aria-labelledby="account-title"
     >
       <h2 id="account-title" class="text-lg font-semibold">
         Datos de la cuenta
       </h2>
-      <dl class="mt-5 grid gap-4 text-sm">
+      <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2">
         <div>
           <dt class="text-muted-foreground">Nombre</dt>
           <dd class="mt-1 break-words font-medium">{user.name}</dd>
@@ -125,7 +140,7 @@ const status = Astro.url.searchParams.get("status");
       </dl>
     </section>
     <section
-      class="rounded-xl border bg-card p-5 sm:p-6"
+      class="min-w-0 rounded-xl border bg-card p-5 sm:p-6"
       aria-labelledby="password-title"
     >
       <h2 id="password-title" class="text-lg font-semibold">
@@ -196,7 +211,7 @@ const status = Astro.url.searchParams.get("status");
       </form>
     </section>
     <section
-      class="rounded-xl border bg-card p-5 sm:p-6"
+      class="min-w-0 rounded-xl border bg-card p-5 sm:p-6"
       aria-labelledby="google-title"
     >
       <h2 id="google-title" class="text-lg font-semibold">
