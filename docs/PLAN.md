@@ -509,7 +509,27 @@ El ajuste UX de interesados (copy del formulario, submit progresivo, tarjetas/ba
 
 Fase 4 (grupos, instructores y acceso) quedó cerrada para los flujos aprobados mediante PR 126 a `master`; la validación y smoke de producción constan en `docs/DEPLOYMENT.md`. Esto no completa Fases 5–9 ni añade baja de instructor, carrera académica, sesiones o asistencia a Fase 4.
 
-La desactivación con cursos futuros sigue sin política ni UI/endpoint; no se ofrece dicha operación. Historial académico/carrera completa, sesiones y asistencia corresponden a Fase 6.
+Al cierre del release de Fase 4 no existían política ni UI/endpoint de baja; el nuevo alcance autorizado queda registrado en las correcciones pendientes abajo. Historial académico/carrera completa, sesiones y asistencia corresponden a Fase 6.
+
+#### Correcciones solicitadas antes de iniciar Fase 5 (pendientes)
+
+Fase 4 conserva su estado histórico de cierre y release para los flujos que entonces se aprobaron. Las solicitudes que siguen son una nueva lista de correcciones/revisión previa, no reescriben la evidencia del release ni declaran implementados esos cambios. **No iniciar implementación de Fase 5 hasta completar las correcciones y ejecutar/revisar el gate completo de validación.** El alcance funcional de Fase 5 ya está confirmado; el presente cambio es documental y no modifica código.
+
+- [ ] Ajustar alta/edición de instructor y perfil: formularios responsive que ocupen el ancho útil del área de contenido, sin columna estrecha ni ancho fijo sobrante. Habilitar alta/login/recovery/cambio de contraseña solo cuando los campos requeridos sean válidos; en edición habilitar guardar solo si hay cambios reales y válidos. Tratar correctamente campos password que no se repueblan.
+- [ ] Retirar el texto «El correo de acceso se conserva para mantener la identidad de la cuenta.» y los dos textos redundantes de login sobre acceso limitado/preaprovisionado e instrucciones de Google/correo. Añadir icono de Google al botón correspondiente.
+- [ ] Baja de instructor: regla aprobada para implementar: sin asignaciones históricas, eliminar solo si el rol es únicamente `INSTRUCTOR`, no hay dependencias y Auth se elimina consistentemente; con historial, solo activar/desactivar. Desactivado deniega servidor incluso sesiones vigentes. Bloquear desactivación si hay curso asignado no archivado (incluye draft), listar cursos y requerir quitar/reasignar; permitir si todos están archivados. No reescribir el estado histórico de Fase 4.
+- [ ] Interesados: filtrar y actualizar lista/zona afectada sin recarga completa, conservando foco; skeleton solo durante carga real. Mantener integridad ante duplicados. Respuesta pública neutra de éxito para duplicate confirmada para evitar enumeración; no revelar si el correo ya existe.
+- [ ] Draft puede permanecer sin instructor; el placeholder «Sin asignar…» queda deshabilitado/gris en el selector incluso en draft, sin impedir conservar `null` al editar otros campos. Publicado requiere instructor activo y al menos un grupo activo. Si se intenta publicar sin instructor, mostrar causa y acción recuperable inline además del toast; no solo «No se pudo completar la acción»/reintentar.
+- [ ] Edición de grupo: cancelar («X») debe cancelar la edición de los campos del grupo, no solo un control; centrar la alineación solicitada. Mantener la validación autoritativa del servidor.
+- [ ] No permitir desactivar el último grupo activo de un curso `PUBLISHED`. Se permite retirar editorialmente el curso publicado; no confundir el retiro del curso con desactivación de grupo.
+- [ ] Sidebar móvil: tema a la izquierda y cerrar sesión a la derecha. Datos personales deben abrir el perfil mediante interacción accesible por clic/teclado (y hover/foco en desktop), sin enlace móvil adicional «Mi perfil». Revisar perfil responsive.
+- [ ] El cambio de contraseña en perfil debe ser solo una acción que conduce a formulario dedicado, no campos incrustados. Mostrar errores estilizados inline, sin diálogos nativos; conservar SSR/POST y validación de servidor. Si la nueva contraseña coincide con la anterior, mostrar el error real/seguro pertinente, no un genérico engañoso. Retirar «Enviar enlace de confirmación» del flujo de cambio de contraseña; el flujo de recovery «Olvidaste tu contraseña» debe tener página dedicada, email y botón sujeto a validez.
+- [ ] No quitar la confirmación/verificación requerida para cuentas Google-only sin probar el acceso seguro del usuario en servidor. Definir por separado el establecimiento de primera contraseña cuando corresponda; una UI no puede reducir las garantías de autenticación.
+- [ ] Mantener feedback/toast por operación: UUID propio, mismo identificador entre loading y resultado, continuidad visual. Incorporar estados de carga y resultado sin perder datos/foco.
+- [ ] Verificar los reportes de que no llega correo de recuperación o perfil solo después de implementar las correcciones y probar Fase 5 junto a ellas. No prometer entrega ni configurar SMTP ahora. SMTP propio ausente; enlace Google real tampoco verificado en la evidencia de Fase 4.
+- [ ] Corregir primero y validar después el conjunto completo aplicable: unitarias e integración junto a su lógica; E2E colectivo tras estabilizar. Conservar tests y cobertura, sin borrar tests ni reducir assertions/coverage para lograr verde. No declarar validación hasta registrar resultados reales. Verificar entrega de recovery/perfil y Google OAuth real al final de Fase 5; SMTP propio no está configurado. No prometer ni afirmar entrega antes de probarla.
+
+Las reglas de identidad, propiedad, validación server-side, SSR y recuperación descritas en `docs/AUTHENTICATION.md`, `docs/SECURITY.md` y `docs/DESIGN.md` siguen siendo límites; esta lista no autoriza debilitarlas.
 
 #### Estado del bloque de autenticación dual
 
@@ -535,8 +555,8 @@ Administración transforma demanda en grupos operativos.
 
 - Registrar presencialmente a una persona como preinscrita, con pago parcial o total y ocupación de cupo; permitir registro directo o prellenar desde un interesado con datos editables.
 - Diseñar el vínculo de origen con el interesado como explícito y trazable, sin inferir identidad global ni pago desde el registro público.
-- No denominar este registro inscripción definitiva sin una regla posterior que confirme esa transición.
-- Completar en esta fase los datos administrativos pendientes, incluido CI cuando se confirme su necesidad.
+- Usar los estados operativos `PREINSCRITO`, `INSCRITO` y `SALDOVENCIDO` según reglas aprobadas; ninguno implica por sí mismo resultado o cierre académico de Fases 6+.
+- Registrar CI como identificador principal de la ficha global, según normalización conservadora descrita en el alcance confirmado.
 - Registrar tipo de participante.
 - Registrar precio aplicado.
 - Aplicar descuentos.
@@ -547,11 +567,45 @@ Administración transforma demanda en grupos operativos.
 - Gestionar cambios de grupo y devoluciones en esta fase; no duplicar estas operaciones en Fase 3.
 - Generar listados administrativos.
 
-El registro público de interesados de Fase 3 no cobra ni ocupa cupo. La preinscripción presencial y pagada pertenece a esta fase; reglas de dinero —precio aplicado, descuentos, pagos, documentos/boleta y devoluciones— permanecen en su alcance y sus detalles pendientes de definición no se adelantan aquí.
+### Inicio de planificación (2026-10-02; implementación NO iniciada)
+
+El usuario autorizó iniciar el trabajo en este orden: correcciones de Fase 4, gate de validación completo de esas correcciones, y solo después implementación de Fase 5. Este documento registra definición funcional; **no hay implementación de Fase 5 en curso ni código/schema autorizado en este cambio documental**. La orquestación futura usará subagentes mínimos y PRs hacia `development`; promoción a `master` solo después de todos los checks requeridos PASS. No se hace push, merge ni release ahora. El contrato funcional queda definido para iniciar diseño técnico una vez superado el gate de Fase 4; definición no equivale a implementación.
+
+#### Alcance confirmado para definir Fase 5 (aún no implementado)
+
+- Participante global sin cuenta, identificado por CI único normalizado conservadoramente: quitar espacios externos, normalizar case/espacios y preservar ceros iniciales, letras y sufijos; no convertir a número ni imponer formato nacional/checksum. Ficha: nombre/apellidos, email requerido, teléfono opcional. Una preinscripción vigente por participante/curso; admite varios cursos. Sin escaneo ni verificación/checksum de CI.
+- Tipos `STUDENT`, `EXTERNAL`, `AUXILIARY` elegidos manualmente por ADMIN. `AUXILIARY` usa tarifa `STUDENT` menos 50 % inmediato; no se exige evidencia digital, categoría adicional ni certificado previo.
+- Configuración ADMIN global mínima: mínimo de pago en porcentaje entero 1–100 (default 25 %) y descuento auxiliar entero 0–100 (default 50 %). Se aplica solo a nuevas preinscripciones. Cada registro guarda snapshot inmutable de revisión/precio del curso, tipo/base, porcentajes y montos en `BOB` como centavos enteros/decimal exacto, nunca `float`. Mínimo = techo al centavo de precio final descontado × porcentaje mínimo. Cambios no alteran registros previos ni producen cobro retroactivo.
+- Abonos manuales en efectivo; no pasarela, upload de comprobantes, emisión de recibo ni boleta/valorado generados. No negativo ni sobrepago. Ledger auditable no destructivo con actor y timestamp de registro; fecha efectiva civil Bolivia puede ser pasada, nunca futura y por defecto hoy. Reembolso registrado no significa transferencia ejecutada por la app y no puede superar lo efectivamente pagado.
+- Alta ordinaria solo para curso `PUBLISHED`, grupo `PLANNED` con cupo e instructor `ACTIVE`, hasta cierre inclusivo de ventana o inicio oficial si no hay ventana. ADMIN puede registrar durante el primer día civil solo con pago 100 %, destino elegible/cupo y auditoría; no hay altas en días posteriores por esta excepción. Zona `America/La_Paz`.
+- La preinscripción permanece `PREINSCRITO` hasta el inicio aunque esté pagada. Al inicio y con saldo completo pasa a `INSCRITO`; saldo pendiente permanece `PREINSCRITO` durante el primer día y al cierre de ese día se marca `SALDOVENCIDO`, sin borrar, cancelar, liberar cupo o reembolsar automáticamente. ADMIN resuelve manualmente; esto no constituye actividad académica.
+- Cancelación voluntaria con devolución total de lo pagado solo hasta la fecha límite inclusiva. Cancelar grupo obliga a registrar devolución total de pagos de preinscritos afectados, sin límite por cutoff. Se preserva identidad/historial, con actor/monto/fecha/motivo; se libera cupo cuando corresponde. No se afirma ejecución bancaria, no hay refund por saldo vencido ni borrado físico.
+- Cambios de grupo solo dentro del mismo curso y hasta fecha límite, con destino activo/cupo; no hay cambio entre cursos. No se recalcula snapshot: grupos del mismo curso comparten tarifa/revisión. Origen, destino y cupo cambian atómicamente.
+- Mutaciones de participantes, preinscripciones, pagos, configuración/grupos/devoluciones son `ADMIN`-only. Instructor, desde inicio oficial, consulta readonly cursos/grupos propios y roster mínimo (nombre/apellidos), sin finanzas, CI/email ni exportación. CSV/PDF administrativos ADMIN-only, no recibos/boletas y protegidos contra formula injection. No incluir sesiones, asistencia, notas ni certificados de Fases 6+.
+- Preservar vínculo explícito y trazable de origen desde `InterestRegistration` si aplica, pero no mostrar flujo/selector de vínculo dedicado ni fusionar personas por el email declarado públicamente. Mantener métricas de interesados intactas; el prellenado no convierte el interés en participación ni afecta métricas.
+
+#### Decisiones confirmadas y límites para el contrato
+
+La política de instructor queda confirmada: bloquear desactivación si tiene asignación a cursos no archivados (incluye draft), mostrar cursos bloqueantes y exigir desasignar/reasignar; permitirla si todo lo asignado está archivado. Con cualquier historia de asignación no hay borrado físico. Sin historia, eliminación solo con rol único `INSTRUCTOR`, sin dependencias y con borrado consistente de Auth. Desactivado deniega todas las rutas y acciones server-side incluso si la sesión sigue abierta.
+
+Instructor puede consultar en modo lectura sus grupos y roster desde el inicio oficial; datos visibles limitados a nombre/apellidos y sin finanzas. El roster no se exporta.
+
+No quedan preguntas de alcance funcional bloqueantes para comenzar diseño técnico/implementación una vez completado el gate. Las comprobaciones de entrega de Google OAuth, recovery SMTP y correo de perfil son una validación operativa al final de Fase 5, no condición para cerrar la definición; SMTP propio no está configurado y no se afirma entrega verificada.
+
+El contrato de negocio queda cerrado para iniciar diseño técnico una vez superado el gate de correcciones Fase 4. No se crea schema/código en este cambio documental.
+
+El registro público de interesados de Fase 3 no cobra ni ocupa cupo. La preinscripción presencial/pagada pertenece a esta fase conforme al alcance financiero de `docs/REQUIREMENTS.md`; no incluye pasarela, comprobantes subidos ni emisión automática de boleta.
+
+#### Validación a completar durante la implementación (pendiente)
+
+- [ ] Tests unitarios para normalización CI, unicidad/vigencia, elegibilidad/ventanas, snapshots/precio/descuento, mínimo y redondeo exacto, estados y cancelación/devolución.
+- [ ] Tests de integración para constraints/migración, historial no destructivo, snapshots no retroactivos, ledger de abonos/devoluciones, autorización/RLS, trazabilidad del interesado-origen y concurrencia de cupos/cambios de grupo.
+- [ ] E2E administrativos de alta directa/prellenada, origen readonly, cupo, pagos parciales/completos, fecha límite/primer día, saldo vencido, cambio de grupo y cancelación/devolución. Verificar ADMIN-only, roster limitado del instructor y exportaciones seguras.
+- [ ] Completar unit e integración junto a la lógica; correr E2E colectivo tras estabilizar. No borrar tests ni rebajar assertions/cobertura. El gate final requiere suites, formatter, lint, typecheck, build y checks CI requeridos PASS antes de release.
 
 ### Resultado demostrable
 
-Administración puede mantener la lista de preinscripciones presenciales con pagos parciales o totales y cupos ocupados. Su eventual paso a inscripción definitiva requiere una regla posterior.
+Administración puede mantener preinscripciones presenciales con persona global, pagos parciales/totales, snapshots de tarifa/descuento, cupo y movimientos de cancelación/devolución. `INSCRITO` y `SALDOVENCIDO` no habilitan módulos académicos. La implementación solo se habilita al superar el gate de correcciones de Fase 4.
 
 ## FASE 6 — SESIONES Y ASISTENCIA
 
