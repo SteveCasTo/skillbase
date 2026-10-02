@@ -420,12 +420,15 @@ Verificar cada componente en ambos temas.
 - Mostrar feedback posterior.
 - No depender únicamente de asteriscos para explicar obligatoriedad.
 
-### Direcciones aprobadas pendientes de implementación
+### Perfiles y cursos de instructores (implementado en development)
 
-- El alta/edición de instructor es un flujo administrativo responsive con nombre, apellido, email requerido normalizado y teléfono opcional; no incluir campo de descripción. Las tarjetas completas de instructores son un único enlace en desktop y mobile, accesible por teclado/foco y sin controles anidados. El detalle y selector deben nombrar personas con nombre completo.
-- La pantalla de acceso ofrece Google y email/password; los formularios de password no precargan ni conservan la contraseña inicial tras respuesta. Cambios y errores quedan visibles sin revelar secretos.
-- La UI de instructor expone perfil propio y cursos asignados únicamente, con autorización en servidor; no presentar asistencia/sesiones antes de Fase 6.
-- Un instructor no activo/asignado no debe aparecer en las opciones de asignación si esa regla se confirma con el tratamiento de activación aprobado; dicha regla aún está pendiente, no asumir estados/acciones en la UI.
+- El listado ADMIN `/app/instructores` usa grilla responsive de tarjetas completas: cada tarjeta es un único enlace semántico a edición, incluye nombre completo, correo/status, y mantiene foco visible sin enlaces/controles anidados. No presenta descripción porque el perfil no la recopila.
+- El formulario de alta/edición tiene nombre y apellidos requeridos, email `type=email` requerido/normalizado (solo lectura al editar), teléfono opcional `type=tel` y password inicial solo al crear. La password nunca se repuebla ante fallo; límites y reglas se vuelven a validar en servidor. La cuenta se activa con el password asignado por ADMIN, sin paso forzado de cambio.
+- La sección «Perfil profesional» dentro de `/app/perfil` solo se presenta a usuarios con rol `INSTRUCTOR`; permite editar nombre, apellidos y teléfono, manteniendo email de cuenta como solo lectura. El perfil de acceso/password sigue siendo una sección distinta.
+- Administración puede elegir instructor registrado activo al crear/editar el curso; draft puede permanecer sin asignación, pero publicación no. El nombre completo asignado es el único dato del instructor proyectado en el detalle público; correo/teléfono no se exponen. Cursos históricos sin asignación conservan su texto libre.
+- Instructor navega a «Mis cursos» y ve únicamente listas/detalles de cursos que le pertenecen; no se exponen acciones ADMIN, interesados, formatos, asistencia ni sesiones. `/app/mis-cursos/[id]` muestra fechas/grupos/cupo/estado como consulta, no una vista de mutación.
+- Formularios conservan HTML/POST y validación de servidor sin JavaScript; con JS la mutación muestra pending/success/error con el mismo ID de notificación, bloquea doble submit y sitúa foco en el error. La contraseña se limpia al fallar.
+- El skeleton de navegación conoce `/app/instructores` y `/app/mis-cursos` como listas, `/app/instructores/nuevo` y edición como formularios, y `/app/mis-cursos/[id]` como detalle; usa el ciclo real de navegación, no un retraso decorativo. Las reglas de activación/desactivación con cursos futuros continúan sin definir y no se exponen controles para inventar ese flujo.
 
 ## CONSISTENCIA
 
@@ -515,6 +518,6 @@ Antes de crear un componente:
 - La UI está implementada y la cobertura responsive, de teclado y de fallback sin JavaScript está verificada; el E2E completo del release pasó 96/96. La secuencia local anterior de 95 escenarios requirió revalidaciones dirigidas; ver el historial exacto en `docs/TESTING.md`.
 - La lista de cursos permite wrapping de slugs largos y evita overflow horizontal en 320, 390, 768, 1024 y 1440 px. Las regresiones de viewport/toasts pasaron dentro del E2E de release (96/96).
 
-## Ajustes UI de interesados (PR independiente pendiente)
+## Estado de los ajustes de interesados
 
-Hay un cambio visual aprobado en implementación paralela, todavía no integrado: eliminar copy redundante del formulario público y dejar una sola aclaración de que el interés no reserva cupo; botón ancho completo, deshabilitado hasta completar obligatorios válidos solo como mejora JS, manteniendo POST/validación server-side utilizables sin JavaScript. En administración, hacer intro fluida a ancho disponible, eliminar métricas/copy irrelevante y usar cards responsivas en vez de tabla/lista densa; barras apiladas con etiqueta y conteo legibles, destacando ganador positivo también en «sin preferencia» y empates, con cero seguro. Cargas estructurales deben usar skeleton ligado a carga real. No marcar implementado hasta merge y revalidación responsive/teclado/contraste.
+El ajuste compacto/responsive del panel y formulario de interesados quedó integrado mediante PRs 116 y 117 a `development`; ver el comportamiento y accesibilidad implementados en la sección «Registro público de interesados» arriba. Su verificación full anterior al módulo de instructores pasó 98/98 E2E. Este hito UX no cierra la gestión de cursos/instructores de Fase 4.

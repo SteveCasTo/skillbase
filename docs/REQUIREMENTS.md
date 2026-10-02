@@ -14,7 +14,7 @@ Gestiona el ciclo operativo completo.
 
 ### Instructor
 
-Gestiona aspectos académicos de grupos asignados.
+Consulta su perfil profesional y sus cursos asignados. La gestión académica de asistencia/sesiones pertenece a Fase 6.
 
 ### Participante
 
@@ -76,10 +76,10 @@ Los niveles iniciales son:
 - La publicación exige un formato activo/revisión válida con exactamente los precios `STUDENT` y `EXTERNAL` aplicables, ambos en `BOB`.
 - El contrato público devuelve exclusivamente cursos `PUBLISHED` y no expone identificadores, estado, nota mínima ni timestamps administrativos; catálogo y detalle están implementados por SSR.
 - El campo `schedule` sigue siendo texto informativo de compatibilidad. Los cursos nuevos indican que el horario depende del grupo, y los cursos anteriores conservan su horario textual o el plan horario histórico. Todavía no hay sesiones operativas de grupos.
-- El contenido opcional Markdown se presenta sin HTML crudo y se filtran protocolos de enlaces no permitidos. Instructor se almacena como texto provisional, no como asignación de identidad.
+- El contenido opcional Markdown se presenta sin HTML crudo y se filtran protocolos de enlaces no permitidos. `instructorName` conserva nombres libres históricos; la asignación real usa el perfil interno y no se backfillea automáticamente desde ese texto.
 - Se puede seleccionar como destacado, con máximo uno entre cursos publicados; si no se designa uno, landing y catálogo usan fallback determinista.
 
-### Instructor y asignación (contrato aprobado para Fase 4; pendiente de implementación)
+### Instructor y asignación (Fase 4, implementación integrada en development)
 
 - Administración crea un perfil de instructor con nombre, apellido y email obligatorios; el email se normaliza antes de persistirse y el teléfono es opcional. En presentación pública se usa únicamente el nombre completo; no se recopila ni publica descripción.
 - Cada instructor interno tiene rol `INSTRUCTOR` y una cuenta Supabase Auth aprovisionada por el ADMIN desde servidor. El ADMIN establece la contraseña inicial; no se envía invitación ni se fuerza un paso adicional de cambio de contraseña. El instructor puede cambiarla desde su perfil opcionalmente.
@@ -90,6 +90,8 @@ Los niveles iniciales son:
 - Una asignación no puede hacer que un instructor esté en dos cursos cuyos calendarios L–V coincidan en fecha y horario civil de Bolivia (`America/La_Paz`). Se usan intervalos semiabiertos, por lo que turnos contiguos no se consideran conflicto. Mutaciones concurrentes de asignación, fecha de curso, horario/grupo, estado o publicación deben serializar conflicto y escritura para evitar carreras.
 - Los perfiles usados conservan identificadores estables e historial referencial; no se borran físicamente. No se ha aprobado qué ocurre al desactivar un instructor con cursos futuros asignados: resolver antes de implementar activación/desactivación en ese caso.
 - Incluir eventos de auditoría para creación/actualización de asignación y mutaciones de cuenta, sin credenciales. Auditoría como UI/reportes no es parte de este flujo.
+
+La migración 0014 agrega perfiles y asignación preservando cursos legados sin mapear automáticamente `instructorName`; las migraciones 0012–0015 están aplicadas al Supabase local estándar y pendientes en cloud. La implementación incluye CRUD ADMIN de perfiles/asignaciones, edición propia de datos profesionales (correo no editable) y consulta instructor de `/app/mis-cursos` filtrada por ownership server-side. PRs 120–123 integraron el alcance en `development`. Se auditan `INSTRUCTOR_CREATED`, `INSTRUCTOR_UPDATED`, cambios de asignación y `PASSWORD_CHANGED`, sin credenciales/tokens. El evento de password se escribe después de éxito Auth; si PostgreSQL falla, el cambio no se revierte y se registra un fallback sanitizado. La regla de desactivar un instructor con cursos futuros sigue sin resolverse y no se ha implementado acción para ello; resolver antes de añadir esa operación.
 
 ### Reglas implementadas de formatos e imágenes
 

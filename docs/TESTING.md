@@ -248,7 +248,35 @@ Las pruebas añadidas en la rama `feat/dual-auth-and-profile` cubren login passw
 
 Estado local comunicado por el implementador: unit 146 PASS, integration 71 PASS, 27 E2E dirigidos PASS; lint PASS; typecheck 0 errores/0 warnings/83 hints; build, Drizzle y formatter PASS; `git diff --check` PASS. Después, el full E2E aislado en el puerto canónico 4321 pasó 104/104 (5.9 min). La corrida full anterior en 4323 obtuvo 73 PASS/31 FAIL: tests heredados enviaban `Origin: http://127.0.0.1:4321` y sus POST fueron rechazados como cross-site. Se corrigió solo la invocación al puerto canónico, sin editar código/tests ni modificar retries; el puerto alternativo aún no cubre todos los tests heredados.
 
-[PR 118](https://github.com/SteveCasTo/skillbase/pull/118) se integró en `development` como `f06b4fdf8f8c7691ffdd7937efb0f813a27666d4`. No reportó checks remotos; estos resultados son locales, no CI PASS. Las migraciones 0012/0013 se probaron únicamente en stacks aislados; siguen pendientes su aplicación local persistente/cloud y la configuración efectiva de hook/secreto server-only. SMTP/entrega real y Google real no están verificados. El servidor original quedó apagado con autorización del usuario; no se reinició.
+[PR 118](https://github.com/SteveCasTo/skillbase/pull/118) se integró en `development` como `f06b4fdf8f8c7691ffdd7937efb0f813a27666d4`. No reportó checks remotos; estos resultados son locales, no CI PASS. En ese momento 0012/0013 solo se habían probado en stacks aislados; su aplicación local posterior y 0014/0015 constan abajo. Cloud, SMTP/entrega real y Google real siguen sin verificarse. El servidor original estuvo apagado durante esa validación histórica; el smoke local posterior está registrado en la sección de PR 123.
+
+### Cobertura de perfiles/asignación de instructor (PR 120)
+
+La cobertura añadida en `tests/unit/instructors.test.ts`, `tests/integration/instructors.test.ts` y `tests/e2e/instructors.spec.ts` valida perfiles/normalización, creación server-side de cuenta y perfil, edición propia/ADMIN, campo email no editable, actor/rol, unicidad y restricciones, asignación obligatoria para publicar pero opcional en borrador, denegación por URL/curso ajeno, historial/auditoría, cambio de instructor antes del inicio y rechazo al comenzar, y fechas/calendarios de grupos concurrentes. Los E2E también cubren tarjeta completa, rutas responsive/teclado, validación accesible/estados de submit y fallback HTML sin JavaScript. La suite usa Supabase temporal; no prueba SMTP, Google real ni estado de migraciones del stack persistente.
+
+Resultados locales reportados para PR 120: 151 unit PASS, 84 integration PASS, full E2E 107/107 PASS en `127.0.0.1:4321`, lint/format/typecheck/build y Drizzle checks PASS. No se reportaron checks remotos; no registrar CI PASS. En esa etapa 0012–0014 estaban solo en stacks aislados. Posteriormente 0012–0015 se aplicaron al Supabase local estándar; cloud sigue pendiente.
+
+### Seed local, auditoría password y reparación forward-only (PRs 121–123)
+
+`tests/integration/renew-demo.test.ts` ejercita el seed/reset sobre Supabase temporal: preserva la identidad Auth, rol y sesión del ADMIN; crea/recupera las mismas tres identidades instructor; hace insert-only sin sobrescribir cursos; y se niega ante metadata de ownership alterada. `tests/integration/auth-repository.test.ts`/`tests/unit/dual-auth.test.ts` cubren `PASSWORD_CHANGED` sin password ni token y el comportamiento cuando la escritura de auditoría falla después de que Supabase Auth ya aceptó el password. `tests/integration/format-deletion-guard.test.ts` valida que revisiones de formato sean inmutables y que solo se eliminen las revisiones de un formato explícitamente autorizado y no referenciado.
+
+Seed local verificado por el implementador: 2 formatos/revisiones, 3 perfiles/cuentas instructor, 6 cursos (5 publicados/1 draft), 12 grupos, 6 historiales de asignación, 35 interesados (30 `ACTIVE`, 5 `CANCELLED`) y 6 marcadores `DEMO_SEEDED`. Los tres instructores autenticaron por password y cada uno vio sus dos cursos propios; las rutas/consultas ADMIN fueron denegadas y las sesiones temporales se cerraron. Los reruns insert-only conservaron cursos/filas existentes. Ninguna contraseña/clave se imprime.
+
+`bun run test:integration:renew-demo` usa únicamente un stack Supabase temporal. El CLI `bun run db:seed:renew-demo` es manual y local-only: sin flags muestra el plan, `--apply` inserta faltantes y `--apply --reset-application-data` resetea solo su allowlist app-data con `TRUNCATE ... RESTRICT`. La CLI no es parte de tests ni puede dirigirse a producción.
+
+PR 123 reparó mediante 0015 el guard de borrado de revisiones observado en el Supabase local estándar. Ledger 16, 0012–0015 aplicadas sin reset; checksums históricos de 0003/0005/0008 quedaron intactos. No se modificaron migraciones históricas. El detalle del drift probado y del guard actual está en `docs/DEPLOYMENT.md`.
+
+Validación local final reportada tras PR 123: 154 unit PASS (1123 assertions), 87 integration PASS (615 assertions), full E2E 107/107 PASS en el puerto canónico `127.0.0.1:4321`, lint/format/build/Drizzle y `git diff --check` PASS; typecheck 0 errores/0 warnings/98 hints. Una corrida E2E anterior a la reparación de Sharp falló 87/107 con error real de procesamiento de imagen; la dependencia opcional Sharp faltante se restauró con `bun install --frozen-lockfile`, sin cambio de código/manifest. La corrida posterior de la fuente corregida pasó 107/107, no fue retry de la fuente fallida. No hay checks remotos reportados.
+
+Smoke frontend local final PASS en `http://127.0.0.1:4321` (PID 23168): catálogo 5 tarjetas, detalles y formulario/preferencias 200; el curso público muestra nombre completo del instructor, sin email/teléfono. Los perfiles synthetic INSTRUCTOR y dos cursos/detalles propios dieron 200; las rutas ADMIN desde sesión INSTRUCTOR fueron denegadas 303. Se cerraron las sesiones temporales. El proceso quedó activo para la comprobación coordinada; no detenerlo. Google OAuth real, SMTP/recovery cloud y production smoke siguen sin verificarse.
+
+### Resumen de operación local
+
+La suite temporal de seed/reset y guard de formato se detalla en los tests `renew-demo.test.ts` y `format-deletion-guard.test.ts`; la herramienta CLI de datos permanece separada y local-only (ver `docs/DEPLOYMENT.md`).
+
+El comportamiento del guard forward-only 0015 y las diferencias históricas probadas se documentan en `docs/DEPLOYMENT.md`; la prueba del schema/función ocurre en stacks aislados, no contra cloud.
+
+Los resultados y límites del gate de producción, distinto de esta validación local, se registran en `docs/PLAN.md` y `docs/DEPLOYMENT.md`.
 
 ### Cobertura de cursos y formatos
 
