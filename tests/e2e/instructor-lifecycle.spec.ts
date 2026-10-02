@@ -17,7 +17,7 @@ test("instructor lifecycle confirmation and mutations remain available without J
       .getByLabel("Correo electrónico")
       .fill(`fallback-lifecycle-${randomUUID()}@e2e.test`);
     await page
-      .getByLabel("Contraseña inicial")
+      .getByLabel("Contraseña inicial", { exact: true })
       .fill(randomBytes(24).toString("base64url"));
     await page
       .getByRole("button", { name: "Crear instructor", exact: true })
@@ -70,7 +70,7 @@ test("ADMIN lifecycle preserves credentials on reactivation, denies existing ses
   await page.getByLabel("Nombre", { exact: true }).fill("Lifecycle");
   await page.getByLabel("Apellidos").fill("Sintético");
   await page.getByLabel("Correo electrónico").fill(email);
-  await page.getByLabel("Contraseña inicial").fill(password);
+  await page.getByLabel("Contraseña inicial", { exact: true }).fill(password);
   await page
     .getByRole("button", { name: "Crear instructor", exact: true })
     .click();
@@ -167,7 +167,7 @@ test("instructor lifecycle preserves inline error and shows pending feedback wit
     .getByLabel("Correo electrónico")
     .fill(`pending-${randomUUID()}@e2e.test`);
   await page
-    .getByLabel("Contraseña inicial")
+    .getByLabel("Contraseña inicial", { exact: true })
     .fill(randomBytes(24).toString("base64url"));
   await page
     .getByRole("button", { name: "Crear instructor", exact: true })
