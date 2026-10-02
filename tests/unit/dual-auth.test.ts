@@ -224,7 +224,7 @@ test("password changes require old password verification or a bounded recovery c
     hasRecoveryProof: false,
   };
   await expect(changeAccountPassword(user, input, gateway)).rejects.toThrow(
-    "Confirma",
+    "La contraseña actual es incorrecta",
   );
   expect(changed).toBe(0);
   expect(auditActors).toHaveLength(0);

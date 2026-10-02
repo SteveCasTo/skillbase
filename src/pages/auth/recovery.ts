@@ -26,7 +26,10 @@ export const GET: APIRoute = async ({ url, locals, cookies, redirect }) => {
       supabase,
       new DrizzleAuthUserRepository(getDatabase()),
     );
-    if (!context.internalUser) {
+    if (
+      !context.internalUser ||
+      context.session?.method !== "EMAIL_CONFIRMATION"
+    ) {
       await supabase.auth.signOut({ scope: "local" });
       return redirect("/login?error=recovery", 303);
     }
@@ -40,7 +43,7 @@ export const GET: APIRoute = async ({ url, locals, cookies, redirect }) => {
         ),
       ),
     );
-    return redirect("/app/perfil?status=confirmed", 303);
+    return redirect("/app/perfil/contrasena?status=confirmed", 303);
   } catch {
     return redirect("/login?error=recovery", 303);
   }

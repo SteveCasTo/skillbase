@@ -105,6 +105,7 @@ describe("private route policies and caching", () => {
       "/app/interesados",
       "/app/mis-cursos",
       "/app/perfil",
+      "/app/perfil/contrasena",
     ]);
     expect(getPrivateRoutePolicy("/app")).toEqual({ access: "ACTIVE_USER" });
     expect(getPrivateRoutePolicy("/app/cursos")).toEqual({

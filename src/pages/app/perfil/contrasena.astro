@@ -1,0 +1,137 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import PasswordField from "@/components/auth/PasswordField";
+import AuthFormPending from "@/components/auth/AuthFormPending.astro";
+import GoogleIcon from "@/components/auth/GoogleIcon.astro";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  loadPasswordEditorState,
+  updateProfilePassword,
+} from "@/server/auth/profile";
+const { hasPassword, hasRecoveryProof, needsGoogle } =
+  await loadPasswordEditorState(Astro);
+let error: string | null = null;
+let fields: Record<string, string> = {};
+if (Astro.request.method === "POST") {
+  const result = await updateProfilePassword(Astro);
+  error = result.error;
+  fields = result.fields ?? {};
+  if (Astro.request.headers.get("accept")?.includes("application/json")) {
+    return new Response(
+      JSON.stringify({
+        error,
+        fields,
+        redirect: error ? undefined : "/app/perfil?status=password_changed",
+      }),
+      {
+        status: Astro.response.status,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "private, no-store",
+        },
+      },
+    );
+  }
+  if (!error) return Astro.redirect("/app/perfil?status=password_changed", 303);
+}
+const title = hasRecoveryProof
+  ? "Restablecer contraseña"
+  : hasPassword
+    ? "Cambiar contraseña"
+    : "Crear contraseña";
+---
+
+<PrivateLayout title={title}>
+  <section class="max-w-lg" aria-labelledby="password-page-title">
+    <a
+      class="text-sm font-medium text-primary underline-offset-4 hover:underline"
+      href="/app/perfil"
+    >
+      Volver a mi perfil
+    </a>
+    <h1
+      id="password-page-title"
+      class="mt-6 text-3xl font-semibold tracking-tight"
+    >
+      {title}
+    </h1>
+    <p class="mt-3 text-sm leading-6 text-muted-foreground">
+      Usa entre 12 y 128 caracteres. Tu contraseña solo se guarda en el
+      proveedor de autenticación.
+    </p>
+    {error && (
+      <p class="mt-5 text-sm text-destructive" role="alert">
+        {error}
+      </p>
+    )}
+    {needsGoogle ? (
+      <>
+        <p class="mt-5 text-sm leading-6" role="status">
+          Vuelve a iniciar sesión con Google para confirmar tu acceso y crear
+          una contraseña. No necesitas una confirmación por correo.
+        </p>
+        <form
+          method="post"
+          action="/auth/google"
+          class="mt-5"
+          data-auth-form
+          data-astro-reload
+        >
+          <input type="hidden" name="next" value="/app/perfil/contrasena" />
+          <input type="hidden" name="reauthenticate" value="true" />
+          <button
+            type="submit"
+            class={buttonVariants({
+              variant: "outline",
+              className: "min-h-11",
+            })}
+          >
+            <GoogleIcon /> Confirmar con Google
+          </button>
+        </form>
+      </>
+    ) : (
+      <form
+        class="mt-7 flex flex-col gap-5"
+        method="post"
+        action="/app/perfil/contrasena"
+        data-auth-form
+        data-auth-enhanced
+        data-astro-reload
+      >
+        {hasPassword && !hasRecoveryProof && (
+          <PasswordField
+            name="currentPassword"
+            label="Contraseña actual"
+            autoComplete="current-password"
+            error={fields.currentPassword}
+            client:load
+          />
+        )}
+        <PasswordField
+          name="password"
+          label="Nueva contraseña"
+          autoComplete="new-password"
+          minLength={12}
+          error={fields.password}
+          client:load
+        />
+        <PasswordField
+          name="confirmation"
+          label="Repetir nueva contraseña"
+          autoComplete="new-password"
+          minLength={12}
+          error={fields.confirmation}
+          client:load
+        />
+        <button
+          type="submit"
+          class={buttonVariants({ className: "min-h-11 self-start" })}
+        >
+          {title}
+        </button>
+      </form>
+    )}
+  </section>
+  <AuthFormPending />
+</PrivateLayout>

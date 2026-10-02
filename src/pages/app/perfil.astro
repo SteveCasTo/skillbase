@@ -1,8 +1,8 @@
 ---
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
 import { requireInternalUser } from "@/server/auth/context";
-import { updateProfilePassword } from "@/server/auth/profile";
-import PasswordField from "@/components/auth/PasswordField";
+import ProfilePasswordEntry from "@/components/auth/ProfilePasswordEntry.astro";
+import { accountHasPassword } from "@/server/auth/password-presence";
 import AuthFormPending from "@/components/auth/AuthFormPending.astro";
 import { buttonVariants } from "@/components/ui/button";
 import { isGoogleAssociated } from "@/domain/auth/identity";
@@ -25,12 +25,12 @@ const professional = user.roles.includes("INSTRUCTOR")
     )
   : null;
 if (professional?.response) return professional.response;
-let error: string | null = null;
-if (Astro.request.method === "POST" && !professionalRequest) {
-  const result = await updateProfilePassword(Astro);
-  error = result.error;
-  if (!error) return Astro.redirect("/app/perfil?status=password_changed", 303);
-}
+if (Astro.request.method === "POST" && !professionalRequest)
+  return Astro.redirect("/app/perfil/contrasena", 303);
+const hasPassword = await accountHasPassword(
+  user,
+  accountIdentity(Astro.locals.authUser!),
+);
 const googleLinked = Astro.locals.authUser
   ? isGoogleAssociated(user, accountIdentity(Astro.locals.authUser))
   : false;
@@ -102,13 +102,13 @@ const status = Astro.url.searchParams.get("status");
             : "Acceso confirmado. Puedes establecer una contraseña durante los próximos cinco minutos."}
       </p>
     )}
-    {(error || Astro.url.searchParams.get("error")) && (
+    {Astro.url.searchParams.get("error") && (
       <p
         class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm xl:col-span-2"
         role="alert"
       >
-        {error ??
-          "No pudimos asociar Google. Utiliza la cuenta con el mismo correo e inténtalo nuevamente."}
+        No pudimos asociar Google. Utiliza la cuenta con el mismo correo e
+        inténtalo nuevamente.
       </p>
     )}
     <section
@@ -139,77 +139,7 @@ const status = Astro.url.searchParams.get("status");
         </div>
       </dl>
     </section>
-    <section
-      class="min-w-0 rounded-xl border bg-card p-5 sm:p-6"
-      aria-labelledby="password-title"
-    >
-      <h2 id="password-title" class="text-lg font-semibold">
-        Contraseña
-      </h2>
-      <p class="mt-2 text-sm leading-6 text-muted-foreground">
-        Es opcional. Para establecerla o cambiarla, confirma tu contraseña
-        actual o solicita un enlace de confirmación a tu correo.
-      </p>
-      <form
-        class="mt-5 flex flex-col gap-5"
-        method="post"
-        action="/app/perfil"
-        data-auth-form
-        data-astro-reload
-      >
-        <PasswordField
-          name="currentPassword"
-          label="Contraseña actual (si tienes una)"
-          autoComplete="current-password"
-          required={false}
-          client:load
-        />
-        <PasswordField
-          name="password"
-          label="Nueva contraseña"
-          autoComplete="new-password"
-          minLength={12}
-          client:load
-        />
-        <PasswordField
-          name="confirmation"
-          label="Confirmar nueva contraseña"
-          autoComplete="new-password"
-          minLength={12}
-          client:load
-        />
-        <p class="text-xs text-muted-foreground">
-          Usa entre 12 y 128 caracteres.
-        </p>
-        <button
-          class={buttonVariants({ className: "min-h-11 self-start" })}
-          type="submit"
-          data-label="Guardar contraseña"
-        >
-          Guardar contraseña
-        </button>
-      </form>
-      <form
-        class="mt-5"
-        method="post"
-        action="/auth/forgot-password"
-        data-auth-form
-        data-astro-reload
-      >
-        <input type="hidden" name="email" value={user.email} />
-        <input type="hidden" name="returnTo" value="profile" />
-        <button
-          class={buttonVariants({
-            variant: "outline",
-            className: "min-h-11 whitespace-normal text-left",
-          })}
-          type="submit"
-          data-label="Enviar enlace de confirmación"
-        >
-          Enviar enlace de confirmación
-        </button>
-      </form>
-    </section>
+    <ProfilePasswordEntry hasPassword={hasPassword} />
     <section
       class="min-w-0 rounded-xl border bg-card p-5 sm:p-6"
       aria-labelledby="google-title"
