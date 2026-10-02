@@ -254,7 +254,7 @@ Estado local comunicado por el implementador: unit 146 PASS, integration 71 PASS
 
 La cobertura añadida en `tests/unit/instructors.test.ts`, `tests/integration/instructors.test.ts` y `tests/e2e/instructors.spec.ts` valida perfiles/normalización, creación server-side de cuenta y perfil, edición propia/ADMIN, campo email no editable, actor/rol, unicidad y restricciones, asignación obligatoria para publicar pero opcional en borrador, denegación por URL/curso ajeno, historial/auditoría, cambio de instructor antes del inicio y rechazo al comenzar, y fechas/calendarios de grupos concurrentes. Los E2E también cubren tarjeta completa, rutas responsive/teclado, validación accesible/estados de submit y fallback HTML sin JavaScript. La suite usa Supabase temporal; no prueba SMTP, Google real ni estado de migraciones del stack persistente.
 
-Resultados locales reportados para PR 120: 151 unit PASS, 84 integration PASS, full E2E 107/107 PASS en `127.0.0.1:4321`, lint/format/typecheck/build y Drizzle checks PASS. No se reportaron checks remotos; no registrar CI PASS. En esa etapa 0012–0014 estaban solo en stacks aislados. Posteriormente 0012–0015 se aplicaron al Supabase local estándar; cloud sigue pendiente.
+Resultados locales reportados para PR 120: 151 unit PASS, 84 integration PASS, full E2E 107/107 PASS en `127.0.0.1:4321`, lint/format/typecheck/build y Drizzle checks PASS. No se reportaron checks remotos para PR 120. En esa etapa 0012–0014 estaban solo en stacks aislados; después se aplicaron al local estándar y cloud vía PR 126.
 
 ### Seed local, auditoría password y reparación forward-only (PRs 121–123)
 
@@ -269,6 +269,14 @@ PR 123 reparó mediante 0015 el guard de borrado de revisiones observado en el S
 Validación local final reportada tras PR 123: 154 unit PASS (1123 assertions), 87 integration PASS (615 assertions), full E2E 107/107 PASS en el puerto canónico `127.0.0.1:4321`, lint/format/build/Drizzle y `git diff --check` PASS; typecheck 0 errores/0 warnings/98 hints. Una corrida E2E anterior a la reparación de Sharp falló 87/107 con error real de procesamiento de imagen; la dependencia opcional Sharp faltante se restauró con `bun install --frozen-lockfile`, sin cambio de código/manifest. La corrida posterior de la fuente corregida pasó 107/107, no fue retry de la fuente fallida. No hay checks remotos reportados.
 
 Smoke frontend local final PASS en `http://127.0.0.1:4321` (PID 23168): catálogo 5 tarjetas, detalles y formulario/preferencias 200; el curso público muestra nombre completo del instructor, sin email/teléfono. Los perfiles synthetic INSTRUCTOR y dos cursos/detalles propios dieron 200; las rutas ADMIN desde sesión INSTRUCTOR fueron denegadas 303. Se cerraron las sesiones temporales. El proceso quedó activo para la comprobación coordinada; no detenerlo. Google OAuth real, SMTP/recovery cloud y production smoke siguen sin verificarse.
+
+### Verificación del release PR 126 en producción
+
+CI master run [`36951624627`](https://github.com/SteveCasTo/skillbase/actions/runs/36951624627) pasó los jobs requeridos `quality`, `integration-e2e` y `deploy`; full E2E 107/107. En una corrida anterior del PR hubo dos pruebas flaky; no se afirma que nunca hayan ocurrido flakes. El release desplegó commit `31623e708b1b3cef64d48c7ab3bdd17fec2bd394` mediante Vercel deployment `dpl_8d1Fd13g7s4CXE3VSMH21fbS1ysz`, `READY`, alias `https://skillbase-alpha.vercel.app`.
+
+Supabase cloud canónico `fvzxqlezdrlzykyoevub` quedó `ACTIVE_HEALTHY` con ledger 0012–0015 y hashes/timestamps alineados al repo; RLS y privilegios restringidos de Auth/instructor/historial verificados. La renovación manual de producción comprobó la preservación de Auth identities/sesiones/roles, ADMIN, perfiles, Storage y tablas técnicas y dejó 2 formatos/revisiones, 3 perfiles instructor, 6 cursos (5 publicados/1 draft), 12 grupos, 6 historiales, 35 interesados (30 activos/5 cancelados) y 6 marcadores demo. No se automatiza reset en deploy.
+
+El smoke productivo revisó catálogo de 5 tarjetas, detalles, formulario/preferencias y nombre de instructor sin contactos; alta y duplicado de interesado respondieron 200 con el mismo mensaje neutro y `no-store`, y el seed de 35 interesados quedó intacto tras limpiar el registro sintético. Los buckets TTL persistieron. Tres logins de instructor por password vieron dos cursos propios cada uno; rutas ADMIN directas fueron denegadas con 303 y sesiones temporales cerradas. No se probó Google real/linking de identidad ni entrega SMTP/recovery; no declarar esos flujos verificados.
 
 ### Resumen de operación local
 
