@@ -1,0 +1,169 @@
+---
+import type { RegistrationSettings } from "@/domain/pre-registrations/types";
+import { buttonVariants } from "@/components/ui/button";
+import "./registration-settings-form-client";
+
+interface Props {
+  settings: RegistrationSettings;
+  action: string;
+  errors?: Readonly<Record<string, string>>;
+}
+
+const { settings, action, errors = {} } = Astro.props;
+const fields = [
+  {
+    name: "minimumPaymentPercent",
+    label: "Pago mínimo para confirmar inscripción",
+    help: "Porcentaje mínimo del precio que debe abonarse para confirmar.",
+    min: 1,
+    value: settings.minimumPaymentPercent,
+  },
+  {
+    name: "auxiliaryDiscountPercent",
+    label: "Descuento para auxiliares elegibles",
+    help: "Descuento sobre el precio para estudiantes elegibles; 100 % cubre el precio completo.",
+    min: 0,
+    value: settings.auxiliaryDiscountPercent,
+  },
+] as const;
+---
+
+<form
+  method="post"
+  action={action}
+  class="registration-settings-form"
+  data-registration-settings-form
+  data-baseline={JSON.stringify({
+    minimumPaymentPercent: settings.minimumPaymentPercent,
+    auxiliaryDiscountPercent: settings.auxiliaryDiscountPercent,
+  })}
+>
+  <input type="hidden" name="revision" value={settings.revision} />
+  <p class="registration-settings-intro">
+    Estos valores se aplican a nuevas preinscripciones. Los pagos y precios ya
+    registrados no cambian.
+  </p>
+  <div class="registration-settings-fields">
+    {fields.map((field) => (
+      <div class="registration-settings-field">
+        <label for={field.name}>{field.label}</label>
+        <div class="registration-settings-input-wrap">
+          <input
+            id={field.name}
+            name={field.name}
+            type="number"
+            inputmode="numeric"
+            min={field.min}
+            max="100"
+            step="1"
+            required
+            value={field.value}
+            aria-describedby={`${field.name}-help ${field.name}-error`}
+            aria-invalid={Boolean(errors[field.name])}
+          />
+          <span aria-hidden="true">%</span>
+          <span class="sr-only">por ciento</span>
+        </div>
+        <p id={`${field.name}-help`} class="registration-settings-help">
+          {field.help}
+        </p>
+        <p
+          id={`${field.name}-error`}
+          class="registration-settings-error"
+          data-field-error={field.name}
+          role="alert"
+        >
+          {errors[field.name]}
+        </p>
+      </div>
+    ))}
+  </div>
+  <p
+    class="registration-settings-error"
+    data-form-error
+    role="alert"
+    hidden
+  ></p>
+  <button
+    type="submit"
+    class={buttonVariants({ variant: "default" })}
+    data-settings-submit
+  >
+    Guardar configuración
+  </button>
+</form>
+
+<style>
+  .registration-settings-form {
+    display: grid;
+    gap: 1.5rem;
+    width: 100%;
+    min-width: 0;
+  }
+  .registration-settings-intro,
+  .registration-settings-help {
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  .registration-settings-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+  .registration-settings-field {
+    display: grid;
+    align-content: start;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+  .registration-settings-field label {
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+  .registration-settings-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+  .registration-settings-input-wrap input {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.75rem;
+    border: 1px solid var(--input);
+    border-radius: var(--radius);
+    background: var(--background);
+    padding: 0.5rem 0.75rem;
+    color: var(--foreground);
+  }
+  .registration-settings-input-wrap input:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .registration-settings-input-wrap span:not(.sr-only) {
+    font-weight: 600;
+  }
+  .registration-settings-error {
+    color: var(--destructive);
+    font-size: 0.875rem;
+  }
+  .registration-settings-error:empty {
+    display: none;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  @media (max-width: 40rem) {
+    .registration-settings-fields {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>
