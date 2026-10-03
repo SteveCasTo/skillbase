@@ -249,7 +249,9 @@ test("publication is tracked per group, including publication after draft creati
         .select()
         .from(auditEvents)
         .where(eq(auditEvents.entityId, draftOnly.id))
-    ).map((event) => event.action),
+    )
+      .map((event) => event.action)
+      .sort(),
   ).toEqual(["GROUP_CREATED", "GROUP_DELETED"]);
   await expect(
     database.db.delete(groups).where(eq(groups.id, exposed.id)).execute(),
