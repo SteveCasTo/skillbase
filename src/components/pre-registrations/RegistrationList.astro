@@ -1,0 +1,110 @@
+---
+import type { RegistrationPageDto } from "@/domain/pre-registrations/types";
+import { buttonVariants } from "@/components/ui/button";
+import { financeLabels, formatMoney, membershipLabels } from "./presentation";
+interface Props {
+  page: RegistrationPageDto;
+  detailHrefs?: Readonly<Record<string, string>>;
+  groupLabels?: Readonly<Record<string, string>>;
+  courseLabels?: Readonly<Record<string, string>>;
+  csvHref?: string;
+  pdfHref?: string;
+}
+const {
+  page,
+  detailHrefs = {},
+  groupLabels = {},
+  courseLabels = {},
+  csvHref,
+  pdfHref,
+} = Astro.props;
+---
+
+<section aria-label="Preinscripciones" class="min-w-0">
+  <header class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-lg font-semibold">
+      Preinscripciones <span class="text-muted-foreground">({page.total})</span>
+    </h2>
+    <div class="flex flex-wrap gap-2">
+      {csvHref && (
+        <a href={csvHref} class={buttonVariants({ variant: "outline" })}>
+          CSV
+        </a>
+      )}
+      {pdfHref && (
+        <a href={pdfHref} class={buttonVariants({ variant: "outline" })}>
+          PDF
+        </a>
+      )}
+    </div>
+  </header>
+  {page.items.length === 0 ? (
+    <p class="rounded-xl border p-6 text-sm text-muted-foreground">
+      No hay preinscripciones para estos filtros. Prueba otro grupo o busca por
+      nombre o CI.
+    </p>
+  ) : (
+    <ul class="registration-list grid min-w-0 gap-4">
+      {page.items.map((registration) => (
+        <li class="flex min-w-0 flex-col gap-4 rounded-xl border p-5">
+          <h3 class="break-words font-semibold">
+            {detailHrefs[registration.id] ? (
+              <a
+                href={detailHrefs[registration.id]}
+                class="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                {registration.participant.firstName}{" "}
+                {registration.participant.lastName}
+              </a>
+            ) : (
+              <>
+                {registration.participant.firstName}{" "}
+                {registration.participant.lastName}
+              </>
+            )}
+          </h3>
+          <p class="break-words text-sm text-muted-foreground">
+            CI: {registration.participant.ci}
+          </p>
+          <p class="break-words text-sm">
+            {courseLabels[registration.courseId] ?? "Curso"} ·{" "}
+            {groupLabels[registration.groupId] ?? "Grupo asignado"}
+          </p>
+          <div class="flex flex-wrap gap-2 text-sm">
+            <span class="rounded-md bg-secondary px-2 py-1">
+              {membershipLabels[registration.membershipStatus]}
+            </span>
+            <span class="py-1 text-muted-foreground">
+              {financeLabels[registration.financialStatus]}
+            </span>
+          </div>
+          <dl class="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt class="text-muted-foreground">Saldo</dt>
+              <dd class="mt-1 font-semibold tabular-nums">
+                {formatMoney(registration.balanceCents)}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-muted-foreground">Por devolver</dt>
+              <dd class="mt-1 font-semibold tabular-nums">
+                {formatMoney(registration.refundDueCents)}
+              </dd>
+            </div>
+          </dl>
+        </li>
+      ))}
+    </ul>
+  )}
+  {page.total > 0 && (
+    <p class="mt-4 text-sm text-muted-foreground">
+      Página {page.page}. {page.items.length} registros mostrados de{" "}
+      {page.total}.
+    </p>
+  )}
+</section>
+<style>
+  .registration-list {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  }
+</style>
