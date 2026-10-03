@@ -61,6 +61,9 @@ export interface AdminRegistrationDto extends RegistrationFinance {
   readonly id: string;
   readonly courseId: string;
   readonly groupId: string;
+  /** Current display labels, not part of the immutable financial snapshot. */
+  readonly courseName?: string;
+  readonly groupName?: string;
   readonly participant: ParticipantDto;
   readonly state: RegistrationState;
   readonly membershipStatus: MembershipStatus;
@@ -178,6 +181,7 @@ export interface RegistrationFormDto {
   };
   readonly groups: readonly {
     readonly id: string;
+    readonly groupName?: string;
     readonly startsAt: string;
     readonly endsAt: string;
     readonly capacity: number;
