@@ -101,13 +101,24 @@ test("instructor and profile layouts fill available width without horizontal ove
   await expect(account).toHaveCount(1);
   await expect(account).toContainText(AUTH_FIXTURES.instructor.email);
   await expect(drawer.getByText("Mi perfil", { exact: true })).toHaveCount(0);
-  const theme = await drawer.locator(".private-theme-toggle").boundingBox();
-  const logout = await drawer
+  const positions = await drawer
     .getByRole("button", { name: "Cerrar sesión", exact: true })
-    .boundingBox();
-  expect(theme).not.toBeNull();
-  expect(logout).not.toBeNull();
-  expect(theme!.x).toBeLessThan(logout!.x);
+    .evaluate((element) => {
+      const theme = element
+        .closest(".private-mobile-actions")!
+        .querySelector(".private-theme-toggle")!;
+      const themeBox = theme.getBoundingClientRect();
+      const logoutBox = element.getBoundingClientRect();
+      return {
+        themeX: themeBox.x,
+        logoutX: logoutBox.x,
+        themeWidth: themeBox.width,
+        logoutWidth: logoutBox.width,
+      };
+    });
+  expect(positions.themeWidth).toBeGreaterThan(0);
+  expect(positions.logoutWidth).toBeGreaterThan(0);
+  expect(positions.themeX).toBeLessThan(positions.logoutX);
   await account.focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/app\/perfil$/u);

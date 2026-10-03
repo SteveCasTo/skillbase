@@ -40,7 +40,7 @@ export default function PasswordField({
           required={required}
           minLength={minLength}
           maxLength={128}
-          aria-invalid={error ? true : undefined}
+          aria-invalid={Boolean(error)}
           aria-describedby={`${name}-error`}
         />
         <Button

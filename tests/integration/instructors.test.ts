@@ -21,6 +21,9 @@ import {
 } from "@/domain/courses/weekday-schedule";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 import type { InternalUser } from "@/domain/auth/types";
+import { DrizzleInstructorLifecycleRepository } from "@/server/db/repositories/instructor-lifecycle-repository";
+import { mutateInstructorLifecycle } from "@/application/instructors/lifecycle";
+import { resolveActiveUser } from "@/application/auth/authorize";
 
 const environment = getTestSupabaseEnvironment();
 const database = createDatabase(environment.databaseUrl, { max: 8 });
@@ -71,9 +74,9 @@ test("profile and assignment history have RLS and no browser-role privileges", a
     readable: boolean;
     writable: boolean;
   }>(
-    sql`select relname, relrowsecurity, has_table_privilege('anon', oid, 'SELECT') or has_table_privilege('authenticated', oid, 'SELECT') as readable, has_table_privilege('anon', oid, 'INSERT,UPDATE,DELETE') or has_table_privilege('authenticated', oid, 'INSERT,UPDATE,DELETE') as writable from pg_class where relnamespace = 'public'::regnamespace and relname in ('instructor_profiles', 'course_instructor_history') order by relname`,
+    sql`select relname, relrowsecurity, has_table_privilege('anon', oid, 'SELECT') or has_table_privilege('authenticated', oid, 'SELECT') as readable, has_table_privilege('anon', oid, 'INSERT,UPDATE,DELETE') or has_table_privilege('authenticated', oid, 'INSERT,UPDATE,DELETE') as writable from pg_class where relnamespace = 'public'::regnamespace and relname in ('instructor_profiles', 'course_instructor_history', 'instructor_account_deletions') order by relname`,
   );
-  expect(rows).toHaveLength(2);
+  expect(rows).toHaveLength(3);
   expect(
     rows.every((row) => row.relrowsecurity && !row.readable && !row.writable),
   ).toBe(true);
@@ -117,6 +120,7 @@ test("publication requires registered active instructor and public projection co
     admin.id,
     draft.updatedAt,
   );
+  await groups.create(assigned.id, "08:00", 10, admin.id);
   await courses.transition(assigned.id, "PUBLISHED", admin.id);
   const publicCourse = await courses.getPublic(assigned.slug);
   expect(publicCourse?.instructorName).toBe("Fixture Instructor");
@@ -466,4 +470,342 @@ test("failed professional-profile persistence rolls back account/role and compen
       .where(eq(schema.users.email, email)),
   ).toHaveLength(0);
   expect((await profiles.get(teacher.id))?.id).toBe(teacher.id);
+});
+
+const lifecycle = new DrizzleInstructorLifecycleRepository(database.db);
+test("publication and last-group cancellation share one atomic serialization boundary", async () => {
+  const target = await createInstructorFixture(database.db);
+  const draft = await course(target.id, "2029-02-01");
+  const group = await groups.create(draft.id, "08:00", 10, admin.id);
+  const results = await Promise.allSettled([
+    courses.transition(draft.id, "PUBLISHED", admin.id),
+    groups.cancel(group.id, admin.id, group.updatedAt),
+  ]);
+  expect(
+    results.filter((result) => result.status === "fulfilled"),
+  ).toHaveLength(1);
+  const current = await courses.getAdmin(draft.id);
+  expect(
+    current?.status === "PUBLISHED" &&
+      (await groups.list(draft.id)).every((row) => row.status === "CANCELLED"),
+  ).toBe(false);
+});
+test("reassigned instructors preserve history, can be disabled and can never be deleted", async () => {
+  const target = await createInstructorFixture(database.db);
+  const replacement = await createInstructorFixture(database.db);
+  const assigned = await course(target.id, "2029-01-01");
+  await courses.update(
+    assigned.id,
+    { ...assigned, instructorId: replacement.id },
+    admin.id,
+    assigned.updatedAt,
+  );
+  const state = await lifecycle.inspect(target.id);
+  expect(state.courses).toHaveLength(0);
+  expect(state.assignedHistorically).toBe(true);
+  const profile = (await profiles.get(target.id))!;
+  await lifecycle.setActive(target.id, admin.id, false, profile.updatedAt);
+  await expect(
+    lifecycle.beginDeletion(
+      target.id,
+      admin.id,
+      (await profiles.get(target.id))!.updatedAt,
+    ),
+  ).rejects.toThrow("historial");
+});
+test("unassigned draft edits retain null; assigned draft and published courses cannot be cleared", async () => {
+  const draft = await course(null, "2029-03-01");
+  const edited = await courses.update(
+    draft.id,
+    { ...draft, description: "Metadata only" },
+    admin.id,
+    draft.updatedAt,
+  );
+  expect(edited.instructorId).toBeNull();
+  const assigned = await courses.update(
+    draft.id,
+    { ...edited, instructorId: teacher.id },
+    admin.id,
+    edited.updatedAt,
+  );
+  await expect(
+    courses.update(
+      draft.id,
+      { ...assigned, instructorId: null },
+      admin.id,
+      assigned.updatedAt,
+    ),
+  ).rejects.toThrow("conservar un instructor");
+  await groups.create(draft.id, "08:00", 10, admin.id);
+  const published = await courses.transition(draft.id, "PUBLISHED", admin.id);
+  await expect(
+    courses.update(
+      draft.id,
+      { ...published, instructorId: null },
+      admin.id,
+      published.updatedAt,
+    ),
+  ).rejects.toThrow("conservar un instructor");
+});
+test("publication rejects zero and cancelled-only groups without writes; withdrawal permits last cancellation", async () => {
+  const draft = await course(teacher.id, "2029-04-02");
+  await expect(
+    courses.transition(draft.id, "PUBLISHED", admin.id),
+  ).rejects.toThrow("al menos un grupo");
+  const first = await groups.create(draft.id, "08:00", 10, admin.id);
+  const cancelled = await groups.cancel(first.id, admin.id, first.updatedAt);
+  await expect(
+    courses.transition(draft.id, "PUBLISHED", admin.id),
+  ).rejects.toThrow("al menos un grupo");
+  const active = await groups.reactivate(
+    first.id,
+    admin.id,
+    cancelled.updatedAt,
+  );
+  await courses.transition(draft.id, "PUBLISHED", admin.id);
+  await expect(
+    groups.cancel(active.id, admin.id, active.updatedAt),
+  ).rejects.toThrow("último grupo");
+  expect((await groups.list(draft.id))[0]?.status).toBe("PLANNED");
+  await courses.transition(draft.id, "DRAFT", admin.id);
+  expect(
+    (await groups.cancel(active.id, admin.id, active.updatedAt)).status,
+  ).toBe("CANCELLED");
+});
+test("concurrent last-two cancellations leave exactly one planned group in published course", async () => {
+  const draft = await course(teacher.id, "2029-05-01");
+  const a = await groups.create(draft.id, "08:00", 10, admin.id);
+  const b = await groups.create(draft.id, "10:00", 10, admin.id);
+  await courses.transition(draft.id, "PUBLISHED", admin.id);
+  const results = await Promise.allSettled([
+    groups.cancel(a.id, admin.id, a.updatedAt),
+    groups.cancel(b.id, admin.id, b.updatedAt),
+  ]);
+  expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  expect(
+    (await groups.list(draft.id)).filter((g) => g.status === "PLANNED"),
+  ).toHaveLength(1);
+});
+test("draft and published assignments block deactivation with actionable names; archived history forbids deletion", async () => {
+  const target = await createInstructorFixture(database.db);
+  const draft = await course(target.id, "2029-06-01");
+  const profile = (await profiles.get(target.id))!;
+  expect((await lifecycle.inspect(target.id)).courses).toEqual([
+    { id: draft.id, name: draft.name },
+  ]);
+  await expect(
+    lifecycle.setActive(target.id, admin.id, false, profile.updatedAt),
+  ).rejects.toThrow("Reasigna");
+  await groups.create(draft.id, "08:00", 10, admin.id);
+  await courses.transition(draft.id, "PUBLISHED", admin.id);
+  await expect(
+    lifecycle.setActive(target.id, admin.id, false, profile.updatedAt),
+  ).rejects.toThrow("Reasigna");
+  await courses.transition(draft.id, "ARCHIVED", admin.id);
+  await lifecycle.setActive(target.id, admin.id, false, profile.updatedAt);
+  expect((await profiles.get(target.id))?.status).toBe("DISABLED");
+  const disabled = (await profiles.get(target.id))!;
+  await expect(
+    lifecycle.beginDeletion(target.id, admin.id, disabled.updatedAt),
+  ).rejects.toThrow("historial");
+  await lifecycle.setActive(target.id, admin.id, true, disabled.updatedAt);
+  const [user] = await database.db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, target.id));
+  expect(user?.authUserId).toBe(target.authUserId);
+  expect(user?.status).toBe("ACTIVE");
+  expect(
+    await database.db
+      .select()
+      .from(schema.courseInstructorHistory)
+      .where(eq(schema.courseInstructorHistory.instructorId, target.id)),
+  ).toHaveLength(1);
+});
+test("multi-role and actor-dependent accounts cannot be deleted or disabled from instructor administration", async () => {
+  const target = await createInstructorFixture(database.db);
+  await database.db
+    .insert(schema.userRoles)
+    .values({ userId: target.id, roleCode: "ADMIN" });
+  const profile = (await profiles.get(target.id))!;
+  await expect(
+    lifecycle.setActive(target.id, admin.id, false, profile.updatedAt),
+  ).rejects.toThrow("otros roles");
+  await expect(
+    lifecycle.beginDeletion(target.id, admin.id, profile.updatedAt),
+  ).rejects.toThrow("otros roles");
+  const dependent = await createInstructorFixture(database.db);
+  await database.db.insert(schema.auditEvents).values({
+    actorId: dependent.id,
+    entityType: "USER",
+    entityId: dependent.id,
+    action: "PASSWORD_CHANGED",
+  });
+  await expect(
+    lifecycle.beginDeletion(
+      dependent.id,
+      admin.id,
+      (await profiles.get(dependent.id))!.updatedAt,
+    ),
+  ).rejects.toThrow("referencias");
+});
+test("concurrent assignment and deactivation serialize: no disabled instructor acquires a course", async () => {
+  const target = await createInstructorFixture(database.db);
+  const draft = await course(null, "2029-07-02");
+  const profile = (await profiles.get(target.id))!;
+  const results = await Promise.allSettled([
+    lifecycle.setActive(target.id, admin.id, false, profile.updatedAt),
+    courses.update(
+      draft.id,
+      { ...draft, instructorId: target.id },
+      admin.id,
+      draft.updatedAt,
+    ),
+  ]);
+  expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  const current = await courses.getAdmin(draft.id);
+  const state = await lifecycle.inspect(target.id);
+  expect(
+    current?.instructorId === target.id && state.status === "DISABLED",
+  ).toBe(false);
+});
+test("pending provider failure blocks reactivation, assignment and profile edit; completion preserves audit tombstone", async () => {
+  const target = await createInstructorFixture(database.db);
+  const profile = (await profiles.get(target.id))!;
+  await expect(
+    mutateInstructorLifecycle(
+      lifecycle,
+      {
+        remove: async () => {
+          throw new Error("provider unavailable");
+        },
+      },
+      admin,
+      target.id,
+      "delete",
+      profile.updatedAt.toISOString(),
+    ),
+  ).rejects.toThrow("bloqueada");
+  expect((await lifecycle.inspect(target.id)).deletionPending).toBe(true);
+  expect((await lifecycle.inspect(target.id)).status).toBe("DISABLED");
+  await expect(
+    resolveActiveUser(
+      new DrizzleAuthUserRepository(database.db),
+      target.authUserId!,
+    ),
+  ).rejects.toMatchObject({ code: "DISABLED" });
+  await expect(
+    lifecycle.setActive(target.id, admin.id, true, profile.updatedAt),
+  ).rejects.toThrow("pendiente");
+  await expect(
+    profiles.update(
+      target.id,
+      { firstName: "Blocked", lastName: "Edit", phone: null },
+      admin.id,
+      profile.updatedAt,
+    ),
+  ).rejects.toThrow("eliminación");
+  const draft = await course(null, "2029-08-01");
+  await expect(
+    courses.update(
+      draft.id,
+      { ...draft, instructorId: target.id },
+      admin.id,
+      draft.updatedAt,
+    ),
+  ).rejects.toThrow("activo");
+  await mutateInstructorLifecycle(
+    lifecycle,
+    {
+      remove: async (id) => {
+        expect(id).toBe(target.authUserId!);
+      },
+    },
+    admin,
+    target.id,
+    "delete",
+    profile.updatedAt.toISOString(),
+  );
+  expect(await profiles.get(target.id)).toBeNull();
+  const [tombstone] = await database.db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, target.id));
+  expect(tombstone?.status).toBe("DISABLED");
+  expect(tombstone?.email).toBe(`deleted-${target.id}@tombstone.invalid`);
+  const events = await database.db
+    .select()
+    .from(schema.auditEvents)
+    .where(eq(schema.auditEvents.entityId, target.id));
+  expect(events.map((e) => e.action).sort()).toEqual([
+    "INSTRUCTOR_DELETED",
+    "INSTRUCTOR_DELETION_REQUESTED",
+  ]);
+  expect(events.every((e) => e.actorId === admin.id)).toBe(true);
+  expect(JSON.stringify(events)).not.toContain(target.email);
+});
+test("real provider removal deletes credentials before finalization; reenable preserves provider password and association", async () => {
+  const provider = createClient(
+    environment.apiUrl,
+    environment.serviceRoleKey,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const target = await createInstructorFixture(database.db);
+  const password = randomBytes(24).toString("base64url");
+  const created = await provider.auth.admin.createUser({
+    email: target.email,
+    password,
+    email_confirm: true,
+  });
+  if (!created.data.user)
+    throw new Error("Synthetic provider fixture unavailable");
+  const authId = created.data.user.id;
+  await database.db
+    .update(schema.users)
+    .set({
+      authUserId: authId,
+      approvedGoogleIdentityId: "synthetic-google-approval",
+    })
+    .where(eq(schema.users.id, target.id));
+  await lifecycle.setActive(
+    target.id,
+    admin.id,
+    false,
+    (await profiles.get(target.id))!.updatedAt,
+  );
+  await lifecycle.setActive(
+    target.id,
+    admin.id,
+    true,
+    (await profiles.get(target.id))!.updatedAt,
+  );
+  const login = await provider.auth.signInWithPassword({
+    email: target.email,
+    password,
+  });
+  expect(login.data.user?.id).toBe(authId);
+  await provider.auth.signOut();
+  const [reenabled] = await database.db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, target.id));
+  expect(reenabled?.approvedGoogleIdentityId).toBe("synthetic-google-approval");
+  await mutateInstructorLifecycle(
+    lifecycle,
+    {
+      remove: async (id) => {
+        const result = await provider.auth.admin.deleteUser(id);
+        if (result.error) throw result.error;
+      },
+    },
+    admin,
+    target.id,
+    "delete",
+    (await profiles.get(target.id))!.updatedAt.toISOString(),
+  );
+  expect((await provider.auth.admin.getUserById(authId)).data.user).toBeNull();
+  expect((await provider.auth.admin.deleteUser(authId)).error?.code).toBe(
+    "user_not_found",
+  );
+  expect(await profiles.get(target.id)).toBeNull();
 });

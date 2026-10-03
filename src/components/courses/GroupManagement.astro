@@ -52,7 +52,7 @@ const prototype: Group = {
 };
 ---
 
-<section aria-labelledby="group-list-title" class="mt-8">
+<section aria-labelledby="group-list-title" class="mt-8 group-management">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h2 id="group-list-title" class="text-xl font-semibold">
       Grupos del curso
@@ -657,3 +657,12 @@ const prototype: Group = {
   </form>
 </dialog>
 <script src="./group-management-client.ts"></script>
+<style>
+  .group-management [data-edit-cancel]:not([hidden]) {
+    display: inline-flex;
+    width: 2.75rem;
+    flex: 0 0 2.75rem;
+    align-items: center;
+    justify-content: center;
+  }
+</style>

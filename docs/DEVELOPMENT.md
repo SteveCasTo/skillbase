@@ -149,7 +149,7 @@ bun install --frozen-lockfile
 bun -e "await Bun.write('.env', Bun.file('.env.example'))"
 ```
 
-Editar `.env`: configurar `DEV_INITIAL_ADMIN_EMAIL` con el correo de Google del administrador y sustituir `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` y `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET` por credenciales reales. En Google autorizar `http://127.0.0.1:54321/auth/v1/callback` como callback de Supabase local. Con Docker encendido:
+Editar `.env`: configurar `DEV_INITIAL_ADMIN_EMAIL` con el correo de Google del administrador y sustituir `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` y `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET` por credenciales reales. En Google autorizar `http://127.0.0.1:55321/auth/v1/callback` como callback de Supabase local, conservando los callbacks existentes de otros entornos. Con Docker encendido:
 
 ```sh
 bun run setup
@@ -172,6 +172,8 @@ Nunca commit de secretos.
 Separar variables públicas y privadas.
 
 ## SUPABASE LOCAL
+
+Los puertos canónicos son API `55321` y PostgreSQL `55322`, definidos en `supabase/config.toml` y `.env.example`. Se movieron desde `54321`/`54322` porque Windows reservó el rango TCP `54296–54395`. La aplicación sigue en `http://127.0.0.1:4321`. En instalaciones existentes, actualizar las URLs locales del `.env` ignorado y los bindings de los contenedores preservando los volúmenes, Auth, Storage y el ledger; **no ejecutar setup/reset ni reescribir hashes históricos** para cambiar puertos. El callback nuevo debe autorizarse manualmente en Google; cambiar puertos no acredita OAuth real ni modifica cloud.
 
 Utilizar Supabase CLI del proyecto.
 

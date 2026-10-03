@@ -91,6 +91,27 @@ export const roles = pgTable(
   ],
 );
 
+// Durable outbox: Auth deletion is external to PostgreSQL. Pending rows keep access disabled.
+export const instructorAccountDeletions = pgTable(
+  "instructor_account_deletions",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "restrict" }),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    authUserId: uuid("auth_user_id").notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("instructor_account_deletions_actor_idx").on(table.actorId),
+  ],
+).enableRLS();
+
 export const authAttemptBuckets = pgTable(
   "auth_attempt_buckets",
   {

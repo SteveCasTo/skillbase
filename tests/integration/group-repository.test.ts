@@ -39,6 +39,7 @@ const courseRepo = new DrizzleCourseRepository(database.db);
 const formats = new DrizzleFormatRepository(database.db);
 let admin: InternalUser;
 let courseId: string;
+let prerequisiteGroupId: string;
 
 beforeEach(async () => {
   const instructor = await createInstructorFixture(database.db);
@@ -84,6 +85,7 @@ beforeEach(async () => {
     actor.id,
   );
   expect(course.endsAt).toEqual(plan.endsAt);
+  prerequisiteGroupId = (await repo.create(course.id, "18:00", 1, actor.id)).id;
   await courseRepo.transition(course.id, "PUBLISHED", actor.id);
   courseId = course.id;
 });
@@ -96,7 +98,7 @@ test("adjacency and other courses work; updates, cancellation and audit retain h
   const first = await createGroup(repo, admin, courseId, "08:00", 1);
   const second = await createGroup(repo, admin, courseId, "09:30", 15);
   expect(first.courseTypeRevisionId).toBe(second.courseTypeRevisionId);
-  expect(await listGroups(repo, admin, courseId)).toHaveLength(2);
+  expect(await listGroups(repo, admin, courseId)).toHaveLength(3);
   await expect(
     createGroup(repo, admin, courseId, "09:00", 5),
   ).rejects.toMatchObject({ code: "SCHEDULE_CONFLICT" });
@@ -141,7 +143,7 @@ test("adjacency and other courses work; updates, cancellation and audit retain h
       .select()
       .from(groups)
       .where(eq(groups.courseId, courseId)),
-  ).toHaveLength(3);
+  ).toHaveLength(4);
   expect(
     (
       await database.db
@@ -170,7 +172,7 @@ test("concurrent creates serialize on course row; failed writes leave no audit",
           (r.reason as { code: string }).code === "SCHEDULE_CONFLICT",
       ),
   ).toBe(true);
-  expect(await repo.list(courseId)).toHaveLength(1);
+  expect(await repo.list(courseId)).toHaveLength(2);
 });
 
 test("withdrawal retains group snapshot and permits new groups with pinned revision", async () => {
@@ -238,6 +240,7 @@ test("publication is tracked per group, including publication after draft creati
     draftOnly.updatedAt.toISOString(),
   );
   expect((await repo.list(courseId)).map((group) => group.id)).toEqual([
+    prerequisiteGroupId,
     exposed.id,
   ]);
   expect(
@@ -430,17 +433,17 @@ test("date-only courses accept different group hours and preserve dates on unrel
     totalHours: 20,
     sessionMinutes: 90,
   });
-  const updated = await courseRepo.update(
-    courseId,
+  const updated = await courseRepo.create(
     {
       ...existing,
+      name: `Date-only ${crypto.randomUUID()}`,
       schedule: GROUP_SCHEDULE,
       startsAt: dates.startsAt,
       endsAt: dates.endsAt,
     },
     admin.id,
-    existing.updatedAt,
   );
+  courseId = updated.id;
   const morning = await createGroup(repo, admin, courseId, "08:00", 5);
   const afternoon = await createGroup(repo, admin, courseId, "14:00", 8);
   expect(morning.startsAt).toEqual(new Date("2027-03-01T12:00:00.000Z"));
@@ -609,21 +612,25 @@ test("competing schedule edits serialize, rejecting stale revision and conflicts
   expect(results.filter((result) => result.status === "rejected")).toHaveLength(
     1,
   );
-  expect(await repo.list(courseId)).toHaveLength(2);
+  expect(await repo.list(courseId)).toHaveLength(3);
 });
 
-test("published historical course with no structured schedule remains published but cannot host a group", async () => {
-  await database.db
-    .update(courses)
-    .set({ weekdaysMask: null })
-    .where(eq(courses.id, courseId));
-  const [course] = await database.db
-    .select()
-    .from(courses)
-    .where(eq(courses.id, courseId));
-  expect(course?.status).toBe("PUBLISHED");
+test("unstructured historical courses cannot be newly published without a planned group or host new groups", async () => {
+  const existing = (await courseRepo.getAdmin(courseId))!;
+  const course = await courseRepo.create(
+    {
+      ...existing,
+      name: `Historical ${crypto.randomUUID()}`,
+      weekdaysMask: null,
+    },
+    admin.id,
+  );
   await expect(
-    createGroup(repo, admin, courseId, "08:00", 1),
+    courseRepo.transition(course.id, "PUBLISHED", admin.id),
+  ).rejects.toThrow("al menos un grupo");
+  expect((await courseRepo.getAdmin(course.id))?.status).toBe("DRAFT");
+  await expect(
+    createGroup(repo, admin, course.id, "08:00", 1),
   ).rejects.toMatchObject({ code: "COURSE_UNAVAILABLE" });
 });
 

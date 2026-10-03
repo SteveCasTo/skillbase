@@ -28,6 +28,7 @@ const connection = getTestSupabaseEnvironment().databaseUrl;
 const database = createDatabase(connection);
 const repository = new DrizzleCourseRepository(database.db);
 const formats = new DrizzleFormatRepository(database.db);
+const groupRepository = new DrizzleGroupRepository(database.db);
 let actorId: string;
 let formatId: string;
 let instructorId: string;
@@ -180,6 +181,7 @@ describe("course format persistence", () => {
         ),
       ),
     ).toMatchObject({ code: "STALE_COURSE" });
+    await groupRepository.create(created.id, "08:00", 1, actorId);
     const published = await repository.transition(
       created.id,
       "PUBLISHED",
@@ -206,6 +208,7 @@ describe("course format persistence", () => {
   });
   test("editorial transitions and saves sharing one revision cannot both commit", async () => {
     const created = await repository.create(input(), actorId);
+    await groupRepository.create(created.id, "08:00", 1, actorId);
     const outcomes = await Promise.allSettled([
       repository.transition(
         created.id,
@@ -396,6 +399,7 @@ describe("course format persistence", () => {
       code: "VALIDATION_FAILED",
       fieldErrors: { schedule: "Usa el horario calculado." },
     });
+    await groupRepository.create(course.id, "08:00", 1, actorId);
     await repository.transition(course.id, "PUBLISHED", actorId);
     await formats.revise(
       formatId,
@@ -654,6 +658,7 @@ describe("course format persistence", () => {
       { ...input(), name: "Published" },
       actorId,
     );
+    await groupRepository.create(published.id, "08:00", 1, actorId);
     await repository.transition(published.id, "PUBLISHED", actorId);
     const archived = await repository.create(
       { ...input(), name: "Archived" },
@@ -696,11 +701,14 @@ describe("course format persistence", () => {
       "DRAFT",
       actorId,
     );
-    expect(withdrawn.totalHours).toBe(35);
+    // Publication now requires a group, which pins this course's revision even after withdrawal.
+    expect(withdrawn.totalHours).toBe(30);
+    expect(withdrawn.courseTypeRevisionId).toBe(published.courseTypeRevisionId);
   });
 
   test("rejects inactive formats for new and draft assignments without changing historical courses", async () => {
     const course = await repository.create(input(), actorId);
+    await groupRepository.create(course.id, "08:00", 1, actorId);
     await repository.transition(course.id, "PUBLISHED", actorId);
     await formats.setActive(formatId, false, actorId);
     expect(await failure(repository.create(input(), actorId))).toMatchObject({
@@ -732,6 +740,7 @@ describe("course format persistence", () => {
       actorId,
     );
     const otherType = draft.courseTypeId;
+    await groupRepository.create(draft.id, "11:00", 1, actorId);
     await formats.setActive(otherType, false, actorId);
     expect(
       await failure(repository.transition(draft.id, "PUBLISHED", actorId)),
@@ -749,6 +758,8 @@ describe("course format persistence", () => {
     expect(
       await failure(repository.setFeatured(first.id, actorId)),
     ).toMatchObject({ code: "INVALID_TRANSITION" });
+    await groupRepository.create(first.id, "08:00", 1, actorId);
+    await groupRepository.create(second.id, "11:00", 1, actorId);
     await repository.transition(first.id, "PUBLISHED", actorId);
     await repository.transition(second.id, "PUBLISHED", actorId);
     await Promise.all([
@@ -790,6 +801,7 @@ describe("course format persistence", () => {
       ),
     ).toMatchObject({ code: "STALE_COURSE" });
     expect(await repository.getPublic(first.slug)).toBeNull();
+    await groupRepository.create(first.id, "08:00", 1, actorId);
     await repository.transition(first.id, "PUBLISHED", actorId);
     const dto = await repository.getPublic(first.slug);
     expect(dto).toMatchObject({

@@ -60,6 +60,12 @@ async function interestCourse(page: Page, context: BrowserContext) {
     id: string;
     revision: string;
   };
+  const remainingGroup = await page.request.post(groupPath, {
+    headers,
+    form: { intent: "create", startTime: "20:00", capacity: "1" },
+  });
+  expect(remainingGroup.status()).toBe(200);
+  const remainingGroupId = ((await remainingGroup.json()) as { id: string }).id;
   const published = await page.request.post(`/app/cursos/${id}/editar`, {
     headers,
     form: { intent: "publish", revision },
@@ -97,7 +103,13 @@ async function interestCourse(page: Page, context: BrowserContext) {
     form: { intent: "cancel", groupId: group.id, revision: current.revision },
   });
   expect(cancelled.status()).toBe(200);
-  return { id, name, path: `/app/interesados/${id}`, groupId: group.id };
+  return {
+    id,
+    name,
+    path: `/app/interesados/${id}`,
+    groupId: group.id,
+    remainingGroupId,
+  };
 }
 
 const rowFor = (page: Page, name = "Ana Sintética") =>
@@ -264,7 +276,14 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
   await expect(
     page.locator('[data-demand-row][data-leading="true"]'),
   ).toHaveCount(2);
+  await expect(page.locator("[data-demand-row]")).toHaveCount(3);
+  await expect(
+    page.locator(`[data-preference-id="${course.remainingGroupId}"]`),
+  ).toHaveText("0");
   for (const demand of await page.locator("[data-demand-row]").all()) {
+    const preference = await demand
+      .locator("[data-preference-id]")
+      .getAttribute("data-preference-id");
     expect(
       await demand
         .locator("[data-demand-bar]")
@@ -273,7 +292,7 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
             bar.getBoundingClientRect().width /
             bar.parentElement!.getBoundingClientRect().width,
         ),
-    ).toBeCloseTo(0.5);
+    ).toBeCloseTo(preference === course.remainingGroupId ? 0 : 0.5);
   }
   const row = rowFor(page);
   await row.locator("summary").focus();

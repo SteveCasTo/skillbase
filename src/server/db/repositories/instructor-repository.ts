@@ -7,6 +7,7 @@ import {
   type InstructorProfileData,
 } from "@/domain/instructors/profile";
 import * as schema from "@/server/db/schema";
+import { lockInstructorSchedules } from "./instructor-schedule";
 
 type Database = PostgresJsDatabase<typeof schema>;
 export class DrizzleInstructorRepository implements InstructorRepository {
@@ -58,6 +59,15 @@ export class DrizzleInstructorRepository implements InstructorRepository {
     expected: Date,
   ) {
     await this.db.transaction(async (tx) => {
+      await lockInstructorSchedules(tx, undefined, id);
+      const [deletion] = await tx
+        .select({ id: schema.instructorAccountDeletions.userId })
+        .from(schema.instructorAccountDeletions)
+        .where(eq(schema.instructorAccountDeletions.userId, id));
+      if (deletion)
+        throw new InstructorError(
+          "La cuenta está pendiente de eliminación y no puede editarse.",
+        );
       const [previous] = await tx
         .select()
         .from(schema.instructorProfiles)

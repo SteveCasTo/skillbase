@@ -133,7 +133,7 @@ bun install --frozen-lockfile
 bun -e "await Bun.write('.env', Bun.file('.env.example'))"
 ```
 
-En `.env`, sustituir los valores `replace-with-*` de Google OAuth por credenciales propias y establecer `DEV_INITIAL_ADMIN_EMAIL` con el correo de Google que accederá a `/app`. Registrar `http://127.0.0.1:54321/auth/v1/callback` como URI de redirección autorizado en Google. La clave pública local de Supabase se conoce **después** de iniciar los servicios:
+En `.env`, sustituir los valores `replace-with-*` de Google OAuth por credenciales propias y establecer `DEV_INITIAL_ADMIN_EMAIL` con el correo de Google que accederá a `/app`. Registrar `http://127.0.0.1:55321/auth/v1/callback` como URI de redirección autorizado en Google, sin eliminar callbacks de otros entornos. La API local usa `55321` y PostgreSQL `55322`; la aplicación conserva `4321`. La clave pública local de Supabase se conoce **después** de iniciar los servicios:
 
 ```sh
 bun run setup
