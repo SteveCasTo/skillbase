@@ -1,0 +1,317 @@
+---
+import type { ParticipantDto } from "@/domain/pre-registrations/types";
+import type { AdminInterestRegistrationDto } from "@/domain/interests/types";
+import { Input } from "@/components/ui/input";
+import { buttonVariants } from "@/components/ui/button";
+interface Props {
+  id: string;
+  courseId: string;
+  participants?: readonly ParticipantDto[];
+  interests?: readonly AdminInterestRegistrationDto[];
+  /** Authorized GET search route supplied at composition time. */
+  action?: string;
+  query?: string;
+  chooseHrefs?: Readonly<Record<string, string>>;
+  targetFormId?: string;
+  error?: string;
+}
+const {
+  id,
+  courseId,
+  participants = [],
+  interests = [],
+  action,
+  query = "",
+  chooseHrefs = {},
+  targetFormId,
+  error,
+} = Astro.props;
+const rows = [
+  ...participants.map((participant) => ({
+    kind: "participant" as const,
+    value: participant,
+    search: participant.ci,
+    title: `${participant.firstName} ${participant.lastName}`,
+    description: `Ficha global · CI ${participant.ci}`,
+  })),
+  ...interests
+    .filter(
+      (interest) =>
+        interest.courseId === courseId && interest.status === "ACTIVE",
+    )
+    .map((interest) => ({
+      kind: "interest" as const,
+      value: interest,
+      search: `${interest.firstName} ${interest.lastName} ${interest.email}`,
+      title: `${interest.firstName} ${interest.lastName}`,
+      description: `Interesado · ${interest.email}`,
+    })),
+].slice(0, 30);
+---
+
+<section
+  id={id}
+  data-participant-search
+  data-target-form={targetFormId}
+  aria-label="Buscar persona"
+  class="flex min-w-0 flex-col gap-4"
+>
+  <h2 class="text-lg font-semibold">Buscar persona</h2>
+  <p class="text-sm text-muted-foreground">
+    Ficha global por CI; interesados de este curso por nombre o correo. El
+    correo no fusiona personas.
+  </p>
+  <form
+    method="get"
+    action={action}
+    class="flex min-w-0 flex-col gap-3 sm:flex-row"
+    data-search-form
+  >
+    <label for={`${id}-query`} class="sr-only">
+      CI, nombre o correo
+    </label>
+    <Input
+      id={`${id}-query`}
+      name="search"
+      type="search"
+      defaultValue={query}
+      maxLength={100}
+      autoComplete="off"
+      aria-describedby={`${id}-help`}
+      className="min-h-11"
+    />
+    {action && (
+      <button
+        type="submit"
+        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+      >
+        Buscar
+      </button>
+    )}
+  </form>
+  <p id={`${id}-help`} class="text-sm text-muted-foreground">
+    Escribe al menos 2 caracteres. Hasta 30 resultados.
+  </p>
+  <p
+    role="alert"
+    data-search-error
+    class="text-sm text-destructive empty:hidden"
+  >
+    {error}
+  </p>
+  <div
+    data-search-loading
+    hidden
+    aria-hidden="true"
+    class="search-skeleton flex flex-col gap-3"
+  >
+    <div class="h-16 rounded-lg bg-muted"></div>
+    <div class="h-16 rounded-lg bg-muted"></div>
+  </div>
+  <ul
+    data-search-results
+    class="flex min-w-0 flex-col divide-y rounded-lg border px-4"
+  >
+    {rows.map((row) => (
+      <li data-search-row data-search-text={row.search} class="min-w-0 py-4">
+        <p class="break-words font-medium">{row.title}</p>
+        <p class="mt-1 break-words text-sm text-muted-foreground">
+          {row.description}
+        </p>
+        {chooseHrefs[row.value.id] ? (
+          <a
+            href={chooseHrefs[row.value.id]}
+            class={buttonVariants({
+              variant: "outline",
+              className: "mt-3 min-h-11",
+            })}
+          >
+            Usar datos
+          </a>
+        ) : (
+          targetFormId && (
+            <button
+              type="button"
+              hidden
+              data-choose-person
+              data-kind={row.kind}
+              data-person={JSON.stringify(row.value)}
+              class={buttonVariants({
+                variant: "outline",
+                className: "mt-3 min-h-11",
+              })}
+            >
+              Usar datos
+            </button>
+          )
+        )}
+      </li>
+    ))}
+  </ul>
+  <p
+    data-search-empty
+    hidden={rows.length > 0}
+    role="status"
+    class="text-sm text-muted-foreground"
+  >
+    Sin coincidencias. Puedes completar una ficha directamente con el CI.
+  </p>
+  <p
+    data-selected-person
+    role="status"
+    class="text-sm text-muted-foreground empty:hidden"
+  ></p>
+  {targetFormId && (
+    <button
+      type="button"
+      hidden
+      data-clear-person
+      class={buttonVariants({
+        variant: "outline",
+        className: "min-h-11 self-start",
+      })}
+    >
+      Registrar otra persona
+    </button>
+  )}
+</section>
+<script>
+  import type { ParticipantDto } from "@/domain/pre-registrations/types";
+  import type { AdminInterestRegistrationDto } from "@/domain/interests/types";
+  function initialize() {
+    document
+      .querySelectorAll<HTMLElement>("[data-participant-search]")
+      .forEach((root) => {
+        if (root.dataset.bound) return;
+        root.dataset.bound = "true";
+        const query = root.querySelector<HTMLInputElement>(
+          'input[name="search"]',
+        );
+        const rows = [
+          ...root.querySelectorAll<HTMLElement>("[data-search-row]"),
+        ];
+        const filter = () => {
+          const value = query?.value.trim().toLocaleLowerCase("es-BO") ?? "";
+          let visible = 0;
+          rows.forEach((row) => {
+            row.hidden =
+              value.length < 2 ||
+              !(row.dataset.searchText ?? "")
+                .toLocaleLowerCase("es-BO")
+                .includes(value);
+            if (!row.hidden) visible++;
+          });
+          const empty = root.querySelector<HTMLElement>("[data-search-empty]");
+          if (empty) {
+            empty.hidden = visible > 0;
+            empty.textContent =
+              value.length < 2
+                ? "Escribe al menos 2 caracteres para buscar."
+                : "Sin coincidencias. Puedes completar una ficha directamente con el CI.";
+          }
+        };
+        query?.addEventListener("input", filter);
+        if (
+          !root
+            .querySelector<HTMLFormElement>("[data-search-form]")
+            ?.getAttribute("action")
+        )
+          root
+            .querySelector("[data-search-form]")
+            ?.addEventListener("submit", (event) => {
+              event.preventDefault();
+              filter();
+            });
+        root
+          .querySelectorAll<HTMLButtonElement>("[data-choose-person]")
+          .forEach((button) => {
+            button.hidden = false;
+            button.addEventListener("click", () => {
+              const form = document.getElementById(
+                root.dataset.targetForm ?? "",
+              );
+              if (!(form instanceof HTMLFormElement) || form.dataset.pending)
+                return;
+              const person = JSON.parse(button.dataset.person!) as
+                ParticipantDto | AdminInterestRegistrationDto;
+              const global = button.dataset.kind === "participant";
+              const fields = {
+                firstName: person.firstName,
+                lastName: person.lastName,
+                email: person.email,
+                phone: person.phone ?? "",
+                ci: "ci" in person ? person.ci : "",
+              };
+              Object.entries(fields).forEach(([name, value]) => {
+                const input = form.elements.namedItem(name);
+                if (input instanceof HTMLInputElement) {
+                  input.value = value;
+                  input.readOnly = global;
+                }
+              });
+              const source = form.elements.namedItem("sourceInterestId");
+              if (source instanceof HTMLInputElement && !global)
+                source.value = person.id;
+              const origin = form.querySelector<HTMLElement>(
+                "[data-source-origin]",
+              );
+              if (origin && source instanceof HTMLInputElement)
+                origin.hidden = !source.value;
+              const selected = root.querySelector<HTMLElement>(
+                "[data-selected-person]",
+              );
+              if (selected)
+                selected.textContent = global
+                  ? "Ficha global seleccionada. No se modifican sus datos desde esta preinscripción."
+                  : "Interesado seleccionado. Completa el CI y revisa los datos; el interés público no se modifica.";
+              const clear = root.querySelector<HTMLButtonElement>(
+                "[data-clear-person]",
+              );
+              if (clear) clear.hidden = false;
+              form.dispatchEvent(new Event("change", { bubbles: true }));
+              const first = form.elements.namedItem(global ? "groupId" : "ci");
+              if (first instanceof HTMLElement && !first.hidden) first.focus();
+            });
+          });
+        root
+          .querySelector<HTMLButtonElement>("[data-clear-person]")
+          ?.addEventListener("click", (event) => {
+            const form = document.getElementById(root.dataset.targetForm ?? "");
+            if (!(form instanceof HTMLFormElement) || form.dataset.pending)
+              return;
+            for (const name of [
+              "ci",
+              "firstName",
+              "lastName",
+              "email",
+              "phone",
+              "sourceInterestId",
+            ]) {
+              const input = form.elements.namedItem(name);
+              if (input instanceof HTMLInputElement) {
+                input.value = "";
+                input.readOnly = false;
+              }
+            }
+            const selected = root.querySelector<HTMLElement>(
+              "[data-selected-person]",
+            );
+            if (selected)
+              selected.textContent =
+                "Completa la nueva ficha. Se buscará la identidad por CI al registrar.";
+            if (event.currentTarget instanceof HTMLButtonElement)
+              event.currentTarget.hidden = true;
+            const origin = form.querySelector<HTMLElement>(
+              "[data-source-origin]",
+            );
+            if (origin) origin.hidden = true;
+            form.dispatchEvent(new Event("change", { bubbles: true }));
+            const ci = form.elements.namedItem("ci");
+            if (ci instanceof HTMLInputElement) ci.focus();
+          });
+        filter();
+      });
+  }
+  initialize();
+  document.addEventListener("astro:page-load", initialize);
+</script>
