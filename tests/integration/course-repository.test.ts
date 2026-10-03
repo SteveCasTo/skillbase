@@ -54,7 +54,12 @@ async function clear() {
       sql`${auditEvents.entityType} in ('COURSE', 'COURSE_TYPE') or (${auditEvents.entityType} = 'GROUP' and ${auditEvents.actorId} in (select id from users where email = 'course.actor@repository.test'))`,
     );
   await database.db.execute(
-    sql`truncate interest_registrations, course_instructor_history, groups, courses, course_type_revisions, course_types`,
+    // Runner-owned isolated test database only: explicit fixture cleanup, never
+    // the production/local demo reset allowlist and never CASCADE.
+    sql`truncate registration_ledger, pre_registrations, registration_command_receipts, participants, registration_settings, interest_registrations, course_instructor_history, groups, courses, course_type_revisions, course_types RESTRICT`,
+  );
+  await database.db.execute(
+    sql`insert into registration_settings (id) values (1)`,
   );
   await database.db
     .delete(users)

@@ -3,6 +3,7 @@ import {
   check,
   boolean,
   decimal,
+  date,
   foreignKey,
   index,
   integer,
@@ -16,6 +17,12 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import type {
+  AdminRegistrationDto,
+  ParticipantDto,
+  RegistrationDetailDto,
+  RegistrationSettings,
+} from "@/domain/pre-registrations/types";
 
 export const userStatus = pgEnum("user_status", [
   "INVITED",
@@ -451,6 +458,10 @@ export const interestRegistrations = pgTable(
       table.courseId,
       table.email,
     ),
+    unique("interest_registrations_course_id_id_unique").on(
+      table.courseId,
+      table.id,
+    ),
     foreignKey({
       name: "interest_registrations_course_group_fk",
       columns: [table.courseId, table.preferredGroupId],
@@ -533,3 +544,288 @@ export const auditEvents = pgTable(
     ),
   ],
 );
+
+export const registrationParticipantType = pgEnum(
+  "registration_participant_type",
+  ["STUDENT", "EXTERNAL", "AUXILIARY"],
+);
+export const preRegistrationState = pgEnum("pre_registration_state", [
+  "ACTIVE",
+  "CANCELLED",
+]);
+export const registrationLedgerKind = pgEnum("registration_ledger_kind", [
+  "PAYMENT",
+  "REFUND",
+]);
+
+export const participants = pgTable(
+  "participants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ci: text("ci").notNull(),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name").notNull(),
+    email: text("email").notNull(),
+    phone: text("phone"),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("participants_ci_unique").on(t.ci),
+    check(
+      "participants_ci_check",
+      sql`char_length(${t.ci}) between 1 and 64 and ${t.ci} = upper(${t.ci}) and ${t.ci} !~ '[[:space:][:cntrl:]]'`,
+    ),
+    check(
+      "participants_first_name_check",
+      sql`char_length(${t.firstName}) between 1 and 100 and ${t.firstName} = btrim(${t.firstName}) and ${t.firstName} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      "participants_last_name_check",
+      sql`char_length(${t.lastName}) between 1 and 150 and ${t.lastName} = btrim(${t.lastName}) and ${t.lastName} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      "participants_email_check",
+      sql`${t.email} = lower(btrim(${t.email})) and char_length(${t.email}) between 3 and 254 and ${t.email} ~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$' and ${t.email} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      "participants_phone_check",
+      sql`${t.phone} is null or (char_length(${t.phone}) between 1 and 32 and ${t.phone} = btrim(${t.phone}) and ${t.phone} !~ '[[:cntrl:]]')`,
+    ),
+  ],
+).enableRLS();
+
+export const registrationSettings = pgTable(
+  "registration_settings",
+  {
+    id: integer("id").primaryKey().default(1),
+    minimumPaymentPercent: integer("minimum_payment_percent")
+      .notNull()
+      .default(25),
+    auxiliaryDiscountPercent: integer("auxiliary_discount_percent")
+      .notNull()
+      .default(50),
+    revision: integer("revision").notNull().default(1),
+    updatedBy: uuid("updated_by").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check("registration_settings_singleton_check", sql`${t.id} = 1`),
+    check(
+      "registration_settings_percent_check",
+      sql`${t.minimumPaymentPercent} between 1 and 100 and ${t.auxiliaryDiscountPercent} between 0 and 100`,
+    ),
+    check(
+      "registration_settings_revision_check",
+      sql`${t.revision} > 0 and (${t.revision} = 1 or ${t.updatedBy} is not null)`,
+    ),
+    index("registration_settings_actor_idx").on(t.updatedBy),
+  ],
+).enableRLS();
+
+export const preRegistrations = pgTable(
+  "pre_registrations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    participantId: uuid("participant_id")
+      .notNull()
+      .references(() => participants.id, { onDelete: "restrict" }),
+    courseId: uuid("course_id").notNull(),
+    groupId: uuid("group_id").notNull(),
+    courseTypeRevisionId: uuid("course_type_revision_id").notNull(),
+    sourceInterestId: uuid("source_interest_id"),
+    state: preRegistrationState("state").notNull().default("ACTIVE"),
+    participantType: registrationParticipantType("participant_type").notNull(),
+    currency: text("currency").notNull().default("BOB"),
+    settingsRevision: integer("settings_revision").notNull(),
+    basePriceCents: decimal("base_price_cents", {
+      precision: 12,
+      scale: 0,
+    }).notNull(),
+    discountPercent: integer("discount_percent").notNull(),
+    totalPriceCents: decimal("total_price_cents", {
+      precision: 12,
+      scale: 0,
+    }).notNull(),
+    minimumPaymentPercent: integer("minimum_payment_percent").notNull(),
+    minimumPaymentCents: decimal("minimum_payment_cents", {
+      precision: 12,
+      scale: 0,
+    }).notNull(),
+    firstDayException: boolean("first_day_exception").notNull().default(false),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    cancelledAt: timestamp("cancelled_at", {
+      withTimezone: true,
+      precision: 3,
+    }),
+    cancelledBy: uuid("cancelled_by").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    cancellationReason: text("cancellation_reason").$type<
+      "VOLUNTARY" | "GROUP_CANCELLED"
+    >(),
+    cancellationNote: text("cancellation_note"),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "pre_registrations_course_group_fk",
+      columns: [t.courseId, t.groupId],
+      foreignColumns: [groups.courseId, groups.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "pre_registrations_course_revision_fk",
+      columns: [t.courseId, t.courseTypeRevisionId],
+      foreignColumns: [courses.id, courses.courseTypeRevisionId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "pre_registrations_course_interest_fk",
+      columns: [t.courseId, t.sourceInterestId],
+      foreignColumns: [
+        interestRegistrations.courseId,
+        interestRegistrations.id,
+      ],
+    }).onDelete("restrict"),
+    uniqueIndex("pre_registrations_active_person_course_unique")
+      .on(t.participantId, t.courseId)
+      .where(sql`${t.state} = 'ACTIVE'`),
+    index("pre_registrations_course_group_state_idx").on(
+      t.courseId,
+      t.groupId,
+      t.state,
+      t.createdAt,
+      t.id,
+    ),
+    index("pre_registrations_group_idx").on(t.groupId),
+    index("pre_registrations_participant_idx").on(t.participantId),
+    index("pre_registrations_revision_idx").on(t.courseTypeRevisionId),
+    index("pre_registrations_interest_idx").on(t.sourceInterestId),
+    index("pre_registrations_created_by_idx").on(t.createdBy),
+    index("pre_registrations_cancelled_by_idx").on(t.cancelledBy),
+    check(
+      "pre_registrations_price_check",
+      sql`${t.currency} = 'BOB' and ${t.settingsRevision} > 0 and ${t.basePriceCents} >= 0 and ${t.discountPercent} between 0 and 100 and (${t.participantType} = 'AUXILIARY' or ${t.discountPercent} = 0) and ${t.totalPriceCents} = floor((${t.basePriceCents} * (100 - ${t.discountPercent}) + 50) / 100) and ${t.minimumPaymentPercent} between 1 and 100 and ${t.minimumPaymentCents} = ceil(${t.totalPriceCents} * ${t.minimumPaymentPercent} / 100)`,
+    ),
+    check(
+      "pre_registrations_cancelled_check",
+      sql`(${t.state} = 'ACTIVE' and ${t.cancelledAt} is null and ${t.cancelledBy} is null and ${t.cancellationReason} is null and ${t.cancellationNote} is null) or (${t.state} = 'CANCELLED' and ${t.cancelledAt} is not null and ${t.cancelledBy} is not null and ${t.cancellationReason} is not null and ${t.cancellationReason} in ('VOLUNTARY', 'GROUP_CANCELLED') and ${t.cancellationNote} is not null and char_length(btrim(${t.cancellationNote})) between 1 and 500 and ${t.cancellationNote} !~ '[[:cntrl:]]')`,
+    ),
+  ],
+).enableRLS();
+
+export const registrationCommandReceipts = pgTable(
+  "registration_command_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    requestKey: uuid("request_key").notNull(),
+    operation: text("operation")
+      .notNull()
+      .$type<
+        | "CREATE"
+        | "PAYMENT"
+        | "REFUND"
+        | "CANCEL"
+        | "TRANSFER"
+        | "PARTICIPANT_UPDATE"
+        | "SETTINGS_UPDATE"
+        | "GROUP_CANCEL"
+      >(),
+    fingerprint: text("fingerprint").notNull(),
+    result: jsonb("result")
+      .$type<
+        | AdminRegistrationDto
+        | ParticipantDto
+        | RegistrationDetailDto
+        | RegistrationSettings
+        | { cancelledRegistrationIds: string[]; refundDueCents: number }
+      >()
+      .notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("registration_command_receipts_actor_key_unique").on(
+      t.actorId,
+      t.requestKey,
+    ),
+    unique("registration_command_receipts_id_actor_unique").on(t.id, t.actorId),
+    check(
+      "registration_command_receipts_fingerprint_check",
+      sql`${t.fingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "registration_command_receipts_operation_check",
+      sql`${t.operation} in ('CREATE', 'PAYMENT', 'REFUND', 'CANCEL', 'TRANSFER', 'PARTICIPANT_UPDATE', 'SETTINGS_UPDATE', 'GROUP_CANCEL')`,
+    ),
+    check(
+      "registration_command_receipts_result_check",
+      sql`jsonb_typeof(${t.result}) = 'object'`,
+    ),
+  ],
+).enableRLS();
+
+export const registrationLedger = pgTable(
+  "registration_ledger",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    registrationId: uuid("registration_id")
+      .notNull()
+      .references(() => preRegistrations.id, { onDelete: "restrict" }),
+    commandReceiptId: uuid("command_receipt_id").notNull(),
+    kind: registrationLedgerKind("kind").notNull(),
+    amountCents: decimal("amount_cents", { precision: 12, scale: 0 }).notNull(),
+    effectiveDate: date("effective_date", { mode: "string" }).notNull(),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    reason: text("reason").notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("registration_ledger_receipt_unique").on(t.commandReceiptId),
+    foreignKey({
+      name: "registration_ledger_receipt_actor_fk",
+      columns: [t.commandReceiptId, t.actorId],
+      foreignColumns: [
+        registrationCommandReceipts.id,
+        registrationCommandReceipts.actorId,
+      ],
+    }).onDelete("restrict"),
+    index("registration_ledger_registration_recorded_idx").on(
+      t.registrationId,
+      t.recordedAt,
+      t.id,
+    ),
+    index("registration_ledger_actor_idx").on(t.actorId),
+    check("registration_ledger_amount_check", sql`${t.amountCents} > 0`),
+    check(
+      "registration_ledger_date_check",
+      sql`${t.effectiveDate} <= (${t.recordedAt} at time zone 'America/La_Paz')::date`,
+    ),
+    check(
+      "registration_ledger_reason_check",
+      sql`char_length(btrim(${t.reason})) between 1 and 500 and ${t.reason} !~ '[[:cntrl:]]'`,
+    ),
+  ],
+).enableRLS();
