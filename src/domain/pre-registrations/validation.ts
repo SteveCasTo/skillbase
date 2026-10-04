@@ -42,7 +42,11 @@ function object(value: unknown): Record<string, unknown> {
     );
   return value as Record<string, unknown>;
 }
-export function validateCashInput(raw: unknown, now: Date): CashInput {
+export function validateCashInput(
+  raw: unknown,
+  now: Date,
+  requireReason = true,
+): CashInput {
   const input = object(raw);
   if (typeof input.amountCents !== "number")
     throw new RegistrationError(
@@ -66,7 +70,7 @@ export function validateCashInput(raw: unknown, now: Date): CashInput {
   validateCashEffectiveDate(effectiveDate, now);
   const reason = typeof input.reason === "string" ? input.reason.trim() : "";
   if (
-    !reason ||
+    (requireReason && !reason) ||
     [...reason].length > 500 ||
     /\p{Cc}/u.test(typeof input.reason === "string" ? input.reason : "")
   )
@@ -75,7 +79,11 @@ export function validateCashInput(raw: unknown, now: Date): CashInput {
       "Introduce un motivo válido.",
       { reason: "Introduce un motivo de hasta 500 caracteres." },
     );
-  return { amountCents: input.amountCents, effectiveDate, reason };
+  return {
+    amountCents: input.amountCents,
+    effectiveDate,
+    reason: reason || null,
+  };
 }
 /** Pure boundary validation; authoritative price/state/capacity remain transactional. */
 export function validateCreateRegistration(
@@ -126,6 +134,6 @@ export function validateCreateRegistration(
     initialPayment:
       input.initialPayment == null
         ? null
-        : validateCashInput(input.initialPayment, now),
+        : validateCashInput(input.initialPayment, now, false),
   };
 }

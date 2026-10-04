@@ -825,7 +825,7 @@ export const registrationLedger = pgTable(
     ),
     check(
       "registration_ledger_reason_check",
-      sql`char_length(btrim(${t.reason})) between 1 and 500 and ${t.reason} !~ '[[:cntrl:]]'`,
+      sql`char_length(btrim(${t.reason})) between 0 and 500 and ${t.reason} !~ '[[:cntrl:]]'`,
     ),
   ],
 ).enableRLS();

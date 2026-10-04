@@ -163,6 +163,7 @@ test.each([
   { ...participant, email: "no-email" },
   { ...participant, firstName: "\nName" },
   { ...participant, phone: 12 },
+  { ...participant, phone: "555-ABC" },
   { ...participant, ci: "a".repeat(65) },
 ])("phase5 participant rejects invalid/unsafe fields %#", (input) => {
   expect(() => validateParticipant(input)).toThrow();
@@ -507,6 +508,15 @@ test("phase5 command validation preserves null default cash date for stable retr
     participant: { ci: "00AB-LP" },
     initialPayment: { effectiveDate: null },
   });
+  const optionalInitialReason = {
+    ...input,
+    initialPayment: { amountCents: 2001, effectiveDate: null },
+  };
+  expect(
+    validateCreateRegistration(optionalInitialReason, before),
+  ).toMatchObject({
+    initialPayment: { amountCents: 2001, reason: null },
+  });
   expect(() =>
     validateCreateRegistration({ ...input, requestKey: "invalid" }, before),
   ).toThrow();
@@ -515,5 +525,17 @@ test("phase5 command validation preserves null default cash date for stable retr
   ).toThrow();
   expect(() =>
     validateCashInput({ amountCents: 1.5, reason: "Cash" }, before),
+  ).toThrow();
+  expect(
+    validateCashInput({ amountCents: 1, effectiveDate: null }, before, false),
+  ).toEqual({ amountCents: 1, effectiveDate: null, reason: null });
+  expect(() =>
+    validateCashInput({ amountCents: 1, effectiveDate: null }, before),
+  ).toThrow();
+  expect(() =>
+    validateCashInput(
+      { amountCents: 1_000_000_000_000, reason: "Cash" },
+      before,
+    ),
   ).toThrow();
 });

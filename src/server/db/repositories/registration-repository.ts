@@ -198,7 +198,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
         amountCents: String(normalized.amountCents),
         effectiveDate,
         actorId,
-        reason: normalized.reason,
+        reason: normalized.reason ?? "",
         recordedAt: now,
       },
       dto: {
@@ -207,7 +207,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
         amountCents: normalized.amountCents,
         effectiveDate,
         actorId,
-        reason: normalized.reason,
+        reason: normalized.reason ?? null,
         recordedAt: now.toISOString(),
       },
     };
@@ -273,13 +273,14 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
               and(
                 eq(schema.interestRegistrations.id, sourceInterestId),
                 eq(schema.interestRegistrations.courseId, courseId),
+                sql`not exists (select 1 from pre_registrations where source_interest_id = ${sourceInterestId}::uuid)`,
               ),
             )
         : [];
       if (sourceInterestId && !interest)
         throw new RegistrationError(
           "NOT_FOUND",
-          "El interesado no pertenece al curso.",
+          "El interesado no pertenece al curso o ya fue usado en un registro.",
         );
       return {
         course: {
@@ -376,12 +377,13 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
               and(
                 eq(schema.interestRegistrations.id, input.sourceInterestId),
                 eq(schema.interestRegistrations.courseId, course.id),
+                sql`not exists (select 1 from pre_registrations where source_interest_id = ${input.sourceInterestId}::uuid)`,
               ),
             );
           if (!interest)
             throw new RegistrationError(
               "NOT_FOUND",
-              "El interesado no pertenece al curso.",
+              "El interesado no pertenece al curso o ya fue usado en un registro.",
             );
         }
         const [createdPerson] = await tx
@@ -570,7 +572,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
       requestKey: checked.requestKey,
       registrationId: checked.registrationId,
       revision: checked.revision,
-      cash: validateCashInput(raw.cash, this.clock()),
+      cash: validateCashInput(raw.cash, this.clock(), kind !== "PAYMENT"),
     };
     return this.command(
       actorId,
@@ -883,7 +885,13 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
       );
       const base = () =>
         tx
-          .select()
+          .select({
+            pre_registrations: schema.preRegistrations,
+            courses: schema.courses,
+            participants: schema.participants,
+            groups: schema.groups,
+            registeredByName: schema.users.name,
+          })
           .from(schema.preRegistrations)
           .innerJoin(
             schema.courses,
@@ -896,6 +904,10 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
           .innerJoin(
             schema.groups,
             eq(schema.groups.id, schema.preRegistrations.groupId),
+          )
+          .leftJoin(
+            schema.users,
+            eq(schema.users.id, schema.preRegistrations.createdBy),
           );
       const rows = await base()
         .where(where)
@@ -919,8 +931,15 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
         .where(where);
       const pageLedger = rows.length
         ? await tx
-            .select()
+            .select({
+              entry: schema.registrationLedger,
+              actorName: schema.users.name,
+            })
             .from(schema.registrationLedger)
+            .innerJoin(
+              schema.users,
+              eq(schema.users.id, schema.registrationLedger.actorId),
+            )
             .where(
               inArray(
                 schema.registrationLedger.registrationId,
@@ -933,9 +952,9 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
             )
         : [];
       const ledgerByRegistration = new Map<string, LedgerEntryDto[]>();
-      for (const entry of pageLedger) {
+      for (const { entry, actorName } of pageLedger) {
         const entries = ledgerByRegistration.get(entry.registrationId) ?? [];
-        entries.push(ledgerDto(entry));
+        entries.push(ledgerDto(entry, actorName));
         ledgerByRegistration.set(entry.registrationId, entries);
       }
       return {
@@ -948,6 +967,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
               ledgerByRegistration.get(row.pre_registrations.id) ?? [],
               {
                 person: row.participants,
+                registeredByName: row.registeredByName,
                 course: row.courses,
                 group: row.groups,
               },

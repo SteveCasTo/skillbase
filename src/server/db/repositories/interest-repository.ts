@@ -191,6 +191,20 @@ export class DrizzleInterestRepository implements InterestRepository {
           ),
         )
         .orderBy(asc(interests.createdAt), asc(interests.id));
+      const consumedRows = await tx
+        .select({ sourceInterestId: schema.preRegistrations.sourceInterestId })
+        .from(schema.preRegistrations)
+        .where(
+          and(
+            eq(schema.preRegistrations.courseId, courseId),
+            sql`${schema.preRegistrations.sourceInterestId} is not null`,
+          ),
+        );
+      const consumedInterests = new Set(
+        consumedRows.flatMap((row) =>
+          row.sourceInterestId ? [row.sourceInterestId] : [],
+        ),
+      );
       const historical = await tx
         .select()
         .from(groups)
@@ -199,6 +213,9 @@ export class DrizzleInterestRepository implements InterestRepository {
       return {
         course,
         registrations: rows.map(dto),
+        availableForPrefillInterestIds: rows
+          .filter((row) => !consumedInterests.has(row.id))
+          .map((row) => row.id),
         metrics: await this.metrics(tx, courseId),
         groups: historical.map(groupDto),
       };
