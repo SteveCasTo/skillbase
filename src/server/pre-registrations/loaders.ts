@@ -10,6 +10,7 @@ import { getDatabase } from "@/server/db/client";
 import { loadAdminInterestCourse } from "@/server/interests/http";
 import { RegistrationError } from "@/domain/pre-registrations/errors";
 import type { RegistrationFormDto } from "@/domain/pre-registrations/types";
+import { filterAvailableInterestCandidates } from "./prefill-interest-candidates";
 
 export async function loadRegistrationChoices(
   actor: InternalUser,
@@ -45,12 +46,11 @@ export async function lookupRegistrationPeople(
     ? await loadAdminInterestCourse(actor, courseId, "ACTIVE")
     : null;
   const query = search.trim().toLocaleLowerCase("es-BO");
-  const interests = (data?.registrations ?? [])
-    .filter((interest) =>
-      `${interest.firstName} ${interest.lastName} ${interest.email}`
-        .toLocaleLowerCase("es-BO")
-        .includes(query),
-    )
-    .slice(0, 30);
+  const interests = filterAvailableInterestCandidates(
+    data?.registrations ?? [],
+    data?.availableForPrefillInterestIds ?? [],
+    courseId,
+    query,
+  );
   return { participants, interests };
 }
