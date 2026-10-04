@@ -446,13 +446,31 @@ Los comportamientos abajo están implementados en `8735d676fe0d96e7230b4636efa8c
 - En alta presencial, permitir alta directa o buscar interesados del curso por nombre/correo y prellenar la ficha editable; el origen es informativo/read-only y el vínculo de trazabilidad permanece interno, sin selector de asociación. Los filtros y resultados respetan foco, integridad/privacidad y errores inline; UI y permisos deben corresponder a los límites `ADMIN`/instructor readonly.
 - Si el total con descuento auxiliar es cero, mostrar preinscripción gratuita/saldo cero y mantener la misma ficha/snapshot/cupo, sin pedir ni registrar un abono de cero; para precios positivos, el primer pago mínimo debe mostrarse con moneda/centavos explícitos y validarse server-side.
 
-## Fase 5: administración de registros (implementación parcial)
+## Fase 5: administración de registros (release en producción)
 
 - PR 177 integró componentes reutilizables de formularios/listados/detalles de inscripción; PR 178 conectó la página de configuración global. PR 179 añadió route policy y montó `/app/preinscripciones`, nueva/detalle, `/app/participantes`/detalle, búsqueda/prellenado, operaciones de efectivo/devolución/cambio/cancelación, export y roster instructor. `PRIVATE_ROUTE_POLICIES` limita escrituras/listados financieros a ADMIN y roster al instructor asignado.
 - Los formularios muestran campos/errores pendientes según validez, feedback recuperable y valores preservados con HTML/SSR como base; con JS las mutaciones usan un adaptador `ok/value` o `ok:false/message/issues` y requestKey para idempotencia. Montos se presentan/transportan como BOB decimal y se convierten a centavos exactos server-side. Configuración responde settings o errores `code/message/fields`, incluyendo `409` revision conflict.
-- El UI integrado pasó el full canonical E2E reportado (125/125) y una revisión de 24 screenshots en 375/768/1440 px, light/dark, sin overflow. Los exportes presentan los campos actuales del backend: etiquetas curso/grupo, participante/CI, categoría, estados y cantidades del snapshot financiero. Fase 5 no está liberada a producción.
+- El UI integrado pasó el full canonical E2E reportado (125/125) y una revisión de 24 screenshots en 375/768/1440 px, light/dark, sin overflow. Los exportes presentan los campos actuales del backend: etiquetas curso/grupo, participante/CI, categoría, estados y cantidades del snapshot financiero. Fase 5 se liberó como `2e0eecb`; las correcciones de experiencia listadas a continuación siguen siendo alcance pendiente.
 - Diseño funcional aprobado: registro directo o prellenado editable; origen del interesado de solo lectura e interno; roster instructor propio desde inicio oficial y solo nombre/apellidos; ADMIN conserva finanzas y mutaciones. Filtros/paginación con recuperación de errores, permisos server-side y cash ledger mantienen estados/foco; el total gratuito por AUXILIARY 100 % se ve como gratuidad, nunca como pago cero.
 - PR 179 integró esa UI; la rama reportó 34 pruebas dirigidas y 3 E2E (dos escenarios principales y uno temporal), además de quality PASS. No equivale a full canonical E2E ni a revisión visual/accesible final del módulo.
+
+### Correcciones de administración aprobadas (pendientes)
+
+- Simplificar el copy de Configuración: no hablar de preinscripción en bloques de ayuda redundantes. Editar cada ajuste y campo de participante en línea, con lápiz/guardar/cancelar como los campos de formatos.
+- Interesados: filtros select aplican inmediatamente; texto parcial usa debounce; actualizaciones son parciales, mantienen fallback SSR y resuelven last-request-wins. Al vincular un interesado consumido a una preinscripción, ocultarlo de candidatos posteriores sin borrar ni alterar su historial. Nunca inferir identidad global por coincidencia de email.
+- Las opciones compactas de candidato muestran nombre y correo; el registro seleccionado muestra solo el curso elegido y los intereses de ese curso. Las tarjetas seleccionables completas funcionan con clic/teclado y no exponen datos financieros.
+- La grilla de participantes usa tres columnas en ancho amplio y se adapta a tablet/mobile. Las tarjetas enlazadas muestran solo nombre, CI, email y estado/curso; las finanzas aparecen dentro del detalle, no en el listado.
+- Usar el calendario shadcn del proyecto en todos los flujos de esta fase; reemplazar pickers nativos. Mostrar descuento AUXILIARY solo para ese tipo. No mostrar banner de procedencia/origen, ficha técnica global ni copy de servidor.
+- El detalle de una operación identifica al actor por nombre humano, nunca UUID. Métricas de devolución aparecen solo donde tengan relación. Acciones superiores de pago, transferencia, cancelación y devolución usan diálogos breves; importes se actualizan al centavo y no exceden saldo. Motivo de pago es opcional; teléfono se valida conservadoramente y CI admite letras/números.
+- Notificaciones usan UUID por operación, estados loading/resultado y conservan fallback sin JavaScript. La búsqueda/filtro debe priorizar resultados observables y no acoplar tests a copy exacto, CSS, orden de opciones o conteos frágiles.
+
+### Sesiones y asistencia (Fase 6, dirección aprobada; pendiente)
+
+- Calendario y gestión deben ser compactos, responsive y utilizar el calendario shadcn. Mostrar sesiones canceladas en cronología y sus reemplazos diferenciados sin perder referencia al original. El instructor ve y edita únicamente sus grupos; ADMIN gestiona configuración, feriados y correcciones posteriores.
+- La toma de asistencia presenta participantes `INSCRITO` del grupo y estado de participante `Presente`, `Ausente` o `Justificada`; no expone CI, email ni datos financieros al instructor. Incluir la asistencia del propio instructor según permisos.
+- La falta de marca durante el día se muestra pendiente; después del día se deriva como ausente. No hacer pasar sesiones canceladas como faltas. Las sesiones históricas generadas requieren revisión ADMIN inicial y no deben representar ausencias retroactivas.
+- La configuración se limita al umbral N de ausencias consecutivas (default 3): advertencia al alcanzar N y pérdida de reconocimiento al superar N; justificada interrumpe la racha. No mostrar porcentaje de asistencia ni crear bandeja/sistema separado de alertas, expulsiones automáticas, cancelaciones o reembolsos.
+- Correcciones ADMIN posteriores deben distinguirse de la captura ordinaria del instructor y conservar evidencia de auditoría. Loading, empty, success, error, foco, teclado, SSR fallback y movimiento reducido se mantienen según los principios de este documento.
 
 ## CONSISTENCIA
 

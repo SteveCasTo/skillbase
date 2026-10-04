@@ -391,7 +391,7 @@ El E2E cubre lifecycle ADMIN completo, perfil sin JavaScript, autorización desd
 
 #### Migraciones y release
 
-La migración `0016_instructor_lifecycle_outbox` se aplicó en los stacks temporales y después al Supabase local estándar, sin reset. Su ledger pasó de 16 a 17; cloud permanece en 16. No se afirma aplicación cloud, CI remoto PASS, SMTP propio, entrega de recovery ni Google OAuth real.
+La migración `0016_instructor_lifecycle_outbox` se aplicó en los stacks temporales y después al Supabase local estándar, sin reset. En este stage su ledger pasó de 16 a 17; cloud aún permanecía en 16. No se afirma aplicación cloud, CI remoto PASS, SMTP propio, entrega de recovery ni Google OAuth real para esta validación histórica.
 
 #### Cambio de puertos y smoke local (PR 135)
 
@@ -399,13 +399,13 @@ PR 135 (`ddd0f3d`) trasladó Supabase local desde API/Auth `127.0.0.1:54321` y P
 
 Después de mover puertos, `bun run db:migrate` aplicó 0016 normalmente a la base local estándar: ledger 16→17. No se hizo reset. Se conservaron Auth identities, ADMIN/roles/perfiles, sesiones, Storage, seis cursos y 35 interesados. Las diferencias esperadas observadas fueron la fila del ledger y el timestamp de inicio de sesión del usuario sintético del smoke. Smoke local PASS: seis rutas/páginas públicas y siete solicitudes de detalle/formulario/imagen; páginas de cursos propios del instructor, perfil y password 200; rutas ADMIN 303. Se cerró la sesión temporal. En el smoke el servidor Astro existente estaba activo en `127.0.0.1:4321`; esto no describe su PID/estado actual después de las corridas posteriores.
 
-Este smoke no prueba Google OAuth real ni entrega de recovery. El callback local actualizado `http://127.0.0.1:55321/auth/v1/callback` requiere allowlist manual en Google Console; no se afirma que ese cambio externo se haya realizado. La producción sigue en el release previo de Fase 4 (`master` `598b1f`, migraciones hasta 0015, ledger 16); no hubo escritura cloud ni deployment.
+Este smoke no prueba Google OAuth real ni entrega de recovery. El callback local actualizado `http://127.0.0.1:55321/auth/v1/callback` requiere allowlist manual en Google Console; no se afirma que ese cambio externo se haya realizado. En ese momento, la producción seguía en el release previo de Fase 4 (`master` `598b1f`, migraciones hasta 0015, ledger 16), sin escritura cloud ni deployment desde esta validación; el release posterior de Fase 5 se registra abajo.
 
 PR 136 (`8cdb38f`) integró el fix final de middleware request-context e hidratación SSR de password. El commit fuente validado `8735d676fe0d96e7230b4636efa8cb51045d1eca` (base `ddd0f3de`, 0 behind/1 ahead) pasó unit **178**, integration **98** y canonical full E2E **120/120**, además de lint, formatter, typecheck (0 errores/0 warnings), build, Drizzle y diff checks. No se informaron warnings/errores de hidratación `Astro.session`/React. La fuente explícita de request context evita expandir getters Astro en middleware; password controlled-state queda coherente antes/después de hidratar y se añade cobertura `request-client-context`/`password-hydration`. No se suprimieron warnings globalmente.
 
 El install directo previo falló por el estado de paquetes del entorno; `bun install --frozen-lockfile` restauró dependencias sin editar `package.json`/`bun.lock` ni cambiar la versión de Astro. No se clasifica como flaky de producto. PR 136 ya está integrado en `development`; la verificación anterior 119/119 y esta final 120/120 son runs separados de distintos trees, no se suman ni se afirma retry automático para el run final.
 
-### Fase 5 parcial: foundation, backend, settings y exportes (development)
+### Fase 5: validación local y release (development)
 
 - PR 173 incorporó foundation/migración 0017; quedó aplicada sin reset al Supabase local estándar y ledger 18. La verificación de preservación registró seis cursos, 35 interesados y cero preinscripciones; no se cargaron datos financieros/fixtures de participantes ni pagos.
 - PR 177 reportó **291 unit**, **125 integration** y quality PASS para la capa compartida de UI/settings integrada. PR 178 reportó **295 unit** y quality PASS para settings HTTP; en ese stage faltaba completar su route policy/UI.
@@ -413,7 +413,7 @@ El install directo previo falló por el estado de paquetes del entorno; `bun ins
 - PR 179 (`d13432d`) integró páginas HTTP de preinscripción/participante, exportes, roster y route policy. La rama UI reportó 34 tests dirigidos y tres E2E (dos escenarios principales y un harness temporal) PASS; después pasó el full canonical descrito abajo.
 - En `development` están integrados schema, operaciones de aplicación/repository, settings y páginas/listado/alta/detalle, acciones de efectivo/devolución/transfer/cancelación, export endpoint y roster. `/app/configuracion` ya está en `PRIVATE_ROUTE_POLICIES` y protegida ADMIN.
 
-La migración 0017 está aplicada solo al Supabase local estándar (`127.0.0.1:55322`), con ledger 18 y datos previos preservados; el proyecto cloud/master sigue en Fase 4/ledger 16. No se afirma deployment, Google OAuth real, allowlist actualizada en Google Console, SMTP propio ni entrega real de recovery.
+La migración 0017 está aplicada al Supabase local estándar (`127.0.0.1:55322`) y al cloud para el release Fase 5 (`2e0eecb`, cloud ledger 18). El gate local reportado fue 303 unit, 125 integration y E2E 125/125. Esto no prueba Google OAuth real, autorización del callback local en Google Console ni SMTP/entrega de recovery; las dos tareas operacionales continúan independientes.
 
 #### Resultados parciales por PR y stage de interfaz
 
@@ -422,4 +422,4 @@ La migración 0017 está aplicada solo al Supabase local estándar (`127.0.0.1:5
 - La rama/stage UI basada en `7d164f1` reportó 34 pruebas dirigidas PASS, tres E2E focales (dos casos principales más un harness temporal) y quality PASS.
 - El full gate final se ejecutó en commit `25890143` e integró mediante PR 180 (`917a636`): **303 unit, 125 integration, canonical E2E 125/125**. Corrida inicial E2E: 119/125; seis fallos SSR 500/settings browser-only/hidratación se corrigieron y el run final pasó sin retries. Quality: 0 errores/0 warnings; revisión visual: 24 screenshots en 375/768/1440 px, light/dark, sin overflow. Esta documentación no ejecutó ni repitió tests.
 
-La aplicación local/migración 0017 no introdujo datos de prueba financieros: quedaron cero preinscripciones; se conservaron seis cursos y 35 interesados. La suite/configuración no equivale a despliegue ni a smoke de producción.
+La aplicación local/migración 0017 no introdujo datos de prueba financieros: quedaron cero preinscripciones en ese baseline; se conservaron seis cursos y 35 interesados. El release posterior a producción está registrado como `2e0eecb`; esta evidencia local no equivale por sí sola a un smoke manual de todos los flujos de producción.
