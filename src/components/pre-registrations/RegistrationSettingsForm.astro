@@ -1,7 +1,6 @@
 ---
 import type { RegistrationSettings } from "@/domain/pre-registrations/types";
 import { buttonVariants } from "@/components/ui/button";
-import "./registration-settings-form-client";
 
 interface Props {
   settings: RegistrationSettings;
@@ -115,6 +114,8 @@ const fields = [
     Guardar configuración
   </button>
 </form>
+
+<script src="./registration-settings-form-client.ts"></script>
 
 <style>
   .registration-settings-form {
