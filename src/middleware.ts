@@ -11,7 +11,10 @@ import {
   isPrivatePath,
   isSessionDependentPath,
 } from "@/server/auth/route-policy";
-import { createRequestSupabaseClient } from "@/server/auth/supabase";
+import {
+  createRequestSupabaseClient,
+  requestClientContext,
+} from "@/server/auth/supabase";
 import { getDatabase, withRequestDatabase } from "@/server/db/client";
 import { DrizzleAuthUserRepository } from "@/server/db/repositories/auth-user-repository";
 import { getPublicAuthEnvironment } from "@/server/environment";
@@ -38,7 +41,7 @@ export const onRequest = defineMiddleware((context, next) =>
 
       const responseHeaders = new Headers();
       const supabase = createRequestSupabaseClient(
-        { ...context, responseHeaders },
+        requestClientContext(context, responseHeaders),
         getPublicAuthEnvironment(),
       );
       context.locals.supabase = supabase;

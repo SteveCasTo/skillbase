@@ -30,6 +30,7 @@ main#main-content {
 .private-mobile-actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
@@ -235,6 +236,17 @@ main#main-content {
   align-items: center;
   gap: 0.75rem;
   padding: 0.375rem 0.5rem;
+  min-width: 0;
+  min-height: 2.75rem;
+  border-radius: var(--radius);
+}
+.private-account:hover,
+.private-account:focus-visible {
+  background: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+}
+.private-account:is(:hover, :focus-visible) .text-muted-foreground {
+  color: inherit;
 }
 .private-account-text {
   min-width: 0;

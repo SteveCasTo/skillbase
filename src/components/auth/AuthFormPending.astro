@@ -1,57 +1,196 @@
 <script>
-  const restoreAuthForms = () => {
-    document
-      .querySelectorAll<HTMLFormElement>("form[data-auth-form]")
-      .forEach((form) => {
-        form.removeAttribute("aria-busy");
-        const button = form.querySelector<HTMLButtonElement>(
-          'button[type="submit"]',
-        );
-        if (button?.dataset.label) {
-          button.disabled = false;
-          button.textContent = button.dataset.label;
-        }
-      });
-  };
+  import { notifications } from "@/lib/notifications";
+  interface AuthResult {
+    error?: string | null;
+    fields?: Record<string, string>;
+    message?: string;
+    redirect?: string;
+  }
   const initializeAuthForms = () => {
     document
       .querySelectorAll<HTMLFormElement>("form[data-auth-form]")
       .forEach((form) => {
         if (form.dataset.initialized) return;
         form.dataset.initialized = "true";
-        const submit = form.querySelector<HTMLButtonElement>(
+        const button = form.querySelector<HTMLButtonElement>(
           'button[type="submit"]',
         );
-        if (submit && !submit.dataset.label)
-          submit.dataset.label = submit.textContent?.trim() ?? "Continuar";
-        form.addEventListener("submit", () => {
-          form.setAttribute("aria-busy", "true");
-          const button = form.querySelector<HTMLButtonElement>(
-            'button[type="submit"]',
+        if (!button) return;
+        const original = button.innerHTML;
+        const enhanced = form.hasAttribute("data-auth-enhanced");
+        if (enhanced) form.noValidate = true;
+        let pending = false;
+        const fields = () =>
+          Array.from(
+            form.querySelectorAll<HTMLInputElement>("input:not([type=hidden])"),
           );
-          if (button) {
-            button.disabled = true;
-            button.textContent = "Procesando…";
+        const fieldMessage = (input: HTMLInputElement) => {
+          if (input.validity.valueMissing) return "Completa este campo.";
+          if (
+            input.validity.typeMismatch ||
+            (input.type === "email" &&
+              !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(input.value))
+          )
+            return "Introduce un correo electrónico válido.";
+          if (input.value.length > input.maxLength && input.maxLength > 0)
+            return `Usa como máximo ${input.maxLength} caracteres.`;
+          if (input.minLength > 0 && input.value.length < input.minLength)
+            return `Usa al menos ${input.minLength} caracteres.`;
+          if (!input.validity.valid) return "Revisa el valor de este campo.";
+          if (
+            input.name === "confirmation" &&
+            input.value !==
+              form.querySelector<HTMLInputElement>('[name="password"]')?.value
+          )
+            return "Las contraseñas no coinciden. Repite la nueva contraseña.";
+          return "";
+        };
+        const displayFieldError = (
+          input: HTMLInputElement,
+          message: string,
+        ) => {
+          const error = form.querySelector<HTMLElement>(
+            `[data-auth-field-error="${input.name}"]`,
+          );
+          if (error) {
+            error.textContent = message;
+            error.hidden = !message;
+            input.setAttribute("aria-describedby", error.id);
+          }
+          input.setAttribute("aria-invalid", message ? "true" : "false");
+        };
+        const sync = () => {
+          button.disabled =
+            pending ||
+            (enhanced &&
+              fields().some((input) => Boolean(fieldMessage(input))));
+        };
+        const restore = () => {
+          pending = false;
+          form.removeAttribute("aria-busy");
+          button.innerHTML = original;
+          sync();
+        };
+        form.addEventListener("auth:restore", restore);
+        if (enhanced) {
+          form.addEventListener("input", (event) => {
+            if (event.target instanceof HTMLInputElement)
+              displayFieldError(event.target, fieldMessage(event.target));
+            sync();
+          });
+          form.addEventListener("change", sync);
+          form.addEventListener("focusout", (event) => {
+            if (event.target instanceof HTMLInputElement)
+              displayFieldError(event.target, fieldMessage(event.target));
+          });
+          sync();
+        }
+        form.addEventListener("submit", async (event) => {
+          if (pending) {
+            event.preventDefault();
+            return;
+          }
+          if (enhanced) {
+            event.preventDefault();
+            const invalid = fields().filter((input) =>
+              Boolean(fieldMessage(input)),
+            );
+            invalid.forEach((input) =>
+              displayFieldError(input, fieldMessage(input)),
+            );
+            if (invalid.length) {
+              invalid[0]?.focus();
+              sync();
+              return;
+            }
+          }
+          pending = true;
+          form.setAttribute("aria-busy", "true");
+          button.disabled = true;
+          button.textContent = "Procesando…";
+          if (!enhanced) return;
+          const id = `notification-${crypto.randomUUID()}`;
+          notifications.loading({ id, title: "Procesando solicitud…" });
+          let resultNode =
+            form.querySelector<HTMLElement>("[data-auth-result]");
+          if (!resultNode) {
+            resultNode = document.createElement("p");
+            resultNode.dataset.authResult = "true";
+            resultNode.className = "text-sm leading-6";
+            resultNode.tabIndex = -1;
+            form.prepend(resultNode);
+          }
+          try {
+            const response = await fetch(form.action, {
+              method: "POST",
+              body: new URLSearchParams(
+                Array.from(new FormData(form).entries()).map(([key, value]) => [
+                  key,
+                  String(value),
+                ]),
+              ),
+              headers: { Accept: "application/json" },
+            });
+            if (
+              !response.headers
+                .get("content-type")
+                ?.includes("application/json")
+            )
+              throw new Error("Invalid response");
+            const result = (await response.json()) as AuthResult;
+            if (!response.ok || result.error) {
+              const message =
+                result.error ??
+                "No pudimos procesar la solicitud. Inténtalo nuevamente.";
+              resultNode.textContent = message;
+              resultNode.setAttribute("role", "alert");
+              resultNode.classList.add("text-destructive");
+              fields().forEach((input) => {
+                if (input.autocomplete.includes("password")) input.value = "";
+                displayFieldError(input, result.fields?.[input.name] ?? "");
+              });
+              notifications.error({ id, title: message });
+              const invalid = fields().find(
+                (input) => result.fields?.[input.name],
+              );
+              (invalid ?? resultNode).focus();
+            } else {
+              notifications.success({
+                id,
+                title: result.message ?? "Solicitud completada.",
+              });
+              if (
+                result.redirect &&
+                result.redirect.startsWith("/") &&
+                !result.redirect.startsWith("//")
+              ) {
+                window.location.assign(result.redirect);
+                return;
+              }
+              resultNode.textContent =
+                result.message ?? "Solicitud completada.";
+              resultNode.setAttribute("role", "status");
+              resultNode.classList.remove("text-destructive");
+              resultNode.focus();
+            }
+          } catch {
+            const message =
+              "No pudimos procesar la solicitud. Revisa tu conexión e inténtalo nuevamente.";
+            resultNode.textContent = message;
+            resultNode.setAttribute("role", "alert");
+            notifications.error({ id, title: message });
+            resultNode.focus();
+          } finally {
+            restore();
           }
         });
       });
   };
   initializeAuthForms();
   document.addEventListener("astro:page-load", initializeAuthForms);
-  window.addEventListener("pageshow", restoreAuthForms);
-  document.addEventListener("astro:before-preparation", (event) => {
-    if (!event.formData) return;
-    const loader = event.loader;
-    event.signal.addEventListener("abort", restoreAuthForms, { once: true });
-    event.loader = async () => {
-      try {
-        await loader();
-      } catch (error) {
-        restoreAuthForms();
-        throw error;
-      } finally {
-        if (event.defaultPrevented || event.signal.aborted) restoreAuthForms();
-      }
-    };
+  window.addEventListener("pageshow", () => {
+    document
+      .querySelectorAll("form[data-auth-form]")
+      .forEach((form) => form.dispatchEvent(new Event("auth:restore")));
   });
 </script>

@@ -23,6 +23,30 @@ import {
 
 type Database = ReturnType<typeof createDatabase>["db"];
 
+class DemoFinancialHistoryError extends Error {
+  constructor() {
+    super(
+      "Demo reset refused: registration or financial/idempotency history exists. Use insert-only renewal; preserve all participant, registration and cash history.",
+    );
+  }
+}
+
+export function assertDemoResetHasNoFinancialHistory(
+  hasHistory: boolean,
+): void {
+  if (hasHistory) throw new DemoFinancialHistoryError();
+}
+
+async function assertNoFinancialHistory(
+  database: Pick<Database, "execute">,
+): Promise<void> {
+  const [history] = await database.execute(sql`select
+    exists (select 1 from public.pre_registrations)
+    or exists (select 1 from public.registration_ledger)
+    or exists (select 1 from public.registration_command_receipts) as present`);
+  assertDemoResetHasNoFinancialHistory(history?.present === true);
+}
+
 /** Trusted development adapter; uses the same authorized application provisioner and atomic profile repository as the server API.
  * Server-owned Auth metadata is written at Auth creation, so email alone never establishes synthetic ownership.
  * Supabase Auth + PostgreSQL cannot share a transaction. An orphan owned identity is recovered, never deleted by email.
@@ -35,7 +59,7 @@ export async function renewDemo(
   reset: boolean,
   now = new Date(),
 ) {
-  if (environment.apiUrl === "http://127.0.0.1:54321") {
+  if (environment.apiUrl === "http://127.0.0.1:55321") {
     assertCanonicalLocalTarget(environment.databaseUrl, environment.apiUrl);
   } else {
     const isolated = getTestSupabaseEnvironment();
@@ -53,6 +77,9 @@ export async function renewDemo(
   if (!row?.authUserId) throw new Error("Existing active ADMIN required");
   const actor = await resolveActiveUser(repository, row.authUserId);
   requireRoles(actor, ["ADMIN"]);
+  // Refuse before creating/recovering Auth accounts; the transaction repeats
+  // this check under locks so a late financial write cannot invalidate it.
+  if (reset) await assertNoFinancialHistory(database);
   if (!reset) {
     const existingCourses = await database
       .select({ id: schema.courses.id })
@@ -172,13 +199,49 @@ export async function renewDemo(
     if (active?.status !== "ACTIVE" || !role)
       throw new Error("ADMIN no longer active");
     if (reset) {
-      // Explicit allowlist, RESTRICT (no CASCADE), no Auth/profile/role/config/ledger/storage writes.
-      // TRUNCATE intentionally bypasses immutable revision/published group DELETE triggers for this authorized local renewal.
+      // Only the original demo allowlist is cleared. Financial tables are never
+      // truncated/deleted, even when empty. FK RESTRICT stays active throughout.
+      // TRUNCATE RESTRICT cannot work once any external referencing table exists.
       await tx.execute(
         sql.raw(
-          `TRUNCATE TABLE ${RESET_TABLES.map((table) => `public.${table}`).join(", ")} RESTRICT`,
+          `LOCK TABLE ${RESET_TABLES.map((table) => `public.${table}`).join(", ")} IN ACCESS EXCLUSIVE MODE`,
         ),
       );
+      await tx.execute(
+        sql`LOCK TABLE public.pre_registrations, public.registration_ledger, public.registration_command_receipts IN SHARE MODE`,
+      );
+      await assertNoFinancialHistory(tx);
+      await tx.delete(schema.interestRegistrations);
+      await tx.delete(schema.interestRegistrationRateLimits);
+      await tx.delete(schema.courseInstructorHistory);
+      await tx.delete(schema.auditEvents);
+      // Equivalent to the former authorized TRUNCATE's published-group bypass,
+      // but only this existing user trigger is suspended under exclusive lock.
+      // Failure rolls back ALTER as well; no financial trigger/FK is disabled.
+      await tx.execute(
+        sql`ALTER TABLE public.groups DISABLE TRIGGER groups_protect_published`,
+      );
+      await tx.delete(schema.groups);
+      await tx.execute(
+        sql`ALTER TABLE public.groups ENABLE TRIGGER groups_protect_published`,
+      );
+      await tx.delete(schema.courses);
+      const formatsToDelete = await tx
+        .select({ id: schema.courseTypes.id })
+        .from(schema.courseTypes);
+      for (const format of formatsToDelete) {
+        // Reuse the existing authorized unused-format deletion guard.
+        await tx.execute(
+          sql`select set_config('app.delete_unused_format_id', ${format.id}, true)`,
+        );
+        await tx
+          .delete(schema.courseTypeRevisions)
+          .where(eq(schema.courseTypeRevisions.courseTypeId, format.id));
+      }
+      await tx.execute(
+        sql`select set_config('app.delete_unused_format_id', '', true)`,
+      );
+      await tx.delete(schema.courseTypes);
     }
     for (const format of formats) {
       const [existing] = await tx
@@ -319,9 +382,11 @@ if (import.meta.main) {
         "Synthetic local seed completed; credentials and identities withheld.",
       );
     }
-  } catch {
+  } catch (error) {
     console.error(
-      "Local demo renewal refused or failed. No credentials or database errors printed. Check local target, active ADMIN, external password, migrations 0014 and synthetic ownership; do not reset Auth.",
+      error instanceof DemoFinancialHistoryError
+        ? error.message
+        : "Local demo renewal refused or failed. No credentials or database errors printed. Check local target, active ADMIN, external password, migrations 0014 and synthetic ownership; do not reset Auth.",
     );
     process.exitCode = 1;
   }

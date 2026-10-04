@@ -1,0 +1,62 @@
+---
+import type { AdminRegistrationDto } from "@/domain/pre-registrations/types";
+import { financeLabels, formatMoney, membershipLabels } from "./presentation";
+interface Props {
+  registration: AdminRegistrationDto;
+}
+const { registration } = Astro.props;
+const amounts = [
+  ["Precio aplicado", registration.price.totalPriceCents],
+  ["Efectivo recibido", registration.paidCents],
+  ["Saldo pendiente", registration.balanceCents],
+  ["Devuelto", registration.refundedCents],
+  ["Devolución pendiente", registration.refundDueCents],
+] as const;
+---
+
+<section
+  aria-label="Resumen financiero"
+  class="min-w-0 rounded-xl border p-5 sm:p-6"
+>
+  <div class="mb-5 flex flex-wrap items-center gap-3">
+    <h2 class="text-lg font-semibold">Resumen financiero</h2>
+    <span class="rounded-md bg-secondary px-3 py-1 text-sm">
+      {membershipLabels[registration.membershipStatus]}
+    </span>
+    <span class="text-sm text-muted-foreground">
+      {financeLabels[registration.financialStatus]}
+    </span>
+  </div>
+  <dl class="financial-amounts grid gap-5">
+    {amounts.map(([label, amount]) => (
+      <div class="min-w-0">
+        <dt class="text-sm text-muted-foreground">{label}</dt>
+        <dd class="mt-1 text-lg font-semibold tabular-nums">
+          {label === "Precio aplicado" && amount === 0
+            ? "Gratuito"
+            : formatMoney(amount)}
+        </dd>
+      </div>
+    ))}
+  </dl>
+  <p class="mt-5 text-sm text-muted-foreground">
+    Tarifa conservada al registrar. Límite de regularización (exclusivo):{" "}
+    {new Intl.DateTimeFormat("es-BO", {
+      timeZone: "America/La_Paz",
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(registration.paymentDeadlineExclusive))}
+    , Bolivia.
+  </p>
+  {registration.refundDueCents > 0 && (
+    <p class="mt-3 text-sm">
+      La devolución sigue pendiente hasta registrar el efectivo realmente
+      entregado.
+    </p>
+  )}
+</section>
+<style>
+  .financial-amounts {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  }
+</style>

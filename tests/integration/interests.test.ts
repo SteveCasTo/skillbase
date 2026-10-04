@@ -27,6 +27,7 @@ import {
   handlePublicInterestPost,
 } from "@/server/interests/http";
 import { getPublicAuthEnvironment } from "@/server/environment";
+import { parseInterestFilter } from "@/server/interests/filter";
 import type { InternalUser } from "@/domain/auth/types";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 const url = getTestSupabaseEnvironment().databaseUrl;
@@ -202,6 +203,15 @@ test("interests preferences require same-course published planned group, includi
       })
       .execute(),
   ).rejects.toThrow();
+  const [remainingGroup] = await db
+    .insert(groups)
+    .values({
+      ...group,
+      id: crypto.randomUUID(),
+      startsAt: new Date(group.startsAt.getTime() + 2 * 60 * 60 * 1000),
+      endsAt: new Date(group.endsAt.getTime() + 2 * 60 * 60 * 1000),
+    })
+    .returning();
   await new DrizzleGroupRepository(db).cancel(
     group.id,
     actor.id,
@@ -214,7 +224,10 @@ test("interests preferences require same-course published planned group, includi
     byPreference: [
       { preferredGroupId: null, activeCount: 0 },
       { preferredGroupId: group.id, activeCount: 1 },
-    ],
+      { preferredGroupId: remainingGroup!.id, activeCount: 0 },
+    ].sort((a, b) =>
+      (a.preferredGroupId ?? "").localeCompare(b.preferredGroupId ?? ""),
+    ),
   });
   await expect(
     registerInterest(repo, course.slug, {
@@ -280,15 +293,40 @@ test("interests administrative audited transitions are monotonic, stale-safe, ow
     .select()
     .from(auditEvents)
     .where(eq(auditEvents.entityId, initial.id));
-  expect(audit.map((row) => row.action)).toEqual([
-    "INTEREST_REGISTRATION_CANCELLED",
-    "INTEREST_REGISTRATION_REACTIVATED",
+  expect(
+    audit
+      .map((row) => ({
+        action: row.action,
+        actorId: row.actorId,
+        entityType: row.entityType,
+        entityId: row.entityId,
+        metadata: row.metadata,
+      }))
+      .sort((left, right) => left.action.localeCompare(right.action)),
+  ).toEqual([
+    {
+      action: "INTEREST_REGISTRATION_CANCELLED",
+      actorId: actor.id,
+      entityType: "INTEREST_REGISTRATION",
+      entityId: initial.id,
+      metadata: {
+        courseId: course.id,
+        fromStatus: "ACTIVE",
+        toStatus: "CANCELLED",
+      },
+    },
+    {
+      action: "INTEREST_REGISTRATION_REACTIVATED",
+      actorId: actor.id,
+      entityType: "INTEREST_REGISTRATION",
+      entityId: initial.id,
+      metadata: {
+        courseId: course.id,
+        fromStatus: "CANCELLED",
+        toStatus: "ACTIVE",
+      },
+    },
   ]);
-  expect(audit[0]!.metadata).toEqual({
-    courseId: course.id,
-    fromStatus: "ACTIVE",
-    toStatus: "CANCELLED",
-  });
   await expect(
     repo.mutate(
       course.id,
@@ -329,8 +367,32 @@ test("interests metrics include historical zero buckets and null independently o
     interestRegistrationId: initial.id,
     revision: initial.updatedAt,
   });
-  const active = await repo.course(course.id, "ACTIVE");
-  const cancelled = await repo.course(course.id, "CANCELLED");
+  const active = await getInterestCourse(
+    repo,
+    actor,
+    course.id,
+    parseInterestFilter(new URLSearchParams("status=ACTIVE")),
+  );
+  const cancelled = await getInterestCourse(
+    repo,
+    actor,
+    course.id,
+    parseInterestFilter(new URLSearchParams("status=CANCELLED")),
+  );
+  const all = await getInterestCourse(
+    repo,
+    actor,
+    course.id,
+    parseInterestFilter(new URLSearchParams("status=ALL")),
+  );
+  expect(all!.registrations).toHaveLength(2);
+  expect(all!.metrics).toEqual(active!.metrics);
+  await expect(
+    getInterestCourse(repo, actor, "invalid-course", "ACTIVE"),
+  ).rejects.toMatchObject({ status: 404, code: "COURSE_NOT_FOUND" });
+  expect(() =>
+    parseInterestFilter(new URLSearchParams("status=INVALID")),
+  ).toThrow("El filtro no es válido");
   expect(active!.registrations).toHaveLength(1);
   expect(cancelled!.registrations).toHaveLength(1);
   expect(cancelled!.metrics).toEqual(active!.metrics);

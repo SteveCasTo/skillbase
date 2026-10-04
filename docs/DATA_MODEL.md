@@ -122,9 +122,15 @@ Un curso debe referenciar exactamente una `CourseTypeRevision`. El curso no cons
 
 `courses.instructor_id` es nullable para admitir borradores sin asignar instructor y tiene FK `ON DELETE RESTRICT` a `instructor_profiles.id`. Publicar exige perfil registrado y usuario interno `ACTIVE` con rol `INSTRUCTOR`; todos los grupos heredan la asignación del curso, no tienen instructor duplicado. Cursos existentes conservan su texto `instructor_name`; la migración 0014 no los vincula automáticamente.
 
+Corrección de Fase 4 implementada/validada en `fix/phase4-lifecycle-guards` e integrada a `development` por PR 134 (no release todavía): publicar también requiere al menos un grupo `PLANNED`; no se puede cancelar el último grupo planificado de curso publicado. Para editar un draft puede mantenerse `instructor_id IS NULL`; el placeholder no es opción de selección/cambio.
+
 `instructor_profiles.id` comparte la PK/FK restrictiva del `users.id`; guarda `first_name`, `last_name`, `phone` nullable y revisión `updated_at`. El correo/status/rol se leen desde `users`, y Supabase Auth conserva `auth_user_id`/password. `course_instructor_history` retiene IDs de curso, instructor, actor y primer instante de asignación, con restricciones que impiden borrar perfiles/cursos/actores referenciados. Creación/edición de perfil y cambios de asignación se auditan; la asignación y su evento/historial se persisten transaccionalmente. PR 122 añade `PASSWORD_CHANGED` sin password ni token. La llamada Auth y la escritura PostgreSQL son secuenciales, no una transacción distribuida; si falla la auditoría tras éxito Auth, se registra un fallback sanitizado y no se revierte/reporta como fallido el password ya cambiado.
 
 Para disponibilidad se consideran grupos `PLANNED` del instructor entre cursos —con independencia del estado editorial del curso—; un grupo `CANCELLED` deja de reservar su horario. El intervalo de fechas de cursos es inclusivo por día civil `America/La_Paz`, con sesiones recurrentes L–V y horario diario semiabierto: turnos contiguos son válidos. Las comprobaciones abarcan cursos con fechas intersecantes y distintos grupos. Migración 0014 se desplegó a local y cloud mediante el release PR 126.
+
+#### Lifecycle de cuenta instructor (0016, integrado en development y aplicado localmente)
+
+La migración `0016_instructor_lifecycle_outbox` añade `instructor_account_deletions`: registro de eliminación pendiente/completada con instructor, actor, `auth_user_id` y tiempos de solicitud/fin; FK `RESTRICT` a users/actor, índice por actor, RLS habilitado y grants Data API revocados. El repositorio conserva una fila tombstone mínima tras quitar perfil/rol para respetar referencias de auditoría, y mantiene el estado bloqueado para reintentar la etapa Auth externa si falla. Solo permite eliminación cuando no existe historia/dependencia y el usuario tiene rol exclusivo `INSTRUCTOR`; perfiles con historia conservan identidad. La migración está integrada en `development` mediante PR 134 y se aplicó sin reset al Supabase local estándar (ledger 16→17), además de stacks temporales de pruebas; cloud permanece en ledger 16. La fuente final validada en PR 136 pasó integration 98 y E2E 120/120.
 
 ### Group
 
@@ -141,16 +147,17 @@ La creación está disponible para cursos `DRAFT` o `PUBLISHED` con plan L–V y
 
 ### Participant
 
-La entidad representa a una persona incorporada al proceso administrativo de inscripción (Fase 5), no a quien únicamente dejó sus datos de interés en Fase 3. La necesidad y momento de persistir CI se confirmarán antes de incorporarlo.
+Implementado parcialmente mediante migración 0017 (local, ledger 18; cloud sigue en ledger 16): persona global de administración sin cuenta Auth. CI es texto único tras trim, eliminación de whitespace y uppercase, preservando ceros iniciales, letras/sufijos; no cast numérico, validación de formato nacional, checksum ni escaneo documental. No es `InterestRegistration` ni se fusiona por email. Una persona puede tener una preinscripción activa por curso y otras en cursos distintos. CI no se expone al roster instructor.
 
 - id
-- names
-- lastNames
-- document data only if formally required
-- email
-- phone if required
-- type
+- firstName
+- lastName
+- ci (identificador único como texto normalizado)
+- email (requerido)
+- phone (nullable)
 - createdAt
+
+Nombre/apellidos y email requerido, más teléfono opcional, pertenecen a ficha global. CI/ email se normalizan como texto; CI es la clave de unicidad y no convierte a número. El tipo `STUDENT`/`EXTERNAL`/`AUXILIARY` se decide por preinscripción; `AUXILIARY` aplica la configuración global sobre tarifa `STUDENT`, sin evidencia adicional. El snapshot de precio/descuento pertenece a cada registro.
 
 ### InterestRegistration (Fase 3, implementado)
 
@@ -162,9 +169,19 @@ La migración `0011_interest_registrations.sql` añade el enum `interest_registr
 
 ### PreRegistration (presencial, Fase 5)
 
-En este proyecto el término se refiere a la preinscripción administrativa presencial que registra pago parcial o total y ocupa cupo. Puede iniciarse directamente o prellenarse desde un interesado de forma editable. La relación con ese registro debe ser explícita y trazable; no debe inferirse identidad global, pago ni equivalencia entre interesado y persona participante. Su modelo persistido y campos aún están por definir; la lista histórica de `Participant`/`PreRegistration` no debe interpretarse como contrato vigente. Esta entidad no implica por sí misma una transición a inscripción definitiva.
+`pre_registrations` está implementada en migración 0017 y conserva `participant_id`, curso/grupo, revisión de tarifa, `source_interest_id` opcional (FK compuesta al mismo curso), estado persistido `ACTIVE`/`CANCELLED`, tipo, configuración/revisión y snapshot monetario, flag de excepción del primer día, actor creador y datos de cancelación/actor. Una unique parcial permite solo una ACTIVE por persona/curso. No se borra: historial cancelado se conserva; trigger impide borrar o mutar snapshot/identidad y congela estado/grupo/motivo una vez cancelado. `membershipStatus` (`PREINSCRITO`, `INSCRITO`, `SALDOVENCIDO`, `CANCELADO`) y estado financiero son valores derivados de registro, pagos, curso y reloj, no columnas de estado adicionales.
+
+La configuración singleton `registration_settings` guarda porcentajes enteros mínimos (1–100, default 25) y descuento auxiliar (0–100 inclusive, default 50), revisión, actor/fecha; afecta nuevas preinscripciones solamente. El precio aplicado queda como snapshot BOB en centavos, no float. Base AUXILIARY = tarifa STUDENT. El total con descuento se convierte a centavos con redondeo half-up; para total positivo el pago inicial alcanza `ceil(total × mínimo / 100)`. Total cero por AUXILIARY 100 % permite registro gratuito y exime mínimo, sin insertar abono cero.
+
+`registration_ledger` almacena únicamente movimientos de efectivo positivos (`PAYMENT`/`REFUND`) con preinscripción, fecha efectiva civil Bolivia, actor, razón, receipt idempotente y `recorded_at`; la tabla tiene RLS, Data API grants revocados y trigger append-only. Fecha efectiva no puede ser futura respecto de la fecha Bolivia de registro. `registration_command_receipts` identifica comandos por actor + `request_key` único y fingerprint, guarda respuesta para reintentos idempotentes y es append-only. El servidor registra devoluciones, no ejecuta la transferencia; libre de pagos no produce refund monetario. `participants`, `pre_registrations`, `registration_settings`, command receipts y ledger tienen RLS y privilegios Data API revocados.
+
+El prellenado desde `InterestRegistration` permite editar datos de participante; el origen se muestra read-only y se traza mediante `source_interest_id`, nunca se fusiona por email y no cambia métricas de intereses. Alta ordinaria exige curso publicado, instructor activo, grupo planificado y cupo; excepción ADMIN de primer día requiere pago completo y auditoría (registro gratuito no requiere pago cero). Cambio de grupo está limitado al mismo curso y cutoff, con transferencia atómica de ocupación; cancelar grupo genera devolución pendiente de lo efectivamente pagado, no una supuesta transferencia bancaria.
+
+PR 179 integra rutas HTTP ADMIN de listado/alta/detalle/participante, búsqueda de interesado/participante, pagos/devoluciones/transfer/cancel, exportes y roster instructor. El roster DTO contiene solo nombre/apellidos del instructor asignado y no se consulta antes del inicio. CSV/PDF exportan curso/grupo, participante/CI, categoría, estados y montos financieros. Full local canonical E2E 125/125 PASS; release cloud/master permanece pendiente.
 
 ### Enrollment
+
+El boceto `Enrollment`/`Refund`/`PaymentReference` a continuación es histórico/no aprobado y no corresponde a tablas actuales. El modelo implementado de Fase 5 usa `pre_registrations` y `registration_ledger`; no existen tablas separadas de enrollment, payment reference o refund.
 
 - id
 - participantId

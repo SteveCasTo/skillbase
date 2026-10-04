@@ -12,8 +12,9 @@ import {
 } from "../fixtures/interest-course-calendar";
 import { signInFixture } from "./auth-helper";
 import { registerCourseInstructor } from "./instructor-helper";
+import { e2eSiteUrl } from "../../scripts/e2e-port";
 
-const headers = { Origin: "http://127.0.0.1:4321", Accept: "application/json" };
+const headers = { Origin: e2eSiteUrl(), Accept: "application/json" };
 
 // Only the isolated E2E server is used. Auth helper obtains the temporary
 // environment and signs in through the existing Supabase Admin API.
@@ -59,6 +60,12 @@ async function interestCourse(page: Page, context: BrowserContext) {
     id: string;
     revision: string;
   };
+  const remainingGroup = await page.request.post(groupPath, {
+    headers,
+    form: { intent: "create", startTime: "20:00", capacity: "1" },
+  });
+  expect(remainingGroup.status()).toBe(200);
+  const remainingGroupId = ((await remainingGroup.json()) as { id: string }).id;
   const published = await page.request.post(`/app/cursos/${id}/editar`, {
     headers,
     form: { intent: "publish", revision },
@@ -96,13 +103,140 @@ async function interestCourse(page: Page, context: BrowserContext) {
     form: { intent: "cancel", groupId: group.id, revision: current.revision },
   });
   expect(cancelled.status()).toBe(200);
-  return { id, name, path: `/app/interesados/${id}`, groupId: group.id };
+  return {
+    id,
+    name,
+    path: `/app/interesados/${id}`,
+    groupId: group.id,
+    remainingGroupId,
+  };
 }
 
 const rowFor = (page: Page, name = "Ana Sintética") =>
   page.locator("[data-interest-id]").filter({
     has: page.getByRole("heading", { name: `${name} Fixture`, exact: true }),
   });
+
+test("filters replace only the authorized list, retain focus and handle history, failure and retry", async ({
+  page,
+  context,
+}) => {
+  const course = await interestCourse(page, context);
+  await page.goto(course.path);
+  const shell = await page.locator("h1").elementHandle();
+  const metrics = await page.locator("[data-interest-metrics]").elementHandle();
+  const all = page.getByRole("button", { name: "Todos", exact: true });
+  const active = page.getByRole("button", { name: "Activos", exact: true });
+  const cancelled = page.getByRole("button", {
+    name: "Cancelados",
+    exact: true,
+  });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(`**${course.path}?status=ACTIVE`, async (route) => {
+    await gate;
+    await route.continue();
+  });
+  await active.focus();
+  await active.press("Enter");
+  await expect(page.locator("[data-filter-skeleton]")).toBeVisible();
+  await expect(page.locator("[data-navigation-skeleton]")).toBeHidden();
+  await cancelled.click();
+  await expect(cancelled).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("[data-interests-empty]")).toBeVisible();
+  release();
+  await expect(page).toHaveURL(`${course.path}?status=CANCELLED`);
+  await expect(cancelled).toBeFocused();
+  expect(await shell!.evaluate((node) => node.isConnected)).toBe(true);
+  expect(await metrics!.evaluate((node) => node.isConnected)).toBe(true);
+  await all.click();
+  await expect(page.locator("[data-interest-id]")).toHaveCount(2);
+  await page.goBack();
+  await expect(cancelled).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("[data-interests-empty]")).toBeVisible();
+  expect(await shell!.evaluate((node) => node.isConnected)).toBe(true);
+  await page.goForward();
+  await expect(all).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("[data-interest-id]")).toHaveCount(2);
+  await page.unroute(`**${course.path}?status=ACTIVE`);
+  await page.route(`**${course.path}?status=ACTIVE`, (route) =>
+    route.fulfill({ status: 503, body: "Unavailable" }),
+  );
+  await active.click();
+  await expect(page.locator("[data-interests-error]")).toContainText(
+    "Reintenta",
+  );
+  await expect(all).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("[data-interest-id]")).toHaveCount(2);
+  await expect(page.locator("[data-filter-skeleton]")).toBeHidden();
+  await page.unroute(`**${course.path}?status=ACTIVE`);
+  await page.route(`**${course.path}?status=ACTIVE`, (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { "Content-Type": "text/html", "X-Interest-Fragment": "1" },
+      body: `<div data-admin-interests data-course-id="${crypto.randomUUID()}" data-filter="ACTIVE"><ul data-interest-list></ul></div>`,
+    }),
+  );
+  await page.getByRole("button", { name: "Reintentar filtro" }).click();
+  await expect(page.locator("[data-interests-error]")).toContainText(
+    "validar el listado",
+  );
+  await expect(page.locator("[data-interest-id]")).toHaveCount(2);
+  await page.unroute(`**${course.path}?status=ACTIVE`);
+  await page.getByRole("button", { name: "Reintentar filtro" }).click();
+  await expect(active).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("[data-interests-error]")).toBeHidden();
+  // Replaced cards keep the original delegated confirmation/mutation behavior.
+  await confirmAction(page, rowFor(page), "Cancelar interés");
+  await expect(rowFor(page)).toHaveCount(0);
+});
+
+test("fragment GET validates filters and never grants interest data to non-admin sessions", async ({
+  page,
+  context,
+}) => {
+  const course = await interestCourse(page, context);
+  const fragmentHeaders = { "X-Interest-Fragment": "1" };
+  const valid = await page.request.get(`${course.path}?status=CANCELLED`, {
+    headers: fragmentHeaders,
+  });
+  expect(valid.status()).toBe(200);
+  expect(valid.headers()["cache-control"]).toContain("no-store");
+  const html = await valid.text();
+  expect(html).toContain("data-admin-interests");
+  expect(html).not.toContain("Ana Sintética");
+  expect(html).not.toContain("<h1");
+  for (const query of [
+    "status=invalid",
+    "status=",
+    "status=ACTIVE&status=ALL",
+  ]) {
+    const invalid = await page.request.get(`${course.path}?${query}`, {
+      headers: fragmentHeaders,
+    });
+    expect(invalid.status()).toBe(400);
+    expect(await invalid.json()).toMatchObject({ code: "INVALID_REQUEST" });
+    expect(await invalid.text()).not.toContain("Ana Sintética");
+  }
+  await signInFixture(context, AUTH_FIXTURES.instructor.email);
+  const denied = await page.request.get(course.path, {
+    headers: fragmentHeaders,
+    maxRedirects: 0,
+  });
+  expect(denied.status()).toBe(303);
+  expect(denied.headers().location).toContain("unauthorized");
+  expect(await denied.text()).not.toContain("Ana Sintética");
+  await context.clearCookies();
+  const anonymous = await page.request.get(course.path, {
+    headers: fragmentHeaders,
+    maxRedirects: 0,
+  });
+  expect(anonymous.status()).toBe(303);
+  expect(anonymous.headers().location).toContain("login");
+  expect(await anonymous.text()).not.toContain("Ana Sintética");
+});
 async function confirmAction(page: Page, row: Locator, action: string) {
   await row.getByText(action, { exact: true }).click();
   const dialog = page.getByRole("alertdialog", { name: action });
@@ -142,7 +276,14 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
   await expect(
     page.locator('[data-demand-row][data-leading="true"]'),
   ).toHaveCount(2);
+  await expect(page.locator("[data-demand-row]")).toHaveCount(3);
+  await expect(
+    page.locator(`[data-preference-id="${course.remainingGroupId}"]`),
+  ).toHaveText("0");
   for (const demand of await page.locator("[data-demand-row]").all()) {
+    const preference = await demand
+      .locator("[data-preference-id]")
+      .getAttribute("data-preference-id");
     expect(
       await demand
         .locator("[data-demand-bar]")
@@ -151,7 +292,7 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
             bar.getBoundingClientRect().width /
             bar.parentElement!.getBoundingClientRect().width,
         ),
-    ).toBeCloseTo(0.5);
+    ).toBeCloseTo(preference === course.remainingGroupId ? 0 : 0.5);
   }
   const row = rowFor(page);
   await row.locator("summary").focus();
@@ -263,8 +404,8 @@ test("status filter removes changed rows, preserves filter and shows local empty
   }
   await expect(page).toHaveURL(`${course.path}?status=ACTIVE`);
   await expect(
-    page.getByRole("link", { name: "Activos", exact: true }),
-  ).toHaveAttribute("aria-current", "page");
+    page.getByRole("button", { name: "Activos", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("[data-interests-empty]")).toBeVisible();
   await expect(page.locator("[data-active-total]")).toHaveText("0");
   await expect(
@@ -430,6 +571,15 @@ test("HTML fallback confirms and redirects without JS; errors stay visible", asy
     expect(response.status()).toBe(409);
     expect(response.headers()["cache-control"]).toBe("private, no-store");
     expect(await response.text()).toContain("El registro cambió");
+    await html.getByRole("button", { name: "Cancelados", exact: true }).click();
+    await expect(html).toHaveURL(`${course.path}?status=CANCELLED`);
+    await expect(html.locator("[data-interest-id]")).toHaveCount(1);
+    await expect(
+      html.getByRole("button", { name: "Cancelados", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await html.getByRole("button", { name: "Todos", exact: true }).click();
+    await expect(html).toHaveURL(`${course.path}?status=ALL`);
+    await expect(html.locator("[data-interest-id]")).toHaveCount(2);
   } finally {
     await fallback.close();
   }

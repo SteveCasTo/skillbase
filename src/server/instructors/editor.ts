@@ -16,6 +16,9 @@ import { readAuthForm } from "@/server/auth/security";
 import { getDatabase } from "@/server/db/client";
 import { DrizzleInstructorRepository } from "@/server/db/repositories/instructor-repository";
 import { getPublicAuthEnvironment } from "@/server/environment";
+import { mutateInstructorLifecycle } from "@/application/instructors/lifecycle";
+import { DrizzleInstructorLifecycleRepository } from "@/server/db/repositories/instructor-lifecycle-repository";
+import { instructorCredentialRemoval } from "./credential-removal";
 
 type EditorContext = Pick<APIContext, "request" | "locals" | "redirect"> & {
   response: { status?: number };
@@ -71,6 +74,34 @@ export async function instructorEditor(
         );
       }
       const form = await readAuthForm(context.request);
+      const intent = form.get("intent");
+      if (intent) {
+        if (own || !previous)
+          throw new InstructorError("La acción no está disponible.");
+        await mutateInstructorLifecycle(
+          new DrizzleInstructorLifecycleRepository(getDatabase()),
+          instructorCredentialRemoval,
+          actor,
+          previous.id,
+          intent,
+          form.get("revision") ?? "",
+        );
+        const destination =
+          intent === "delete"
+            ? "/app/instructores?success=deleted"
+            : `/app/instructores/${previous.id}/editar?success=${intent}`;
+        response = context.request.headers
+          .get("accept")
+          ?.includes("application/json")
+          ? new Response(JSON.stringify({ destination }), {
+              headers: {
+                "Content-Type": "application/json",
+                "Cache-Control": "private, no-store",
+              },
+            })
+          : context.redirect(destination, 303);
+        return { values, errors, error, revision, response, previous };
+      }
       values = Object.fromEntries(
         ["firstName", "lastName", "email", "phone"].map((key) => [
           key,

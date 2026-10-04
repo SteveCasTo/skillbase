@@ -1,0 +1,232 @@
+---
+import type {
+  AdminRegistrationDto,
+  LedgerKind,
+} from "@/domain/pre-registrations/types";
+import { assertRefund } from "@/domain/pre-registrations/finance";
+import { assertAdditionalPayment } from "@/domain/pre-registrations/policies";
+import { boliviaToday } from "@/domain/pre-registrations/time";
+import { buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import MoneyInput from "./MoneyInput";
+import { formatMoney, moneyFieldIssues } from "./presentation";
+interface Props {
+  id: string;
+  registration: AdminRegistrationDto;
+  kind: LedgerKind;
+  startsAt: string;
+  serverNow: string;
+  requestKey: string;
+  action: string;
+  values?: Readonly<Record<string, string>>;
+  errors?: Readonly<Record<string, string>>;
+  message?: string;
+}
+const {
+  id,
+  registration,
+  kind,
+  startsAt,
+  serverNow,
+  requestKey,
+  action,
+  values = {},
+  errors: serverErrors = {},
+  message,
+} = Astro.props;
+const errors = moneyFieldIssues(serverErrors);
+const refund = kind === "REFUND";
+let unavailable = "";
+try {
+  if (refund) assertRefund(registration.state, registration, 1);
+  else
+    assertAdditionalPayment(
+      registration.state,
+      registration,
+      1,
+      new Date(startsAt),
+      new Date(serverNow),
+    );
+} catch (error) {
+  unavailable =
+    error instanceof Error ? error.message : "Movimiento no disponible.";
+}
+const fields = [
+  {
+    name: "amount",
+    label: "Importe (Bs)",
+    type: "text",
+    value: values.amount ?? "",
+  },
+  {
+    name: "effectiveDate",
+    label: "Fecha efectiva (Bolivia)",
+    type: "date",
+    value: values.effectiveDate ?? boliviaToday(new Date(serverNow)),
+  },
+  { name: "reason", label: "Motivo", type: "text", value: values.reason ?? "" },
+];
+---
+
+<form
+  id={id}
+  method="post"
+  action={action}
+  data-cash-form
+  data-last-submitted={
+    Object.keys(values).length ? JSON.stringify(values) : undefined
+  }
+  data-cash-context={JSON.stringify({
+    registration,
+    kind,
+    startsAt,
+    serverNow,
+  })}
+  class="flex min-w-0 flex-col gap-5"
+  data-astro-reload
+>
+  <input type="hidden" name="requestKey" value={requestKey} />
+  <input type="hidden" name="registrationId" value={registration.id} />
+  <input type="hidden" name="revision" value={registration.revision} />
+  <h2 class="text-lg font-semibold">
+    {refund ? "Registrar devolución" : "Registrar abono"}
+  </h2>
+  <p class="text-sm text-muted-foreground">
+    {refund
+      ? "Registra solo efectivo ya entregado; no ejecuta una transferencia bancaria."
+      : "Registra solo efectivo realmente recibido."}{" "}
+    Máximo:{" "}
+    {formatMoney(
+      refund ? registration.refundDueCents : registration.balanceCents,
+    )}
+    .
+  </p>
+  <p role="alert" data-form-error class="text-sm text-destructive empty:hidden">
+    {message ?? errors.form}
+  </p>
+  {unavailable && (
+    <p role="status" class="text-sm text-muted-foreground">
+      {unavailable}
+    </p>
+  )}
+  {(!unavailable || Object.keys(values).length > 0) && (
+    <fieldset
+      disabled={Boolean(unavailable)}
+      class="cash-fields grid min-w-0 gap-5"
+    >
+      <legend class="sr-only">Datos del movimiento</legend>
+      {fields.map((field) => {
+        const Control = field.name === "amount" ? MoneyInput : Input;
+        return (
+          <div
+            class="flex min-w-0 flex-col gap-2"
+            data-invalid={Boolean(errors[field.name])}
+          >
+            <label for={`${id}-${field.name}`} class="text-sm font-medium">
+              {field.label}
+            </label>
+            <Control
+              id={`${id}-${field.name}`}
+              name={field.name}
+              type={field.type}
+              max={
+                field.type === "date"
+                  ? boliviaToday(new Date(serverNow))
+                  : undefined
+              }
+              maxLength={field.name === "reason" ? 500 : undefined}
+              defaultValue={field.value}
+              required
+              aria-invalid={Boolean(errors[field.name])}
+              aria-describedby={`${id}-${field.name}-error`}
+              className="min-h-11"
+            />
+            <p
+              id={`${id}-${field.name}-error`}
+              data-field-error={field.name}
+              class="text-sm text-destructive empty:hidden"
+            >
+              {errors[field.name]}
+            </p>
+          </div>
+        );
+      })}
+    </fieldset>
+  )}
+  {!unavailable && (
+    <button
+      type="submit"
+      class={buttonVariants({
+        className: "min-h-11 w-full sm:w-auto sm:self-start",
+      })}
+    >
+      {refund ? "Registrar devolución" : "Registrar abono"}
+    </button>
+  )}
+</form>
+<style>
+  .cash-fields {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  }
+</style>
+<script>
+  import { cashFormState } from "./cash-state";
+  import { bindMoneyInput } from "./money-input";
+  import { readFormValues, showFormIssues } from "./registration-client";
+  import type {
+    AdminRegistrationDto,
+    LedgerKind,
+  } from "@/domain/pre-registrations/types";
+  function initialize() {
+    document
+      .querySelectorAll<HTMLFormElement>("[data-cash-form]")
+      .forEach((form) => {
+        if (form.dataset.bound) return;
+        form.dataset.bound = "true";
+        form.noValidate = true;
+        const money = form.elements.namedItem("amount");
+        if (money instanceof HTMLInputElement) bindMoneyInput(money);
+        const context = JSON.parse(form.dataset.cashContext!) as {
+          registration: AdminRegistrationDto;
+          kind: LedgerKind;
+          startsAt: string;
+          serverNow: string;
+        };
+        const touched = new Set<string>();
+        const update = (all = false) => {
+          const state = cashFormState(
+            context.registration,
+            context.kind,
+            context.startsAt,
+            context.serverNow,
+            readFormValues(form),
+          );
+          showFormIssues(form, state.issues, all ? undefined : touched);
+          const button = form.querySelector<HTMLButtonElement>(
+            'button[type="submit"]',
+          );
+          if (button)
+            button.disabled = Boolean(form.dataset.pending) || !state.valid;
+          return state.valid;
+        };
+        form.addEventListener("input", () => update());
+        form.addEventListener("focusout", (event) => {
+          if (event.target instanceof HTMLInputElement)
+            touched.add(event.target.name);
+          update();
+        });
+        form.addEventListener("registration:updated", () => update());
+        form.addEventListener("submit", (event) => {
+          if (form.dataset.pending || !update(true)) {
+            event.preventDefault();
+            form.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+          }
+        });
+        update();
+      });
+  }
+  initialize();
+  document.dispatchEvent(new Event("registration:forms-ready"));
+  document.addEventListener("registration:fragment", initialize);
+  document.addEventListener("astro:page-load", initialize);
+</script>

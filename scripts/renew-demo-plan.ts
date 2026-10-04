@@ -226,17 +226,17 @@ export function assertCanonicalLocalTarget(
     if (
       !["postgres:", "postgresql:"].includes(db.protocol) ||
       db.hostname !== "127.0.0.1" ||
-      db.port !== "54322" ||
+      db.port !== "55322" ||
       db.pathname !== "/postgres" ||
       db.username !== "postgres" ||
       db.search ||
       db.hash ||
-      api.href !== "http://127.0.0.1:54321/"
+      api.href !== "http://127.0.0.1:55321/"
     )
       throw new Error();
   } catch {
     throw new Error(
-      "Renewal only accepts canonical local Supabase (127.0.0.1:54322 / 54321).",
+      "Renewal only accepts canonical local Supabase (127.0.0.1:55322 / 55321).",
     );
   }
 }

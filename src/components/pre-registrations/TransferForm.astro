@@ -1,0 +1,138 @@
+---
+import type {
+  AdminRegistrationDto,
+  RegistrationFormDto,
+} from "@/domain/pre-registrations/types";
+import { assertTransfer } from "@/domain/pre-registrations/policies";
+import { buttonVariants } from "@/components/ui/button";
+import RegistrationSelect from "./RegistrationSelect";
+import { courseContext, formatDate } from "./presentation";
+interface Props {
+  id: string;
+  registration: AdminRegistrationDto;
+  form: RegistrationFormDto;
+  serverNow: string;
+  action: string;
+  requestKey: string;
+  destinationGroupId?: string;
+  errors?: Readonly<Record<string, string>>;
+  lastSubmitted?: Readonly<Record<string, string>> | undefined;
+}
+const {
+  id,
+  registration,
+  form,
+  serverNow,
+  action,
+  requestKey,
+  destinationGroupId = "",
+  errors = {},
+} = Astro.props;
+const options = form.groups.map((group, index) => {
+  let disabled = group.id === registration.groupId;
+  try {
+    assertTransfer(
+      courseContext(form),
+      registration.state,
+      {
+        ...group,
+        courseId: form.course.id,
+        courseTypeRevisionId: form.course.courseTypeRevisionId,
+      },
+      new Date(serverNow),
+    );
+  } catch {
+    disabled = true;
+  }
+  return {
+    value: group.id,
+    label: `${group.groupName ?? `Grupo ${index + 1}`} · ${formatDate(group.startsAt)} · ${group.occupied}/${group.capacity} ocupados`,
+    disabled,
+  };
+});
+const available = options.some((option) => !option.disabled);
+---
+
+<form
+  id={id}
+  method="post"
+  action={action}
+  class="flex min-w-0 flex-col gap-5"
+  data-transfer-form
+  data-last-submitted={
+    Astro.props.lastSubmitted
+      ? JSON.stringify(Astro.props.lastSubmitted)
+      : undefined
+  }
+  data-astro-reload
+>
+  <h2 class="text-lg font-semibold">Cambiar de grupo</h2>
+  <p class="text-sm text-muted-foreground">
+    Solo dentro de {form.course.name}. El precio aplicado y los pagos se
+    conservan.
+  </p>
+  <input type="hidden" name="registrationId" value={registration.id} />
+  <input type="hidden" name="revision" value={registration.revision} />
+  <input type="hidden" name="requestKey" value={requestKey} />
+  <p role="alert" data-form-error class="text-sm text-destructive empty:hidden">
+    {errors.form}
+  </p>
+  {available ? (
+    <>
+      <RegistrationSelect
+        client:load
+        id={`${id}-destinationGroupId`}
+        name="destinationGroupId"
+        label="Grupo de destino"
+        value={destinationGroupId}
+        options={options}
+        error={errors.destinationGroupId}
+      />
+      <button
+        type="submit"
+        class={buttonVariants({
+          className: "min-h-11 w-full sm:w-auto sm:self-start",
+        })}
+      >
+        Cambiar de grupo
+      </button>
+    </>
+  ) : (
+    <p role="status" class="text-sm text-muted-foreground">
+      No hay un destino disponible. Revisa el plazo y los grupos con cupo.
+    </p>
+  )}
+</form>
+<script>
+  function initialize() {
+    document
+      .querySelectorAll<HTMLFormElement>("[data-transfer-form]")
+      .forEach((form) => {
+        if (form.dataset.bound) return;
+        form.dataset.bound = "true";
+        form.noValidate = true;
+        const update = () => {
+          const select = form.elements.namedItem("destinationGroupId");
+          const button = form.querySelector<HTMLButtonElement>(
+            'button[type="submit"]',
+          );
+          const valid =
+            select instanceof HTMLSelectElement &&
+            Boolean(select.value) &&
+            !select.selectedOptions[0]?.disabled;
+          if (button) button.disabled = Boolean(form.dataset.pending) || !valid;
+          return valid;
+        };
+        form.addEventListener("change", update);
+        form.addEventListener("registration:updated", update);
+        form.addEventListener("submit", (event) => {
+          if (!update()) event.preventDefault();
+        });
+        update();
+      });
+  }
+  initialize();
+  document.dispatchEvent(new Event("registration:forms-ready"));
+  document.addEventListener("registration:fragment", initialize);
+  document.addEventListener("astro:page-load", initialize);
+</script>

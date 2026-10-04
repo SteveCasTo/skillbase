@@ -290,13 +290,18 @@ const currentArtworkUrl = publicArtworkUrl(
             client:only="react"
             name="instructorId"
             label="Instructor"
+            preserveDisabledValue={Boolean(courseId) && !values.instructorId}
             value={values.instructorId || "unassigned"}
             placeholder="Selecciona un instructor"
             required={false}
             disabled={disabled}
             error={errors.instructorId ?? ""}
             options={[
-              { value: "unassigned", label: "Sin asignar (solo borrador)" },
+              {
+                value: "unassigned",
+                label: "Sin asignar (solo borrador)",
+                disabled: Boolean(courseId),
+              },
               ...instructors
                 .filter((instructor) => instructor.status === "ACTIVE")
                 .map((instructor) => ({
@@ -316,7 +321,11 @@ const currentArtworkUrl = publicArtworkUrl(
                 disabled={disabled}
                 aria-invalid={Boolean(errors.instructorId)}
               >
-                <option value="" selected={!values.instructorId}>
+                <option
+                  value=""
+                  selected={!values.instructorId}
+                  disabled={Boolean(courseId)}
+                >
                   Sin asignar (solo borrador)
                 </option>
                 {instructors

@@ -8,7 +8,7 @@ const email = process.env.DEV_INITIAL_ADMIN_EMAIL?.trim();
 {
   const connectionString =
     process.env.DATABASE_URL ??
-    "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+    "postgresql://postgres:postgres@127.0.0.1:55322/postgres";
   const database = createDatabase(connectionString);
   try {
     if (email) {

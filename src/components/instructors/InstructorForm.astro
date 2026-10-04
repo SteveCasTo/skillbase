@@ -1,13 +1,23 @@
 ---
 import { buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Eye, EyeOff } from "lucide-react";
 interface Props {
   values: Readonly<Record<string, string>>;
   errors: Readonly<Record<string, string>>;
   revision?: string;
   editing?: boolean;
   action?: string;
+  baseline?: Readonly<Record<string, string>>;
 }
-const { values, errors, revision, editing = false, action } = Astro.props;
+const {
+  values,
+  errors,
+  revision,
+  editing = false,
+  action,
+  baseline = values,
+} = Astro.props;
 const fields = [
   {
     key: "firstName",
@@ -47,66 +57,98 @@ const fields = [
 <form
   method="post"
   action={action}
-  class="mt-8 flex max-w-2xl flex-col gap-6"
+  class="mt-8 flex w-full min-w-0 flex-col gap-6"
   data-instructor-form
+  data-baseline={editing ? JSON.stringify(baseline) : undefined}
   data-astro-reload
 >
   {revision && <input type="hidden" name="revision" value={revision} />}
   <p role="alert" data-form-error class="hidden text-sm text-destructive"></p>
-  <fieldset class="grid gap-5 sm:grid-cols-2">
+  <p class="text-sm text-muted-foreground">
+    Todos los campos son obligatorios, excepto el teléfono.
+  </p>
+  <fieldset class="instructor-fields min-w-0 grid gap-5">
     <legend class="mb-5 text-lg font-semibold">Datos del instructor</legend>
     {fields.map((field) => (
       <div
-        class="flex flex-col gap-2"
+        class="min-w-0 flex flex-col gap-2"
         data-invalid={Boolean(errors[field.key])}
       >
         <label for={field.key} class="text-sm font-medium">
           {field.label}
         </label>
-        <input
+        <Input
           id={field.key}
           name={field.key}
           type={field.type}
-          autocomplete={field.autocomplete}
-          maxlength={field.max}
+          autoComplete={field.autocomplete}
+          maxLength={field.max}
           required={field.required}
-          readonly={editing && field.key === "email"}
-          value={values[field.key] ?? ""}
+          readOnly={editing && field.key === "email"}
+          defaultValue={values[field.key] ?? ""}
           aria-invalid={Boolean(errors[field.key])}
           aria-describedby={`${field.key}-error`}
-          class="min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="min-h-11"
         />
         <p
           id={`${field.key}-error`}
           data-field-error={field.key}
-          class="text-sm text-destructive"
+          class="text-sm text-destructive empty:hidden"
         >
           {errors[field.key]}
         </p>
       </div>
     ))}
   </fieldset>
-  {editing ? (
-    <p class="text-sm text-muted-foreground">
-      El correo de acceso se conserva para mantener la identidad de la cuenta.
-    </p>
-  ) : (
-    <fieldset class="flex flex-col gap-2">
+  {!editing && (
+    <fieldset class="min-w-0 flex flex-col gap-2">
       <legend class="mb-3 text-lg font-semibold">Acceso inicial</legend>
       <label for="password" class="text-sm font-medium">
         Contraseña inicial
       </label>
-      <input
-        id="password"
-        name="password"
-        type="password"
-        autocomplete="new-password"
-        required
-        minlength="12"
-        maxlength="128"
-        class="min-h-11 w-full rounded-lg border bg-background px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      />
-      <p class="text-sm text-muted-foreground">
+      <div
+        class="flex max-w-xl items-center gap-2"
+        data-invalid={Boolean(errors.password)}
+      >
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          required
+          minLength={12}
+          maxLength={128}
+          aria-invalid={Boolean(errors.password)}
+          aria-describedby="password-help password-error"
+          className="min-h-11"
+        />
+        <button
+          type="button"
+          hidden
+          data-password-toggle
+          aria-controls="password"
+          aria-label="Mostrar contraseña inicial"
+          aria-pressed="false"
+          class={buttonVariants({
+            variant: "outline",
+            size: "icon",
+            className: "min-h-11 min-w-11 shrink-0",
+          })}
+        >
+          <Eye data-password-show aria-hidden="true" />
+          <span data-password-hide hidden>
+            <EyeOff aria-hidden="true" />
+          </span>
+        </button>
+      </div>
+      <p
+        id="password-error"
+        data-field-error="password"
+        class="text-sm text-destructive empty:hidden"
+      >
+        {errors.password}
+      </p>
+      <p id="password-help" class="text-sm text-muted-foreground">
         Elige entre 12 y 128 caracteres. No se guarda en el perfil; cambiarla
         después es opcional.
       </p>
@@ -114,30 +156,123 @@ const fields = [
   )}
   <button
     type="submit"
-    class={buttonVariants({ className: "min-h-11 self-start" })}
+    class={buttonVariants({
+      className: "min-h-11 w-full sm:w-auto sm:self-start",
+    })}
   >
     {editing ? "Guardar cambios" : "Crear instructor"}
   </button>
 </form>
+<style>
+  .instructor-fields {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  }
+</style>
 <script>
   import { navigate } from "astro:transitions/client";
   import { notifications } from "@/lib/notifications";
+  import { instructorFormState } from "./form-state";
   function initialize() {
     document
       .querySelectorAll<HTMLFormElement>("[data-instructor-form]")
       .forEach((form) => {
         if (form.dataset.bound) return;
         form.dataset.bound = "true";
+        form.noValidate = true;
+        const baseline: Record<string, string> | undefined = form.dataset
+          .baseline
+          ? JSON.parse(form.dataset.baseline)
+          : undefined;
+        const button = form.querySelector<HTMLButtonElement>(
+          'button[type="submit"]',
+        );
+        const inputs = [
+          ...form.querySelectorAll<HTMLInputElement>(
+            'input:not([type="hidden"])',
+          ),
+        ];
+        const touched = new Set(
+          inputs
+            .filter((input) => input.getAttribute("aria-invalid") === "true")
+            .map((input) => input.name),
+        );
+        const state = () =>
+          instructorFormState(
+            Object.fromEntries(
+              inputs.map((input) => [input.name, input.value]),
+            ),
+            baseline,
+          );
+        const update = (showAll = false) => {
+          const current = state();
+          for (const input of inputs) {
+            const message =
+              current.errors[input.name] ??
+              (!input.validity.valid ? "Revisa este campo." : "");
+            if (showAll || touched.has(input.name)) {
+              input.setAttribute("aria-invalid", String(Boolean(message)));
+              input
+                .closest("[data-invalid]")
+                ?.setAttribute("data-invalid", String(Boolean(message)));
+              const error = form.querySelector<HTMLElement>(
+                `[data-field-error="${input.name}"]`,
+              );
+              if (error) error.textContent = message;
+            }
+          }
+          const canSubmit =
+            current.canSubmit && inputs.every((input) => input.validity.valid);
+          if (button)
+            button.disabled = Boolean(form.dataset.pending) || !canSubmit;
+          return canSubmit;
+        };
+        inputs.forEach((input) => {
+          input.addEventListener("input", () => update());
+          input.addEventListener("change", () => update());
+          input.addEventListener("blur", () => {
+            touched.add(input.name);
+            update();
+          });
+        });
+        const toggle = form.querySelector<HTMLButtonElement>(
+          "[data-password-toggle]",
+        );
+        const password =
+          form.querySelector<HTMLInputElement>('[name="password"]');
+        if (toggle && password) {
+          toggle.hidden = false;
+          toggle.addEventListener("click", () => {
+            const visible = password.type === "password";
+            password.type = visible ? "text" : "password";
+            toggle.setAttribute("aria-pressed", String(visible));
+            toggle.setAttribute(
+              "aria-label",
+              `${visible ? "Ocultar" : "Mostrar"} contraseña inicial`,
+            );
+            const show = toggle.querySelector<SVGElement>(
+              "[data-password-show]",
+            );
+            const hide = toggle.querySelector<HTMLElement>(
+              "[data-password-hide]",
+            );
+            if (show) show.style.display = visible ? "none" : "";
+            if (hide) hide.hidden = !visible;
+          });
+        }
+        update();
         form.addEventListener("submit", async (event) => {
           event.preventDefault();
           if (form.dataset.pending) return;
+          if (!update(true)) {
+            form
+              .querySelector<HTMLInputElement>('[aria-invalid="true"]')
+              ?.focus();
+            return;
+          }
           const data = new URLSearchParams();
           new FormData(form).forEach((value, key) => {
             if (typeof value === "string") data.set(key, value);
           });
-          const button = form.querySelector<HTMLButtonElement>(
-            'button[type="submit"]',
-          );
           form.dataset.pending = "true";
           form.setAttribute("aria-busy", "true");
           const fieldsets = [
@@ -184,6 +319,13 @@ const fields = [
                     "aria-invalid",
                     String(Boolean(result.fieldErrors?.[input.name])),
                   );
+                  input
+                    .closest("[data-invalid]")
+                    ?.setAttribute(
+                      "data-invalid",
+                      String(Boolean(result.fieldErrors?.[input.name])),
+                    );
+                  if (result.fieldErrors?.[input.name]) touched.add(input.name);
                 });
               throw new Error(
                 result.error ?? "No se pudo guardar. Inténtalo nuevamente.",
@@ -203,14 +345,35 @@ const fields = [
             notifications.error({ id, title: message });
             const password =
               form.querySelector<HTMLInputElement>('[name="password"]');
-            if (password) password.value = "";
+            if (password) {
+              password.value = "";
+              touched.add("password");
+              password.setAttribute("aria-invalid", "true");
+              password
+                .closest("[data-invalid]")
+                ?.setAttribute("data-invalid", "true");
+              const passwordError = form.querySelector<HTMLElement>(
+                '[data-field-error="password"]',
+              );
+              if (passwordError && !passwordError.textContent?.trim())
+                passwordError.textContent =
+                  "Vuelve a introducir la contraseña inicial para reintentar.";
+            }
+            if (alert) {
+              alert.tabIndex = -1;
+              alert.focus();
+            }
           } finally {
             delete form.dataset.pending;
             form.removeAttribute("aria-busy");
             fieldsets.forEach((fieldset) => {
               fieldset.disabled = false;
             });
-            if (button) button.disabled = false;
+            // Recompute eligibility without replacing authoritative server errors.
+            if (button)
+              button.disabled =
+                !state().canSubmit ||
+                !inputs.every((input) => input.validity.valid);
             form
               .querySelector<HTMLInputElement>('[aria-invalid="true"]')
               ?.focus();

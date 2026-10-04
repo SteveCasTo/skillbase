@@ -1,0 +1,63 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import ParticipantSearch from "@/components/pre-registrations/ParticipantSearch.astro";
+import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
+import { requireInternalUser } from "@/server/auth/context";
+import { requireRegistrationAdmin } from "@/application/pre-registrations/authorization";
+import { lookupRegistrationPeople } from "@/server/pre-registrations/loaders";
+import {
+  registrationFailure,
+  singleQuery,
+} from "@/server/pre-registrations/http";
+import type { ParticipantDto } from "@/domain/pre-registrations/types";
+if (Astro.request.method !== "GET")
+  return new Response(null, { status: 405, headers: { Allow: "GET" } });
+const actor = requireInternalUser(Astro.locals);
+requireRegistrationAdmin(actor);
+Astro.response.headers.set("Cache-Control", "private, no-store");
+let search = "";
+let participants: readonly ParticipantDto[] = [];
+let message = "";
+try {
+  search = singleQuery(Astro.url.searchParams, "search");
+  if (search.length >= 2)
+    ({ participants } = await lookupRegistrationPeople(actor, search));
+} catch (error) {
+  const failure = registrationFailure(error);
+  Astro.response.status = failure.status;
+  message = failure.payload.message;
+}
+---
+
+<PrivateLayout title="Participantes">
+  <a href="/app/preinscripciones" class="text-sm underline underline-offset-4">
+    Preinscripciones
+  </a>
+  <h1 class="mt-5 text-3xl font-semibold">Participantes</h1>
+  <p class="mt-3 text-muted-foreground">
+    Fichas globales identificadas por CI. Una persona puede participar en varios
+    cursos.
+  </p>
+  {message && <RegistrationPageError {message} />}
+  <div class="mt-6" data-registration-lookup>
+    <ParticipantSearch
+      id="participant-list-search"
+      courseId=""
+      {participants}
+      action="/app/participantes"
+      query={search}
+      chooseLabel="Ver preinscripciones"
+      chooseHrefs={Object.fromEntries(
+        participants.map((participant) => [
+          participant.id,
+          `/app/preinscripciones?${new URLSearchParams({ search: participant.ci })}`,
+        ]),
+      )}
+    />
+  </div>
+</PrivateLayout>
+<script>
+  import { initializeRegistrationHttp } from "@/components/pre-registrations/http-client";
+  initializeRegistrationHttp();
+  document.addEventListener("astro:page-load", initializeRegistrationHttp);
+</script>

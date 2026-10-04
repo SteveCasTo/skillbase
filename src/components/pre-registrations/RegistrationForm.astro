@@ -1,0 +1,302 @@
+---
+import type {
+  ParticipantData,
+  RegistrationFormDto,
+} from "@/domain/pre-registrations/types";
+import { REGISTRATION_PARTICIPANT_TYPES } from "@/domain/pre-registrations/types";
+import { buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import MoneyInput from "./MoneyInput";
+import { boliviaToday } from "@/domain/pre-registrations/time";
+import ParticipantFields from "./ParticipantFields.astro";
+import RegistrationSelect from "./RegistrationSelect";
+import {
+  formatDate,
+  formatMoney,
+  pricePreview,
+  registrationWindow,
+  moneyFieldIssues,
+} from "./presentation";
+interface Props {
+  id: string;
+  form: RegistrationFormDto;
+  action: string;
+  serverNow: string;
+  requestKey: string;
+  participant?: ParticipantData;
+  participantReadonly?: boolean;
+  values?: Readonly<Record<string, string>>;
+  errors?: Readonly<Record<string, string>>;
+  message?: string;
+}
+const {
+  id,
+  form,
+  action,
+  serverNow,
+  requestKey,
+  values = {},
+  errors: serverErrors = {},
+  message,
+} = Astro.props;
+const errors = moneyFieldIssues(serverErrors);
+const participant = Astro.props.participant ?? {
+  ci: "",
+  firstName: form.sourceInterest?.firstName ?? "",
+  lastName: form.sourceInterest?.lastName ?? "",
+  email: form.sourceInterest?.email ?? "",
+  phone: form.sourceInterest?.phone ?? null,
+};
+const selectedType =
+  REGISTRATION_PARTICIPANT_TYPES.find(
+    (type) => type === values.participantType,
+  ) ?? "STUDENT";
+const price = pricePreview(form, selectedType);
+const window = registrationWindow(form, serverNow);
+const free = price.totalPriceCents === 0;
+// Without JavaScript a category change can make cash optional. Leave that
+// conditional requirement to server validation rather than forcing a fake payment.
+const cashAlwaysRequired = REGISTRATION_PARTICIPANT_TYPES.every(
+  (type) => pricePreview(form, type).totalPriceCents > 0,
+);
+const unavailable =
+  form.course.status !== "PUBLISHED" ||
+  !form.course.instructorActive ||
+  (!window.ordinary && !window.firstDay);
+---
+
+<form
+  id={id}
+  method="post"
+  action={action}
+  data-registration-form
+  data-configuration={JSON.stringify(form)}
+  data-server-now={serverNow}
+  data-last-submitted={
+    Object.keys(values).length ? JSON.stringify(values) : undefined
+  }
+  class="flex w-full min-w-0 flex-col gap-8"
+  data-astro-reload
+>
+  <input type="hidden" name="requestKey" value={requestKey} />
+  <input type="hidden" name="courseId" value={form.course.id} />
+  <input
+    type="hidden"
+    name="courseRevision"
+    value={values.courseRevision ?? form.course.revision}
+  />
+  <input
+    type="hidden"
+    name="settingsRevision"
+    value={values.settingsRevision ?? form.settings.revision}
+  />
+  <input
+    type="hidden"
+    name="sourceInterestId"
+    value={form.sourceInterest?.id ?? ""}
+  />
+  <p role="alert" data-form-error class="text-sm text-destructive empty:hidden">
+    {message ?? errors.form}
+  </p>
+  <fieldset class="min-w-0" disabled={unavailable}>
+    <legend class="mb-4 text-lg font-semibold">Persona participante</legend>
+    <p class="mb-5 text-sm text-muted-foreground">
+      El CI identifica la ficha global. No se crea una cuenta de acceso.
+    </p>
+    <p
+      data-source-origin
+      hidden={!form.sourceInterest}
+      class="mb-5 rounded-lg border bg-secondary p-3 text-sm"
+    >
+      Origen: interesado del curso. Completa el CI y revisa los datos; este
+      registro no modifica el interés público.
+    </p>
+    <ParticipantFields
+      id={id}
+      readOnly={Astro.props.participantReadonly ?? false}
+      participant={{
+        ci: values.ci ?? participant.ci,
+        firstName: values.firstName ?? participant.firstName,
+        lastName: values.lastName ?? participant.lastName,
+        email: values.email ?? participant.email,
+        phone: values.phone ?? participant.phone,
+      }}
+      errors={errors}
+    />
+  </fieldset>
+  <fieldset class="min-w-0 border-t pt-6" disabled={unavailable}>
+    <legend class="mb-4 text-lg font-semibold">
+      Grupo y tipo de participante
+    </legend>
+    <p class="mb-5 text-sm text-muted-foreground">
+      {form.course.name} · Inicio {formatDate(form.course.startsAt)}
+    </p>
+    <div class="registration-options grid min-w-0 gap-5">
+      <RegistrationSelect
+        client:load
+        id={`${id}-groupId`}
+        name="groupId"
+        label="Grupo"
+        value={values.groupId ?? ""}
+        error={errors.groupId}
+        options={form.groups.map((group, index) => ({
+          value: group.id,
+          label: `${group.groupName ?? `Grupo ${index + 1}`} · ${formatDate(group.startsAt)} · ${group.occupied}/${group.capacity} cupos ocupados`,
+          disabled:
+            group.status !== "PLANNED" || group.occupied >= group.capacity,
+        }))}
+      />
+      <RegistrationSelect
+        client:load
+        id={`${id}-participantType`}
+        name="participantType"
+        label="Tipo (clasificación ADMIN)"
+        value={selectedType}
+        error={errors.participantType}
+        options={[
+          { value: "STUDENT", label: "Estudiante" },
+          { value: "EXTERNAL", label: "Externo" },
+          { value: "AUXILIARY", label: "Auxiliar" },
+        ]}
+      />
+    </div>
+    <p class="mt-3 text-sm text-muted-foreground">
+      Los grupos conservan la misma tarifa del curso. El cupo se confirma al
+      registrar.
+    </p>
+  </fieldset>
+  <fieldset class="min-w-0 border-t pt-6" disabled={unavailable}>
+    <legend class="mb-4 text-lg font-semibold">Precio y primer pago</legend>
+    <dl class="registration-options mb-5 grid gap-4 rounded-lg bg-secondary p-4">
+      <div>
+        <dt class="text-sm text-muted-foreground">Precio aplicado</dt>
+        <dd data-price-total class="mt-1 text-xl font-semibold tabular-nums">
+          {free ? "Gratuito" : formatMoney(price.totalPriceCents)}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-muted-foreground">Primer pago mínimo</dt>
+        <dd data-price-minimum class="mt-1 font-semibold tabular-nums">
+          {free
+            ? "Exento"
+            : formatMoney(
+                window.firstDay
+                  ? price.totalPriceCents
+                  : price.minimumPaymentCents,
+              )}
+        </dd>
+      </div>
+    </dl>
+    <p data-price-discount class="mb-4 text-sm text-muted-foreground">
+      {price.discountPercent
+        ? `Descuento auxiliar: ${price.discountPercent} % sobre tarifa estudiante.`
+        : "Sin descuento aplicado."}
+    </p>
+    {window.firstDay && (
+      <label class="mb-5 flex items-start gap-3 text-sm">
+        <input
+          type="checkbox"
+          name="firstDayException"
+          value="true"
+          checked={values.firstDayException === "true"}
+          required
+          class="mt-1 size-5 accent-primary"
+        />
+        Registro excepcional del primer día: requiere pago total y queda
+        auditado.
+      </label>
+    )}
+    <p data-free-notice hidden={!free} class="mb-5 text-sm">
+      Sin movimiento de efectivo. La preinscripción conserva cupo y fechas
+      normales.
+    </p>
+    <fieldset
+      data-cash-fields
+      disabled={free}
+      hidden={free}
+      class="registration-options grid min-w-0 gap-5"
+    >
+      <legend class="sr-only">Efectivo recibido</legend>
+      {[
+        {
+          name: "amount",
+          label: "Efectivo recibido (Bs)",
+          type: "text",
+          value: values.amount ?? "",
+        },
+        {
+          name: "effectiveDate",
+          label: "Fecha efectiva (Bolivia)",
+          type: "date",
+          value: values.effectiveDate ?? boliviaToday(new Date(serverNow)),
+        },
+        {
+          name: "reason",
+          label: "Motivo del pago",
+          type: "text",
+          value: values.reason ?? "Primer pago presencial",
+        },
+      ].map((field) => {
+        const Control = field.name === "amount" ? MoneyInput : Input;
+        return (
+          <div
+            class="flex min-w-0 flex-col gap-2"
+            data-invalid={Boolean(errors[field.name])}
+          >
+            <label for={`${id}-${field.name}`} class="text-sm font-medium">
+              {field.label}
+            </label>
+            <Control
+              id={`${id}-${field.name}`}
+              name={field.name}
+              type={field.type}
+              required={cashAlwaysRequired}
+              maxLength={field.name === "reason" ? 500 : undefined}
+              defaultValue={field.value}
+              aria-invalid={Boolean(errors[field.name])}
+              aria-describedby={`${id}-${field.name}-error`}
+              className="min-h-11"
+            />
+            <p
+              id={`${id}-${field.name}-error`}
+              data-field-error={field.name}
+              class="text-sm text-destructive empty:hidden"
+            >
+              {errors[field.name]}
+            </p>
+          </div>
+        );
+      })}
+    </fieldset>
+    <p class="mt-4 text-sm text-muted-foreground">
+      Registra solo efectivo recibido. El servidor confirma tarifa, plazo y cupo
+      vigentes.
+    </p>
+  </fieldset>
+  {unavailable && (
+    <p role="status" class="text-sm text-destructive">
+      El curso no está disponible para registrar. Revisa su estado, instructor y
+      plazo.
+    </p>
+  )}
+  <button
+    type="submit"
+    disabled={unavailable}
+    data-submit-label="Registrar preinscripción"
+    class={buttonVariants({
+      className: "min-h-11 w-full sm:w-auto sm:self-start",
+    })}
+  >
+    Registrar preinscripción
+  </button>
+</form>
+<style>
+  .registration-options {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  }
+</style>
+<script>
+  import { initializeRegistrationForms } from "./registration-client";
+  initializeRegistrationForms();
+  document.addEventListener("astro:page-load", initializeRegistrationForms);
+</script>

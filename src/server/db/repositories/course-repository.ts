@@ -568,6 +568,21 @@ export class DrizzleCourseRepository implements CourseRepository {
         assertTransition(previous.status, next);
         if (next === "PUBLISHED") {
           await assertActiveInstructor(tx, previous.instructorId, true);
+          const [activeGroup] = await tx
+            .select({ id: schema.groups.id })
+            .from(schema.groups)
+            .where(
+              and(
+                eq(schema.groups.courseId, id),
+                eq(schema.groups.status, "PLANNED"),
+              ),
+            )
+            .limit(1);
+          if (!activeGroup)
+            throw new CourseDomainError(
+              "VALIDATION_FAILED",
+              "Añade o reactiva al menos un grupo antes de publicar el curso.",
+            );
           await assertInstructorSchedule(tx, id, previous.instructorId);
         }
         const existing = revisionFor(previous, await revisions(tx, [previous]));

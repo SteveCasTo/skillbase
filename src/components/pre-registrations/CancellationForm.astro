@@ -1,0 +1,118 @@
+---
+import type {
+  AdminRegistrationDto,
+  RegistrationFormDto,
+} from "@/domain/pre-registrations/types";
+import { assertCancellation } from "@/domain/pre-registrations/policies";
+import { Input } from "@/components/ui/input";
+import CancellationConfirmation from "./CancellationConfirmation";
+import { courseContext, formatMoney } from "./presentation";
+interface Props {
+  id: string;
+  registration: AdminRegistrationDto;
+  form: RegistrationFormDto;
+  serverNow: string;
+  requestKey: string;
+  action: string;
+  reason?: string;
+  errors?: Readonly<Record<string, string>>;
+  lastSubmitted?: Readonly<Record<string, string>> | undefined;
+}
+const {
+  id,
+  registration,
+  form,
+  serverNow,
+  requestKey,
+  action,
+  reason = "",
+  errors = {},
+} = Astro.props;
+let unavailable = "";
+try {
+  assertCancellation(
+    courseContext(form),
+    registration.state,
+    "VOLUNTARY",
+    new Date(serverNow),
+  );
+} catch (error) {
+  unavailable =
+    error instanceof Error ? error.message : "Cancelación no disponible.";
+}
+const description =
+  registration.paidCents > 0
+    ? `Se libera el cupo y queda una devolución pendiente de ${formatMoney(registration.paidCents)}. Registra el efectivo entregado después; cancelar no devuelve dinero automáticamente.`
+    : "Se libera el cupo. No hay efectivo por devolver y se conserva el historial.";
+---
+
+<section class="min-w-0">
+  <h2 class="mb-4 text-lg font-semibold">Cancelar preinscripción</h2>
+  {unavailable ? (
+    <div>
+      <p role="status" class="text-sm text-muted-foreground">
+        {unavailable}
+      </p>
+      {errors.form && (
+        <p role="alert" class="mt-3 text-sm text-destructive">
+          {errors.form}
+        </p>
+      )}
+      {reason && (
+        <p class="mt-3 break-words text-sm">Motivo enviado: {reason}</p>
+      )}
+    </div>
+  ) : (
+    <form
+      id={id}
+      action={action}
+      method="post"
+      class="flex min-w-0 flex-col gap-5"
+      data-cancellation-form
+      data-last-submitted={
+        Astro.props.lastSubmitted
+          ? JSON.stringify(Astro.props.lastSubmitted)
+          : undefined
+      }
+      data-astro-reload
+    >
+      <input type="hidden" name="registrationId" value={registration.id} />
+      <input type="hidden" name="revision" value={registration.revision} />
+      <input type="hidden" name="requestKey" value={requestKey} />
+      <p
+        role="alert"
+        data-form-error
+        class="text-sm text-destructive empty:hidden"
+      >
+        {errors.form}
+      </p>
+      <div class="flex flex-col gap-2" data-invalid={Boolean(errors.reason)}>
+        <label for={`${id}-reason`} class="text-sm font-medium">
+          Motivo de cancelación
+        </label>
+        <Input
+          id={`${id}-reason`}
+          name="reason"
+          required
+          maxLength={500}
+          defaultValue={reason}
+          aria-invalid={Boolean(errors.reason)}
+          aria-describedby={`${id}-reason-error`}
+          className="min-h-11"
+        />
+        <p
+          id={`${id}-reason-error`}
+          data-field-error="reason"
+          class="text-sm text-destructive empty:hidden"
+        >
+          {errors.reason}
+        </p>
+      </div>
+      <CancellationConfirmation
+        client:load
+        formId={id}
+        description={description}
+      />
+    </form>
+  )}
+</section>

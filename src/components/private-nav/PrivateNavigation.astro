@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Layers3,
   UsersRound,
+  Settings,
 } from "lucide-react";
 
 interface Props {
@@ -21,6 +22,9 @@ const formatActive = currentPath === "/app/formatos";
 const interestActive =
   currentPath === "/app/interesados" ||
   currentPath.startsWith("/app/interesados/");
+const registrationActive =
+  currentPath.startsWith("/app/preinscripciones") ||
+  currentPath.startsWith("/app/participantes");
 ---
 
 <nav
@@ -75,7 +79,10 @@ const interestActive =
           <summary
             class:list={[
               "private-nav-link",
-              (courseActive || formatActive || interestActive) &&
+              (courseActive ||
+                formatActive ||
+                interestActive ||
+                registrationActive) &&
                 "private-parent-active",
             ]}
             title="Cursos"
@@ -89,6 +96,16 @@ const interestActive =
             />
           </summary>
           <ul class="private-subnav">
+            <li>
+              <a
+                href="/app/preinscripciones"
+                aria-current={registrationActive ? "page" : undefined}
+                class="private-subnav-link"
+              >
+                <UsersRound size={17} aria-hidden="true" />
+                <span>Preinscripciones</span>
+              </a>
+            </li>
             <li>
               <a
                 href="/app/interesados"
@@ -121,6 +138,21 @@ const interestActive =
             </li>
           </ul>
         </details>
+      </li>
+    )}
+    {isAdmin && (
+      <li>
+        <a
+          href="/app/configuracion"
+          class="private-nav-link"
+          title="Configuración"
+          aria-current={
+            currentPath === "/app/configuracion" ? "page" : undefined
+          }
+        >
+          <Settings size={19} aria-hidden="true" />
+          <span class="private-label">Configuración</span>
+        </a>
       </li>
     )}
   </ul>
