@@ -50,17 +50,22 @@ test("isolated renewal preserves ADMIN identity/session and all accounts, reruns
       email: "global@example.invalid",
     })
     .returning();
-  const [globalSettings] = await database.db
-    .update(schema.registrationSettings)
-    .set({
-      minimumPaymentPercent: 30,
-      auxiliaryDiscountPercent: 100,
-      revision: 2,
-      updatedBy: admin!.id,
-    })
-    .where(eq(schema.registrationSettings.id, 1))
-    .returning();
+  const [originalSettings] = await database.db
+    .select()
+    .from(schema.registrationSettings)
+    .where(eq(schema.registrationSettings.id, 1));
   try {
+    expect(originalSettings).toBeDefined();
+    const [globalSettings] = await database.db
+      .update(schema.registrationSettings)
+      .set({
+        minimumPaymentPercent: 30,
+        auxiliaryDiscountPercent: 100,
+        revision: 2,
+        updatedBy: admin!.id,
+      })
+      .where(eq(schema.registrationSettings.id, 1))
+      .returning();
     // Simulate interruption after owned Auth creation but before internal profile commit.
     const orphan = await auth.auth.admin.createUser({
       email: teachers[0].email,
@@ -181,7 +186,16 @@ test("isolated renewal preserves ADMIN identity/session and all accounts, reruns
         ?.id,
     ).toBe(authId);
   } finally {
-    await database.close();
+    try {
+      // Restore the runner-owned singleton even if a preservation assertion fails.
+      if (originalSettings)
+        await database.db
+          .update(schema.registrationSettings)
+          .set(originalSettings)
+          .where(eq(schema.registrationSettings.id, 1));
+    } finally {
+      await database.close();
+    }
   }
 }, 120000);
 
