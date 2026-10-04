@@ -1,0 +1,57 @@
+---
+import { buttonVariants } from "@/components/ui/button";
+import { Pencil } from "lucide-react";
+interface Props {
+  label: string;
+  value: string;
+}
+const { label, value } = Astro.props;
+---
+
+<div data-inline-field class="flex min-w-0 flex-col gap-3">
+  <div
+    data-inline-display
+    hidden
+    class="flex min-w-0 items-center justify-between gap-3"
+  >
+    <div class="min-w-0">
+      <p class="text-sm text-muted-foreground">{label}</p>
+      <p data-inline-value class="mt-1 break-words font-medium">
+        {value || "No indicado"}
+      </p>
+    </div>
+    <button
+      type="button"
+      data-inline-edit
+      aria-label={`Editar ${label.toLowerCase()}`}
+      class={buttonVariants({
+        variant: "ghost",
+        size: "icon",
+        className: "size-11 shrink-0",
+      })}
+    >
+      <Pencil aria-hidden="true" />
+    </button>
+  </div>
+  <div data-inline-editor class="flex min-w-0 flex-col gap-3">
+    <slot />
+    <div class="flex flex-wrap gap-2">
+      <button
+        type="submit"
+        data-inline-save
+        class={buttonVariants({ className: "min-h-11" })}
+      >
+        Guardar
+      </button>
+      <button
+        type="button"
+        data-inline-cancel
+        hidden
+        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+      >
+        Cancelar
+      </button>
+    </div>
+  </div>
+</div>
+<script src="./inline-field-client.ts"></script>

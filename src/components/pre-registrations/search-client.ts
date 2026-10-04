@@ -25,6 +25,7 @@ export function bindParticipantLookup(
   const results = root.querySelector<HTMLElement>("[data-search-results]");
   const error = root.querySelector<HTMLElement>("[data-search-error]");
   let generation = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const pending = (value: boolean) => {
     root.setAttribute("aria-busy", String(value));
     if (loading) loading.hidden = !value;
@@ -58,17 +59,35 @@ export function bindParticipantLookup(
       if (token === generation) pending(false);
     }
   };
-  input?.addEventListener("input", run);
+  const schedule = () => {
+    ++generation;
+    search.cancel();
+    clearTimeout(timer);
+    const query = input?.value.trim() ?? "";
+    if (query.length < 2) {
+      pending(false);
+      adapter.onResults({ participants: [], interests: [] });
+      return;
+    }
+    pending(true);
+    timer = setTimeout(() => void run(), 250);
+  };
+  input?.addEventListener("input", schedule);
+  root
+    .querySelector<HTMLElement>("[data-search-submit]")
+    ?.setAttribute("hidden", "");
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
+    clearTimeout(timer);
     void run();
   };
   const form = root.querySelector<HTMLFormElement>("[data-search-form]");
   form?.addEventListener("submit", submit);
   return () => {
     ++generation;
+    clearTimeout(timer);
     search.cancel();
-    input?.removeEventListener("input", run);
+    input?.removeEventListener("input", schedule);
     form?.removeEventListener("submit", submit);
   };
 }

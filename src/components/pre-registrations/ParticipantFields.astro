@@ -1,6 +1,7 @@
 ---
 import { Input } from "@/components/ui/input";
 import type { ParticipantData } from "@/domain/pre-registrations/types";
+import { participantFields as fields } from "./participant-fields";
 interface Props {
   id: string;
   participant: ParticipantData;
@@ -8,37 +9,6 @@ interface Props {
   readOnly?: boolean;
 }
 const { id, participant, errors = {}, readOnly = false } = Astro.props;
-const fields = [
-  { name: "ci", label: "CI", type: "text", max: 80, autocomplete: "off" },
-  {
-    name: "firstName",
-    label: "Nombre",
-    type: "text",
-    max: 100,
-    autocomplete: "given-name",
-  },
-  {
-    name: "lastName",
-    label: "Apellidos",
-    type: "text",
-    max: 150,
-    autocomplete: "family-name",
-  },
-  {
-    name: "email",
-    label: "Correo electrónico",
-    type: "email",
-    max: 254,
-    autocomplete: "email",
-  },
-  {
-    name: "phone",
-    label: "Teléfono (opcional)",
-    type: "tel",
-    max: 32,
-    autocomplete: "tel",
-  },
-] as const;
 ---
 
 <div class="participant-fields grid min-w-0 gap-5">
@@ -75,6 +45,21 @@ const fields = [
 </div>
 <style>
   .participant-fields {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (min-width: 40rem) {
+    .participant-fields {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 64rem) {
+    .participant-fields {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 </style>
+<script>
+  import { bindPhoneInputs } from "./participant-fields";
+  bindPhoneInputs();
+  document.addEventListener("astro:page-load", () => bindPhoneInputs());
+</script>

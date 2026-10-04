@@ -178,6 +178,7 @@ export function registrationFormState(
           reason: values.reason,
         },
         now,
+        false,
       );
   });
   return { issues, valid: Object.keys(issues).length === 0 };
