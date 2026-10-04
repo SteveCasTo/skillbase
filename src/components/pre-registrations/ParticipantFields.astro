@@ -1,0 +1,78 @@
+---
+import { Input } from "@/components/ui/input";
+import type { ParticipantData } from "@/domain/pre-registrations/types";
+interface Props {
+  id: string;
+  participant: ParticipantData;
+  errors?: Readonly<Record<string, string>>;
+}
+const { id, participant, errors = {} } = Astro.props;
+const fields = [
+  { name: "ci", label: "CI", type: "text", max: 80, autocomplete: "off" },
+  {
+    name: "firstName",
+    label: "Nombre",
+    type: "text",
+    max: 100,
+    autocomplete: "given-name",
+  },
+  {
+    name: "lastName",
+    label: "Apellidos",
+    type: "text",
+    max: 150,
+    autocomplete: "family-name",
+  },
+  {
+    name: "email",
+    label: "Correo electrónico",
+    type: "email",
+    max: 254,
+    autocomplete: "email",
+  },
+  {
+    name: "phone",
+    label: "Teléfono (opcional)",
+    type: "tel",
+    max: 32,
+    autocomplete: "tel",
+  },
+] as const;
+---
+
+<div class="participant-fields grid min-w-0 gap-5">
+  {fields.map((field) => (
+    <div
+      class="flex min-w-0 flex-col gap-2"
+      data-invalid={Boolean(errors[field.name])}
+    >
+      <label for={`${id}-${field.name}`} class="text-sm font-medium">
+        {field.label}
+      </label>
+      <Input
+        id={`${id}-${field.name}`}
+        name={field.name}
+        type={field.type}
+        autoComplete={field.autocomplete}
+        maxLength={field.max}
+        required={field.name !== "phone"}
+        defaultValue={participant[field.name] ?? ""}
+        aria-invalid={Boolean(errors[field.name])}
+        aria-describedby={`${id}-${field.name}-error`}
+        className="min-h-11"
+      />
+      <p
+        id={`${id}-${field.name}-error`}
+        data-field-error={field.name}
+        class="text-sm text-destructive empty:hidden"
+      >
+        {errors[field.name]}
+      </p>
+    </div>
+  ))}
+</div>
+<style>
+  .participant-fields {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  }
+</style>

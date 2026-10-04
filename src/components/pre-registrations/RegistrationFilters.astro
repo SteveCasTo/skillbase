@@ -1,0 +1,108 @@
+---
+import type {
+  RegistrationFilter,
+  RegistrationFormDto,
+} from "@/domain/pre-registrations/types";
+import { Input } from "@/components/ui/input";
+import { buttonVariants } from "@/components/ui/button";
+import RegistrationSelect from "./RegistrationSelect";
+import { financeLabels, formatDate, membershipLabels } from "./presentation";
+interface Props {
+  id: string;
+  action: string;
+  filter: RegistrationFilter;
+  courses: readonly RegistrationFormDto["course"][];
+  groups: RegistrationFormDto["groups"];
+}
+const { id, action, filter, courses, groups } = Astro.props;
+---
+
+<form
+  id={id}
+  method="get"
+  action={action}
+  class="filter-fields mb-6 grid min-w-0 gap-4"
+  aria-label="Filtrar preinscripciones"
+>
+  <div class="flex min-w-0 flex-col gap-2">
+    <label for={`${id}-search`} class="text-sm font-medium">
+      Nombre o CI
+    </label>
+    <Input
+      id={`${id}-search`}
+      name="search"
+      type="search"
+      defaultValue={filter.search ?? ""}
+      maxLength={100}
+      className="min-h-11"
+    />
+  </div>
+  <RegistrationSelect
+    client:load
+    id={`${id}-course`}
+    name="courseId"
+    label="Curso"
+    value={filter.courseId ?? ""}
+    required={false}
+    placeholder="Todos los cursos"
+    options={courses.map((course) => ({
+      value: course.id,
+      label: course.name,
+    }))}
+  />
+  <RegistrationSelect
+    client:load
+    id={`${id}-group`}
+    name="groupId"
+    label="Grupo"
+    value={filter.groupId ?? ""}
+    required={false}
+    placeholder="Todos los grupos"
+    options={groups.map((group, index) => ({
+      value: group.id,
+      label: `Grupo ${index + 1} · ${formatDate(group.startsAt)}`,
+    }))}
+  />
+  <RegistrationSelect
+    client:load
+    id={`${id}-membership`}
+    name="membershipStatus"
+    label="Estado"
+    value={filter.membershipStatus ?? ""}
+    required={false}
+    placeholder="Todos los estados"
+    options={Object.entries(membershipLabels).map(([value, label]) => ({
+      value,
+      label,
+    }))}
+  />
+  <RegistrationSelect
+    client:load
+    id={`${id}-finance`}
+    name="financialStatus"
+    label="Pagos"
+    value={filter.financialStatus ?? ""}
+    required={false}
+    placeholder="Todos los pagos"
+    options={Object.entries(financeLabels).map(([value, label]) => ({
+      value,
+      label,
+    }))}
+  />
+  <input type="hidden" name="page" value="1" />
+  <input type="hidden" name="pageSize" value={filter.pageSize} />
+  <button
+    type="submit"
+    class={buttonVariants({
+      variant: "outline",
+      className: "min-h-11 self-end",
+    })}
+  >
+    Aplicar filtros
+  </button>
+</form>
+<style>
+  .filter-fields {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  }
+</style>

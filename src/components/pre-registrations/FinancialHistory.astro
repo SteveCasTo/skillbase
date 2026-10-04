@@ -1,0 +1,59 @@
+---
+import type { RegistrationDetailDto } from "@/domain/pre-registrations/types";
+import { formatDate, formatMoney } from "./presentation";
+interface Props {
+  detail: RegistrationDetailDto;
+  actorLabels?: Readonly<Record<string, string>>;
+}
+const { detail, actorLabels = {} } = Astro.props;
+---
+
+<section aria-label="Historial de efectivo" class="min-w-0">
+  <h2 class="mb-5 text-lg font-semibold">Historial de efectivo</h2>
+  {detail.ledger.length === 0 ? (
+    <p class="rounded-lg border p-5 text-sm text-muted-foreground">
+      No hay movimientos de efectivo. Los registros gratuitos no generan pagos
+      de valor cero.
+    </p>
+  ) : (
+    <ol class="flex min-w-0 flex-col divide-y rounded-xl border px-5">
+      {detail.ledger.map((entry) => (
+        <li class="history-entry grid min-w-0 gap-3 py-5">
+          <div>
+            <p class="font-semibold">
+              {entry.kind === "PAYMENT"
+                ? "Pago recibido"
+                : "Devolución registrada"}
+            </p>
+            <p class="mt-1 text-sm text-muted-foreground">
+              Fecha efectiva:{" "}
+              <time datetime={entry.effectiveDate}>{entry.effectiveDate}</time>
+            </p>
+          </div>
+          <p class="font-semibold tabular-nums">
+            {formatMoney(entry.amountCents)}
+          </p>
+          <div class="min-w-0 text-sm">
+            <p class="break-words">{entry.reason}</p>
+            <p class="mt-1 break-words text-muted-foreground">
+              Registrado por {actorLabels[entry.actorId] ?? entry.actorId} ·{" "}
+              <time datetime={entry.recordedAt}>
+                {formatDate(entry.recordedAt)}
+              </time>
+            </p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  )}
+</section>
+<style>
+  .history-entry {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (min-width: 48rem) {
+    .history-entry {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 0.5fr) minmax(0, 1.5fr);
+    }
+  }
+</style>

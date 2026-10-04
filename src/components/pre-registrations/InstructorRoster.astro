@@ -1,0 +1,29 @@
+---
+import type { InstructorRosterEntryDto } from "@/domain/pre-registrations/types";
+interface Props {
+  entries: readonly InstructorRosterEntryDto[];
+  available: boolean;
+}
+const { entries, available } = Astro.props;
+---
+
+<section aria-label="Participantes del grupo" class="min-w-0">
+  <h2 class="mb-4 text-lg font-semibold">Participantes</h2>
+  {!available ? (
+    <p class="text-sm text-muted-foreground">
+      Disponible desde el inicio oficial del curso.
+    </p>
+  ) : entries.length === 0 ? (
+    <p class="text-sm text-muted-foreground">
+      Este grupo todavía no tiene participantes vigentes.
+    </p>
+  ) : (
+    <ul class="divide-y rounded-xl border px-5">
+      {entries.map((entry) => (
+        <li class="break-words py-4">
+          {entry.firstName} {entry.lastName}
+        </li>
+      ))}
+    </ul>
+  )}
+</section>
