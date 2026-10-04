@@ -30,7 +30,7 @@ afterEach(restoreSettingsDefaults);
 afterAll(async () => {
   // Only this isolated test suite's synthetic financial tables; never bypass append-only triggers.
   await db.execute(
-    sql`truncate registration_ledger, registration_command_receipts, pre_registrations, participants restrict`,
+    sql`truncate participant_attendance, instructor_attendance, session_roster, attendance_command_receipts, group_sessions, registration_ledger, registration_command_receipts, pre_registrations, participants restrict`,
   );
   await restoreSettingsDefaults();
   await database.close();
