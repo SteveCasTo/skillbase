@@ -47,8 +47,10 @@ export interface LedgerEntryDto {
   readonly amountCents: number;
   readonly effectiveDate: string;
   readonly actorId: string;
+  /** Current internal display name; present only in ADMIN finance responses. */
+  readonly actorName?: string;
   readonly recordedAt: string;
-  readonly reason: string;
+  readonly reason: string | null;
 }
 export interface RegistrationFinance {
   readonly paidCents: number;
@@ -64,6 +66,8 @@ export interface AdminRegistrationDto extends RegistrationFinance {
   /** Current display labels, not part of the immutable financial snapshot. */
   readonly courseName?: string;
   readonly groupName?: string;
+  /** Current actor name from the internal profile; ADMIN only. */
+  readonly registeredByName?: string;
   readonly participant: ParticipantDto;
   readonly state: RegistrationState;
   readonly membershipStatus: MembershipStatus;
@@ -106,7 +110,7 @@ export interface CashInput {
   readonly amountCents: number;
   /** Null means today in Bolivia, resolved once by the transaction clock. */
   readonly effectiveDate: string | null;
-  readonly reason: string;
+  readonly reason?: string | null;
 }
 export interface CreateRegistrationInput extends RequestIdentity {
   readonly courseId: string;

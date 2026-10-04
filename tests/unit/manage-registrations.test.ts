@@ -164,6 +164,22 @@ test("payment orchestration rejects future cash and invalid optimistic revision 
     recordRegistrationPayment(
       repository,
       admin,
+      { ...cash, cash: { amountCents: 2001, effectiveDate: null } },
+      now,
+    ),
+  ).rejects.toBe(sentinel);
+  await expect(
+    recordRegistrationRefund(
+      repository,
+      admin,
+      { ...cash, cash: { amountCents: 2001, effectiveDate: null } },
+      now,
+    ),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  await expect(
+    recordRegistrationPayment(
+      repository,
+      admin,
       { ...cash, cash: { ...cash.cash, effectiveDate: "2099-02-02" } },
       now,
     ),

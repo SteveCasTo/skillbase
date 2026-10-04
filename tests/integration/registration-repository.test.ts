@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeEach, expect, test } from "bun:test";
 import { eq, sql } from "drizzle-orm";
 import { createDatabase } from "@/server/db/client";
 import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
+import { DrizzleInterestRepository } from "@/server/db/repositories/interest-repository";
 import { DrizzleGroupRepository } from "@/server/db/repositories/group-repository";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
 import * as schema from "@/server/db/schema";
@@ -218,6 +219,7 @@ test("create idempotency returns original DTO; changed payload or operation reje
     repository.create(f.input, f.actor.id),
   ]);
   expect(repeat).toEqual(first);
+  expect(first.registeredByName).toBeTruthy();
   expect((await repository.detail(first.id, f.actor.id))!.ledger).toHaveLength(
     1,
   );
@@ -635,13 +637,43 @@ test("interest prefill is same-course editable trace only and does not mutate pu
     .returning();
   const form = await repository.form(f.course.id, f.actor.id, interest!.id);
   expect(form!.sourceInterest!.firstName).toBe("Public");
+  const interests = new DrizzleInterestRepository(db);
+  expect(
+    (await interests.course(f.course.id))!.availableForPrefillInterestIds,
+  ).toContain(interest!.id);
   const row = await repository.create(
-    { ...f.input, sourceInterestId: interest!.id },
+    {
+      ...f.input,
+      sourceInterestId: interest!.id,
+      initialPayment: { amountCents: 2001, effectiveDate: null },
+    },
     f.actor.id,
   );
   expect(row.sourceInterestId).toBe(interest!.id);
   expect(row.participant.firstName).toBe("Synthetic");
+  expect(row.paidCents).toBe(2001);
+  const ledger = (await repository.detail(row.id, f.actor.id))!.ledger;
+  expect(ledger[0]?.reason).toBeNull();
+  expect(ledger[0]?.actorName).toBeTruthy();
   expect(row.groupId).not.toBe(interest!.preferredGroupId);
+  const availableAfterRegistration = await interests.course(f.course.id);
+  expect(
+    availableAfterRegistration!.availableForPrefillInterestIds,
+  ).not.toContain(interest!.id);
+  expect(availableAfterRegistration!.metrics.activeTotal).toBe(1);
+  await expect(
+    repository.form(f.course.id, f.actor.id, interest!.id),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  await expect(
+    repository.create(
+      {
+        ...f.input,
+        requestKey: crypto.randomUUID(),
+        sourceInterestId: interest!.id,
+      },
+      f.actor.id,
+    ),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
   expect(
     (
       await db

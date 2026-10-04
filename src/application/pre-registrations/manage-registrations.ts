@@ -139,7 +139,10 @@ export async function recordRegistrationPayment(
 ) {
   requireRegistrationAdmin(actor);
   return repository.recordPayment(
-    { ...validateMutation(input), cash: validateCashInput(input.cash, now) },
+    {
+      ...validateMutation(input),
+      cash: validateCashInput(input.cash, now, false),
+    },
     actor.id,
   );
 }
