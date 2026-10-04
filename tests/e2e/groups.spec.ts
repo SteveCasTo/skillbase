@@ -81,6 +81,7 @@ test("initially unassigned draft edits preserve one null value and keep the disa
     name: "Instructor",
     exact: true,
   });
+  await expect(instructor).toHaveAttribute("id", "instructorId-select");
   await instructor.click();
   await expect(
     page.getByRole("option", {
