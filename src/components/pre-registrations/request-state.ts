@@ -1,7 +1,20 @@
 /** Keep the receipt key after uncertain failures; rotate only for changed payloads. */
-export function createRequestState(requestKey: string, uuid: () => string) {
+export function requestFingerprint(
+  values: Readonly<Record<string, string>>,
+): string {
+  return JSON.stringify(
+    Object.entries(values)
+      .filter(([name]) => name !== "requestKey" && name !== "confirmed")
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+export function createRequestState(
+  requestKey: string,
+  uuid: () => string,
+  initialFingerprint?: string,
+) {
   let key = requestKey;
-  let fingerprint: string | undefined;
+  let fingerprint: string | undefined = initialFingerprint;
   let pending = false;
   return {
     begin(payload: string): string | null {

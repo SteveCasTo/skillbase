@@ -27,12 +27,20 @@ const {
     </h2>
     <div class="flex flex-wrap gap-2">
       {csvHref && (
-        <a href={csvHref} class={buttonVariants({ variant: "outline" })}>
+        <a
+          href={csvHref}
+          data-registration-export="CSV"
+          class={buttonVariants({ variant: "outline" })}
+        >
           CSV
         </a>
       )}
       {pdfHref && (
-        <a href={pdfHref} class={buttonVariants({ variant: "outline" })}>
+        <a
+          href={pdfHref}
+          data-registration-export="PDF"
+          class={buttonVariants({ variant: "outline" })}
+        >
           PDF
         </a>
       )}

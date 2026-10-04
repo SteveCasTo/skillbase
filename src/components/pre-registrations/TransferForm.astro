@@ -16,6 +16,7 @@ interface Props {
   requestKey: string;
   destinationGroupId?: string;
   errors?: Readonly<Record<string, string>>;
+  lastSubmitted?: Readonly<Record<string, string>> | undefined;
 }
 const {
   id,
@@ -45,7 +46,7 @@ const options = form.groups.map((group, index) => {
   }
   return {
     value: group.id,
-    label: `Grupo ${index + 1} · ${formatDate(group.startsAt)} · ${group.occupied}/${group.capacity} ocupados`,
+    label: `${group.groupName ?? `Grupo ${index + 1}`} · ${formatDate(group.startsAt)} · ${group.occupied}/${group.capacity} ocupados`,
     disabled,
   };
 });
@@ -58,6 +59,11 @@ const available = options.some((option) => !option.disabled);
   action={action}
   class="flex min-w-0 flex-col gap-5"
   data-transfer-form
+  data-last-submitted={
+    Astro.props.lastSubmitted
+      ? JSON.stringify(Astro.props.lastSubmitted)
+      : undefined
+  }
   data-astro-reload
 >
   <h2 class="text-lg font-semibold">Cambiar de grupo</h2>
@@ -126,5 +132,7 @@ const available = options.some((option) => !option.disabled);
       });
   }
   initialize();
+  document.dispatchEvent(new Event("registration:forms-ready"));
+  document.addEventListener("registration:fragment", initialize);
   document.addEventListener("astro:page-load", initialize);
 </script>
