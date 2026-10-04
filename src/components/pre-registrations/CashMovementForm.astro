@@ -73,6 +73,9 @@ const fields = [
   method="post"
   action={action}
   data-cash-form
+  data-last-submitted={
+    Object.keys(values).length ? JSON.stringify(values) : undefined
+  }
   data-cash-context={JSON.stringify({
     registration,
     kind,
@@ -106,8 +109,11 @@ const fields = [
       {unavailable}
     </p>
   )}
-  {!unavailable && (
-    <fieldset class="cash-fields grid min-w-0 gap-5">
+  {(!unavailable || Object.keys(values).length > 0) && (
+    <fieldset
+      disabled={Boolean(unavailable)}
+      class="cash-fields grid min-w-0 gap-5"
+    >
       <legend class="sr-only">Datos del movimiento</legend>
       {fields.map((field) => {
         const Control = field.name === "amount" ? MoneyInput : Input;
@@ -220,5 +226,7 @@ const fields = [
       });
   }
   initialize();
+  document.dispatchEvent(new Event("registration:forms-ready"));
+  document.addEventListener("registration:fragment", initialize);
   document.addEventListener("astro:page-load", initialize);
 </script>

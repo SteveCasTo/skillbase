@@ -16,6 +16,7 @@ interface Props {
   action: string;
   reason?: string;
   errors?: Readonly<Record<string, string>>;
+  lastSubmitted?: Readonly<Record<string, string>> | undefined;
 }
 const {
   id,
@@ -48,9 +49,19 @@ const description =
 <section class="min-w-0">
   <h2 class="mb-4 text-lg font-semibold">Cancelar preinscripción</h2>
   {unavailable ? (
-    <p role="status" class="text-sm text-muted-foreground">
-      {unavailable}
-    </p>
+    <div>
+      <p role="status" class="text-sm text-muted-foreground">
+        {unavailable}
+      </p>
+      {errors.form && (
+        <p role="alert" class="mt-3 text-sm text-destructive">
+          {errors.form}
+        </p>
+      )}
+      {reason && (
+        <p class="mt-3 break-words text-sm">Motivo enviado: {reason}</p>
+      )}
+    </div>
   ) : (
     <form
       id={id}
@@ -58,6 +69,11 @@ const description =
       method="post"
       class="flex min-w-0 flex-col gap-5"
       data-cancellation-form
+      data-last-submitted={
+        Astro.props.lastSubmitted
+          ? JSON.stringify(Astro.props.lastSubmitted)
+          : undefined
+      }
       data-astro-reload
     >
       <input type="hidden" name="registrationId" value={registration.id} />

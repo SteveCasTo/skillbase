@@ -63,7 +63,12 @@ export default function CancellationConfirmation({
       ) : (
         <AlertDialog.Root>
           <AlertDialog.Trigger asChild>
-            <Button type="button" variant="destructive" disabled={disabled}>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={disabled}
+              data-cancel-trigger
+            >
               Cancelar preinscripción
             </Button>
           </AlertDialog.Trigger>

@@ -60,7 +60,7 @@ const { id, action, filter, courses, groups } = Astro.props;
     placeholder="Todos los grupos"
     options={groups.map((group, index) => ({
       value: group.id,
-      label: `Grupo ${index + 1} · ${formatDate(group.startsAt)}`,
+      label: `${group.groupName ?? `Grupo ${index + 1}`} · ${formatDate(group.startsAt)}`,
     }))}
   />
   <RegistrationSelect

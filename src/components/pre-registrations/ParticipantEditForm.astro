@@ -13,6 +13,7 @@ interface Props {
   requestKey: string;
   errors?: Readonly<Record<string, string>>;
   message?: string;
+  lastSubmitted?: Readonly<Record<string, string>> | undefined;
 }
 const {
   id,
@@ -30,6 +31,11 @@ const {
   action={action}
   method="post"
   data-participant-edit
+  data-last-submitted={
+    Astro.props.lastSubmitted
+      ? JSON.stringify(Astro.props.lastSubmitted)
+      : undefined
+  }
   data-participant-baseline={JSON.stringify(participant)}
   class="flex min-w-0 flex-col gap-6"
   data-astro-reload
@@ -113,5 +119,6 @@ const {
       });
   }
   initialize();
+  document.dispatchEvent(new Event("registration:forms-ready"));
   document.addEventListener("astro:page-load", initialize);
 </script>

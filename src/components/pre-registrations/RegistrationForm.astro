@@ -24,6 +24,7 @@ interface Props {
   serverNow: string;
   requestKey: string;
   participant?: ParticipantData;
+  participantReadonly?: boolean;
   values?: Readonly<Record<string, string>>;
   errors?: Readonly<Record<string, string>>;
   message?: string;
@@ -71,13 +72,24 @@ const unavailable =
   data-registration-form
   data-configuration={JSON.stringify(form)}
   data-server-now={serverNow}
+  data-last-submitted={
+    Object.keys(values).length ? JSON.stringify(values) : undefined
+  }
   class="flex w-full min-w-0 flex-col gap-8"
   data-astro-reload
 >
   <input type="hidden" name="requestKey" value={requestKey} />
   <input type="hidden" name="courseId" value={form.course.id} />
-  <input type="hidden" name="courseRevision" value={form.course.revision} />
-  <input type="hidden" name="settingsRevision" value={form.settings.revision} />
+  <input
+    type="hidden"
+    name="courseRevision"
+    value={values.courseRevision ?? form.course.revision}
+  />
+  <input
+    type="hidden"
+    name="settingsRevision"
+    value={values.settingsRevision ?? form.settings.revision}
+  />
   <input
     type="hidden"
     name="sourceInterestId"
@@ -101,6 +113,7 @@ const unavailable =
     </p>
     <ParticipantFields
       id={id}
+      readOnly={Astro.props.participantReadonly ?? false}
       participant={{
         ci: values.ci ?? participant.ci,
         firstName: values.firstName ?? participant.firstName,
@@ -128,7 +141,7 @@ const unavailable =
         error={errors.groupId}
         options={form.groups.map((group, index) => ({
           value: group.id,
-          label: `Grupo ${index + 1} · ${formatDate(group.startsAt)} · ${group.occupied}/${group.capacity} cupos ocupados`,
+          label: `${group.groupName ?? `Grupo ${index + 1}`} · ${formatDate(group.startsAt)} · ${group.occupied}/${group.capacity} cupos ocupados`,
           disabled:
             group.status !== "PLANNED" || group.occupied >= group.capacity,
         }))}

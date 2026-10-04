@@ -1,0 +1,20 @@
+---
+interface Props {
+  message: string;
+  retryHref?: string;
+}
+const { message, retryHref } = Astro.props;
+---
+
+<section role="alert" class="my-6 rounded-xl border bg-card p-5">
+  <h2 class="text-lg font-semibold">No se pudo completar la consulta</h2>
+  <p class="mt-3 text-sm">{message}</p>
+  {retryHref && (
+    <a
+      href={retryHref}
+      class="mt-4 inline-flex min-h-11 items-center underline underline-offset-4"
+    >
+      Reintentar
+    </a>
+  )}
+</section>

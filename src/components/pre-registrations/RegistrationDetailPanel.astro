@@ -1,0 +1,140 @@
+---
+import type {
+  RegistrationDetailDto,
+  RegistrationFormDto,
+} from "@/domain/pre-registrations/types";
+import type { RegistrationOperation } from "@/server/pre-registrations/http";
+import FinancialSummary from "./FinancialSummary.astro";
+import FinancialHistory from "./FinancialHistory.astro";
+import CashMovementForm from "./CashMovementForm.astro";
+import CancellationForm from "./CancellationForm.astro";
+import TransferForm from "./TransferForm.astro";
+interface Props {
+  detail: RegistrationDetailDto;
+  form: RegistrationFormDto;
+  serverNow: string;
+  failedOperation?: RegistrationOperation | undefined;
+  values?: Readonly<Record<string, string>>;
+  errors?: Readonly<Record<string, string>>;
+  message?: string | undefined;
+}
+const {
+  detail,
+  form,
+  serverNow,
+  failedOperation,
+  values = {},
+  errors = {},
+  message,
+} = Astro.props;
+const registration = detail.registration;
+const path = `/app/preinscripciones/${registration.id}`;
+const attempted = (operation: RegistrationOperation) =>
+  failedOperation === operation;
+const revision = values.revision;
+const withAttemptedRevision = (operation: RegistrationOperation) =>
+  attempted(operation) && revision
+    ? { ...registration, revision }
+    : registration;
+const key = (operation: RegistrationOperation) =>
+  attempted(operation)
+    ? values.requestKey || crypto.randomUUID()
+    : crypto.randomUUID();
+---
+
+<div data-registration-panel class="mt-8 flex min-w-0 flex-col gap-8">
+  <FinancialSummary registration={registration} />
+  <FinancialHistory detail={detail} />
+  <div class="mutation-panels grid min-w-0 gap-8">
+    <section
+      class="min-w-0 rounded-xl border p-5"
+      data-registration-operation="payment"
+    >
+      <CashMovementForm
+        id="registration-payment"
+        registration={withAttemptedRevision("payment")}
+        kind="PAYMENT"
+        startsAt={form.course.startsAt}
+        {serverNow}
+        requestKey={key("payment")}
+        action={`${path}?operation=payment`}
+        values={attempted("payment") ? values : {}}
+        errors={
+          attempted("payment")
+            ? { ...errors, ...(message ? { form: message } : {}) }
+            : {}
+        }
+      />
+    </section>
+    {((registration.state === "CANCELLED" && registration.refundDueCents > 0) ||
+      attempted("refund")) && (
+      <section
+        class="min-w-0 rounded-xl border p-5"
+        data-registration-operation="refund"
+      >
+        <CashMovementForm
+          id="registration-refund"
+          registration={withAttemptedRevision("refund")}
+          kind="REFUND"
+          startsAt={form.course.startsAt}
+          {serverNow}
+          requestKey={key("refund")}
+          action={`${path}?operation=refund`}
+          values={attempted("refund") ? values : {}}
+          errors={
+            attempted("refund")
+              ? { ...errors, ...(message ? { form: message } : {}) }
+              : {}
+          }
+        />
+      </section>
+    )}
+    <section
+      class="min-w-0 rounded-xl border p-5"
+      data-registration-operation="transfer"
+    >
+      <TransferForm
+        id="registration-transfer"
+        lastSubmitted={attempted("transfer") ? values : undefined}
+        registration={withAttemptedRevision("transfer")}
+        {form}
+        {serverNow}
+        action={`${path}?operation=transfer`}
+        requestKey={key("transfer")}
+        destinationGroupId={
+          attempted("transfer") ? (values.destinationGroupId ?? "") : ""
+        }
+        errors={
+          attempted("transfer")
+            ? { ...errors, ...(message ? { form: message } : {}) }
+            : {}
+        }
+      />
+    </section>
+    <section
+      class="min-w-0 rounded-xl border p-5"
+      data-registration-operation="cancel"
+    >
+      <CancellationForm
+        id="registration-cancel"
+        lastSubmitted={attempted("cancel") ? values : undefined}
+        registration={withAttemptedRevision("cancel")}
+        {form}
+        {serverNow}
+        action={`${path}?operation=cancel`}
+        requestKey={key("cancel")}
+        reason={attempted("cancel") ? (values.reason ?? "") : ""}
+        errors={
+          attempted("cancel")
+            ? { ...errors, ...(message ? { form: message } : {}) }
+            : {}
+        }
+      />
+    </section>
+  </div>
+</div>
+<style>
+  .mutation-panels {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  }
+</style>
