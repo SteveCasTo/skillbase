@@ -1,0 +1,149 @@
+---
+import {
+  getRegistrationSettings,
+  updateRegistrationSettings,
+} from "@/application/pre-registrations/manage-registrations";
+import RegistrationSettingsForm from "@/components/pre-registrations/RegistrationSettingsForm.astro";
+import { RegistrationError } from "@/domain/pre-registrations/errors";
+import type { RegistrationSettings } from "@/domain/pre-registrations/types";
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import { requireInternalUser } from "@/server/auth/context";
+import { requestHasExpectedOrigin } from "@/server/auth/redirects";
+import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
+import { getPublicAuthEnvironment } from "@/server/environment";
+import {
+  InvalidRegistrationSettingsFormError,
+  readRegistrationSettingsForm,
+  registrationSettingsErrorResponse,
+} from "@/server/pre-registrations/settings-http";
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
+const actor = requireInternalUser(Astro.locals);
+if (!actor.roles.includes("ADMIN"))
+  return Astro.redirect("/unauthorized?reason=forbidden", 303);
+
+const repository = createRegistrationRepository();
+const wantsJson =
+  Astro.request.headers.get("accept")?.includes("application/json") ?? false;
+const json = (body: object, status: number) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "private, no-store",
+    },
+  });
+void json;
+
+let settings: RegistrationSettings | null = null;
+let values: Record<string, string> = {};
+let errors: Readonly<Record<string, string>> = {};
+let pageError: string | null = null;
+let pageStatus = 200;
+
+if (Astro.request.method === "POST") {
+  if (
+    !requestHasExpectedOrigin(Astro.request, getPublicAuthEnvironment().siteUrl)
+  ) {
+    pageError =
+      "La solicitud no tiene un origen válido. Recarga la página e inténtalo de nuevo.";
+    pageStatus = 403;
+    if (wantsJson)
+      return json(
+        { code: "FORBIDDEN", message: pageError, fields: {} },
+        pageStatus,
+      );
+  } else {
+    try {
+      const submission = await readRegistrationSettingsForm(Astro.request);
+      values = { ...submission.values };
+      const input = submission.input;
+      settings = await updateRegistrationSettings(repository, actor, input);
+      if (wantsJson) return json({ settings }, 200);
+      return Astro.redirect("/app/configuracion?success=saved", 303);
+    } catch (error) {
+      if (error instanceof RegistrationError) {
+        const failure = registrationSettingsErrorResponse(error);
+        pageStatus = failure.status;
+        errors = error.issues;
+        pageError = error.message;
+        if (wantsJson) return json(failure.body, pageStatus);
+      } else {
+        pageStatus =
+          error instanceof InvalidRegistrationSettingsFormError ||
+          (error instanceof Error && error.message === "Invalid form")
+            ? 400
+            : 500;
+        pageError =
+          pageStatus === 400
+            ? "El formulario no es válido. Revisa los valores e inténtalo nuevamente."
+            : "No se pudo guardar la configuración. Inténtalo nuevamente.";
+        if (wantsJson)
+          return json(
+            { code: "REQUEST_FAILED", message: pageError, fields: {} },
+            pageStatus,
+          );
+      }
+    }
+  }
+}
+
+if (!settings) {
+  try {
+    settings = await getRegistrationSettings(repository, actor);
+  } catch {
+    pageStatus = 503;
+    pageError = "No se pudo cargar la configuración. Inténtalo nuevamente.";
+  }
+}
+Astro.response.status = pageStatus;
+const success = Astro.url.searchParams.get("success") === "saved";
+---
+
+<PrivateLayout title="Configuración de preinscripciones">
+  <header>
+    <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">
+      Configuración de preinscripciones
+    </h1>
+    <p class="mt-3 max-w-2xl leading-7 text-muted-foreground">
+      Define el pago mínimo y el descuento auxiliar para nuevas
+      preinscripciones. Los registros y pagos existentes conservan sus valores.
+    </p>
+  </header>
+  {success && (
+    <p
+      role="status"
+      class="mt-6 rounded-lg border bg-secondary px-4 py-3 text-sm"
+    >
+      Configuración guardada.
+    </p>
+  )}
+  {pageError && (
+    <p
+      role="alert"
+      class="mt-6 rounded-lg border border-destructive/40 bg-card px-4 py-3 text-sm text-destructive"
+    >
+      {pageError}
+    </p>
+  )}
+  {settings ? (
+    <section
+      class="mt-8 w-full rounded-xl border bg-card p-5 sm:p-7"
+      aria-label="Valores de preinscripción"
+    >
+      <RegistrationSettingsForm
+        settings={settings}
+        action="/app/configuracion"
+        values={values}
+        errors={errors}
+        requestKey={values.requestKey ?? crypto.randomUUID()}
+        staleConflict={pageStatus === 409}
+      />
+    </section>
+  ) : (
+    <p role="alert" class="mt-8 rounded-xl border p-6 text-destructive">
+      No pudimos mostrar los valores. Recarga la página para volver a
+      intentarlo.
+    </p>
+  )}
+</PrivateLayout>

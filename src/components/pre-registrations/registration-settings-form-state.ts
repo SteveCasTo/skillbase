@@ -1,3 +1,6 @@
+import { RegistrationError } from "@/domain/pre-registrations/errors";
+import { validateSettings } from "@/domain/pre-registrations/money";
+
 export interface RegistrationSettingsFormValues {
   minimumPaymentPercent: number;
   auxiliaryDiscountPercent: number;
@@ -7,10 +10,10 @@ export type RegistrationSettingsFormInput = Readonly<
   Record<keyof RegistrationSettingsFormValues, string | undefined>
 >;
 
-const fieldRules = {
-  minimumPaymentPercent: { min: 1, max: 100 },
-  auxiliaryDiscountPercent: { min: 0, max: 100 },
-} as const;
+const settingsFields = [
+  "minimumPaymentPercent",
+  "auxiliaryDiscountPercent",
+] as const;
 
 export function registrationSettingsFormState(
   input: RegistrationSettingsFormInput,
@@ -18,25 +21,28 @@ export function registrationSettingsFormState(
 ) {
   const errors: Partial<Record<keyof RegistrationSettingsFormValues, string>> =
     {};
-  const values: Partial<RegistrationSettingsFormValues> = {};
+  const values = {
+    minimumPaymentPercent: Number.NaN,
+    auxiliaryDiscountPercent: Number.NaN,
+  };
 
-  for (const name of Object.keys(
-    fieldRules,
-  ) as (keyof RegistrationSettingsFormValues)[]) {
+  for (const name of settingsFields) {
     const raw = input[name]?.trim() ?? "";
-    const value = raw === "" ? Number.NaN : Number(raw);
-    const { min, max } = fieldRules[name];
-    if (!Number.isInteger(value)) {
-      errors[name] = "Ingresa un porcentaje entero.";
-    } else if (value < min || value > max) {
-      errors[name] = `Ingresa un valor entre ${min} y ${max}.`;
-    } else {
-      values[name] = value;
+    values[name] = raw === "" ? Number.NaN : Number(raw);
+  }
+
+  try {
+    validateSettings({ ...values, revision: 1 });
+  } catch (error) {
+    if (!(error instanceof RegistrationError)) throw error;
+    for (const name of settingsFields) {
+      const message = error.issues[name];
+      if (message) errors[name] = message;
     }
   }
 
   const valid = Object.keys(errors).length === 0;
-  const complete = valid ? (values as RegistrationSettingsFormValues) : null;
+  const complete: RegistrationSettingsFormValues | null = valid ? values : null;
   const changed =
     baseline === undefined ||
     (complete !== null &&
@@ -54,11 +60,19 @@ export function registrationSettingsFormState(
 }
 
 /** Prevent repeated native submissions while the first POST is navigating. */
-export function createPendingSubmitGuard(): () => boolean {
+export function createPendingSubmitGuard(): {
+  begin(): boolean;
+  reset(): void;
+} {
   let pending = false;
-  return () => {
-    if (pending) return false;
-    pending = true;
-    return true;
+  return {
+    begin() {
+      if (pending) return false;
+      pending = true;
+      return true;
+    },
+    reset() {
+      pending = false;
+    },
   };
 }
