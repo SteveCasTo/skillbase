@@ -67,10 +67,6 @@ const available = options.some((option) => !option.disabled);
   data-astro-reload
 >
   <h2 class="text-lg font-semibold">Cambiar de grupo</h2>
-  <p class="text-sm text-muted-foreground">
-    Solo dentro de {form.course.name}. El precio aplicado y los pagos se
-    conservan.
-  </p>
   <input type="hidden" name="registrationId" value={registration.id} />
   <input type="hidden" name="revision" value={registration.revision} />
   <input type="hidden" name="requestKey" value={requestKey} />

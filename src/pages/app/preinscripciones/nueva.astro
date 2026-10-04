@@ -118,15 +118,38 @@ const hrefs = Object.fromEntries([
 ---
 
 <PrivateLayout title="Registrar preinscripción">
-  <a href="/app/preinscripciones" class="text-sm underline underline-offset-4">
-    Preinscripciones
-  </a>
+  <nav
+    aria-label="Ruta de navegación"
+    class="flex flex-wrap items-center gap-2 text-sm"
+  >
+    <a href="/app/preinscripciones" class="underline underline-offset-4">
+      Preinscripciones
+    </a>
+    {form && (
+      <>
+        <span aria-hidden="true">/</span>
+        <a
+          href={`/app/preinscripciones?courseId=${form.course.id}`}
+          class="break-words underline underline-offset-4"
+        >
+          {form.course.name}
+        </a>
+      </>
+    )}
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">Nueva</span>
+  </nav>
+  {form && (
+    <a
+      href="/app/preinscripciones/nueva"
+      class="mt-3 inline-flex min-h-11 items-center text-sm underline underline-offset-4"
+    >
+      Cambiar curso
+    </a>
+  )}
   <h1 class="mt-5 text-3xl font-semibold tracking-tight">
     Registrar preinscripción
   </h1>
-  <p class="mt-3 text-muted-foreground">
-    Selecciona el curso y registra la persona, el grupo y el efectivo recibido.
-  </p>
   {form ? (
     <div class="mt-8 flex min-w-0 flex-col gap-8">
       <div data-registration-lookup data-lookup-course={courseId}>
@@ -166,23 +189,25 @@ const hrefs = Object.fromEntries([
       ) : (
         <ul class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {choices.map((choice) => (
-            <li class="min-w-0 rounded-xl border p-5">
+            <li class="min-w-0">
               <a
                 href={`${action}?courseId=${choice.course.id}`}
-                class="break-words font-semibold underline underline-offset-4"
+                class="flex h-full min-w-0 flex-col gap-3 rounded-xl border p-5 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
               >
-                {choice.course.name}
+                <span class="break-words font-semibold">
+                  {choice.course.name}
+                </span>
+                <span class="text-sm text-muted-foreground">
+                  {
+                    choice.groups.filter(
+                      (group) =>
+                        group.status === "PLANNED" &&
+                        group.occupied < group.capacity,
+                    ).length
+                  }{" "}
+                  grupos con cupo
+                </span>
               </a>
-              <p class="mt-3 text-sm text-muted-foreground">
-                {
-                  choice.groups.filter(
-                    (group) =>
-                      group.status === "PLANNED" &&
-                      group.occupied < group.capacity,
-                  ).length
-                }{" "}
-                grupos con cupo
-              </p>
             </li>
           ))}
         </ul>

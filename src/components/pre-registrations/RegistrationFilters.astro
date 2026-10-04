@@ -50,19 +50,21 @@ const { id, action, filter, courses, groups } = Astro.props;
       label: course.name,
     }))}
   />
-  <RegistrationSelect
-    client:load
-    id={`${id}-group`}
-    name="groupId"
-    label="Grupo"
-    value={filter.groupId ?? ""}
-    required={false}
-    placeholder="Todos los grupos"
-    options={groups.map((group, index) => ({
-      value: group.id,
-      label: `${group.groupName ?? `Grupo ${index + 1}`} · ${formatDate(group.startsAt)}`,
-    }))}
-  />
+  <div data-group-filter>
+    <RegistrationSelect
+      client:load
+      id={`${id}-group`}
+      name="groupId"
+      label="Grupo"
+      value={filter.groupId ?? ""}
+      required={false}
+      placeholder="Todos los grupos"
+      options={groups.map((group, index) => ({
+        value: group.id,
+        label: `${group.groupName ?? `Grupo ${index + 1}`} · ${formatDate(group.startsAt)}`,
+      }))}
+    />
+  </div>
   <RegistrationSelect
     client:load
     id={`${id}-membership`}
@@ -93,6 +95,7 @@ const { id, action, filter, courses, groups } = Astro.props;
   <input type="hidden" name="pageSize" value={filter.pageSize} />
   <button
     type="submit"
+    data-filter-submit
     class={buttonVariants({
       variant: "outline",
       className: "min-h-11 self-end",

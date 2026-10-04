@@ -53,9 +53,15 @@ test("ADMIN settings save stays in place, reports conflicts, and restores only t
   await withIsolatedSettings(async (snapshot) => {
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     await page.goto("/app/configuracion");
-    const form = page.locator("[data-registration-settings-form]");
+    const form = page.locator("[data-registration-settings-form]").filter({
+      has: page.getByLabel("Descuento para auxiliares elegibles", {
+        exact: true,
+      }),
+    });
     await expect(form).toHaveJSProperty("noValidate", true);
-    const minimum = form.getByLabel("Pago mínimo para confirmar inscripción");
+    const minimum = page.getByLabel("Pago mínimo para confirmar inscripción", {
+      exact: true,
+    });
     const auxiliary = form.getByLabel("Descuento para auxiliares elegibles");
     const savedMinimum = await minimum.inputValue();
     const savedAuxiliary = await auxiliary.inputValue();
@@ -65,18 +71,25 @@ test("ADMIN settings save stays in place, reports conflicts, and restores only t
     );
     const revision = await form.locator('[name="revision"]').inputValue();
     const nextAuxiliary = savedAuxiliary === "100" ? "99" : "100";
+    await page
+      .getByRole("button", {
+        name: "Editar descuento para auxiliares elegibles",
+      })
+      .click();
     await auxiliary.fill(nextAuxiliary);
     const submit = form.getByRole("button", {
-      name: "Guardar configuración",
+      name: "Guardar",
       exact: true,
     });
     await expect(submit).toBeEnabled();
     await submit.click();
     await expect(auxiliary).toHaveValue(nextAuxiliary);
-    await expect(submit).toBeDisabled();
     await expect(
-      page.getByText("Configuración guardada.", { exact: true }),
-    ).toBeVisible();
+      page.getByRole("button", {
+        name: "Editar descuento para auxiliares elegibles",
+      }),
+    ).toBeFocused();
+    await expect(minimum).toHaveValue(savedMinimum);
 
     const response = await page.request.post("/app/configuracion", {
       headers: {
@@ -110,11 +123,15 @@ test("settings POST remains usable without JavaScript and preserves the starting
       await signInFixture(context, AUTH_FIXTURES.admin.email);
       const page = await context.newPage();
       await page.goto("/app/configuracion");
-      const form = page.locator("[data-registration-settings-form]");
+      const form = page.locator("[data-registration-settings-form]").filter({
+        has: page.getByLabel("Descuento para auxiliares elegibles", {
+          exact: true,
+        }),
+      });
       const auxiliary = form.getByLabel("Descuento para auxiliares elegibles");
       const next = (Number(await auxiliary.inputValue()) + 1) % 101;
       await auxiliary.fill(String(next));
-      await form.getByRole("button", { name: "Guardar configuración" }).click();
+      await form.getByRole("button", { name: "Guardar", exact: true }).click();
       await expect(page).toHaveURL(/\/app\/configuracion\?success=saved$/u);
       await expect(
         page.getByText("Configuración guardada.", { exact: true }),
