@@ -1,6 +1,6 @@
 # Demo financiero append-only (Fase 5)
 
-Herramienta manual independiente: `scripts/financial-demo.ts`. **No se ejecuta en deploy**, no sustituye `renew-demo.ts` (que permanece local-only), no migra ni resetea bases. Su aplicación local/canónica/cloud queda pendiente de autorización coordinada después del release y gate combinado.
+Herramienta manual independiente: `scripts/financial-demo.ts`. **No se ejecuta en deploy**, no sustituye `renew-demo.ts` (que permanece local-only), no migra ni resetea bases. El usuario ya autorizó la carga demo de producción después del release y gate combinado; su ejecución queda pendiente de esa coordinación y de los prerrequisitos técnicos, no de una nueva autorización genérica. Esta integración en `development` no ejecuta la carga local/canónica/cloud ni adelanta el release.
 
 ## Preparación y PLAN
 
