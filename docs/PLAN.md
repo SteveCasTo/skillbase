@@ -466,7 +466,7 @@ Parte del alcance de Fase 4 fue anticipada: la gestión de grupos indicada como 
 - [x] Implementar login email/password junto con Google para usuarios internos, cambios/recovery de password y asociación Google explícita desde perfil.
 - [x] Implementar creación y edición administrativa de perfiles/cuentas INSTRUCTOR, con credencial solo en Supabase Auth y compensación ante fallo de persistencia interna.
 - [x] Gestionar cambio de instructor sujeto a calendario, validación de fechas ya iniciadas y conflictos de horario entre cursos.
-- En PR 126 no existía acción de baja; la corrección implementada en la rama fuente define la política y el control. Ver «Correcciones solicitadas antes de iniciar Fase 5»; todavía no afirmar integración/release desde este registro.
+- PR 126 no incluía baja; lifecycle y política correctiva se implementaron y se integraron en `development` mediante PRs 134/136. No se atribuye esa corrección a `master`/producción.
 - [ ] Gestionar reemplazo por feriados cuando existan sesiones y calendario operativo (Fase 6).
 - [x] Permitir expresar preferencia de grupo en Fase 3; asignar inscritos a grupos en Fase 5, sin tratar la preferencia como asignación.
 
@@ -479,7 +479,7 @@ Parte del alcance de Fase 4 fue anticipada: la gestión de grupos indicada como 
 - Un curso tiene un único instructor asignado; la asignación es global al curso y la heredan todos sus grupos. Se elimina el nombre libre como fuente de identidad al completar el flujo.
 - Se puede cambiar el instructor de un curso publicado antes del inicio oficial del curso; desde el inicio, el cambio queda bloqueado. El servidor es autoritativo y se conservan reglas existentes de retiro/archivo e historial/auditoría.
 - Conflictos se comprueban para el mismo instructor entre cursos con calendario L–V que coincida en fecha y hora civil `America/La_Paz`; intervalos semiabiertos permiten turnos contiguos. Las escrituras concurrentes de asignaciones, cambios de fechas, creación/cambio de horario de grupos, estado y publicación deben compartir una estrategia transaccional de serialización para evitar carreras.
-- El perfil usado mantiene identidad estable e historial y no se borra físicamente. El bloqueo por asignaciones no archivadas y desactivación solo cuando no queden tales cursos está implementado en la rama de correcciones; PR 126 histórico no lo incluía.
+- El perfil con historial mantiene identidad estable y no se borra físicamente. El bloqueo por asignaciones no archivadas y la desactivación solo cuando no queden tales cursos se implementaron mediante PRs 134/136; PR 126 histórico no lo incluía.
 
 PR 120 implementó e integró a `development` perfiles profesionales con ID estable, alta/edición, asignación a curso, ownership de `/app/mis-cursos`, guardas ADMIN/INSTRUCTOR y verificación de conflictos. PR 121 añadió y aplicó en local el seed/reset de demo. PR 122 añadió `PASSWORD_CHANGED` sin credenciales a `audit_events`. PR 123 reparó el guard de borrado de formatos con migración 0015 forward-only. No hay campo de descripción; el email del perfil es de solo lectura al editar. La publicación exige instructor registrado y `ACTIVE`, mientras que un borrador puede quedar sin asignar. Se conserva `instructor_name` histórico sin backfill automático; en cursos asignados el nombre completo deriva del perfil.
 
@@ -566,17 +566,32 @@ Administración transforma demanda en grupos operativos.
 - Gestionar cambios de grupo y devoluciones en esta fase; no duplicar estas operaciones en Fase 3.
 - Generar listados administrativos.
 
-### Estado Fase 5 (2026-10-02; foundation en curso, features NO implementadas)
+### Estado Fase 5 (2026-10-04; workflows implementados/validados en development, release pendiente)
 
-El usuario autorizó el orden de trabajo: correcciones de Fase 4, gate completo y después iniciar Fase 5. Las correcciones/gate están cerrados e integrados en `development` mediante PR 136; por tanto queda autorizado y en curso el trabajo fundacional de Fase 5 (contratos compartidos, dominio y diseño del schema). Ningún flujo funcional de Fase 5 se marca implementado todavía. La orquestación usa subagentes mínimos y PRs hacia `development`; promoción a `master` solo después de un milestone completo y todos sus checks PASS. Esta actualización es documental, no añade código/schema.
+Las correcciones y el gate completo de Fase 4 se integraron mediante PR 136. PRs 173–179 integraron schema/dominio/persistencia transaccional, settings, exportes y rutas HTTP/de roster de Fase 5 en `development`. La migración 0017 está aplicada solo en Supabase local (ledger 18); cloud/master siguen en Fase 4. El full E2E canónico de Fase 5 pasó 125/125; quality reportó 0 errores/0 warnings y 24 screenshots responsive/temas sin overflow. La implementación del milestone está validada localmente; el release/migración cloud de Fase 5 sigue pendiente.
 
-#### Alcance confirmado para Fase 5 (flows funcionales aún no implementados)
+El usuario autorizó continuar el trabajo fundacional e integración de Fase 5 bajo subagentes mínimos/PRs a `development`; los workflows/backend/UI integrados pasan su gate local, pero el release del milestone a `master` y su migración cloud están pendientes. Producción/cloud no se modificaron.
+
+#### Implementación integrada en development
+
+- [x] PR 173 (`512d5da`): dominio/base de participantes, preinscripciones presenciales, configuración, snapshots, recibos idempotentes y ledger; migración 0017 aplicada al Supabase local estándar (ledger 17→18), preservando datos preexistentes. Baseline local actual: seis cursos, 35 interesados y cero preinscripciones; no se insertaron fixtures financieros. Cloud permanece en 16.
+- [x] PR 174 (`2978dd0`): formulario/componentes para administrar porcentajes globales (mínimo 25 %, auxiliar 50 % por defecto) y revisión optimista; integrado en conjunto con su backend/HTTP en PR 178.
+- [x] PR 175 (`a21e466`): generadores server-side CSV/PDF; límite máximo 1000 registros, CSV con mitigación de fórmula, PDF con Noto Sans incrustado y licencia incluida. Las columnas implementadas son etiquetas curso/grupo, nombres/apellidos/CI, tipo, estado de membresía/estado financiero y montos snapshot (precio, pagado, saldo, devuelto y por devolver); no se agregan campos no aprobados.
+- [x] PR 176 (`8681387`): casos de uso/repositorio transaccional para alta/actualización, abonos, devoluciones, cancelación, cambio de grupo, cancelar grupo y roster; ownership/cupo/actor/snapshot/idempotencia se comprueban en servidor/DB.
+- [x] PR 177 (`2d4cf5d`): componentes UI reutilizables y corrección del formulario de ajustes. Reportó 291 unit, 125 integration y quality PASS; no representa validación E2E completa del flujo.
+- [x] PR 178 (`5215a50`): settings ADMIN singleton, page/form y handler SSR/POST/JSON en `/app/configuracion`; su middleware route policy se agregó en PR 179.
+- [x] PR 179 (`c78bb81`, merge `d13432d`): integra las rutas `/app/preinscripciones` (listado, `/nueva`, detalle y acciones), `/app/participantes`/detalle, búsqueda/prellenado, `/app/preinscripciones/exportar?format=CSV|PDF` y roster propio `/app/mis-cursos/[id]/grupos/[groupId]`; actualiza route policy ADMIN/INSTRUCTOR. Montos HTTP son texto decimal BOB, parseados a centavos en servidor; mutaciones responden con contratos discriminados de éxito/error. La UI reportó 34 pruebas dirigidas y 3 E2E focales PASS; la suite full canonical también pasó (registro abajo).
+- [x] Gate local reportado tras PR 179: 303 unit, 125 integration, 125/125 E2E canónico; quality con 0 errores/0 warnings y 24 screenshots en 375/768/1440 px, ambos temas, sin overflow. Una corrida inicial pasó 119/125 por fallos reales SSR 500/settings browser-only e hidración; se corrigieron y el full final pasó sin retries.
+- [x] Resultado final de `25890143` quedó integrado mediante PR 180 (`917a636`): 303 unit, 125 integration y full canonical E2E 125/125. La corrida inicial 119/125 expuso seis fallos SSR/settings/hidratación; el source se corrigió y la corrida final pasó sin retries. No quedan avisos de calidad en el resultado reportado.
+- [ ] Completar la promoción/release del milestone en `master` con los checks release y migración cloud autorizada. No afirmar producción actualizada hasta contar con esa evidencia.
+
+#### Alcance confirmado para Fase 5 (implementación end-to-end en development; sin release)
 
 - Participante global sin cuenta, identificado por CI único normalizado conservadoramente: quitar espacios externos, normalizar case/espacios y preservar ceros iniciales, letras y sufijos; no convertir a número ni imponer formato nacional/checksum. Ficha: nombre/apellidos, email requerido, teléfono opcional. Una preinscripción vigente por participante/curso; admite varios cursos. Sin escaneo ni verificación/checksum de CI.
 - Tipos `STUDENT`, `EXTERNAL`, `AUXILIARY` elegidos manualmente por ADMIN. `AUXILIARY` usa tarifa `STUDENT` menos 50 % inmediato; no se exige evidencia digital, categoría adicional ni certificado previo.
 - Configuración ADMIN global mínima: porcentaje entero de mínimo de pago (1–100 %, default 25 %) y porcentaje entero de descuento AUXILIARY (0–100 % inclusive, default 50 %). Solo afecta nuevas preinscripciones. Se guarda snapshot inmutable de precio/revisión del curso, tipo/base, porcentajes y montos en `BOB`, centavos enteros/decimal exacto, no `float`. Si el total final es positivo, primer pago mínimo = ceil al centavo del total final × mínimo. Si AUXILIARY aplica 100 % y total queda exactamente 0, permitir preinscripción gratis y eximir mínimo; conservar snapshot cero sin inventar pago.
 - Abonos positivos manuales en efectivo; no pasarela, comprobante subido, recibo ni boleta/valorado generados. No negativos ni sobrepago. Ledger auditable no destructivo con actor y timestamp de registro; fecha efectiva civil Bolivia puede ser pasada, nunca futura y por defecto hoy. No crear evento/abono de cero para la inscripción gratuita. Devolución registrada no significa transferencia ejecutada por la app y nunca supera lo realmente pagado; registro gratis sin pago no genera devolución monetaria.
-- Alta ordinaria solo para curso `PUBLISHED`, grupo `PLANNED` con cupo e instructor `ACTIVE`, hasta cierre inclusivo de ventana o inicio oficial si no hay ventana. ADMIN puede registrar durante el primer día civil solo con pago 100 %, destino elegible/cupo y auditoría; no hay altas en días posteriores por esta excepción. Zona `America/La_Paz`.
+- Alta ordinaria solo para curso `PUBLISHED`, grupo `PLANNED` con cupo e instructor `ACTIVE`, hasta cierre inclusivo de ventana o inicio oficial si no hay ventana. ADMIN puede registrar durante el primer día civil solo con el total cubierto (importe positivo: efectivo total; importe gratis: sin movimiento de pago), destino elegible/cupo y auditoría; no hay altas en días posteriores por esta excepción. Zona `America/La_Paz`.
 - La preinscripción permanece `PREINSCRITO` hasta el inicio aunque esté pagada. Al inicio y con saldo completo pasa a `INSCRITO`; saldo pendiente permanece `PREINSCRITO` durante el primer día y al cierre de ese día se marca `SALDOVENCIDO`, sin borrar, cancelar, liberar cupo o reembolsar automáticamente. ADMIN resuelve manualmente; esto no constituye actividad académica.
 - Cancelación voluntaria con devolución total de lo pagado solo hasta la fecha límite inclusiva. Cancelar grupo obliga a registrar devolución total de pagos de preinscritos afectados, sin límite por cutoff. Se preserva identidad/historial, con actor/monto/fecha/motivo; se libera cupo cuando corresponde. No se afirma ejecución bancaria, no hay refund por saldo vencido ni borrado físico.
 - Cambios de grupo solo dentro del mismo curso y hasta fecha límite, con destino activo/cupo; no hay cambio entre cursos. No se recalcula snapshot: grupos del mismo curso comparten tarifa/revisión. Origen, destino y cupo cambian atómicamente.
@@ -591,20 +606,21 @@ Instructor puede consultar en modo lectura sus grupos y roster desde el inicio o
 
 El alcance funcional quedó cerrado por confirmación del usuario. Descuento auxiliar configurable 0–100 % (default 50) sobre tarifa `STUDENT`; 100 % y total final cero permiten registrar una preinscripción gratuita sin crear un pago ficticio, y el mínimo se exime solo para total cero. Para todo importe positivo aplica el mínimo configurable 1–100 % (default 25) sobre total final, redondeado hacia arriba al centavo. Los snapshots y exclusión de retroactividad siguen vigentes. No queda pendiente esta pregunta de precio cero.
 
-El contrato aprobado habilita el trabajo fundacional ya en curso; no equivale a que el modelo físico o los flujos estén implementados. La verificación real de Google OAuth/recovery email permanece aplazada hasta el final de Fase 5; no se afirma Google local real ni SMTP propio.
+El contrato aprobado se implementó por etapas en development. La verificación real de Google OAuth/recovery email continúa como comprobación operacional externa antes del release; no se afirma Google OAuth real ni SMTP/delivery propia verificada.
 
 El registro público de interesados de Fase 3 no cobra ni ocupa cupo. La preinscripción presencial/pagada pertenece a esta fase conforme al alcance financiero de `docs/REQUIREMENTS.md`; no incluye pasarela, comprobantes subidos ni emisión automática de boleta.
 
-#### Validación a completar durante la implementación (pendiente)
+#### Validación de implementación (local PASS; release pendiente)
 
-- [ ] Tests unitarios para normalización CI, unicidad/vigencia, elegibilidad/ventanas, snapshots/precio/descuento, descuento AUXILIARY 100 %/registro gratuito sin pago ni refund ficticios, exención de mínimo solo en total cero, redondeo de centavos, estados y cancelación/devolución.
-- [ ] Tests de integración para constraints/migración, historial no destructivo, snapshots no retroactivos, ledger de abonos/devoluciones, autorización/RLS, trazabilidad del interesado-origen y concurrencia de cupos/cambios de grupo.
-- [ ] E2E administrativos de alta directa/prellenada, origen readonly, cupo, pagos parciales/completos, fecha límite/primer día, saldo vencido, cambio de grupo y cancelación/devolución. Verificar ADMIN-only, roster limitado del instructor y exportaciones seguras.
-- [ ] Completar unit e integración junto a la lógica; correr E2E colectivo tras estabilizar. No borrar tests ni rebajar assertions/cobertura. El gate final requiere suites, formatter, lint, typecheck, build y checks CI requeridos PASS antes de release.
+- [x] Cubrir normalización CI, unicidad/vigencia, elegibilidad/ventanas, snapshots/precio/descuento, AUXILIARY 100 %/gratis sin ledger de cero, mínimo/redondeo exacto, estados y cancelación/devolución en unit/integration.
+- [x] Cubrir schema/constraints, migración, historial, settings no retroactivos, ledger, autorización/RLS, origen interesado y concurrencia cupos/transferencias en integration.
+- [x] E2E admin de alta directa/prellenada, filtros/detalles, cupo, pagos, fecha límite/primer día, saldo vencido, transferencia y cancelación/devolución; revisar ADMIN-only, roster instructor mínimo y exportes.
+- [x] En el full canónico reportado: 303 unit, 125 integration y 125/125 E2E; quality 0 errores/0 warnings y 24 screenshots responsive/temas sin overflow. Sin commits de cobertura retirados ni reducciones de assertions para lograr verde.
+- [ ] Terminar el milestone con los checks requeridos del PR/release a `master`, migrar cloud de forma autorizada y verificar deployment. Los tests/validación local PASS no equivalen a release.
 
 ### Resultado demostrable
 
-Administración podrá mantener preinscripciones presenciales con persona global, pagos cuando corresponda, snapshots de tarifa/descuento, cupo y movimientos de cancelación/devolución. `INSCRITO` y `SALDOVENCIDO` no habilitan módulos académicos. Los flujos siguen pendientes de implementación; Fase 5 solo ha iniciado su trabajo fundacional.
+Administración puede gestionar en `development` preinscripciones presenciales con persona global, efectivo cuando corresponda, gratuidad aprobada, snapshots de tarifa/descuento, cupo y movimientos financieros/cancelación. Instructor consulta roster propio mínimo desde inicio. `INSCRITO` y `SALDOVENCIDO` no habilitan módulos académicos. El gate local canónico pasó; Fase 5 no se considera completada ni liberada hasta finalizar los checks/deploy de master y cloud.
 
 ## FASE 6 — SESIONES Y ASISTENCIA
 

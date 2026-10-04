@@ -147,17 +147,17 @@ La creación está disponible para cursos `DRAFT` o `PUBLISHED` con plan L–V y
 
 ### Participant
 
-Alcance conceptual confirmado de Fase 5 (todavía no implementado): persona global ADMIN, sin cuenta de acceso, no equivalente a un interesado público. CI es ID único normalizado con trim/case/espacios, preservando ceros, letras y sufijos; no cast numérico, formato nacional, checksum ni escaneo. Una persona puede tener una preinscripción vigente por curso y participar en varios cursos. CI no se expone al roster.
+Implementado parcialmente mediante migración 0017 (local, ledger 18; cloud sigue en ledger 16): persona global de administración sin cuenta Auth. CI es texto único tras trim, eliminación de whitespace y uppercase, preservando ceros iniciales, letras/sufijos; no cast numérico, validación de formato nacional, checksum ni escaneo documental. No es `InterestRegistration` ni se fusiona por email. Una persona puede tener una preinscripción activa por curso y otras en cursos distintos. CI no se expone al roster instructor.
 
 - id
-- names
-- lastNames
-- CI (identificador principal; formato pendiente)
+- firstName
+- lastName
+- ci (identificador único como texto normalizado)
 - email (requerido)
 - phone (nullable)
 - createdAt
 
-Nombre/apellidos y email requerido, más teléfono opcional, pertenecen a ficha global. El tipo `STUDENT`/`EXTERNAL`/`AUXILIARY` se decide por preinscripción; `AUXILIARY` aplica 50 % a tarifa `STUDENT` por elección ADMIN, sin evidencia adicional. Snapshot de precio/descuento pertenece al registro. No fusionar por email público no verificado.
+Nombre/apellidos y email requerido, más teléfono opcional, pertenecen a ficha global. CI/ email se normalizan como texto; CI es la clave de unicidad y no convierte a número. El tipo `STUDENT`/`EXTERNAL`/`AUXILIARY` se decide por preinscripción; `AUXILIARY` aplica la configuración global sobre tarifa `STUDENT`, sin evidencia adicional. El snapshot de precio/descuento pertenece a cada registro.
 
 ### InterestRegistration (Fase 3, implementado)
 
@@ -169,19 +169,19 @@ La migración `0011_interest_registrations.sql` añade el enum `interest_registr
 
 ### PreRegistration (presencial, Fase 5)
 
-En este proyecto el término se refiere a la preinscripción administrativa presencial que ocupa cupo; registra abonos efectivos cuando los hay y admite registro gratuito cuando el precio final calculado es cero por descuento AUXILIARY de 100 %. Puede iniciarse directamente o prellenarse desde un interesado de forma editable. La relación con ese registro debe ser explícita y trazable; no debe inferirse identidad global, pago ni equivalencia entre interesado y persona participante. Su modelo persistido aún está por definir; la lista histórica de `Participant`/`PreRegistration` no debe interpretarse como contrato vigente. La entidad no implica culminación académica.
+`pre_registrations` está implementada en migración 0017 y conserva `participant_id`, curso/grupo, revisión de tarifa, `source_interest_id` opcional (FK compuesta al mismo curso), estado persistido `ACTIVE`/`CANCELLED`, tipo, configuración/revisión y snapshot monetario, flag de excepción del primer día, actor creador y datos de cancelación/actor. Una unique parcial permite solo una ACTIVE por persona/curso. No se borra: historial cancelado se conserva; trigger impide borrar o mutar snapshot/identidad y congela estado/grupo/motivo una vez cancelado. `membershipStatus` (`PREINSCRITO`, `INSCRITO`, `SALDOVENCIDO`, `CANCELADO`) y estado financiero son valores derivados de registro, pagos, curso y reloj, no columnas de estado adicionales.
 
-Contrato conceptual confirmado, aún no schema: referencia `Participant`, curso y grupo; una sola vigente por persona/curso; `PREINSCRITO` hasta inicio oficial. Con saldo cubierto en inicio pasa a `INSCRITO`; con saldo pendiente conserva `PREINSCRITO` hasta cierre del primer día y pasa a `SALDOVENCIDO`, sin perder cupo ni cancelarse automáticamente. ADMIN resuelve después.
+La configuración singleton `registration_settings` guarda porcentajes enteros mínimos (1–100, default 25) y descuento auxiliar (0–100 inclusive, default 50), revisión, actor/fecha; afecta nuevas preinscripciones solamente. El precio aplicado queda como snapshot BOB en centavos, no float. Base AUXILIARY = tarifa STUDENT. El total con descuento se convierte a centavos con redondeo half-up; para total positivo el pago inicial alcanza `ceil(total × mínimo / 100)`. Total cero por AUXILIARY 100 % permite registro gratuito y exime mínimo, sin insertar abono cero.
 
-Conservar snapshot de revisión/precio de curso, tipo/base, porcentajes y montos aplicados. Configuración global ADMIN de porcentajes enteros: mínimo de 1–100 % (default 25 %) y descuento AUXILIARY de 0–100 % inclusivo (default 50 %); afecta solo registros nuevos. Precio y descuento de histórico nunca se recalculan. Para total positivo, el primer pago debe alcanzar el mínimo calculado sobre el total final con descuento, redondeando hacia arriba al centavo. Si el total final es exactamente cero por descuento auxiliar de 100 %, admite preinscripción gratuita y exime el mínimo; no se crea un pago/abono ficticio de cero. Cantidades monetarias BOB exactas, no float.
+`registration_ledger` almacena únicamente movimientos de efectivo positivos (`PAYMENT`/`REFUND`) con preinscripción, fecha efectiva civil Bolivia, actor, razón, receipt idempotente y `recorded_at`; la tabla tiene RLS, Data API grants revocados y trigger append-only. Fecha efectiva no puede ser futura respecto de la fecha Bolivia de registro. `registration_command_receipts` identifica comandos por actor + `request_key` único y fingerprint, guarda respuesta para reintentos idempotentes y es append-only. El servidor registra devoluciones, no ejecuta la transferencia; libre de pagos no produce refund monetario. `participants`, `pre_registrations`, `registration_settings`, command receipts y ledger tienen RLS y privilegios Data API revocados.
 
-Pagos positivos separados como ledger de abonos en efectivo; no crear movimientos de cero para registrar gratuidad. Fecha efectiva civil Bolivia permite pasado/no futuro, con hoy por defecto; actor y `recordedAt` aparte. Devoluciones se registran, no se liquidan bancariamente y no superan lo pagado; registro gratuito sin efectivo no genera refund. Cancelación voluntaria reembolsa total solo hasta cutoff; cancelación de grupo reembolsa total pagado independientemente del cutoff. No pasarela, evidencia upload, recibo o PDF de boleta.
+El prellenado desde `InterestRegistration` permite editar datos de participante; el origen se muestra read-only y se traza mediante `source_interest_id`, nunca se fusiona por email y no cambia métricas de intereses. Alta ordinaria exige curso publicado, instructor activo, grupo planificado y cupo; excepción ADMIN de primer día requiere pago completo y auditoría (registro gratuito no requiere pago cero). Cambio de grupo está limitado al mismo curso y cutoff, con transferencia atómica de ocupación; cancelar grupo genera devolución pendiente de lo efectivamente pagado, no una supuesta transferencia bancaria.
 
-El prellenado desde `InterestRegistration` es editable, pero el origen se muestra readonly y se conserva solo como traza interna; no hay control de vinculación ni fusión por correo. Las métricas de interés no cambian. Alta requiere curso publicado, instructor activo, grupo activo/cupo; excepción de primer día solo ADMIN, pago total, auditoría y cupo. Cambio de grupo limitado al mismo curso/cutoff, preserva precio snapshot; pagos/config/cancelaciones y movimiento entre dos cupos requieren consistencia transaccional. Mecanismo concreto es decisión de diseño posterior, ahora habilitado por el contrato cerrado en `docs/PLAN.md`.
+PR 179 integra rutas HTTP ADMIN de listado/alta/detalle/participante, búsqueda de interesado/participante, pagos/devoluciones/transfer/cancel, exportes y roster instructor. El roster DTO contiene solo nombre/apellidos del instructor asignado y no se consulta antes del inicio. CSV/PDF exportan curso/grupo, participante/CI, categoría, estados y montos financieros. Full local canonical E2E 125/125 PASS; release cloud/master permanece pendiente.
 
 ### Enrollment
 
-El boceto a continuación es histórico/no aprobado, no esquema implementado ni contrato de Fase 5. La definición vigente es `PreRegistration` arriba; debe reemplazarse por un diseño coherente de inscripciones y movimientos de pago/devolución conforme al contrato cerrado en `docs/PLAN.md`.
+El boceto `Enrollment`/`Refund`/`PaymentReference` a continuación es histórico/no aprobado y no corresponde a tablas actuales. El modelo implementado de Fase 5 usa `pre_registrations` y `registration_ledger`; no existen tablas separadas de enrollment, payment reference o refund.
 
 - id
 - participantId
