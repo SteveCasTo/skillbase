@@ -7,9 +7,19 @@ interface Props {
   settings: RegistrationSettings;
   action: string;
   errors?: Readonly<Record<string, string>>;
+  values?: Readonly<Record<string, string>>;
+  requestKey?: string;
+  staleConflict?: boolean;
 }
 
-const { settings, action, errors = {} } = Astro.props;
+const {
+  settings,
+  action,
+  errors = {},
+  values = {},
+  requestKey = crypto.randomUUID(),
+  staleConflict = false,
+} = Astro.props;
 const fields = [
   {
     name: "minimumPaymentPercent",
@@ -38,7 +48,12 @@ const fields = [
     auxiliaryDiscountPercent: settings.auxiliaryDiscountPercent,
   })}
 >
-  <input type="hidden" name="revision" value={settings.revision} />
+  <input
+    type="hidden"
+    name="revision"
+    value={values.revision ?? settings.revision}
+  />
+  <input type="hidden" name="requestKey" value={requestKey} />
   <p class="registration-settings-intro">
     Estos valores se aplican a nuevas preinscripciones. Los pagos y precios ya
     registrados no cambian.
@@ -57,7 +72,7 @@ const fields = [
             max="100"
             step="1"
             required
-            value={field.value}
+            value={values[field.name] ?? field.value}
             aria-describedby={`${field.name}-help ${field.name}-error`}
             aria-invalid={Boolean(errors[field.name])}
           />
@@ -84,9 +99,17 @@ const fields = [
     role="alert"
     hidden
   ></p>
+  <a
+    href="/app/configuracion"
+    data-settings-refresh
+    hidden={!staleConflict}
+    class="text-sm font-medium text-primary underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+  >
+    Recargar valores vigentes
+  </a>
   <button
     type="submit"
-    class={buttonVariants({ variant: "default" })}
+    class={buttonVariants({ variant: "default", className: "min-h-11" })}
     data-settings-submit
   >
     Guardar configuración
