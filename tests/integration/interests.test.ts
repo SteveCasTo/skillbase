@@ -293,15 +293,40 @@ test("interests administrative audited transitions are monotonic, stale-safe, ow
     .select()
     .from(auditEvents)
     .where(eq(auditEvents.entityId, initial.id));
-  expect(audit.map((row) => row.action)).toEqual([
-    "INTEREST_REGISTRATION_CANCELLED",
-    "INTEREST_REGISTRATION_REACTIVATED",
+  expect(
+    audit
+      .map((row) => ({
+        action: row.action,
+        actorId: row.actorId,
+        entityType: row.entityType,
+        entityId: row.entityId,
+        metadata: row.metadata,
+      }))
+      .sort((left, right) => left.action.localeCompare(right.action)),
+  ).toEqual([
+    {
+      action: "INTEREST_REGISTRATION_CANCELLED",
+      actorId: actor.id,
+      entityType: "INTEREST_REGISTRATION",
+      entityId: initial.id,
+      metadata: {
+        courseId: course.id,
+        fromStatus: "ACTIVE",
+        toStatus: "CANCELLED",
+      },
+    },
+    {
+      action: "INTEREST_REGISTRATION_REACTIVATED",
+      actorId: actor.id,
+      entityType: "INTEREST_REGISTRATION",
+      entityId: initial.id,
+      metadata: {
+        courseId: course.id,
+        fromStatus: "CANCELLED",
+        toStatus: "ACTIVE",
+      },
+    },
   ]);
-  expect(audit[0]!.metadata).toEqual({
-    courseId: course.id,
-    fromStatus: "ACTIVE",
-    toStatus: "CANCELLED",
-  });
   await expect(
     repo.mutate(
       course.id,

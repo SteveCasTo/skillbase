@@ -1,4 +1,4 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, expect, test } from "bun:test";
 import { eq, sql } from "drizzle-orm";
 import { createDatabase } from "@/server/db/client";
 import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
@@ -15,17 +15,23 @@ const database = createDatabase(getTestSupabaseEnvironment().databaseUrl, {
 const db = database.db;
 let now = new Date("2099-02-01T12:00:00.000Z");
 const repository = createRegistrationRepository(db, () => now);
-afterAll(async () => {
-  // Only this isolated test suite's synthetic financial tables; never bypass append-only triggers.
-  await db.execute(
-    sql`truncate registration_ledger, registration_command_receipts, pre_registrations, participants restrict`,
-  );
+async function restoreSettingsDefaults() {
+  // db is created only after the runner-owned isolated stack guard above succeeds.
   await db.update(schema.registrationSettings).set({
     revision: 1,
     minimumPaymentPercent: 25,
     auxiliaryDiscountPercent: 50,
     updatedBy: null,
   });
+}
+beforeEach(restoreSettingsDefaults);
+afterEach(restoreSettingsDefaults);
+afterAll(async () => {
+  // Only this isolated test suite's synthetic financial tables; never bypass append-only triggers.
+  await db.execute(
+    sql`truncate registration_ledger, registration_command_receipts, pre_registrations, participants restrict`,
+  );
+  await restoreSettingsDefaults();
   await database.close();
 });
 async function fixture(capacity = 3) {
