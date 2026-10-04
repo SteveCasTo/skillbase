@@ -284,3 +284,9 @@ Este estado local no es evidencia de escritura en cloud. `master`/producción pe
 #### Validación de la fuente más reciente
 
 La fuente pre-port-fix completó unit 176, integration 98 y full E2E 119/119 (secuencia histórica en `docs/TESTING.md`). PR 135 reportó 177 unit, un test aislado de integración de puertos y quality/build PASS. Tras arreglar el warning/hidratación de middleware/password, el commit final `8735d676fe0d96e7230b4636efa8cb51045d1eca` (integrado por PR 136) pasó 178 unit, 98 integration, full E2E 120/120 y lint/format/typecheck/build/Drizzle/diff checks; sin avisos/errores de hidratación `Astro.session`/React. No se hizo deployment a `master`. La producción queda en PR 126 (`master` `598b1f`, ledger 16), sin nuevos cambios.
+
+## Fase 5: estado local y boundary cloud (2026-10-04)
+
+PRs 173–180 integraron schema/application/settings/export generators y páginas/route policy de preinscripción, participantes y roster en `development`; migración 0017 se aplicó únicamente al Supabase local estándar, cuyo ledger pasó a 18. La base preservó datos existentes (seis cursos/35 interesados, cero preinscripciones/ledger financiero). Los únicos cambios observados en el baseline fueron el ledger y el timestamp de login del usuario sintético del smoke. La validación final del commit `25890143` pasó 303 unit, 125 integration y full canonical E2E 125/125, más quality y revisión de 24 screenshots responsive/themes. Esto no equivale a CI/release cloud/master.
+
+Supabase cloud y `master` siguen en el release Fase 4: cloud ledger 16/migraciones hasta 0015, commit production `598b1f`. No se aplicó 0017 en cloud, no se hizo release ni se escribió configuración/provider ni se crearon datos financieros sintéticos. La verificación real de Google OAuth/allowlist local y delivery SMTP/recovery sigue diferida al final de Fase 5.
