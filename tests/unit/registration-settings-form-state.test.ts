@@ -80,8 +80,10 @@ test("valid initial values remain submittable without JavaScript baseline enhanc
   });
 });
 
-test("allows only one submission while the initial POST is pending", () => {
-  const allowSubmission = createPendingSubmitGuard();
-  expect(allowSubmission()).toBe(true);
-  expect(allowSubmission()).toBe(false);
+test("blocks duplicate submissions while pending and re-enables retry after failure", () => {
+  const submission = createPendingSubmitGuard();
+  expect(submission.begin()).toBe(true);
+  expect(submission.begin()).toBe(false);
+  submission.reset();
+  expect(submission.begin()).toBe(true);
 });
