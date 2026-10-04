@@ -12,6 +12,12 @@ export const PRIVATE_ROUTE_POLICIES = {
   "/app/formatos": { access: "ROLES", roles: ["ADMIN"] },
   "/app/formatos/nuevo": { access: "ROLES", roles: ["ADMIN"] },
   "/app/interesados": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/preinscripciones": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/preinscripciones/nueva": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/preinscripciones/buscar": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/preinscripciones/exportar": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/participantes": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/configuracion": { access: "ROLES", roles: ["ADMIN"] },
   "/app/perfil": { access: "ACTIVE_USER" },
   "/app/perfil/contrasena": { access: "ACTIVE_USER" },
   "/app/instructores": { access: "ROLES", roles: ["ADMIN"] },
@@ -40,6 +46,18 @@ export function getPrivateRoutePolicy(
       normalizedPath as keyof typeof PRIVATE_ROUTE_POLICIES
     ] ?? null;
   if (exact) return exact;
+  if (
+    /^\/app\/(?:preinscripciones|participantes)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+      normalizedPath,
+    )
+  )
+    return { access: "ROLES", roles: ["ADMIN"] };
+  if (
+    /^\/app\/mis-cursos\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\/grupos\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(
+      normalizedPath,
+    )
+  )
+    return { access: "ROLES", roles: ["INSTRUCTOR"] };
   if (
     /^\/app\/instructores\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\/editar$/iu.test(
       normalizedPath,

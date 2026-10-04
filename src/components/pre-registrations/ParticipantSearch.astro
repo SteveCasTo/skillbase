@@ -14,6 +14,7 @@ interface Props {
   chooseHrefs?: Readonly<Record<string, string>>;
   targetFormId?: string;
   error?: string;
+  chooseLabel?: string;
 }
 const {
   id,
@@ -25,12 +26,13 @@ const {
   chooseHrefs = {},
   targetFormId,
   error,
+  chooseLabel = "Usar datos",
 } = Astro.props;
 const rows = [
   ...participants.map((participant) => ({
     kind: "participant" as const,
     value: participant,
-    search: participant.ci,
+    search: `${participant.ci} ${participant.firstName} ${participant.lastName}`,
     title: `${participant.firstName} ${participant.lastName}`,
     description: `Ficha global · CI ${participant.ci}`,
   })),
@@ -58,8 +60,10 @@ const rows = [
 >
   <h2 class="text-lg font-semibold">Buscar persona</h2>
   <p class="text-sm text-muted-foreground">
-    Ficha global por CI; interesados de este curso por nombre o correo. El
-    correo no fusiona personas.
+    {courseId
+      ? "Ficha global por CI o nombre; interesados de este curso por nombre o correo."
+      : "Busca la ficha global por CI o nombre."}{" "}
+    El correo no fusiona personas.
   </p>
   <form
     method="get"
@@ -67,6 +71,7 @@ const rows = [
     class="flex min-w-0 flex-col gap-3 sm:flex-row"
     data-search-form
   >
+    {courseId && <input type="hidden" name="courseId" value={courseId} />}
     <label for={`${id}-query`} class="sr-only">
       CI, nombre o correo
     </label>
@@ -126,7 +131,7 @@ const rows = [
               className: "mt-3 min-h-11",
             })}
           >
-            Usar datos
+            {chooseLabel}
           </a>
         ) : (
           targetFormId && (

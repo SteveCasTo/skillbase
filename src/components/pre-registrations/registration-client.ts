@@ -6,7 +6,7 @@ import {
   registrationWindow,
   moneyFieldIssues,
 } from "./presentation";
-import { createRequestState } from "./request-state";
+import { createRequestState, requestFingerprint } from "./request-state";
 import { notifications } from "@/lib/notifications";
 import { bindMoneyInput } from "./money-input";
 
@@ -52,22 +52,28 @@ export function bindRegistrationMutation<T>(
     submit: (
       values: Readonly<Record<string, string>>,
     ) => Promise<SubmitResult<T>>;
-    onSuccess: (value: T) => void;
+    onSuccess: (value: T) => void | Promise<void>;
     successMessage: string;
   },
 ) {
   const keyInput = form.elements.namedItem("requestKey");
   if (!(keyInput instanceof HTMLInputElement))
     throw new Error("Missing requestKey");
-  const state = createRequestState(keyInput.value, () => crypto.randomUUID());
+  const state = createRequestState(
+    keyInput.value,
+    () => crypto.randomUUID(),
+    form.dataset.lastSubmitted
+      ? requestFingerprint(
+          JSON.parse(form.dataset.lastSubmitted) as Record<string, string>,
+        )
+      : undefined,
+  );
   const handler = async (event: SubmitEvent) => {
     // Validation listener cancels invalid submissions first.
     if (event.defaultPrevented) return;
     event.preventDefault();
     const values = readFormValues(form);
-    const payload = { ...values };
-    delete payload.requestKey;
-    const key = state.begin(JSON.stringify(payload));
+    const key = state.begin(requestFingerprint(values));
     if (!key) return;
     keyInput.value = key;
     form.dataset.pending = "true";
@@ -85,7 +91,7 @@ export function bindRegistrationMutation<T>(
       control.disabled = true;
     });
     const button = form.querySelector<HTMLButtonElement>(
-      'button[type="submit"]',
+      'button[type="submit"], button[data-cancel-trigger]',
     );
     const label = button?.textContent ?? "Guardar";
     if (button) button.textContent = "Registrando…";
@@ -94,7 +100,7 @@ export function bindRegistrationMutation<T>(
     try {
       const result = await adapter.submit({ ...values, requestKey: key });
       if (result.ok) {
-        adapter.onSuccess(result.value);
+        await adapter.onSuccess(result.value);
         notifications.success({ id: toastId, title: adapter.successMessage });
       } else {
         showFormIssues(form, { ...result.issues, form: result.message });

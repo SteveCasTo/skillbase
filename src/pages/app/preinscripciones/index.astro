@@ -1,0 +1,200 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import RegistrationList from "@/components/pre-registrations/RegistrationList.astro";
+import RegistrationFilters from "@/components/pre-registrations/RegistrationFilters.astro";
+import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { requireInternalUser } from "@/server/auth/context";
+import { listRegistrations } from "@/application/pre-registrations/manage-registrations";
+import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
+import { loadRegistrationChoices } from "@/server/pre-registrations/loaders";
+import {
+  parseRegistrationFilter,
+  registrationFailure,
+  registrationJson as jsonResponse,
+} from "@/server/pre-registrations/http";
+import type {
+  RegistrationPageDto,
+  RegistrationFormDto,
+  RegistrationFilter,
+} from "@/domain/pre-registrations/types";
+void jsonResponse; // Astro checker omits imported references in returned responses.
+if (Astro.request.method !== "GET")
+  return new Response(null, {
+    status: 405,
+    headers: { Allow: "GET", "Cache-Control": "private, no-store" },
+  });
+Astro.response.headers.set("Cache-Control", "private, no-store");
+const actor = requireInternalUser(Astro.locals);
+const fragment = Astro.request.headers.get("X-Registration-Fragment") === "1";
+let page: RegistrationPageDto | null = null;
+let forms: readonly RegistrationFormDto[] = [];
+let filter: RegistrationFilter = { page: 1, pageSize: 20 };
+let message = "";
+try {
+  filter = parseRegistrationFilter(Astro.url.searchParams);
+  [page, forms] = await Promise.all([
+    listRegistrations(createRegistrationRepository(), actor, filter),
+    loadRegistrationChoices(actor),
+  ]);
+} catch (error) {
+  const failure = registrationFailure(error);
+  Astro.response.status = failure.status;
+  message = failure.payload.message;
+  if (fragment) return jsonResponse(failure.payload, failure.status);
+}
+const selectedForm = forms.find((form) => form.course.id === filter.courseId);
+const courseLabels = Object.fromEntries(
+  forms.map((form) => [form.course.id, form.course.name]),
+);
+const groupLabels = Object.fromEntries(
+  forms.flatMap((form) =>
+    form.groups.map((group) => [group.id, group.groupName ?? group.id]),
+  ),
+);
+const query = new URLSearchParams(Astro.url.searchParams);
+query.delete("format");
+const exportHref = (format: string) =>
+  `/app/preinscripciones/exportar?${new URLSearchParams([...query, ["format", format]])}`;
+const previous = new URLSearchParams(query);
+previous.set("page", String(filter.page - 1));
+const next = new URLSearchParams(query);
+next.set("page", String(filter.page + 1));
+---
+
+{fragment ? (
+  <div data-registration-list-region>
+    {page && (
+      <>
+        <RegistrationFilters
+          id="registration-filters"
+          action="/app/preinscripciones"
+          {filter}
+          courses={forms.map((form) => form.course)}
+          groups={selectedForm?.groups ?? []}
+        />
+        <RegistrationList
+          {page}
+          {courseLabels}
+          {groupLabels}
+          detailHrefs={Object.fromEntries(
+            page.items.map((row) => [
+              row.id,
+              `/app/preinscripciones/${row.id}`,
+            ]),
+          )}
+          csvHref={exportHref("CSV")}
+          pdfHref={exportHref("PDF")}
+        />
+        <nav aria-label="Páginas" class="mt-5 flex flex-wrap gap-5">
+          {filter.page > 1 && (
+            <a
+              href={`/app/preinscripciones?${previous}`}
+              class="min-h-11 underline"
+            >
+              Anterior
+            </a>
+          )}
+          {filter.page * filter.pageSize < page.total && (
+            <a
+              href={`/app/preinscripciones?${next}`}
+              class="min-h-11 underline"
+            >
+              Siguiente
+            </a>
+          )}
+        </nav>
+      </>
+    )}
+  </div>
+) : (
+  <PrivateLayout title="Preinscripciones">
+    <header class="mb-8 flex flex-wrap items-start justify-between gap-5">
+      <div>
+        <h1 class="text-3xl font-semibold tracking-tight">Preinscripciones</h1>
+        <p class="mt-3 text-muted-foreground">
+          Cupos, efectivo recibido y devoluciones por curso.
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <a
+          href="/app/participantes"
+          class={buttonVariants({ variant: "outline" })}
+        >
+          Participantes
+        </a>
+        <a href="/app/preinscripciones/nueva" class={buttonVariants()}>
+          Registrar preinscripción
+        </a>
+      </div>
+    </header>
+    {message ? (
+      <RegistrationPageError
+        {message}
+        retryHref={Astro.url.pathname + Astro.url.search}
+      />
+    ) : (
+      page && (
+        <div data-registration-list-region>
+          <RegistrationFilters
+            id="registration-filters"
+            action="/app/preinscripciones"
+            {filter}
+            courses={forms.map((form) => form.course)}
+            groups={selectedForm?.groups ?? []}
+          />
+          <RegistrationList
+            {page}
+            {courseLabels}
+            {groupLabels}
+            detailHrefs={Object.fromEntries(
+              page.items.map((row) => [
+                row.id,
+                `/app/preinscripciones/${row.id}`,
+              ]),
+            )}
+            csvHref={exportHref("CSV")}
+            pdfHref={exportHref("PDF")}
+          />
+          <nav aria-label="Páginas" class="mt-5 flex flex-wrap gap-5">
+            {filter.page > 1 && (
+              <a
+                href={`/app/preinscripciones?${previous}`}
+                class="min-h-11 underline"
+              >
+                Anterior
+              </a>
+            )}
+            {filter.page * filter.pageSize < page.total && (
+              <a
+                href={`/app/preinscripciones?${next}`}
+                class="min-h-11 underline"
+              >
+                Siguiente
+              </a>
+            )}
+          </nav>
+        </div>
+      )
+    )}
+    <p
+      data-registration-page-error
+      role="alert"
+      class="mt-5 text-sm text-destructive empty:hidden"
+    ></p>
+    <div
+      data-registration-list-loading
+      hidden
+      aria-label="Cargando preinscripciones"
+      class="mt-5 grid gap-4 sm:grid-cols-2"
+    >
+      <div class="h-44 rounded-xl bg-muted"></div>
+      <div class="h-44 rounded-xl bg-muted"></div>
+    </div>
+  </PrivateLayout>
+)}
+<script>
+  import { initializeRegistrationHttp } from "@/components/pre-registrations/http-client";
+  initializeRegistrationHttp();
+  document.addEventListener("astro:page-load", initializeRegistrationHttp);
+</script>

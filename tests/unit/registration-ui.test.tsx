@@ -15,6 +15,7 @@ import { cashFormState } from "@/components/pre-registrations/cash-state";
 import {
   createLatestSearch,
   createRequestState,
+  requestFingerprint,
 } from "@/components/pre-registrations/request-state";
 import type {
   AdminRegistrationDto,
@@ -365,6 +366,31 @@ describe("registration component presentation", () => {
   });
 });
 describe("registration client concurrency", () => {
+  test("SSR error retry keeps its key but an edited submitted payload rotates it", () => {
+    const submitted = {
+      amount: "25.50",
+      revision: now,
+      requestKey: "original",
+    };
+    const state = createRequestState(
+      "original",
+      () => "changed",
+      requestFingerprint(submitted),
+    );
+    expect(
+      state.begin(
+        requestFingerprint({
+          revision: now,
+          amount: "25.50",
+          requestKey: "ignored",
+        }),
+      ),
+    ).toBe("original");
+    state.finish();
+    expect(
+      state.begin(requestFingerprint({ ...submitted, amount: "25.51" })),
+    ).toBe("changed");
+  });
   test("blocks duplicates pending, reuses retry key and rotates on changed payload only", () => {
     let calls = 0;
     const state = createRequestState("original", () => `new-${++calls}`);
