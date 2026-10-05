@@ -13,10 +13,13 @@ La migración es `0019_phase6_attendance`, posterior a `0018_optional_payment_re
 Las seis tablas nuevas tienen RLS y grants Data API revocados. Las referencias
 están indexadas; roster y command receipts son append-only. El guard de sesión
 protege duración/revisión de formato, grupo del reemplazo y timestamps originales.
-Backend, UI y runner demo están integrados en `development` mediante PRs 201–203.
+Backend, UI y runner demo están integrados en `development` mediante PRs 201–203;
+los cambios posteriores de consistencia/pruebas están en PRs 204–205 y 207–209.
 Supabase local canónico aplicó 0018/0019 sin reset y quedó en ledger 20,
 preservando 53 tablas. Cloud/`master` permanecen en Fase 5/ledger 18; 0019
-no se ha aplicado en cloud y falta el gate combinado final/release.
+no se ha aplicado en cloud. El E2E 126/127 y la revalidación focal 1/1 del
+locator corregido son ejecuciones separadas, no un solo full run 127/127;
+revisión visual y cierre coordinado del gate/release siguen pendientes.
 
 ## Casos de uso para UI y loaders
 

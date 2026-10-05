@@ -640,7 +640,7 @@ El detalle UX se mantiene en `docs/DESIGN.md`, las reglas de secretos/demo en `d
 
 ### Estado (integrada en development; gate final/release pendientes)
 
-PR 201 integró dominio/aplicación y migraciones 0018/0019; PR 202 añadió runner de demo con asistencia opcional; PR 203 integró páginas y UI. `development` actual es `6813a4c`. El Supabase local quedó en ledger 20 tras aplicar 0018/0019, preservando las 53 tablas del baseline. Cloud/`master` siguen en Fase 5, ledger 18. No declarar release ni aplicación de 0019 en cloud.
+PRs 201–203 integraron dominio, migraciones, demo y UI; PRs 204–205 corrigieron hallazgos de validación/consistencia y PRs 207–209 ajustaron pruebas focales. El último `development` observado es `082dbbf`; la aplicación validada por gate corresponde a `b681a365`. El Supabase local quedó en ledger 20 tras aplicar 0018/0019, preservando las 53 tablas del baseline. Cloud/`master` siguen en Fase 5, ledger 18. No declarar release ni aplicación de 0019 en cloud.
 
 El módulo incluye calendario de grupo/sesión, permisos ADMIN/INSTRUCTOR, asistencia del roster elegible, asistencia del instructor, revisiones administrativas de rosters históricos, reemplazos/cancelaciones y configuración del umbral. La implementación se describe en [`docs/ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md); esto no incluye evaluaciones, porcentajes ni certificados.
 
@@ -649,8 +649,11 @@ El módulo incluye calendario de grupo/sesión, permisos ADMIN/INSTRUCTOR, asist
 - [x] Implementar configuración independiente de ausencia consecutiva (default 3), estados Present/Absent/Excused y `PENDING` derivado. No existe porcentaje ni retraso/tardanza.
 - [x] Integrar páginas SSR/POST para ADMIN e INSTRUCTOR y edición autorizada; roster solo nombres, sin CI/email/finanzas para instructor.
 - [x] Integrar y ejecutar el generador de demo optativo para asistencia; APPLY confirmado contra `6813a4c`. Se agregaron 5 cursos, 10 grupos, 15 registros, 12 movimientos financieros, 28 sesiones, 16 marcas de participante y 4 del instructor; totales actuales 12 cursos, 23 grupos, 16 registros y 13 movimientos incluyen las filas previas preservadas. Sin operaciones de seed en producción.
-- [x] Añadir cobertura focal de backend, UI y runner; los resultados por PR no constituyen gate completo.
-- [ ] Completar el gate combinado final de milestone. Está en ejecución sobre un stack aislado congelado en `6813a4c`; aún no hay resultado global disponible.
+- [x] Añadir cobertura focal de backend, UI y runner. La cobertura combinada documentada no es un único full E2E verde: unit 332 e integration 137 PASS en `4b331ff9`; E2E 126/127 PASS en `b681a365`, con un fallo de strict locator en prueba sin JavaScript. Tras el cambio de test-only PR 209, el escenario afectado pasó en una corrida focal, sin retry; la evidencia combinada cubre los escenarios pero no se afirma full 127/127 en una sola ejecución.
+- [x] Pasar build, Drizzle y quality en `b681a365`; typecheck: cero errores, cero warnings y 204 hints. El backend mantuvo sus 12 unit y 12 integration focales PASS.
+- [x] Revalidar mediante PR 209 el locator del test sin JavaScript: un caso focal PASS, sin repetir la suite completa.
+- [ ] Completar revisión visual final responsive/accesible; no se afirma todavía evidencia visual final del milestone.
+- [ ] Cerrar el gate de milestone con la revisión visual y consolidar los resultados ya reportados, sin presentar las corridas combinadas como un único full E2E verde.
 - [ ] Promover a `master`, aplicar migraciones autorizadas a cloud y desplegar únicamente tras superar el gate final. Hasta entonces, cloud permanece en ledger 18.
 
 ### Objetivos
@@ -679,7 +682,7 @@ Las reglas siguientes describen el comportamiento integrado en `development`; no
 - El runner demo append-only aplicó localmente los fixtures descritos arriba sin reescribir historial ni modificar los 53 objetos/tablas previos. La carga demo de producción permanece autorizada solo después del gate/release y no se ha ejecutado.
 - La configuración SMTP cloud y local está aplicada sin exponer secretos; recepción de prueba local confirmada. Esto no verifica recovery end-to-end ni Google OAuth: el callback local actual `http://127.0.0.1:55321/auth/v1/callback` aún requiere autorización manual en Google Console.
 
-La suite de cada agente se limitará a pruebas focales de resultados observables; el gate full combinado se ejecutará una vez al final del milestone.
+Las pruebas focales descritas son resultados de sus respectivos heads. No se afirma un único full E2E 127/127; el cierre restante es revisión visual responsive/accesible y cierre coordinado del gate. No repetir suites completas por agente.
 
 ## FASE 7 — EVALUACIONES Y NOTAS
 
