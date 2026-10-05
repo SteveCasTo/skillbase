@@ -7,6 +7,29 @@ import { CourseDomainError } from "@/domain/courses/errors";
 type Database = PostgresJsDatabase<typeof schema>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
+/** Source group writes retain reservations awaiting recovery after group cancellation.
+ * Individual cancellations release time; replaced ancestors never reserve twice.
+ * This does not reactivate operative sessions or change their cancellation evidence.
+ */
+export function groupScheduleReservations(
+  group: { id: string; startsAt: Date; endsAt: Date },
+  sessions: readonly (typeof schema.groupSessions.$inferSelect)[],
+) {
+  const actual = sessions.filter((session) => session.groupId === group.id);
+  if (!actual.length) return [group];
+  const replaced = new Set(
+    actual.map((session) => session.replacementForSessionId),
+  );
+  return actual.filter(
+    (session) =>
+      !session.cancelledAt ||
+      (!replaced.has(session.id) &&
+        (session.cancellationReason === "Grupo cancelado" ||
+          session.cancellationReason ===
+            "Calendario generado para grupo ya cancelado")),
+  );
+}
+
 /** Gate precedes discovery and all row locks. Existing format writes also take this gate.
  * Sorted instructor locks precede the course row; no stale assignment can escape discovery.
  */
@@ -104,13 +127,7 @@ export async function instructorHasConflict(
     : [];
   const own =
     candidates ??
-    ownGroups.flatMap<
-      | typeof schema.groups.$inferSelect
-      | typeof schema.groupSessions.$inferSelect
-    >((g) => {
-      const actual = ownSessions.filter((r) => r.groupId === g.id);
-      return actual.length ? actual.filter((r) => !r.cancelledAt) : [g];
-    });
+    ownGroups.flatMap((g) => groupScheduleReservations(g, ownSessions));
   const others = await tx
     .select({
       id: schema.groups.id,
@@ -137,10 +154,9 @@ export async function instructorHasConflict(
           ),
         )
     : [];
-  const operative = others.flatMap((g) => {
-    const actual = otherSessions.filter((r) => r.groupId === g.id);
-    return actual.length ? actual.filter((r) => !r.cancelledAt) : [g];
-  });
+  const operative = others.flatMap((g) =>
+    groupScheduleReservations(g, otherSessions),
+  );
   return own.some((a) =>
     operative.some((b) => {
       // Actual sessions may be weekends; recurrence must retain its weekday constraint.
