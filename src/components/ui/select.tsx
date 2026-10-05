@@ -45,7 +45,7 @@ function SelectContent({
         sideOffset={4}
         collisionPadding={8}
         className={cn(
-          "bg-popover text-popover-foreground max-h-[var(--radix-select-content-available-height)] w-[var(--radix-select-trigger-width)] overflow-y-auto rounded-md border p-1 shadow-md",
+          "bg-popover text-popover-foreground z-50 max-h-[var(--radix-select-content-available-height)] w-[var(--radix-select-trigger-width)] overflow-y-auto rounded-md border p-1 shadow-md",
           className,
         )}
         {...props}
