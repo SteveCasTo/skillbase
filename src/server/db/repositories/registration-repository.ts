@@ -183,7 +183,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
     kind: "PAYMENT" | "REFUND",
     now: Date,
   ): { row: PendingCash; dto: LedgerEntryDto } {
-    const normalized = validateCashInput(input, now);
+    const normalized = validateCashInput(input, now, kind !== "PAYMENT");
     const id = randomUUID();
     const effectiveDate = validateCashEffectiveDate(
       normalized.effectiveDate,

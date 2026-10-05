@@ -212,10 +212,11 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
   const phoneForm = page
     .locator("form")
     .filter({ has: page.getByLabel("Teléfono (opcional)", { exact: true }) });
+  const phone = phoneForm.getByLabel("Teléfono (opcional)", { exact: true });
   await expect(
     phoneForm.getByRole("button", { name: "Guardar", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel("Teléfono (opcional)").fill("+591 70000000");
+  await phone.fill("+591 70000000");
   await phoneForm.getByRole("button", { name: "Guardar", exact: true }).click();
   await expect(
     page.getByRole("button", {
@@ -223,9 +224,7 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
       exact: true,
     }),
   ).toBeFocused();
-  await expect(page.getByLabel("Teléfono (opcional)")).toHaveValue(
-    "+591 70000000",
-  );
+  await expect(phone).toHaveValue("+591 70000000");
   await page.getByRole("link", { name: "Volver", exact: true }).click();
   const cancel = page.locator("#registration-cancel");
   await actions

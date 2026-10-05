@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { randomBytes } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, inArray } from "drizzle-orm";
+import { GroupError } from "@/domain/groups/rules";
 import { createClient } from "@supabase/supabase-js";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { createDatabase, withRequestDatabase } from "@/server/db/client";
@@ -211,12 +212,46 @@ test("competing cross-course schedule edits and reactivations cannot both occupy
   const cancelledC = await groups.cancel(cg.id, admin.id, cg.updatedAt);
   const dg = await groups.create(d.id, "08:00", 10, admin.id);
   const cancelledD = await groups.cancel(dg.id, admin.id, dg.updatedAt);
+  const beforeSessions = await database.db
+    .select()
+    .from(schema.groupSessions)
+    .where(inArray(schema.groupSessions.groupId, [cg.id, dg.id]))
+    .orderBy(schema.groupSessions.id);
+  expect(beforeSessions).toHaveLength(4);
+  expect(beforeSessions.every((row) => row.cancelledAt !== null)).toBe(true);
   const reactivations = await Promise.allSettled([
     groups.reactivate(cg.id, admin.id, cancelledC.updatedAt),
     groups.reactivate(dg.id, admin.id, cancelledD.updatedAt),
   ]);
   expect(reactivations.filter((r) => r.status === "fulfilled")).toHaveLength(1);
   expect(reactivations.filter((r) => r.status === "rejected")).toHaveLength(1);
+  const rejected = reactivations.find((r) => r.status === "rejected");
+  if (rejected?.status !== "rejected")
+    throw new Error("Expected schedule conflict");
+  expect(rejected.reason).toBeInstanceOf(GroupError);
+  expect(rejected.reason).toMatchObject({ code: "SCHEDULE_CONFLICT" });
+  const current = [...(await groups.list(c.id)), ...(await groups.list(d.id))];
+  expect(current.filter((row) => row.status === "PLANNED")).toHaveLength(1);
+  const loser = current.find((row) => row.status === "CANCELLED")!;
+  expect(loser).toEqual(loser.id === cg.id ? cancelledC : cancelledD);
+  expect(
+    await database.db
+      .select()
+      .from(schema.groupSessions)
+      .where(inArray(schema.groupSessions.groupId, [cg.id, dg.id]))
+      .orderBy(schema.groupSessions.id),
+  ).toEqual(beforeSessions);
+  const audits = await database.db
+    .select()
+    .from(schema.auditEvents)
+    .where(
+      and(
+        inArray(schema.auditEvents.entityId, [cg.id, dg.id]),
+        eq(schema.auditEvents.action, "GROUP_REACTIVATED"),
+      ),
+    );
+  expect(audits).toHaveLength(1);
+  expect(audits[0]?.entityId).not.toBe(loser.id);
 });
 test("ownership is applied to every course and group query and instructor has no mutation repository", async () => {
   const owned = await course(teacher.id, "2027-09-01");

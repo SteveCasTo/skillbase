@@ -62,7 +62,9 @@ test("ADMIN settings save stays in place, reports conflicts, and restores only t
     const minimum = page.getByLabel("Pago mínimo para confirmar inscripción", {
       exact: true,
     });
-    const auxiliary = form.getByLabel("Descuento para auxiliares elegibles");
+    const auxiliary = form.getByLabel("Descuento para auxiliares elegibles", {
+      exact: true,
+    });
     const savedMinimum = await minimum.inputValue();
     const savedAuxiliary = await auxiliary.inputValue();
     expect(savedMinimum).toBe(String(snapshot?.minimumPaymentPercent ?? 25));
@@ -128,7 +130,9 @@ test("settings POST remains usable without JavaScript and preserves the starting
           exact: true,
         }),
       });
-      const auxiliary = form.getByLabel("Descuento para auxiliares elegibles");
+      const auxiliary = form.getByLabel("Descuento para auxiliares elegibles", {
+        exact: true,
+      });
       const next = (Number(await auxiliary.inputValue()) + 1) % 101;
       await auxiliary.fill(String(next));
       await form.getByRole("button", { name: "Guardar", exact: true }).click();
