@@ -1,0 +1,93 @@
+---
+import type { AttendanceGroupDto } from "@/domain/attendance/types";
+import SessionCalendar from "./SessionCalendar";
+import { dateLabel, timeLabel, sessionLabels } from "./presentation";
+interface Props {
+  group: AttendanceGroupDto;
+  sessionBase: string;
+  id?: string;
+}
+const { group, sessionBase, id = "attendance-sessions" } = Astro.props;
+---
+
+<section aria-label="Sesiones del grupo" class="min-w-0">
+  <h2 class="mb-5 text-xl font-semibold">Sesiones</h2>
+  {group.sessions.length === 0 ? (
+    <p class="py-5 text-sm text-muted-foreground">
+      No hay sesiones disponibles.
+    </p>
+  ) : (
+    <div class="session-layout grid min-w-0 items-start gap-6">
+      <div data-session-calendar hidden>
+        <SessionCalendar
+          client:load
+          listId={id}
+          days={group.sessions.map((session) => session.civilDate)}
+        />
+      </div>
+      <ol id={id} class="flex min-w-0 flex-col divide-y rounded-xl border">
+        {group.sessions.map((session) => {
+          const original = group.sessions.find(
+            (row) => row.id === session.replacementForSessionId,
+          );
+          const replacement = group.sessions.find(
+            (row) => row.replacementForSessionId === session.id,
+          );
+          return (
+            <li data-session-day={session.civilDate} class="min-w-0">
+              <a
+                href={`${sessionBase}/${session.id}`}
+                class="flex min-h-11 min-w-0 flex-col gap-2 p-4 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring sm:p-5"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <h3 class="font-semibold">
+                    <time datetime={session.startsAt}>
+                      {dateLabel(session.startsAt)}
+                    </time>
+                  </h3>
+                  <span class="text-sm text-muted-foreground">
+                    {sessionLabels[session.status]}
+                  </span>
+                </div>
+                <p class="text-sm tabular-nums">
+                  {timeLabel(session.startsAt)}–{timeLabel(session.endsAt)}
+                </p>
+                {original && (
+                  <p class="text-sm text-muted-foreground">
+                    Recuperación de {dateLabel(original.startsAt)}
+                  </p>
+                )}
+                {replacement && (
+                  <p class="text-sm text-muted-foreground">
+                    Reprogramada para {dateLabel(replacement.startsAt)}
+                  </p>
+                )}
+                {session.administrativeReviewRequired && (
+                  <p class="text-sm text-muted-foreground">
+                    Revisión administrativa pendiente
+                  </p>
+                )}
+              </a>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  )}
+  {group.operationalEndsAt &&
+    new Date(group.operationalEndsAt) > new Date(group.officialEndsAt) && (
+      <p class="mt-4 text-sm text-muted-foreground">
+        Última sesión: {dateLabel(group.operationalEndsAt)}
+      </p>
+    )}
+</section>
+<style>
+  .session-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (min-width: 64rem) {
+    .session-layout[data-calendar-ready="true"] {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+  }
+</style>

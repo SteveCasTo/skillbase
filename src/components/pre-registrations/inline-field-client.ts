@@ -35,6 +35,11 @@ export function initializeInlineFields() {
       if (cancel) cancel.hidden = false;
       // Retain recoverable SSR errors and attempted input in its editor.
       const invalid =
+        Boolean(
+          form
+            ?.querySelector<HTMLElement>("[data-form-error]")
+            ?.textContent?.trim(),
+        ) ||
         Boolean(form?.querySelector('[aria-invalid="true"]')) ||
         Boolean(
           form?.dataset.lastSubmitted &&

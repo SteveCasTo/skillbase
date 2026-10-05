@@ -1,0 +1,188 @@
+---
+import type { AttendanceSessionDto } from "@/domain/attendance/types";
+import { buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import DatePicker from "@/components/ui/date-picker";
+import RegistrationActionDialog from "@/components/pre-registrations/RegistrationActionDialog";
+import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+import { durationLabel } from "./presentation";
+interface Props {
+  session: AttendanceSessionDto;
+  path: string;
+  failedOperation?: string | undefined;
+  values?: Readonly<Record<string, string>>;
+  errors?: Readonly<Record<string, string>>;
+  message?: string | undefined;
+}
+const {
+  session,
+  path,
+  failedOperation,
+  values = {},
+  errors = {},
+  message,
+} = Astro.props;
+const civil = instantToBoliviaCivil(new Date(session.startsAt));
+---
+
+<div class="flex flex-wrap gap-3" role="group" aria-label="Acciones de sesión">
+  <RegistrationActionDialog
+    client:load
+    targetId="attendance-replace-panel"
+    title="Reprogramar sesión"
+    description={`Duración: ${durationLabel(session)}.`}
+    initialOpen={failedOperation === "replace"}
+  />
+  {session.status !== "CANCELLED" && (
+    <RegistrationActionDialog
+      client:load
+      targetId="attendance-cancel-panel"
+      title="Cancelar sesión"
+      description="Se conserva el historial. No se puede deshacer."
+      destructive
+      initialOpen={failedOperation === "cancel"}
+    />
+  )}
+</div>
+{["replace", ...(session.status !== "CANCELLED" ? ["cancel"] : [])].map(
+  (operation) => {
+    const attempted = failedOperation === operation;
+    const current = attempted ? values : {};
+    return (
+      <section class="min-w-0">
+        <div id={`attendance-${operation}-panel`}>
+          <form
+            id={`attendance-${operation}`}
+            method="post"
+            action={`${path}?operation=${operation}`}
+            data-attendance-form
+            data-attendance-operation={operation}
+            data-baseline={JSON.stringify({
+              replacementDate: civil.slice(0, 10),
+              replacementTime: civil.slice(11, 16),
+              reason: "",
+            })}
+            data-last-submitted={attempted ? JSON.stringify(values) : undefined}
+            class="flex min-w-0 flex-col gap-4"
+          >
+            <input
+              type="hidden"
+              name="revision"
+              value={current.revision ?? session.revision}
+            />
+            <input
+              type="hidden"
+              name="requestKey"
+              value={current.requestKey ?? crypto.randomUUID()}
+            />
+            <h2 class="text-lg font-semibold">
+              {operation === "replace"
+                ? "Reprogramar sesión"
+                : "Cancelar sesión"}
+            </h2>
+            {operation === "replace" && (
+              <>
+                <DatePicker
+                  client:load
+                  id="attendance-replacement-date"
+                  name="replacementDate"
+                  label="Fecha de recuperación"
+                  value={current.replacementDate ?? civil.slice(0, 10)}
+                  required
+                  error={attempted ? errors.startsAt : undefined}
+                />
+                <div class="flex flex-col gap-2">
+                  <label
+                    for="attendance-replacement-time"
+                    class="text-sm font-medium"
+                  >
+                    Hora de inicio (Bolivia)
+                  </label>
+                  <Input
+                    id="attendance-replacement-time"
+                    name="replacementTime"
+                    type="time"
+                    required
+                    defaultValue={
+                      current.replacementTime ?? civil.slice(11, 16)
+                    }
+                    className="min-h-11"
+                    aria-describedby="attendance-startsAt-error"
+                    aria-invalid={attempted && Boolean(errors.startsAt)}
+                  />
+                  <p
+                    id="attendance-startsAt-error"
+                    data-field-error="replacementTime"
+                    role="alert"
+                    class="text-sm text-destructive empty:hidden"
+                  >
+                    {attempted ? errors.startsAt : ""}
+                  </p>
+                </div>
+              </>
+            )}
+            <div class="flex flex-col gap-2">
+              <label
+                for={`attendance-${operation}-reason`}
+                class="text-sm font-medium"
+              >
+                Motivo (opcional)
+              </label>
+              <Input
+                id={`attendance-${operation}-reason`}
+                name="reason"
+                maxLength={500}
+                defaultValue={current.reason ?? ""}
+                className="min-h-11"
+                aria-describedby={`attendance-${operation}-reason-error`}
+                aria-invalid={attempted && Boolean(errors.reason)}
+              />
+              <p
+                id={`attendance-${operation}-reason-error`}
+                data-field-error="reason"
+                role="alert"
+                class="text-sm text-destructive empty:hidden"
+              >
+                {attempted ? errors.reason : ""}
+              </p>
+            </div>
+            {operation === "cancel" && (
+              <label class="flex items-start gap-3 text-sm">
+                <input
+                  data-attendance-confirmation
+                  type="checkbox"
+                  required
+                  class="mt-1 size-5 accent-primary"
+                />
+                Confirmo la cancelación de esta sesión.
+              </label>
+            )}
+            <p
+              data-form-error
+              role="alert"
+              class="text-sm text-destructive empty:hidden"
+            >
+              {attempted ? message : ""}
+            </p>
+            <button
+              type="submit"
+              class={buttonVariants({
+                variant: operation === "cancel" ? "destructive" : "default",
+                className: "min-h-11 w-full sm:w-auto sm:self-start",
+              })}
+            >
+              {operation === "replace"
+                ? "Reprogramar sesión"
+                : "Confirmar cancelación"}
+            </button>
+          </form>
+        </div>
+      </section>
+    );
+  },
+)}
+<style>
+  :global([data-dialog-host] h2) {
+    display: none;
+  }
+</style>

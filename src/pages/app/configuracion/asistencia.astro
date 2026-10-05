@@ -1,0 +1,65 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import AttendanceSettingsForm from "@/components/attendance/AttendanceSettingsForm.astro";
+import { requireInternalUser } from "@/server/auth/context";
+import { getPublicAuthEnvironment } from "@/server/environment";
+import { getAttendanceRepository } from "@/server/attendance/service";
+import { attendanceJson, attendanceFailure } from "@/server/attendance/http";
+import { getAttendanceSettings } from "@/application/attendance/manage-attendance";
+import { submitAttendancePage } from "@/components/attendance/page-load";
+import type { AttendanceSettingsDto } from "@/domain/attendance/types";
+void attendanceJson;
+if (Astro.request.method === "GET")
+  return Astro.redirect("/app/configuracion", 303);
+if (Astro.request.method !== "POST")
+  return new Response(null, {
+    status: 405,
+    headers: { Allow: "GET, POST", "Cache-Control": "private, no-store" },
+  });
+const actor = requireInternalUser(Astro.locals),
+  repository = getAttendanceRepository();
+const result = await submitAttendancePage({
+  request: Astro.request,
+  actor,
+  repository,
+  siteUrl: getPublicAuthEnvironment().siteUrl,
+  operation: "settings",
+});
+const wantsJson = Astro.request.headers
+  .get("accept")
+  ?.includes("application/json");
+if (wantsJson) return attendanceJson(result.payload, result.status);
+if (result.payload.ok)
+  return Astro.redirect("/app/configuracion?success=attendance", 303);
+Astro.response.status = result.status;
+let settings: AttendanceSettingsDto | null = null;
+try {
+  settings = await getAttendanceSettings(repository, actor);
+} catch (error) {
+  Astro.response.status = attendanceFailure(error).status;
+}
+---
+
+<PrivateLayout title="Configuración">
+  <a
+    href="/app/configuracion"
+    class="min-h-11 text-sm underline underline-offset-4"
+  >
+    Configuración
+  </a>
+  <h1 class="mt-5 text-3xl font-semibold">Configuración</h1>
+  <div class="mt-8 rounded-xl border bg-card p-5 sm:p-7">
+    {settings ? (
+      <AttendanceSettingsForm
+        {settings}
+        values={result.values}
+        errors={result.payload.issues}
+        message={result.payload.message}
+      />
+    ) : (
+      <p role="alert" class="text-sm text-destructive">
+        {result.payload.message}
+      </p>
+    )}
+  </div>
+</PrivateLayout>
