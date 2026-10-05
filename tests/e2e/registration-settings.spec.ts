@@ -130,7 +130,9 @@ test("settings POST remains usable without JavaScript and preserves the starting
           exact: true,
         }),
       });
-      const auxiliary = form.getByLabel("Descuento para auxiliares elegibles");
+      const auxiliary = form.getByLabel("Descuento para auxiliares elegibles", {
+        exact: true,
+      });
       const next = (Number(await auxiliary.inputValue()) + 1) % 101;
       await auxiliary.fill(String(next));
       await form.getByRole("button", { name: "Guardar", exact: true }).click();
