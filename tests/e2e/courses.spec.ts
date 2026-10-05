@@ -817,8 +817,10 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(save).toBeDisabled();
   await markdown.selectText();
   await page.getByRole("button", { name: "Negrita" }).click();
+  await expect(markdown).toHaveValue(/\*\*/u);
   await expect(save).toBeEnabled();
   await markdown.fill("## Temario\n- Unidad uno");
+  await expect(markdown).toHaveValue("## Temario\n- Unidad uno");
   await expect(save).toBeDisabled();
   await expect(
     page.getByRole("textbox", {
@@ -982,7 +984,10 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   const prerequisite = await page.request.post(
     savePath.replace(/\/editar$/u, "/grupos"),
     {
-      headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
+      headers: {
+        Origin: new URL(page.url()).origin,
+        Accept: "application/json",
+      },
       form: { intent: "create", startTime: "08:00", capacity: "10" },
     },
   );

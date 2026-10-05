@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   applyMarkdownAction,
   type MarkdownAction,
@@ -38,6 +38,12 @@ export default function CourseMarkdownEditor({
 }: Props) {
   const [markdown, setMarkdown] = useState(value);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingSelection = useRef<{
+    start: number;
+    end: number;
+    scrollTop: number;
+    scrollLeft: number;
+  } | null>(null);
   const errorId = error ? "contentMarkdown-error" : undefined;
   const descriptionIds = [describedBy, errorId]
     .filter(
@@ -51,6 +57,17 @@ export default function CourseMarkdownEditor({
       new Event("course-form-change", { bubbles: true }),
     );
   }, [markdown]);
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current,
+      selection = pendingSelection.current;
+    if (!textarea || !selection) return;
+    pendingSelection.current = null;
+    // Commit the command's selection before a later edit can select/replace text.
+    textarea.focus();
+    textarea.setSelectionRange(selection.start, selection.end);
+    textarea.scrollTop = selection.scrollTop;
+    textarea.scrollLeft = selection.scrollLeft;
+  }, [markdown]);
 
   function format(action: MarkdownAction) {
     const textarea = textareaRef.current;
@@ -63,14 +80,13 @@ export default function CourseMarkdownEditor({
       selectionEnd,
       action,
     );
+    pendingSelection.current = {
+      start: edit.selectionStart,
+      end: edit.selectionEnd,
+      scrollTop,
+      scrollLeft,
+    };
     setMarkdown(edit.value);
-
-    window.requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.setSelectionRange(edit.selectionStart, edit.selectionEnd);
-      textarea.scrollTop = scrollTop;
-      textarea.scrollLeft = scrollLeft;
-    });
   }
 
   return (
