@@ -24,6 +24,33 @@ export function normalRegistrationOpen(
     now < (course.registrationEndAt ?? course.startsAt)
   );
 }
+/** Whether an administrator can currently choose this course for registration. */
+export function hasAvailableRegistrationDestination(
+  course: RegistrationCourseContext,
+  groups: readonly RegistrationGroupContext[],
+  now: Date,
+): boolean {
+  if (course.status !== "PUBLISHED" || !course.instructorActive) return false;
+  if (
+    !normalRegistrationOpen(course, now) &&
+    boliviaToday(course.startsAt) !== boliviaToday(now)
+  )
+    return false;
+
+  return groups.some((group) => {
+    try {
+      assertEligibleDestination(course, group);
+      return true;
+    } catch (error) {
+      if (
+        error instanceof RegistrationError &&
+        ["GROUP_UNAVAILABLE", "CAPACITY_EXCEEDED"].includes(error.code)
+      )
+        return false;
+      throw error;
+    }
+  });
+}
 export function assertEligibleDestination(
   course: RegistrationCourseContext,
   group: RegistrationGroupContext,
