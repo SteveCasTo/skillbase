@@ -72,6 +72,8 @@ El job de despliegue está condicionado explícitamente al evento push en `maste
 
 ## MIGRACIONES
 
+La carga demo de producción es una operación separada mediante `production-demo.yml`, **solo workflow_dispatch en master** y environment `production`, no un paso de deploy. Reutiliza `MIGRATION_DATABASE_URL` sin leer/exportar su valor, una clave servidor existente cifrada `DEMO_SUPABASE_SERVICE_ROLE_KEY` y el actor existente `DEMO_ADMIN_ID`. PLAN por defecto precede a APPLY explícito; respeta concurrencia sin cancelación, guards de proyecto/actor/provenance y todos los datos anteriores. No crea secretos de DB nuevos ni rota passwords, y no publica endpoints de seed/exfiltración. Operación y prerrequisitos en `docs/FINANCIAL_DEMO.md`.
+
 Las migraciones viven versionadas en Git.
 
 El job actual ejecuta `bunx drizzle-kit migrate` con `MIGRATION_DATABASE_URL` y detiene el despliegue si falla. Drizzle consulta el historial y aplica las migraciones versionadas que estén pendientes; no hay un paso separado de previsualización/verificación.

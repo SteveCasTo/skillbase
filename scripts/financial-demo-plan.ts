@@ -12,6 +12,34 @@ import { assertCanonicalLocalTarget } from "./renew-demo-plan";
 
 export const FINANCIAL_DEMO_OWNER = "skillbase-financial-demo-v1";
 export const PRODUCTION_PROJECT = "fvzxqlezdrlzykyoevub";
+/** Ordinary CI/Vercel remains forbidden; only the protected manual master workflow is admitted. */
+export function assertFinancialExecution(
+  environment: Readonly<Record<string, string | undefined>>,
+  approvedProductionOperator: boolean,
+  target: string,
+  project: string,
+): void {
+  if (!approvedProductionOperator) {
+    if (environment.CI || environment.VERCEL)
+      throw new Error("Manual operator execution only");
+    return;
+  }
+  if (
+    environment.VERCEL ||
+    environment.CI !== "true" ||
+    environment.GITHUB_ACTIONS !== "true" ||
+    environment.GITHUB_EVENT_NAME !== "workflow_dispatch" ||
+    environment.GITHUB_REF !== "refs/heads/master" ||
+    environment.GITHUB_REPOSITORY !== "SteveCasTo/skillbase" ||
+    environment.GITHUB_WORKFLOW_REF !==
+      "SteveCasTo/skillbase/.github/workflows/production-demo.yml@refs/heads/master" ||
+    !/^[a-f0-9]{40}$/u.test(environment.GITHUB_SHA ?? "") ||
+    environment.GITHUB_WORKFLOW_SHA !== environment.GITHUB_SHA ||
+    target !== "production" ||
+    project !== PRODUCTION_PROJECT
+  )
+    throw new Error("Protected production operator context required");
+}
 export function financialDemoId(key: string): string {
   const h = createHash("sha256")
     .update(`${FINANCIAL_DEMO_OWNER}:${key}`)

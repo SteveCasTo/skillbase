@@ -28,6 +28,7 @@ import { SEED_OWNER, teachers } from "./renew-demo-plan";
 import { getLocalSupabaseEnvironment } from "./supabase-local-env";
 import {
   assertFinancialTarget,
+  assertFinancialExecution,
   currentAnchor,
   financialDemoId,
   financialDemoPlan,
@@ -545,6 +546,7 @@ if (import.meta.main) {
       "--anchor",
       "--apply",
       "--attendance",
+      "--approved-production-operator",
     ]);
     const values = new Map<string, string>();
     let apply = false;
@@ -553,7 +555,11 @@ if (import.meta.main) {
       if (!allowed.has(key) || values.has(key) || (key === "--apply" && apply))
         throw new Error("Invalid arguments");
       if (key === "--apply") apply = true;
-      else if (key === "--attendance") values.set(key, "true");
+      else if (
+        key === "--attendance" ||
+        key === "--approved-production-operator"
+      )
+        values.set(key, "true");
       else {
         const value = args[++i];
         if (!value || value.startsWith("--"))
@@ -561,9 +567,13 @@ if (import.meta.main) {
         values.set(key, value);
       }
     }
-    if (process.env.CI || process.env.VERCEL)
-      throw new Error("Manual operator execution only");
     const target = values.get("--target") ?? "";
+    assertFinancialExecution(
+      process.env,
+      values.has("--approved-production-operator"),
+      target,
+      values.get("--project") ?? "",
+    );
     const url = process.env.DEMO_DATABASE_URL ?? "";
     const api = process.env.DEMO_SUPABASE_URL ?? "";
     assertFinancialTarget(target, url, api, values.get("--project") ?? "");
