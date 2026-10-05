@@ -1,6 +1,10 @@
 # Demo financiero append-only (Fase 5)
 
-Herramienta manual independiente: `scripts/financial-demo.ts`. **No se ejecuta en deploy**, no sustituye `renew-demo.ts` (que permanece local-only), no migra ni resetea bases. El usuario ya autorizó la carga demo de producción después del release y gate combinado; su ejecución queda pendiente de esa coordinación y de los prerrequisitos técnicos, no de una nueva autorización genérica. Esta integración en `development` no ejecuta la carga local/canónica/cloud ni adelanta el release.
+Herramienta manual independiente: `scripts/financial-demo.ts`. **No se ejecuta en deploy**, no sustituye `renew-demo.ts` (que permanece local-only), no migra ni resetea bases. El usuario autorizó la carga demo de producción después del release y gate combinado; aún no se ejecutó en cloud/producción. El APPLY local fue confirmado explícitamente después de integrar el código; el estado observado está acotado abajo.
+
+Estado: runner integrado en `development` (`6813a4c`); migraciones 0018/0019 aplicadas al local canónico (ledger 20), preservando 53 tablas previas. PLAN inspecciona destino/proyecto/provenance sin escribir. APPLY local confirmado, append-only: añadió 5 cursos, 10 grupos, 15 registros, 12 movimientos financieros, 28 sesiones, 16 marcas de participante y 4 marcas de instructor. Los totales actuales son 12 cursos, 23 grupos, 16 registros y 13 movimientos; incluyen registros previos preservados. Auth, perfiles, roles, sesiones, settings, Storage e historial financiero previo quedaron intactos. Cloud permanece en ledger 18 y no recibió seed.
+
+La muestra verifica pagos completos/parciales y registros gratuitos sin movimiento cero; saldo pendiente de devolución y devolución registrada; transferencia entre grupos y abono adicional. Para asistencia comprueba Presente/Ausente/Justificada, N=3 (aviso al llegar a 3; inelegibilidad a partir de 4 consecutivas), revisión histórica pendiente y roster explícito, sesión de hoy aún sin marca, cancelación y reemplazos de 90 minutos. No altera el código fuente de `6813a4c`; el gate combinado final continúa pendiente.
 
 ## Preparación y PLAN
 
@@ -97,4 +101,4 @@ bun test tests/unit/attendance-demo-plan.test.ts tests/unit/financial-demo-plan.
 bun scripts/test-attendance-demo.ts
 ```
 
-La integración dirigida usa únicamente su Supabase temporal propio, aplica 0018/0019 allí y comprueba PLAN sin escrituras, cuarentena de CI ajeno, rollback intermedio, estados/rachas reales, recuperación/cancelación/duración, idempotencia, cash/settings/usuarios/perfiles preservados y rechazo de replay tras una corrección administrativa. No crea identidades Auth, envía correo ni accede a puertos canónicos/cloud. El gate combinado completo queda para el cierre coordinado con UI; esta implementación no ejecuta ninguna carga canónica ni productiva.
+La integración dirigida usa únicamente su Supabase temporal propio, aplica 0018/0019 allí y comprueba PLAN sin escrituras, cuarentena de CI ajeno, rollback intermedio, estados/rachas reales, recuperación/cancelación/duración, idempotencia, cash/settings/usuarios/perfiles preservados y rechazo de replay tras una corrección administrativa. No crea identidades Auth, envía correo ni accede a puertos canónicos/cloud. Esta suite temporal es distinta del APPLY local confirmado arriba. El gate combinado completo queda para el cierre coordinado con UI; no se ejecutó carga productiva.
