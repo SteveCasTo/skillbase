@@ -93,6 +93,12 @@ son reales; una ausencia inferida tiene `inferred:true`, actor/fecha nulos.
 - Conflictos de instructor/grupo incluyen calendarios operativos y recurrencia
   de grupos todavía no materializados. Asignaciones/altas existentes usan la
   misma barrera y reconocen recuperaciones y cancelaciones.
+  Para escrituras del plan de grupos/asignaciones, un grupo `PLANNED` conserva
+  los intervalos cancelados por desactivación del grupo que aún esperan una
+  recuperación; reactivarlo no permite reservar simultáneamente otro grupo
+  incompatible. Cancelaciones individuales liberan su intervalo y ancestros
+  con recuperación vinculada no reservan de nuevo. El calendario operativo
+  sigue excluyendo toda sesión cancelada y no se restaura automáticamente.
 
 ## Configuración y elegibilidad
 

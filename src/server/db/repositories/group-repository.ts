@@ -19,6 +19,7 @@ import { instructorSchedulesOverlap } from "@/domain/instructors/schedule";
 import { AttendanceError } from "@/domain/attendance/rules";
 import {
   instructorHasConflict,
+  groupScheduleReservations,
   lockInstructorSchedules,
 } from "./instructor-schedule";
 
@@ -120,14 +121,16 @@ export class DrizzleGroupRepository implements GroupRepository {
       : [];
     if (
       existing.some((row) => {
-        const sessions = actual.filter((r) => r.groupId === row.id);
-        return sessions.length
-          ? sessions.some(
-              (r) =>
-                !r.cancelledAt &&
-                instructorSchedulesOverlap({ startsAt, endsAt }, r),
-            )
-          : overlaps(startsAt, endsAt, row.startsAt, row.endsAt);
+        return groupScheduleReservations(row, actual).some((reservation) =>
+          "ordinal" in reservation
+            ? instructorSchedulesOverlap({ startsAt, endsAt }, reservation)
+            : overlaps(
+                startsAt,
+                endsAt,
+                reservation.startsAt,
+                reservation.endsAt,
+              ),
+        );
       })
     )
       throw new GroupError(
