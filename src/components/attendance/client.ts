@@ -41,12 +41,19 @@ async function refreshSession(path: string, savedFormId?: string) {
           string
         >;
         const values = readFormValues(form);
+        const draftValue = (name: string) => {
+          const control = form.elements.namedItem(name);
+          return control instanceof HTMLInputElement ||
+            control instanceof HTMLSelectElement
+            ? control.value
+            : (values[name] ?? "");
+        };
         return {
           id: form.id,
           values: Object.fromEntries(
             Object.entries(baseline)
-              .filter(([name, value]) => values[name] !== value)
-              .map(([name]) => [name, values[name] ?? ""]),
+              .filter(([name, value]) => draftValue(name) !== value)
+              .map(([name]) => [name, draftValue(name)]),
           ),
         };
       });
@@ -164,6 +171,18 @@ export function initializeAttendanceForms() {
       form.dataset.attendanceBound = "true";
       form.noValidate = true;
       const update = () => {
+        if (form.dataset.attendanceOperation === "cancel") {
+          const choice = form.elements.namedItem("cancellationReasonChoice");
+          const holiday =
+            choice instanceof HTMLSelectElement && choice.value === "holiday";
+          const custom = form.querySelector<HTMLElement>(
+            "[data-cancellation-custom-reason]",
+          );
+          if (custom) custom.hidden = holiday;
+          const reason = form.elements.namedItem("reason");
+          if (reason instanceof HTMLInputElement)
+            reason.disabled = holiday || Boolean(form.dataset.pending);
+        }
         const result = state(form);
         const submit = form.querySelector<HTMLButtonElement>(
           'button[type="submit"]',
@@ -230,7 +249,9 @@ export function initializeAttendanceForms() {
           const response = await fetch(form.action, {
             method: "POST",
             headers: { Accept: "application/json" },
-            body: new URLSearchParams(attendanceFormPayload(values)),
+            body: new URLSearchParams(
+              attendanceFormPayload(values, form.dataset.attendanceOperation),
+            ),
             redirect: "manual",
           });
           if (response.type === "opaqueredirect")

@@ -34,18 +34,21 @@ export async function submitAttendancePage(input: {
         ),
       );
       if (
-        input.operation === "replace" &&
-        ("replacementDate" in values || "replacementTime" in values)
+        (input.operation === "replace" &&
+          ("replacementDate" in values || "replacementTime" in values)) ||
+        (input.operation === "cancel" &&
+          ["holiday", "other"].includes(values.cancellationReasonChoice ?? ""))
       ) {
         const headers = new Headers(input.request.headers);
         headers.delete("content-length");
         headers.set("content-type", "application/json");
-        const body = { ...raw, ...attendanceFormPayload(values) } as Record<
-          string,
-          unknown
-        >;
+        const body = {
+          ...raw,
+          ...attendanceFormPayload(values, input.operation),
+        } as Record<string, unknown>;
         delete body.replacementDate;
         delete body.replacementTime;
+        if (input.operation === "cancel") delete body.cancellationReasonChoice;
         input = {
           ...input,
           request: new Request(input.request, {

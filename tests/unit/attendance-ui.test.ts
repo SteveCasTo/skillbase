@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import {
   attendanceFormPayload,
   attendanceFieldIssues,
+  sessionCancellationLabel,
   markValue,
   validMarkValue,
   durationLabel,
@@ -40,6 +41,59 @@ const repo: AttendanceRepository = {
   record: unused,
   updateSettings: unused,
 };
+test("holiday choice uses the persisted cancellation reason without inventing a session status", async () => {
+  const persisted: {
+    status: "COMPLETED" | "CANCELLED";
+    cancellationReason: string | null;
+  } = { status: "COMPLETED", cancellationReason: null };
+  const repository = {
+    ...repo,
+    cancel: async (
+      _actor: string,
+      input: Parameters<AttendanceRepository["cancel"]>[1],
+    ) => {
+      persisted.status = "CANCELLED";
+      persisted.cancellationReason = input.reason ?? null;
+      return {
+        kind: "session" as const,
+        sessionId: input.sessionId,
+        revision: input.revision + 1,
+      };
+    },
+  };
+  const values = {
+    requestKey: crypto.randomUUID(),
+    revision: "1",
+    cancellationReasonChoice: "holiday",
+    reason: "Texto de otro motivo",
+  };
+  expect(attendanceFormPayload(values, "cancel").reason).toBe("Feriado");
+  expect(attendanceFormPayload(values, "cancel")).not.toHaveProperty(
+    "cancellationReasonChoice",
+  );
+  const result = await submitAttendancePage({
+    request: request(values, "cancel"),
+    actor,
+    repository,
+    siteUrl,
+    operation: "cancel",
+    ...context,
+  });
+  expect(result.payload.ok).toBe(true);
+  expect(sessionCancellationLabel(persisted)).toBe("Feriado");
+  expect(
+    sessionCancellationLabel({
+      status: "UPCOMING",
+      cancellationReason: "Feriado",
+    }),
+  ).toBe("");
+  expect(
+    attendanceFormPayload(
+      { ...values, cancellationReasonChoice: "other" },
+      "cancel",
+    ).reason,
+  ).toBe(values.reason);
+});
 function request(values: Record<string, string>, operation = "replace") {
   return new Request(
     `${siteUrl}/app/cursos/${context.courseId}/grupos/${context.groupId}/sesiones/${context.sessionId}?operation=${operation}`,

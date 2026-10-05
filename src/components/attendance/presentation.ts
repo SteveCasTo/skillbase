@@ -24,14 +24,30 @@ export const markValue = (
 ) => (status === "PENDING" ? "" : JSON.stringify([{ registrationId, status }]));
 export function attendanceFormPayload(
   values: Readonly<Record<string, string>>,
+  operation?: string,
 ): Record<string, string> {
   const payload = { ...values };
+  if (
+    operation === "cancel" &&
+    ["holiday", "other"].includes(payload.cancellationReasonChoice ?? "")
+  ) {
+    if (payload.cancellationReasonChoice === "holiday")
+      payload.reason = "Feriado";
+    delete payload.cancellationReasonChoice;
+  }
   if ("replacementDate" in payload || "replacementTime" in payload) {
     payload.startsAt = `${payload.replacementDate ?? ""}T${payload.replacementTime ?? ""}`;
     delete payload.replacementDate;
     delete payload.replacementTime;
   }
   return payload;
+}
+export function sessionCancellationLabel(
+  session: Pick<AttendanceSessionDto, "status" | "cancellationReason">,
+) {
+  return session.status === "CANCELLED"
+    ? (session.cancellationReason?.trim() ?? "")
+    : "";
 }
 export function validMarkValue(value: string): boolean {
   try {

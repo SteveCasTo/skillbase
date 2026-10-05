@@ -4,6 +4,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import DatePicker from "@/components/ui/date-picker";
 import RegistrationActionDialog from "@/components/pre-registrations/RegistrationActionDialog";
+import RegistrationSelect from "@/components/pre-registrations/RegistrationSelect";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 import { durationLabel } from "./presentation";
 interface Props {
@@ -61,6 +62,9 @@ const civil = instantToBoliviaCivil(new Date(session.startsAt));
               replacementDate: civil.slice(0, 10),
               replacementTime: civil.slice(11, 16),
               reason: "",
+              ...(operation === "cancel"
+                ? { cancellationReasonChoice: "other" }
+                : {}),
             })}
             data-last-submitted={attempted ? JSON.stringify(values) : undefined}
             class="flex min-w-0 flex-col gap-4"
@@ -121,12 +125,35 @@ const civil = instantToBoliviaCivil(new Date(session.startsAt));
                 </div>
               </>
             )}
-            <div class="flex flex-col gap-2">
+            {operation === "cancel" && (
+              <RegistrationSelect
+                client:load
+                id="attendance-cancellation-reason-choice"
+                name="cancellationReasonChoice"
+                label="Motivo de cancelación"
+                value={
+                  current.cancellationReasonChoice ??
+                  (current.reason === "Feriado" ? "holiday" : "other")
+                }
+                options={[
+                  { value: "holiday", label: "Feriado" },
+                  { value: "other", label: "Otro motivo" },
+                ]}
+              />
+            )}
+            <div
+              data-cancellation-custom-reason={
+                operation === "cancel" ? "" : undefined
+              }
+              class="flex flex-col gap-2"
+            >
               <label
                 for={`attendance-${operation}-reason`}
                 class="text-sm font-medium"
               >
-                Motivo (opcional)
+                {operation === "cancel"
+                  ? "Otro motivo (opcional)"
+                  : "Motivo (opcional)"}
               </label>
               <Input
                 id={`attendance-${operation}-reason`}

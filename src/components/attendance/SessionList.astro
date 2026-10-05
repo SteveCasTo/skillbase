@@ -1,7 +1,12 @@
 ---
 import type { AttendanceGroupDto } from "@/domain/attendance/types";
 import SessionCalendar from "./SessionCalendar";
-import { dateLabel, timeLabel, sessionLabels } from "./presentation";
+import {
+  dateLabel,
+  timeLabel,
+  sessionLabels,
+  sessionCancellationLabel,
+} from "./presentation";
 interface Props {
   group: AttendanceGroupDto;
   sessionBase: string;
@@ -52,6 +57,11 @@ const { group, sessionBase, id = "attendance-sessions" } = Astro.props;
                 <p class="text-sm tabular-nums">
                   {timeLabel(session.startsAt)}–{timeLabel(session.endsAt)}
                 </p>
+                {sessionCancellationLabel(session) && (
+                  <p class="break-words text-sm text-muted-foreground">
+                    {sessionCancellationLabel(session)}
+                  </p>
+                )}
                 {original && (
                   <p class="text-sm text-muted-foreground">
                     Recuperación de {dateLabel(original.startsAt)}
