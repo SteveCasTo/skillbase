@@ -622,21 +622,36 @@ El registro público de interesados de Fase 3 no cobra ni ocupa cupo. La preinsc
 
 Administración puede gestionar preinscripciones presenciales con persona global, efectivo cuando corresponda, gratuidad aprobada, snapshots de tarifa/descuento, cupo y movimientos financieros/cancelación. Instructor consulta roster propio mínimo desde inicio. `INSCRITO` y `SALDOVENCIDO` no habilitan módulos académicos. Fase 5 está liberada en producción en `2e0eecb`; la asistencia/sesiones continúan pendientes.
 
-## CORRECCIONES POST-RELEASE DE ADMINISTRACIÓN (PRECONDICIÓN PARA FASE 6)
+## CORRECCIONES POST-RELEASE DE ADMINISTRACIÓN (integradas en development)
 
-Fase 5 está liberada, pero las siguientes correcciones aprobadas son pendientes y deben preceder la implementación de Fase 6. Se integrarán por PR a `development`; no modificar el historial ni cherry-pick/mergear el commit documental `46fa1c0`.
+Las correcciones aprobadas se integraron en `development` mediante PRs 196–199; no equivalen a un nuevo release a `master`. El commit documental histórico `46fa1c0` no se cherry-pickea ni mergea.
 
-- [ ] Simplificar Configuración y editar ajustes/campos de participantes en línea.
-- [ ] Corregir selección/búsqueda de interesados, ocultar candidatos consumidos preservando historial y no inferir identidad por email.
-- [ ] Ajustar cards/grillas/listados para minimizar datos personales/financieros; UI responsive de tres columnas de participantes en ancho amplio.
-- [ ] Usar calendario shadcn compartido, mostrar descuento solo para AUXILIARY, eliminar copy/banner técnicos no aprobados y presentar nombre humano del actor.
-- [ ] Completar diálogos breves de operaciones financieras con importes exactos/validados, razón opcional, UUID/loading/resultado y fallback SSR sin JavaScript.
-- [ ] Configurar y verificar SMTP server-only para local y cloud sin versionar secretos. La autorización manual Google OAuth permanece como tarea operacional independiente.
-- [ ] Diseñar antes de ejecutar la limpieza/renovación de demos autorizada para el próximo release: identificar únicamente datasets sintéticos propios, revisar dependencias y abortar ante filas no reconocidas; preservar identidades, perfiles, settings, Storage, ledger de migraciones e historia financiera legítima. No es un reset general ni se ejecuta durante estas correcciones.
+- [x] Simplificar Configuración y editar ajustes/campos de participantes en línea.
+- [x] Corregir selección/búsqueda de interesados, ocultar candidatos consumidos preservando historial y no inferir identidad por email.
+- [x] Ajustar cards/grillas/listados; el detalle conserva las finanzas y el listado de participantes las minimiza.
+- [x] Usar calendario shadcn compartido, mostrar descuento solo para AUXILIARY, retirar copy/banner técnicos y presentar nombre humano del actor.
+- [x] Completar diálogos financieros con importes exactos/validados, razón opcional, UUID/loading/resultado y fallback SSR sin JavaScript.
+- [x] Integrar configuración SMTP protegida local/cloud. Recepción de prueba confirmada por el usuario en local; no se ha verificado clic de recovery/cambio de contraseña ni entrega cloud. Google OAuth real/callback continúa pendiente de forma independiente.
+- [x] Integrar un runner de demo financiero con extensión opcional de asistencia, PLAN de solo lectura, destinos explícitos, provenance estable y abortos conservadores. La carga canónica local está en curso y aún no hay evidencia de APPLY completado; no declarar datos demo aplicados. Producción se mantiene sin operaciones de seed hasta después del release/gate autorizado.
 
 El detalle UX se mantiene en `docs/DESIGN.md`, las reglas de secretos/demo en `docs/SECURITY.md` y la configuración de Auth en `docs/AUTHENTICATION.md`.
 
 ## FASE 6 — SESIONES Y ASISTENCIA
+
+### Estado (integrada en development; gate final/release pendientes)
+
+PR 201 integró dominio/aplicación y migraciones 0018/0019; PR 202 añadió runner de demo con asistencia opcional; PR 203 integró páginas y UI. `development` actual es `6813a4c`. El Supabase local quedó en ledger 20 tras aplicar 0018/0019, preservando las 53 tablas del baseline. Cloud/`master` siguen en Fase 5, ledger 18. No declarar release ni aplicación de 0019 en cloud.
+
+El módulo incluye calendario de grupo/sesión, permisos ADMIN/INSTRUCTOR, asistencia del roster elegible, asistencia del instructor, revisiones administrativas de rosters históricos, reemplazos/cancelaciones y configuración del umbral. La implementación se describe en [`docs/ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md); esto no incluye evaluaciones, porcentajes ni certificados.
+
+- [x] Implementar migración 0019 con seis tablas protegidas/RLS, repositorios/casos de uso y auditoría/idempotencia; 0018 añade razón opcional para movimiento de efectivo.
+- [x] Generar/materializar sesiones desde el planificador vigente, preservando cronología y duración de la revisión; cancelación conserva razón y el original, los reemplazos quedan ligados y no extienden horas configuradas.
+- [x] Implementar configuración independiente de ausencia consecutiva (default 3), estados Present/Absent/Excused y `PENDING` derivado. No existe porcentaje ni retraso/tardanza.
+- [x] Integrar páginas SSR/POST para ADMIN e INSTRUCTOR y edición autorizada; roster solo nombres, sin CI/email/finanzas para instructor.
+- [x] Integrar generador de demo optativo para asistencia con PLAN y verificación de destinos/provenance; los scripts no resetean, no reescriben historial financiero y no hacen APPLY implícito. Resultado de APPLY en Supabase local aún no confirmado; producción no se ha tocado.
+- [x] Añadir cobertura focal de backend, UI y runner; los resultados por PR no constituyen gate completo.
+- [ ] Ejecutar una sola vez el gate combinado final de milestone después de concluir el APPLY/validación de demo local y coordinar el estado real de ese seed.
+- [ ] Promover a `master`, aplicar migraciones autorizadas a cloud y desplegar únicamente tras superar el gate final. Hasta entonces, cloud permanece en ledger 18.
 
 ### Objetivos
 
@@ -651,19 +666,18 @@ El detalle UX se mantiene en `docs/DESIGN.md`, las reglas de secretos/demo en `d
 
 Instructor gestiona asistencia diaria de un grupo.
 
-### Alcance aprobado; pendiente de implementación
+### Alcance implementado en development
 
-La Fase 6 aún no está implementada. Lo siguiente registra el alcance aprobado y no describe comportamiento disponible:
+Las reglas siguientes describen el comportamiento integrado en `development`; no afirman disponibilidad en `master`/producción:
 
 - Generar sesiones según fechas/duración de la revisión del formato. Las sesiones existentes no se sobrescriben al regenerar; cambios se representan mediante cancelación/reemplazo conservando el original y la cronología. El calendario L–V incluye fechas pasadas sin inferir ausencias históricas: quedan pendientes de revisión explícita de ADMIN. La generación no produce ausencias retroactivas.
-- ADMIN puede gestionar feriados, cancelar sesiones y crear reemplazos conservando la sesión original cancelada y la cronología. Un reemplazo conserva duración, puede ser el mismo día a hora anterior o caer otro día (incluido fin de semana), y debe evitar conflictos del instructor/grupo.
+- ADMIN puede cancelar una sesión por feriado (o indicar otro motivo) y crear reemplazos conservando la sesión original cancelada y la cronología. No hay módulo/calendario global de feriados. Un reemplazo conserva duración, puede ser el mismo día a hora anterior o caer otro día (incluido fin de semana), y debe evitar conflictos del instructor/grupo.
 - Instructor solo consulta y registra sesiones de sus propios grupos, para participantes `INSCRITO` del curso y su propia asistencia; ADMIN puede consultar/registrar ambas. No exponer finanzas/CI/email en roster.
 - Estados de participante: `Presente`, `Ausente`, `Justificada`. La justificación cuenta para asistencia, pero interrumpe la racha de ausencias. No existe estado de tardanza. Para el instructor, la edición se limita al día civil de Bolivia de la clase; ADMIN puede corregir posteriormente con auditoría.
 - Durante el día de la sesión, una asistencia aún no registrada se considera pendiente; al finalizar el día se deriva como ausente. Este resultado debe derivarse sin un job global que inserte ausencias irreversibles; sesiones canceladas se excluyen. Las sesiones históricas generadas siguen pendientes hasta revisión ADMIN.
 - Configuración de asistencia se limita al umbral de ausencias consecutivas: valor inicial 3, configurable. Se advierte al alcanzarlo y se pierde elegibilidad al superarlo (N+1); una justificada interrumpe la racha. No hay subsistema independiente de alertas, expulsión, cancelación automática de cupo ni reembolso. La elegibilidad futura puede bloquear certificados (Fase 9); no se generan certificados en Fase 6.
-- Las correcciones de preinscripciones/admin UX anteriores son precondición; no se consideran parte ya implementada de este milestone.
-- El seed autorizado de demos requiere primero diseñar una operación de renovación controlada, explícita y con ownership/provenance de datos sintéticos, guards por dependencias y aborto ante datos no reconocidos. No usar reset amplio, `CASCADE` ni desactivar protecciones globales de historial financiero; preservar Auth/roles/perfiles/sesiones/Storage/settings/secretos/ledger de migraciones. La renovación demo en producción queda para release autorizado posterior, no ejecutar en este alcance documental.
-- Configurar SMTP propio para Supabase Auth mediante secretos de servidor/entorno local y cloud, sin versionar ni documentar credenciales. Esto no resuelve Google OAuth: el callback local actual es `http://127.0.0.1:55321/auth/v1/callback` y requiere autorización manual en Google Console; no afirmar esa verificación.
+- El runner demo está integrado; se mantiene append-only y no repara ni elimina historial. Su APPLY local se encuentra en curso, sin resultado confirmado en este corte. La renovación de producción permanece autorizada solo después del gate/release y no se ha ejecutado.
+- La configuración SMTP cloud y local está aplicada sin exponer secretos; recepción de prueba local confirmada. Esto no verifica recovery end-to-end ni Google OAuth: el callback local actual `http://127.0.0.1:55321/auth/v1/callback` aún requiere autorización manual en Google Console.
 
 La suite de cada agente se limitará a pruebas focales de resultados observables; el gate full combinado se ejecutará una vez al final del milestone.
 

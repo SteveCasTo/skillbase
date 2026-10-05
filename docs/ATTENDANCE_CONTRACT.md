@@ -9,12 +9,14 @@ no una fecha enviada por el cliente. `getAttendanceRepository()` usa la conexió
 del request existente. No se modifica dinero, cupo ni certificación al registrar
 asistencia o cancelar/reemplazar una sesión. No hay porcentajes ni tardanzas.
 
-La migración generada es `0019_phase6_attendance`, posterior a `0018`.
+La migración es `0019_phase6_attendance`, posterior a `0018_optional_payment_reason`.
 Las seis tablas nuevas tienen RLS y grants Data API revocados. Las referencias
 están indexadas; roster y command receipts son append-only. El guard de sesión
 protege duración/revisión de formato, grupo del reemplazo y timestamps originales.
-No se aplicó esta migración al Supabase canónico ni a producción durante el
-desarrollo del backend.
+Backend, UI y runner demo están integrados en `development` mediante PRs 201–203.
+Supabase local canónico aplicó 0018/0019 sin reset y quedó en ledger 20,
+preservando 53 tablas. Cloud/`master` permanecen en Fase 5/ledger 18; 0019
+no se ha aplicado en cloud y falta el gate combinado final/release.
 
 ## Casos de uso para UI y loaders
 
@@ -123,22 +125,27 @@ Resultado: `{status,payload}`. Éxito: `{ok:true,value,message}`, donde value es
 `nosniff`. Conflictos: 409; autorización: 403; inexistente/ajeno: 404;
 validación: 422; infraestructura: 503 sin detalles internos.
 
-Este backend no monta páginas, navegación ni endpoints Astro: corresponden al
-owner UI. El POST de settings puede montarse en `/app/configuracion/asistencia`
-con `operation:'settings'` y reutilizar los formularios inline existentes.
+La UI SSR/POST está montada en `/app/configuracion/asistencia`, en las rutas
+ADMIN de grupos/sesiones y en las rutas equivalentes del instructor asignado.
+Las rutas están incluidas en la política privada fail-closed. ADMIN configura N,
+revisa/corrige evidencia histórica, cancela y reemplaza; el instructor solo
+opera sus grupos y registra en el día civil Bolivia.
 
 ## Seed y validación
 
-El owner seed puede usar el mismo adaptador con un actor ADMIN válido y un
-reloj server-side controlado para escenarios sintéticos. Para historia pasada
-debe establecer roster/revisión explícitos; no modificar horas/fechas financieras
-históricas para conseguir ausencias. No ejecutar seeds ni crear cuentas desde
-tests del backend. Un reset autorizado deberá incluir primero las tablas nuevas
-en su allowlist explícita para respetar FKs, nunca añadir `CASCADE` genérico.
+El runner financiero admite la extensión opcional de asistencia en
+`scripts/attendance-demo.ts`; usa el contrato y repositorios existentes con
+ADMIN existente y reloj server-side, y no hace reset. Su PLAN es de solo lectura,
+exige destino/proyecto explícitos y verifica ownership/provenance; preserva
+settings e historial financiero y aborta ante colisiones/ediciones inesperadas.
+La carga APPLY local está en curso y no tiene resultado confirmado en este corte;
+producción no se ejecuta hasta el gate/release autorizado. Ver
+[`FINANCIAL_DEMO.md`](FINANCIAL_DEMO.md). Para sesiones históricas se establece
+roster/revisión explícitos; no se cambian timestamps financieros ni se crean
+cuentas Auth desde tests.
 
-Pruebas focales: `tests/unit/attendance*.test.ts` y
-`tests/integration/attendance-repository.test.ts`. Integración se ejecuta mediante
-`runWithTestStack` apuntando exclusivamente al archivo nuevo, con Supabase
-temporal y migraciones desde cero; no accede a puertos/volúmenes canónicos.
-Los gates unit/integration/E2E/build globales quedan para la validación final
-coordinada después de UI y seed.
+El backend reportó 12 pruebas unitarias y 12 de integración focales; la UI y el
+seed tienen cobertura dirigida propia documentada en el registro de milestone.
+Las integraciones aisladas usan `runWithTestStack` en Supabase temporal y no
+acceden al stack canónico. Esa evidencia focal no equivale al gate unit/
+integration/E2E/build combinado: se ejecutará una vez al cierre coordinado.

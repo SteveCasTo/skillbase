@@ -2,6 +2,8 @@
 
 Herramienta manual independiente: `scripts/financial-demo.ts`. **No se ejecuta en deploy**, no sustituye `renew-demo.ts` (que permanece local-only), no migra ni resetea bases. El usuario ya autorizó la carga demo de producción después del release y gate combinado; su ejecución queda pendiente de esa coordinación y de los prerrequisitos técnicos, no de una nueva autorización genérica. Esta integración en `development` no ejecuta la carga local/canónica/cloud ni adelanta el release.
 
+Estado de este corte: runner integrado en `development` (`6813a4c`); migraciones 0018/0019 aplicadas al local canónico (ledger 20, 53 tablas preservadas). El PLAN puede inspeccionar el destino sin escribir. El APPLY local está en curso y no se recibió evidencia final; no afirmar que se hayan insertado demos hasta contar con el resultado. Cloud permanece en ledger 18 y no se ejecutó seed productivo.
+
 ## Preparación y PLAN
 
 Usar el checkout del release con migraciones requeridas, incluida 0018 (motivo opcional de efectivo), ya aplicadas mediante el flujo estándar. PLAN comprueba la columna requerida y aborta si falta; nunca aplica una migración. El runner exige configuración de preinscripción existente, ADMIN activo con identidad Auth existente y las tres identidades instructor del seed anterior con `app_metadata.seed_owner = skillbase-instructor-interest-demo-v1`. No crea cuentas, modifica passwords/roles/perfiles ni envía email.

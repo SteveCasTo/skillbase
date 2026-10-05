@@ -413,7 +413,7 @@ El install directo previo falló por el estado de paquetes del entorno; `bun ins
 - PR 179 (`d13432d`) integró páginas HTTP de preinscripción/participante, exportes, roster y route policy. La rama UI reportó 34 tests dirigidos y tres E2E (dos escenarios principales y un harness temporal) PASS; después pasó el full canonical descrito abajo.
 - En `development` están integrados schema, operaciones de aplicación/repository, settings y páginas/listado/alta/detalle, acciones de efectivo/devolución/transfer/cancelación, export endpoint y roster. `/app/configuracion` ya está en `PRIVATE_ROUTE_POLICIES` y protegida ADMIN.
 
-La migración 0017 está aplicada al Supabase local estándar (`127.0.0.1:55322`) y al cloud para el release Fase 5 (`2e0eecb`, cloud ledger 18). El gate local reportado fue 303 unit, 125 integration y E2E 125/125. Esto no prueba Google OAuth real, autorización del callback local en Google Console ni SMTP/entrega de recovery; las dos tareas operacionales continúan independientes.
+La migración 0017 está aplicada al Supabase local estándar (`127.0.0.1:55322`) y al cloud para el release Fase 5 (`2e0eecb`, cloud ledger 18). El gate local reportado fue 303 unit, 125 integration y E2E 125/125. Ese gate de release no prueba Google OAuth real ni autorización del callback local; SMTP se configuró posteriormente y su evidencia/alcance se registra abajo.
 
 #### Resultados parciales por PR y stage de interfaz
 
@@ -423,3 +423,11 @@ La migración 0017 está aplicada al Supabase local estándar (`127.0.0.1:55322`
 - El full gate final se ejecutó en commit `25890143` e integró mediante PR 180 (`917a636`): **303 unit, 125 integration, canonical E2E 125/125**. Corrida inicial E2E: 119/125; seis fallos SSR 500/settings browser-only/hidratación se corrigieron y el run final pasó sin retries. Quality: 0 errores/0 warnings; revisión visual: 24 screenshots en 375/768/1440 px, light/dark, sin overflow. Esta documentación no ejecutó ni repitió tests.
 
 La aplicación local/migración 0017 no introdujo datos de prueba financieros: quedaron cero preinscripciones en ese baseline; se conservaron seis cursos y 35 interesados. El release posterior a producción está registrado como `2e0eecb`; esta evidencia local no equivale por sí sola a un smoke manual de todos los flujos de producción.
+
+### Correcciones de Fase 5 y Fase 6 (development; gate combinado pendiente)
+
+PR 196 añadió configuración SMTP privada/plantilla; PRs 197–199 integraron los ajustes de administración e interesados; PRs 200–202 añadieron runner demo financiero/asistencia y PR 203 integró UI de sesiones/asistencia. User confirmó recepción de un correo de prueba local; esto no verifica clic/recovery, delivery cloud ni Google OAuth.
+
+Las migraciones 0018/0019 se aplicaron al Supabase local canónico hasta ledger 20, preservando las 53 tablas existentes. Cloud/`master` permanecen en Fase 5/ledger 18. Cobertura focal reportada por los cambios: backend de asistencia 12 unit + 12 integration; UI y correcciones 15 UI + 5 mock + 1 caso de feriado; runner demo 3 unit + 1 integración aislada. Estos resultados dirigidos no son un full gate combinado.
+
+El PLAN de demo puede validar target/proyecto y provenance sin escrituras. El APPLY local está en curso sin evidencia final confirmada en este corte, así que no se afirma que existan filas demo aplicadas; no hubo operaciones de seed en producción. El gate global de milestone se ejecutará una vez al final cuando se confirme el seed local y el conjunto integrado.
