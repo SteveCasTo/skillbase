@@ -37,6 +37,11 @@ import {
   type FinancialDemoContext,
   type FinancialDemoPlan,
 } from "./financial-demo-plan";
+import { runAttendanceDemo } from "./attendance-demo";
+import {
+  ATTENDANCE_DEMO_TABLES,
+  type AttendanceDemoPlan,
+} from "./attendance-demo-plan";
 
 const markerId = financialDemoId("manifest");
 export interface FinancialIdentityReader {
@@ -50,6 +55,11 @@ export interface FinancialDemoOptions {
   readonly now?: Date;
   readonly identities: FinancialIdentityReader;
   readonly preview?: (plan: FinancialDemoPlan, existing: boolean) => void;
+  readonly attendance?: boolean;
+  readonly attendancePreview?: (
+    plan: AttendanceDemoPlan,
+    existing: boolean,
+  ) => void;
 }
 async function stateHash(
   tx: RegistrationTransaction,
@@ -461,6 +471,14 @@ export async function runFinancialDemo(
       )
         throw new Error("Invalid fixture context");
       options.preview?.(plan, true);
+      if (options.attendance)
+        await runAttendanceDemo(
+          tx,
+          actor,
+          context,
+          options.apply,
+          options.attendancePreview,
+        );
       return context;
     }
     await assertNoCollisions(tx, plan);
@@ -475,18 +493,26 @@ export async function runFinancialDemo(
       )
         throw new Error("Demo instructor schedule conflicts");
     options.preview?.(plan, false);
-    if (!options.apply)
-      return {
-        owner: FINANCIAL_DEMO_OWNER,
-        anchorDay,
-        registrations: {},
-        courses: Object.fromEntries(
-          plan.samples.map((s) => [
-            s.key,
-            { courseId: s.course.id, groupIds: s.groups.map((g) => g.id) },
-          ]),
-        ),
-      };
+    const plannedContext: FinancialDemoContext = {
+      owner: FINANCIAL_DEMO_OWNER,
+      anchorDay,
+      registrations: {},
+      courses: Object.fromEntries(
+        plan.samples.map((s) => [
+          s.key,
+          { courseId: s.course.id, groupIds: s.groups.map((g) => g.id) },
+        ]),
+      ),
+    };
+    if (options.attendance)
+      await runAttendanceDemo(
+        tx,
+        actor,
+        plannedContext,
+        false,
+        options.attendancePreview,
+      );
+    if (!options.apply) return plannedContext;
     const context = await createFixtures(tx, plan, actor, instructors);
     await tx.insert(schema.auditEvents).values({
       id: markerId,
@@ -504,6 +530,7 @@ export async function runFinancialDemo(
         contextHash: fingerprint(context),
       },
     });
+    if (options.attendance) await runAttendanceDemo(tx, actor, context, true);
     return context;
   });
 }
@@ -512,7 +539,13 @@ if (import.meta.main) {
   let connection: ReturnType<typeof createDatabase> | undefined;
   try {
     const args = process.argv.slice(2);
-    const allowed = new Set(["--target", "--project", "--anchor", "--apply"]);
+    const allowed = new Set([
+      "--target",
+      "--project",
+      "--anchor",
+      "--apply",
+      "--attendance",
+    ]);
     const values = new Map<string, string>();
     let apply = false;
     for (let i = 0; i < args.length; i++) {
@@ -520,6 +553,7 @@ if (import.meta.main) {
       if (!allowed.has(key) || values.has(key) || (key === "--apply" && apply))
         throw new Error("Invalid arguments");
       if (key === "--apply") apply = true;
+      else if (key === "--attendance") values.set(key, "true");
       else {
         const value = args[++i];
         if (!value || value.startsWith("--"))
@@ -550,6 +584,7 @@ if (import.meta.main) {
     const context = await runFinancialDemo(connection.db, {
       actorId: process.env.DEMO_ADMIN_ID ?? "",
       apply,
+      attendance: values.has("--attendance"),
       ...(values.has("--anchor")
         ? { anchorDay: validateAnchor(values.get("--anchor")!) }
         : {}),
@@ -594,6 +629,38 @@ if (import.meta.main) {
           ),
         );
       },
+      attendancePreview(plan, existing) {
+        console.info(
+          JSON.stringify(
+            {
+              mode: apply ? "APPLY" : "PLAN",
+              target,
+              owner: plan.owner,
+              anchorDay: plan.anchorDay,
+              existing,
+              course: {
+                name: plan.course.name,
+                id: plan.course.id,
+                startsAt: plan.course.startsAt,
+                endsAt: plan.course.endsAt,
+              },
+              formats: 1,
+              groups: plan.groups.map((g) => g.id),
+              registrations: plan.participants.map((p) => p.key),
+              sessionsPerGroup: plan.calendar.length,
+              consecutiveAbsenceLimit: plan.limit,
+              reviewedSessions: plan.reviewedCount,
+              todayReplacementAt: plan.todayReplacementAt,
+              weekendReplacementAt: plan.weekendReplacementAt,
+              attendanceTables: ATTENDANCE_DEMO_TABLES,
+              resetAllowed: false,
+              globalSettingsChanged: false,
+            },
+            null,
+            2,
+          ),
+        );
+      },
     });
     console.info(
       apply
@@ -602,7 +669,7 @@ if (import.meta.main) {
     );
   } catch {
     console.error(
-      "Financial demo refused or failed; no credentials or database errors printed. Verify explicit target/project, active ADMIN, seed-owned instructors, migrations, settings, anchor and fixture collisions. Never reset or disable guards to resolve this failure.",
+      "Demo refused or failed; no credentials or database errors printed. Verify explicit target/project, active ADMIN, seed-owned instructors, migrations (0019 for --attendance), settings, anchor and fixture collisions. Never reset or disable guards to resolve this failure.",
     );
     process.exitCode = 1;
   } finally {
