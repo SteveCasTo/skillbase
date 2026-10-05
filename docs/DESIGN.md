@@ -229,21 +229,21 @@ Archivo recomendado: `src/styles/globals.css`.
   --popover-foreground: oklch(0.3353 0.0132 2.7676);
   --primary: oklch(0.7357 0.1641 34.7091);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.9596 0.0200 28.9029);
+  --secondary: oklch(0.9596 0.02 28.9029);
   --secondary-foreground: oklch(0.5587 0.1294 32.7364);
   --muted: oklch(0.9656 0.0176 39.4009);
   --muted-foreground: oklch(0.5534 0.0116 58.0708);
   --accent: oklch(0.8278 0.1131 57.9984);
   --accent-foreground: oklch(0.3353 0.0132 2.7676);
-  --destructive: oklch(0.6122 0.2082 22.2410);
+  --destructive: oklch(0.6122 0.2082 22.241);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.9296 0.0370 38.6868);
-  --input: oklch(0.9296 0.0370 38.6868);
+  --border: oklch(0.9296 0.037 38.6868);
+  --input: oklch(0.9296 0.037 38.6868);
   --ring: oklch(0.7357 0.1641 34.7091);
   --chart-1: oklch(0.7357 0.1641 34.7091);
   --chart-2: oklch(0.8278 0.1131 57.9984);
   --chart-3: oklch(0.8773 0.0763 54.9314);
-  --chart-4: oklch(0.8200 0.1054 40.8859);
+  --chart-4: oklch(0.82 0.1054 40.8859);
   --chart-5: oklch(0.6368 0.1306 32.0721);
   --sidebar: oklch(0.9656 0.0176 39.4009);
   --sidebar-foreground: oklch(0.3353 0.0132 2.7676);
@@ -251,7 +251,7 @@ Archivo recomendado: `src/styles/globals.css`.
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.8278 0.1131 57.9984);
   --sidebar-accent-foreground: oklch(0.3353 0.0132 2.7676);
-  --sidebar-border: oklch(0.9296 0.0370 38.6868);
+  --sidebar-border: oklch(0.9296 0.037 38.6868);
   --sidebar-ring: oklch(0.7357 0.1641 34.7091);
   --font-sans: "Montserrat", sans-serif;
   --font-serif: "Merriweather", serif;
@@ -259,11 +259,16 @@ Archivo recomendado: `src/styles/globals.css`.
   --radius: 0.625rem;
   --shadow-2xs: 0 6px 12px -3px hsl(0 0% 0% / 0.04);
   --shadow-xs: 0 6px 12px -3px hsl(0 0% 0% / 0.04);
-  --shadow-sm: 0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 1px 2px -4px hsl(0 0% 0% / 0.09);
-  --shadow: 0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 1px 2px -4px hsl(0 0% 0% / 0.09);
-  --shadow-md: 0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 2px 4px -4px hsl(0 0% 0% / 0.09);
-  --shadow-lg: 0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 4px 6px -4px hsl(0 0% 0% / 0.09);
-  --shadow-xl: 0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 8px 10px -4px hsl(0 0% 0% / 0.09);
+  --shadow-sm:
+    0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 1px 2px -4px hsl(0 0% 0% / 0.09);
+  --shadow:
+    0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 1px 2px -4px hsl(0 0% 0% / 0.09);
+  --shadow-md:
+    0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 2px 4px -4px hsl(0 0% 0% / 0.09);
+  --shadow-lg:
+    0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 4px 6px -4px hsl(0 0% 0% / 0.09);
+  --shadow-xl:
+    0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 8px 10px -4px hsl(0 0% 0% / 0.09);
   --shadow-2xl: 0 6px 12px -3px hsl(0 0% 0% / 0.22);
 }
 
@@ -282,7 +287,7 @@ Archivo recomendado: `src/styles/globals.css`.
   --muted-foreground: oklch(0.8378 0.0237 52.6346);
   --accent: oklch(0.8278 0.1131 57.9984);
   --accent-foreground: oklch(0.2569 0.0169 352.4042);
-  --destructive: oklch(0.6122 0.2082 22.2410);
+  --destructive: oklch(0.6122 0.2082 22.241);
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.3637 0.0203 342.2664);
   --input: oklch(0.3637 0.0203 342.2664);
@@ -290,7 +295,7 @@ Archivo recomendado: `src/styles/globals.css`.
   --chart-1: oklch(0.7357 0.1641 34.7091);
   --chart-2: oklch(0.8278 0.1131 57.9984);
   --chart-3: oklch(0.8773 0.0763 54.9314);
-  --chart-4: oklch(0.8200 0.1054 40.8859);
+  --chart-4: oklch(0.82 0.1054 40.8859);
   --chart-5: oklch(0.6368 0.1306 32.0721);
   --sidebar: oklch(0.2569 0.0169 352.4042);
   --sidebar-foreground: oklch(0.9397 0.0119 51.3156);
