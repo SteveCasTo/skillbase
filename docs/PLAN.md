@@ -652,8 +652,9 @@ El módulo incluye calendario de grupo/sesión, permisos ADMIN/INSTRUCTOR, asist
 - [x] Añadir cobertura focal de backend, UI y runner. La cobertura combinada documentada no es un único full E2E verde: unit 332 e integration 137 PASS en `4b331ff9`; E2E 126/127 PASS en `b681a365`, con un fallo de strict locator en prueba sin JavaScript. Tras el cambio de test-only PR 209, el escenario afectado pasó en una corrida focal, sin retry; la evidencia combinada cubre los escenarios pero no se afirma full 127/127 en una sola ejecución.
 - [x] Pasar build, Drizzle y quality en `b681a365`; typecheck: cero errores, cero warnings y 204 hints. El backend mantuvo sus 12 unit y 12 integration focales PASS.
 - [x] Revalidar mediante PR 209 el locator del test sin JavaScript: un caso focal PASS, sin repetir la suite completa.
-- [ ] Completar revisión visual final responsive/accesible; no se afirma todavía evidencia visual final del milestone.
-- [ ] Cerrar el gate de milestone con la revisión visual y consolidar los resultados ya reportados, sin presentar las corridas combinadas como un único full E2E verde.
+- [x] Completar revisión visual final responsive/accesible: seis vistas (375/1440 px, light/dark), sin overflow; foco visible, diálogo con Escape y retorno de foco; estado de asistencia N=3 y restricción desde N+1; instructor sin datos de contacto/finanzas; sesión no autorizada 404; cero errores/warnings de consola.
+- [x] Cerrar el gate local mediante evidencia combinada: unit/integration, full E2E más revalidación focal del único locator test-only fallido, build/Drizzle/quality y revisión visual. No se afirma un único full E2E 127/127.
+- [ ] Completar promoción a `master`, migración cloud y release autorizados. Cloud/`master` permanecen en Fase 5/ledger 18.
 - [ ] Promover a `master`, aplicar migraciones autorizadas a cloud y desplegar únicamente tras superar el gate final. Hasta entonces, cloud permanece en ledger 18.
 
 ### Objetivos
@@ -682,7 +683,7 @@ Las reglas siguientes describen el comportamiento integrado en `development`; no
 - El runner demo append-only aplicó localmente los fixtures descritos arriba sin reescribir historial ni modificar los 53 objetos/tablas previos. La carga demo de producción permanece autorizada solo después del gate/release y no se ha ejecutado.
 - La configuración SMTP cloud y local está aplicada sin exponer secretos; recepción de prueba local confirmada. Esto no verifica recovery end-to-end ni Google OAuth: el callback local actual `http://127.0.0.1:55321/auth/v1/callback` aún requiere autorización manual en Google Console.
 
-Las pruebas focales descritas son resultados de sus respectivos heads. No se afirma un único full E2E 127/127; el cierre restante es revisión visual responsive/accesible y cierre coordinado del gate. No repetir suites completas por agente.
+Las pruebas focales y full citadas corresponden a sus heads, no a una única ejecución agregada. Revisión visual y gate local están cerrados con el alcance de evidencia detallado arriba; no se afirma un full E2E único 127/127. El release cloud/master permanece pendiente.
 
 ## FASE 7 — EVALUACIONES Y NOTAS
 

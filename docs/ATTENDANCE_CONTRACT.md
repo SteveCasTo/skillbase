@@ -18,8 +18,9 @@ los cambios posteriores de consistencia/pruebas están en PRs 204–205 y 207–
 Supabase local canónico aplicó 0018/0019 sin reset y quedó en ledger 20,
 preservando 53 tablas. Cloud/`master` permanecen en Fase 5/ledger 18; 0019
 no se ha aplicado en cloud. El E2E 126/127 y la revalidación focal 1/1 del
-locator corregido son ejecuciones separadas, no un solo full run 127/127;
-revisión visual y cierre coordinado del gate/release siguen pendientes.
+locator corregido son ejecuciones separadas, no un solo full run 127/127. La
+revisión visual final y el gate local están cerrados con esa evidencia; release
+y migración cloud siguen pendientes.
 
 ## Casos de uso para UI y loaders
 
