@@ -1,4 +1,4 @@
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, eq, ne, sql, inArray } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { GroupRepository } from "@/application/groups/group-repository";
 import {
@@ -10,6 +10,13 @@ import {
 import * as schema from "@/server/db/schema";
 import { occupiedSeats } from "./registration-support";
 import { cancelRegisteredGroup } from "./registered-group-cancellation";
+import {
+  ensureGroupSessions,
+  cancelFutureGroupSessions,
+  replanFutureGroupSessions,
+} from "./attendance-calendar";
+import { instructorSchedulesOverlap } from "@/domain/instructors/schedule";
+import { AttendanceError } from "@/domain/attendance/rules";
 import {
   instructorHasConflict,
   lockInstructorSchedules,
@@ -100,10 +107,28 @@ export class DrizzleGroupRepository implements GroupRepository {
           except ? ne(schema.groups.id, except) : undefined,
         ),
       );
+    const actual = existing.length
+      ? await tx
+          .select()
+          .from(schema.groupSessions)
+          .where(
+            inArray(
+              schema.groupSessions.groupId,
+              existing.map((g) => g.id),
+            ),
+          )
+      : [];
     if (
-      existing.some((row) =>
-        overlaps(startsAt, endsAt, row.startsAt, row.endsAt),
-      )
+      existing.some((row) => {
+        const sessions = actual.filter((r) => r.groupId === row.id);
+        return sessions.length
+          ? sessions.some(
+              (r) =>
+                !r.cancelledAt &&
+                instructorSchedulesOverlap({ startsAt, endsAt }, r),
+            )
+          : overlaps(startsAt, endsAt, row.startsAt, row.endsAt);
+      })
     )
       throw new GroupError(
         "SCHEDULE_CONFLICT",
@@ -175,6 +200,7 @@ export class DrizzleGroupRepository implements GroupRepository {
         })
         .returning();
       if (!row) throw new Error("Group insert failed");
+      await ensureGroupSessions(tx, row, this.clock(), actorId);
       await this.audit(tx, actorId, row, "GROUP_CREATED", {
         capacity,
         startTime,
@@ -241,6 +267,19 @@ export class DrizzleGroupRepository implements GroupRepository {
         if (previous.startsAt.getTime() === plan.startsAt.getTime())
           return previous;
         await this.assertFree(tx, course.id, plan.startsAt, plan.endsAt, id);
+        try {
+          await replanFutureGroupSessions(
+            tx,
+            previous,
+            plan.startsAt,
+            actorId,
+            this.clock(),
+          );
+        } catch (error) {
+          if (error instanceof AttendanceError)
+            throw new GroupError("COURSE_UNAVAILABLE", error.message);
+          throw error;
+        }
         changes = { startsAt: plan.startsAt, endsAt: plan.endsAt };
       } else if (operation === "capacity") {
         assertCapacity(value as number);
@@ -279,6 +318,7 @@ export class DrizzleGroupRepository implements GroupRepository {
           actorId,
           this.clock(),
         );
+        await cancelFutureGroupSessions(tx, previous.id, actorId, this.clock());
         changes = { status: "CANCELLED" };
       }
       const [row] = await tx

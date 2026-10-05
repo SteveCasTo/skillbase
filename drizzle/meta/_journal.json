@@ -134,6 +134,13 @@
       "when": 1791129600000,
       "tag": "0018_optional_payment_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791151576201,
+      "tag": "0019_phase6_attendance",
+      "breakpoints": true
     }
   ]
 }

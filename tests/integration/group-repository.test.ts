@@ -153,7 +153,12 @@ test("adjacency and other courses work; updates, cancellation and audit retain h
     )
       .map((r) => r.action)
       .sort(),
-  ).toEqual(["GROUP_CANCELLED", "GROUP_CAPACITY_CHANGED", "GROUP_CREATED"]);
+  ).toEqual([
+    "GROUP_CANCELLED",
+    "GROUP_CAPACITY_CHANGED",
+    "GROUP_CREATED",
+    "SESSION_CALENDAR_GENERATED",
+  ]);
 });
 
 test("concurrent creates serialize on course row; failed writes leave no audit", async () => {
@@ -252,7 +257,7 @@ test("publication is tracked per group, including publication after draft creati
     )
       .map((event) => event.action)
       .sort(),
-  ).toEqual(["GROUP_CREATED", "GROUP_DELETED"]);
+  ).toEqual(["GROUP_CREATED", "GROUP_DELETED", "SESSION_CALENDAR_GENERATED"]);
   await expect(
     database.db.delete(groups).where(eq(groups.id, exposed.id)).execute(),
   ).rejects.toThrow();
@@ -398,7 +403,7 @@ test("parallel delete and cancellation serialize and stale attempts leave no ext
         .from(auditEvents)
         .where(eq(auditEvents.entityId, group.id))
     ).filter((event) => event.action !== "GROUP_CREATED"),
-  ).toHaveLength(1);
+  ).toHaveLength(2); // Calendar generation plus exactly one successful lifecycle operation.
 });
 
 test("deletion rejects stale revisions and rolls back if audit cannot be written", async () => {
