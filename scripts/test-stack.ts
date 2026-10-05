@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import {
+  cpSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -11,6 +12,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { e2ePort, e2eSiteUrl } from "./e2e-port";
+import { withoutExternalSmtp } from "./supabase-test-email";
 
 import {
   getLocalSupabaseEnvironment,
@@ -94,6 +96,9 @@ export async function runWithTestStack(command: string[]): Promise<number> {
     "TEST_SUPABASE_SERVICE_ROLE_KEY",
     "TEST_SUPABASE_WORKDIR",
     "TEST_SUPABASE_PROJECT_ID",
+    "SUPABASE_AUTH_SMTP_USER",
+    "SUPABASE_AUTH_SMTP_PASS",
+    "SUPABASE_AUTH_SMTP_ADMIN_EMAIL",
   ])
     delete env[key];
   let started = false;
@@ -125,7 +130,7 @@ export async function runWithTestStack(command: string[]): Promise<number> {
       "[edge_runtime]": edge!,
     };
     let section = "";
-    const config = original.replace(/^.*$/gmu, (line) => {
+    const config = withoutExternalSmtp(original).replace(/^.*$/gmu, (line) => {
       if (/^\[[^\]]+\]$/u.test(line)) section = line;
       if (/^project_id = /u.test(line)) return `project_id = "${projectId}"`;
       if (section === "[auth]" && /^site_url = /u.test(line))
@@ -141,6 +146,11 @@ export async function runWithTestStack(command: string[]): Promise<number> {
       return line;
     });
     mkdirSync(join(workdir, "supabase"));
+    cpSync(
+      join(root, "supabase", "templates"),
+      join(workdir, "supabase", "templates"),
+      { recursive: true },
+    );
     writeFileSync(join(workdir, "supabase", "config.toml"), config);
     // No migrations, seed, .env or Docker state are copied from the working project.
     started = true; // start can partially create containers before failing

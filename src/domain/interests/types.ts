@@ -40,6 +40,8 @@ export type AdminInterestSummaryDto = {
 export type AdminInterestCourseDto = {
   course: { id: string; name: string };
   registrations: AdminInterestRegistrationDto[];
+  /** Same-course interest IDs not yet linked to any registration (including cancelled). */
+  availableForPrefillInterestIds: string[];
   metrics: AdminInterestMetricsDto;
   groups: {
     id: string;

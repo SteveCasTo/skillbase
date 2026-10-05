@@ -9,8 +9,14 @@ const amounts = [
   ["Precio aplicado", registration.price.totalPriceCents],
   ["Efectivo recibido", registration.paidCents],
   ["Saldo pendiente", registration.balanceCents],
-  ["Devuelto", registration.refundedCents],
-  ["Devolución pendiente", registration.refundDueCents],
+  ...(registration.refundedCents > 0 ||
+  registration.refundDueCents > 0 ||
+  registration.state === "CANCELLED"
+    ? ([
+        ["Devuelto", registration.refundedCents],
+        ["Devolución pendiente", registration.refundDueCents],
+      ] as const)
+    : []),
 ] as const;
 ---
 
@@ -39,15 +45,6 @@ const amounts = [
       </div>
     ))}
   </dl>
-  <p class="mt-5 text-sm text-muted-foreground">
-    Tarifa conservada al registrar. Límite de regularización (exclusivo):{" "}
-    {new Intl.DateTimeFormat("es-BO", {
-      timeZone: "America/La_Paz",
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(registration.paymentDeadlineExclusive))}
-    , Bolivia.
-  </p>
   {registration.refundDueCents > 0 && (
     <p class="mt-3 text-sm">
       La devolución sigue pendiente hasta registrar el efectivo realmente

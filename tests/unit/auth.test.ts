@@ -96,6 +96,7 @@ describe("private route policies and caching", () => {
     expect(Object.keys(PRIVATE_ROUTE_POLICIES).sort()).toEqual([
       "/app",
       "/app/configuracion",
+      "/app/configuracion/asistencia",
       "/app/cursos",
       "/app/cursos/imagen",
       "/app/cursos/nuevo",

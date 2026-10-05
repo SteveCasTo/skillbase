@@ -1,5 +1,4 @@
 import { navigate } from "astro:transitions/client";
-import { buttonVariants } from "@/components/ui/button";
 import {
   bindRegistrationMutation,
   initializeRegistrationForms,
@@ -102,7 +101,7 @@ function bindForms() {
             event.preventDefault();
         });
       const label = form.hasAttribute("data-participant-edit")
-        ? "Ficha global actualizada"
+        ? "Datos actualizados"
         : form.hasAttribute("data-cancellation-form")
           ? "Preinscripción cancelada"
           : "Operación registrada";
@@ -119,30 +118,45 @@ function bindForms() {
             return;
           }
           if (value.kind === "participant") {
-            // Reconcile baseline and optimistic revision before registration:updated.
-            form.dataset.participantBaseline = JSON.stringify(
-              value.participant,
-            );
-            const revision = form.elements.namedItem("revision");
-            if (revision instanceof HTMLInputElement)
-              revision.value = revision.defaultValue =
-                value.participant.revision;
-            for (const field of [
-              "ci",
-              "firstName",
-              "lastName",
-              "email",
-              "phone",
-            ] as const) {
-              const input = form.elements.namedItem(field);
-              if (input instanceof HTMLInputElement)
-                input.value = input.defaultValue =
-                  value.participant[field] ?? "";
-            }
+            document
+              .querySelectorAll<HTMLFormElement>("[data-participant-edit]")
+              .forEach((peer) => {
+                peer.dataset.participantBaseline = JSON.stringify(
+                  value.participant,
+                );
+                const revision = peer.elements.namedItem("revision");
+                if (revision instanceof HTMLInputElement)
+                  revision.value = revision.defaultValue =
+                    value.participant.revision;
+                for (const field of [
+                  "ci",
+                  "firstName",
+                  "lastName",
+                  "email",
+                  "phone",
+                ] as const) {
+                  const input = peer.elements.namedItem(field);
+                  if (input instanceof HTMLInputElement) {
+                    const dirty = input.value !== input.defaultValue;
+                    input.defaultValue = value.participant[field] ?? "";
+                    if (peer === form || input.type === "hidden" || !dirty)
+                      input.value = input.defaultValue;
+                  }
+                }
+                const display = peer.querySelector<HTMLElement>(
+                  "[data-inline-value]",
+                );
+                const field = peer.dataset.editField as
+                  "ci" | "firstName" | "lastName" | "email" | "phone";
+                if (display)
+                  display.textContent =
+                    value.participant[field] || "No indicado";
+              });
             const error = form.querySelector<HTMLElement>("[data-form-error]");
             if (error) error.textContent = "";
             return;
           }
+          form.dispatchEvent(new Event("registration:closing"));
           await refreshDetail(value);
         },
         successMessage: label,
@@ -159,6 +173,89 @@ function bindLookup() {
         "[data-participant-search]",
       );
       if (!root) return;
+      const selectPerson = (
+        person: ParticipantDto | AdminInterestRegistrationDto,
+        global: boolean,
+      ) => {
+        const form = document.getElementById(root.dataset.targetForm ?? "");
+        if (!(form instanceof HTMLFormElement) || form.dataset.pending) return;
+        const fields = {
+          ci: "ci" in person ? person.ci : "",
+          firstName: person.firstName,
+          lastName: person.lastName,
+          email: person.email,
+          phone: person.phone ?? "",
+        };
+        Object.entries(fields).forEach(([name, value]) => {
+          const input = form.elements.namedItem(name);
+          if (input instanceof HTMLInputElement) {
+            input.value = value;
+            input.readOnly = global;
+          }
+        });
+        const source = form.elements.namedItem("sourceInterestId");
+        if (source instanceof HTMLInputElement)
+          source.value = global ? "" : person.id;
+        const selected = root.querySelector<HTMLElement>(
+          "[data-selected-person]",
+        );
+        if (selected)
+          selected.textContent = `${person.firstName} ${person.lastName} · ${person.email}`;
+        const clear = root.querySelector<HTMLButtonElement>(
+          "[data-clear-person]",
+        );
+        if (clear) clear.hidden = false;
+        root
+          .querySelector<HTMLElement>("[data-search-results]")
+          ?.replaceChildren();
+        form.dispatchEvent(new Event("change", { bubbles: true }));
+        const target = global
+          ? form.querySelector<HTMLElement>('[data-slot="select-trigger"]')
+          : form.elements.namedItem("ci");
+        if (target instanceof HTMLElement) target.focus();
+      };
+      root
+        .querySelectorAll<HTMLAnchorElement>("[data-choose-person]")
+        .forEach((link) =>
+          link.addEventListener("click", (event) => {
+            event.preventDefault();
+            selectPerson(
+              JSON.parse(link.dataset.person!) as
+                ParticipantDto | AdminInterestRegistrationDto,
+              link.dataset.kind === "participant",
+            );
+          }),
+        );
+      root
+        .querySelector<HTMLButtonElement>("[data-clear-person]")
+        ?.addEventListener("click", (event) => {
+          const form = document.getElementById(root.dataset.targetForm ?? "");
+          if (!(form instanceof HTMLFormElement) || form.dataset.pending)
+            return;
+          for (const name of [
+            "ci",
+            "firstName",
+            "lastName",
+            "email",
+            "phone",
+            "sourceInterestId",
+          ]) {
+            const input = form.elements.namedItem(name);
+            if (input instanceof HTMLInputElement) {
+              input.value = "";
+              input.readOnly = false;
+            }
+          }
+          const selected = root.querySelector<HTMLElement>(
+            "[data-selected-person]",
+          );
+          if (selected) selected.textContent = "";
+          if (event.currentTarget instanceof HTMLButtonElement)
+            event.currentTarget.hidden = true;
+          form.dispatchEvent(new Event("change", { bubbles: true }));
+          const ci = form.elements.namedItem("ci");
+          if (ci instanceof HTMLElement) ci.focus();
+        });
       bindParticipantLookup(root, {
         load: async (query, signal) => {
           const params = new URLSearchParams({ search: query });
@@ -192,88 +289,48 @@ function bindLookup() {
           ].slice(0, 30);
           for (const { person, global } of people) {
             const item = document.createElement("li");
-            item.className = "min-w-0 py-4";
+            item.className = "min-w-0";
             const title = document.createElement("p");
             title.className = "break-words font-medium";
             title.textContent = `${person.firstName} ${person.lastName}`;
             const note = document.createElement("p");
             note.className = "mt-1 break-words text-sm text-muted-foreground";
-            note.textContent =
-              global && "ci" in person
-                ? `Ficha global · CI ${person.ci}`
-                : `Interesado · ${person.email}`;
+            note.textContent = person.email;
             const button = document.createElement("button");
             button.type = "button";
-            button.className = buttonVariants({
-              variant: "outline",
-              className: "mt-3 min-h-11",
-            });
-            button.textContent = "Usar datos";
+            button.className =
+              "flex min-h-11 w-full flex-col gap-1 px-4 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring";
             button.addEventListener("click", () => {
-              const form = document.getElementById(
-                root.dataset.targetForm ?? "",
-              );
-              if (!(form instanceof HTMLFormElement) || form.dataset.pending)
-                return;
-              const fields = {
-                ci: "ci" in person ? person.ci : "",
-                firstName: person.firstName,
-                lastName: person.lastName,
-                email: person.email,
-                phone: person.phone ?? "",
-              };
-              Object.entries(fields).forEach(([name, value]) => {
-                const input = form.elements.namedItem(name);
-                if (input instanceof HTMLInputElement) {
-                  input.value = value;
-                  input.readOnly = global;
-                }
-              });
-              const source = form.elements.namedItem("sourceInterestId");
-              if (!global && source instanceof HTMLInputElement)
-                source.value = person.id;
-              const origin = form.querySelector<HTMLElement>(
-                "[data-source-origin]",
-              );
-              if (origin && source instanceof HTMLInputElement)
-                origin.hidden = !source.value;
-              const selected = root.querySelector<HTMLElement>(
-                "[data-selected-person]",
-              );
-              if (selected)
-                selected.textContent = global
-                  ? "Ficha global seleccionada. Cambia sus datos desde la página dedicada de ficha global."
-                  : "Interesado seleccionado. Completa el CI; el interés público se conserva.";
-              const clear = root.querySelector<HTMLButtonElement>(
-                "[data-clear-person]",
-              );
-              if (clear) clear.hidden = false;
-              form.dispatchEvent(new Event("change", { bubbles: true }));
-              const target = global
-                ? form.querySelector<HTMLElement>(
-                    '[data-slot="select-trigger"]',
-                  )
-                : form.elements.namedItem("ci");
-              if (target instanceof HTMLElement) target.focus();
+              selectPerson(person, global);
             });
-            if (root.dataset.targetForm) item.append(title, note, button);
-            else {
+            if (root.dataset.targetForm) {
+              button.append(title, note);
+              item.append(button);
+            } else {
               const link = document.createElement("a");
-              link.className = buttonVariants({
-                variant: "outline",
-                className: "mt-3 min-h-11",
-              });
+              link.className =
+                "flex h-full min-w-0 flex-col gap-2 rounded-xl border p-5 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring";
               link.href = `/app/preinscripciones?${new URLSearchParams({ search: "ci" in person ? person.ci : person.firstName })}`;
-              link.textContent = "Ver preinscripciones";
-              item.append(title, note, link);
+              link.append(title);
+              if ("ci" in person) {
+                const ci = document.createElement("p");
+                ci.className = "break-words text-sm text-muted-foreground";
+                ci.textContent = `CI: ${person.ci}`;
+                link.append(ci);
+              }
+              link.append(note);
+              item.append(link);
             }
             list.append(item);
           }
           const empty = root.querySelector<HTMLElement>("[data-search-empty]");
           if (empty) {
-            empty.hidden = people.length > 0;
-            empty.textContent =
-              "Sin coincidencias. Puedes completar la ficha directamente.";
+            const query =
+              root
+                .querySelector<HTMLInputElement>('input[name="search"]')
+                ?.value.trim() ?? "";
+            empty.hidden = people.length > 0 || query.length < 2;
+            empty.textContent = "Sin coincidencias.";
           }
         },
       });
@@ -285,8 +342,11 @@ function bindFilters() {
   form.dataset.httpBound = "true";
   let controller: AbortController | undefined;
   let generation = 0;
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  form
+    .querySelector<HTMLElement>("[data-filter-submit]")
+    ?.setAttribute("hidden", "");
+  const run = async () => {
     const token = ++generation;
     controller?.abort();
     controller = new AbortController();
@@ -322,12 +382,30 @@ function bindFilters() {
       );
       if (token !== generation) return;
       if (!updated || !region) throw new Error("Missing list");
-      region.replaceWith(document.importNode(updated, true));
+      // Keep the form and focused controls mounted; only course-dependent groups
+      // and the result region are replaced. Last-request-wins protects both.
+      const currentGroup = form.querySelector<HTMLElement>(
+        "[data-group-filter]",
+      );
+      const newGroup = updated.querySelector<HTMLElement>(
+        "[data-group-filter]",
+      );
+      const oldCourse = form.dataset.appliedCourse ?? "";
+      const course = params.get("courseId") ?? "";
+      if (oldCourse !== course && currentGroup && newGroup) {
+        currentGroup.replaceWith(document.importNode(newGroup, true));
+        form.dataset.appliedCourse = course;
+      }
+      const returnedForm = updated.querySelector("#registration-filters");
+      returnedForm?.remove();
+      [...region.children]
+        .filter((child) => child !== form)
+        .forEach((child) => child.remove());
+      [...updated.children].forEach((child) =>
+        region.append(document.importNode(child, true)),
+      );
       history.replaceState(history.state, "", url);
       initializeRegistrationHttp();
-      document
-        .querySelector<HTMLInputElement>("#registration-filters-search")
-        ?.focus();
     } catch {
       if (token === generation && error)
         error.textContent =
@@ -338,6 +416,36 @@ function bindFilters() {
         if (loading) loading.hidden = true;
       }
     }
+  };
+  const invalidate = () => {
+    ++generation;
+    controller?.abort();
+    clearTimeout(timer);
+  };
+  form.dataset.appliedCourse =
+    (form.elements.namedItem("courseId") as HTMLSelectElement)?.value ?? "";
+  form.addEventListener("input", (event) => {
+    if (
+      !(event.target instanceof HTMLInputElement) ||
+      event.target.name !== "search"
+    )
+      return;
+    invalidate();
+    timer = setTimeout(() => void run(), 250);
+  });
+  form.addEventListener("change", (event) => {
+    if (!(event.target instanceof HTMLSelectElement)) return;
+    invalidate();
+    if (event.target.name === "courseId") {
+      const group = form.elements.namedItem("groupId");
+      if (group instanceof HTMLSelectElement) group.value = "";
+    }
+    void run();
+  });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    invalidate();
+    void run();
   });
 }
 function bindExports() {

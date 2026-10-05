@@ -56,7 +56,7 @@ async function clear() {
   await database.db.execute(
     // Runner-owned isolated test database only: explicit fixture cleanup, never
     // the production/local demo reset allowlist and never CASCADE.
-    sql`truncate registration_ledger, pre_registrations, registration_command_receipts, participants, registration_settings, interest_registrations, course_instructor_history, groups, courses, course_type_revisions, course_types RESTRICT`,
+    sql`truncate participant_attendance, instructor_attendance, session_roster, attendance_command_receipts, group_sessions, registration_ledger, pre_registrations, registration_command_receipts, participants, registration_settings, interest_registrations, course_instructor_history, groups, courses, course_type_revisions, course_types RESTRICT`,
   );
   await database.db.execute(
     sql`insert into registration_settings (id) values (1)`,

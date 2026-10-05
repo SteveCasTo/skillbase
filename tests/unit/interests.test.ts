@@ -57,6 +57,7 @@ test("interests reject invalid types, controls, limits, missing and unknown fiel
     { ...input, firstName: "😀".repeat(101) },
     { ...input, lastName: "x".repeat(151) },
     { ...input, phone: "x".repeat(33) },
+    { ...input, phone: "+591 70AB-0000" },
     { ...input, firstName: "\nname" },
     { ...input, phone: "a\u0085b" },
     { ...input, email: "a@b" },

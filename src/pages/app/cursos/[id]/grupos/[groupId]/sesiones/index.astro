@@ -1,0 +1,13 @@
+---
+import AttendanceGroupPage from "@/components/attendance/AttendanceGroupPage.astro";
+if (Astro.request.method !== "GET")
+  return new Response(null, {
+    status: 405,
+    headers: { Allow: "GET", "Cache-Control": "private, no-store" },
+  });
+---
+
+<AttendanceGroupPage
+  courseId={Astro.params.id ?? ""}
+  groupId={Astro.params.groupId ?? ""}
+/>

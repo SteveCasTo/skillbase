@@ -82,7 +82,7 @@ const attemptedValues: ParticipantData | undefined =
     : undefined;
 ---
 
-<PrivateLayout title="Ficha global">
+<PrivateLayout title="Participante">
   <a
     href={
       registrationId
@@ -93,7 +93,7 @@ const attemptedValues: ParticipantData | undefined =
   >
     Volver
   </a>
-  <h1 class="mt-5 text-3xl font-semibold">Ficha global de participante</h1>
+  <h1 class="mt-5 text-3xl font-semibold">Participante</h1>
   {participant ? (
     <div class="mt-8">
       <ParticipantEditForm
@@ -111,7 +111,7 @@ const attemptedValues: ParticipantData | undefined =
       />
       {Astro.url.searchParams.has("success") && (
         <p role="status" class="mt-4 text-sm">
-          Ficha global actualizada.
+          Datos actualizados.
         </p>
       )}
     </div>

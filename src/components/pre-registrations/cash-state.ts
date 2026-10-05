@@ -27,6 +27,7 @@ export function cashFormState(
         reason: values.reason,
       },
       new Date(serverNow),
+      kind === "REFUND",
     );
     if (kind === "REFUND")
       assertRefund(registration.state, registration, cash.amountCents);

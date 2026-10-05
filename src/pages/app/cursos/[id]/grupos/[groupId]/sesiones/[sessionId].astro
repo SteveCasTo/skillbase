@@ -1,0 +1,9 @@
+---
+import AttendanceSessionPage from "@/components/attendance/AttendanceSessionPage.astro";
+import { prepareAttendanceSessionRoute } from "@/components/attendance/session-route";
+const result = await prepareAttendanceSessionRoute(Astro);
+if (result.response) return result.response;
+Astro.response.status = result.status;
+---
+
+{result.props && <AttendanceSessionPage {...result.props} />}

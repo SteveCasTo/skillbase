@@ -3,8 +3,9 @@ import type {
   ParticipantDto,
   ParticipantData,
 } from "@/domain/pre-registrations/types";
-import { buttonVariants } from "@/components/ui/button";
-import ParticipantFields from "./ParticipantFields.astro";
+import { Input } from "@/components/ui/input";
+import InlineEditField from "./InlineEditField.astro";
+import { participantFields } from "./participant-fields";
 interface Props {
   id: string;
   participant: ParticipantDto;
@@ -26,43 +27,85 @@ const {
 } = Astro.props;
 ---
 
-<form
-  id={id}
-  action={action}
-  method="post"
-  data-participant-edit
-  data-last-submitted={
-    Astro.props.lastSubmitted
-      ? JSON.stringify(Astro.props.lastSubmitted)
-      : undefined
-  }
-  data-participant-baseline={JSON.stringify(participant)}
-  class="flex min-w-0 flex-col gap-6"
-  data-astro-reload
->
-  <input type="hidden" name="participantId" value={participant.id} />
-  <input type="hidden" name="revision" value={participant.revision} />
-  <input type="hidden" name="requestKey" value={requestKey} />
-  <p class="rounded-lg border bg-secondary p-4 text-sm">
-    Esta es la ficha global de la misma persona en todos sus cursos. Los cambios
-    no modifican datos públicos de interesados.
-  </p>
-  <p role="alert" data-form-error class="text-sm text-destructive empty:hidden">
-    {message ?? errors.form}
-  </p>
-  <fieldset class="min-w-0">
-    <legend class="mb-4 text-lg font-semibold">Datos de la persona</legend>
-    <ParticipantFields id={id} participant={values} errors={errors} />
-  </fieldset>
-  <button
-    type="submit"
-    class={buttonVariants({
-      className: "min-h-11 w-full sm:w-auto sm:self-start",
-    })}
-  >
-    Guardar cambios
-  </button>
-</form>
+<div class="grid min-w-0 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+  {participantFields.map((field, index) => (
+    <form
+      id={`${id}-${field.name}`}
+      method="post"
+      action={action}
+      data-participant-edit
+      data-edit-field={field.name}
+      data-participant-baseline={JSON.stringify(participant)}
+      data-last-submitted={
+        Astro.props.lastSubmitted
+          ? JSON.stringify(Astro.props.lastSubmitted)
+          : undefined
+      }
+      data-astro-reload
+      class="min-w-0"
+    >
+      <input type="hidden" name="participantId" value={participant.id} />
+      <input type="hidden" name="revision" value={participant.revision} />
+      <input
+        type="hidden"
+        name="requestKey"
+        value={index === 0 ? requestKey : crypto.randomUUID()}
+      />
+      {participantFields
+        .filter((other) => other.name !== field.name)
+        .map((other) => (
+          <input
+            type="hidden"
+            name={other.name}
+            value={participant[other.name] ?? ""}
+          />
+        ))}
+      <InlineEditField
+        label={field.label}
+        value={participant[field.name] ?? ""}
+      >
+        <label for={`${id}-${field.name}-input`} class="text-sm font-medium">
+          {field.label}
+        </label>
+        <Input
+          id={`${id}-${field.name}-input`}
+          name={field.name}
+          type={field.type}
+          autoComplete={field.autocomplete}
+          maxLength={field.max}
+          required={field.name !== "phone"}
+          defaultValue={values[field.name] ?? ""}
+          aria-invalid={Boolean(errors[field.name])}
+          aria-describedby={`${id}-${field.name}-error`}
+          className="min-h-11"
+        />
+        <p
+          id={`${id}-${field.name}-error`}
+          data-field-error={field.name}
+          role="alert"
+          class="text-sm text-destructive empty:hidden"
+        >
+          {errors[field.name]}
+        </p>
+        <p
+          data-form-error
+          role="alert"
+          class="text-sm text-destructive empty:hidden"
+        >
+          {errors[field.name] ? message : ""}
+        </p>
+      </InlineEditField>
+    </form>
+  ))}
+</div>
+{message &&
+  !Object.keys(errors).some((name) =>
+    participantFields.some((field) => field.name === name),
+  ) && (
+    <p role="alert" class="mt-4 text-sm text-destructive">
+      {message}
+    </p>
+  )}
 <script>
   import type { ParticipantDto } from "@/domain/pre-registrations/types";
   import { RegistrationError } from "@/domain/pre-registrations/errors";
@@ -71,7 +114,9 @@ const {
     participantValues,
   } from "./presentation";
   import { readFormValues, showFormIssues } from "./registration-client";
+  import { bindPhoneInputs } from "./participant-fields";
   function initialize() {
+    bindPhoneInputs();
     document
       .querySelectorAll<HTMLFormElement>("[data-participant-edit]")
       .forEach((form) => {
@@ -79,7 +124,7 @@ const {
         form.dataset.bound = "true";
         form.noValidate = true;
         const touched = new Set<string>();
-        const update = (all = false) => {
+        const update = (all = false, show = true) => {
           const baseline = JSON.parse(
             form.dataset.participantBaseline!,
           ) as ParticipantDto;
@@ -91,29 +136,29 @@ const {
             if (!(error instanceof RegistrationError)) throw error;
             issues = error.issues;
           }
-          showFormIssues(form, issues, all ? undefined : touched);
+          if (show) showFormIssues(form, issues, all ? undefined : touched);
           const valid =
             Object.keys(issues).length === 0 &&
             normalizedParticipantDirty(values, baseline);
-          const button = form.querySelector<HTMLButtonElement>(
-            'button[type="submit"]',
+          const pending = Boolean(
+            document.querySelector("[data-participant-edit][data-pending]"),
           );
-          if (button) button.disabled = Boolean(form.dataset.pending) || !valid;
-          return valid;
+          const button =
+            form.querySelector<HTMLButtonElement>('[type="submit"]');
+          if (button) button.disabled = pending || !valid;
+          return valid && !pending;
         };
         form.addEventListener("input", () => update());
-        form.addEventListener("reset", () => queueMicrotask(() => update()));
         form.addEventListener("focusout", (event) => {
           if (event.target instanceof HTMLInputElement)
             touched.add(event.target.name);
           update();
         });
-        form.addEventListener("registration:updated", () => update());
+        form.addEventListener("registration:updated", () =>
+          update(false, false),
+        );
         form.addEventListener("submit", (event) => {
-          if (form.dataset.pending || !update(true)) {
-            event.preventDefault();
-            form.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
-          }
+          if (!update(true)) event.preventDefault();
         });
         update();
       });

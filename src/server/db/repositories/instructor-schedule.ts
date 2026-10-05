@@ -1,4 +1,4 @@
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, ne, sql, inArray } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import * as schema from "@/server/db/schema";
 import { instructorSchedulesOverlap } from "@/domain/instructors/schedule";
@@ -82,22 +82,41 @@ export async function instructorHasConflict(
   candidates?: readonly { startsAt: Date; endsAt: Date }[],
 ): Promise<boolean> {
   if (!instructorId) return false;
+  const ownGroups = await tx
+    .select()
+    .from(schema.groups)
+    .where(
+      and(
+        eq(schema.groups.courseId, courseId),
+        eq(schema.groups.status, "PLANNED"),
+      ),
+    );
+  const ownSessions = ownGroups.length
+    ? await tx
+        .select()
+        .from(schema.groupSessions)
+        .where(
+          inArray(
+            schema.groupSessions.groupId,
+            ownGroups.map((g) => g.id),
+          ),
+        )
+    : [];
   const own =
     candidates ??
-    (await tx
-      .select({
-        startsAt: schema.groups.startsAt,
-        endsAt: schema.groups.endsAt,
-      })
-      .from(schema.groups)
-      .where(
-        and(
-          eq(schema.groups.courseId, courseId),
-          eq(schema.groups.status, "PLANNED"),
-        ),
-      ));
+    ownGroups.flatMap<
+      | typeof schema.groups.$inferSelect
+      | typeof schema.groupSessions.$inferSelect
+    >((g) => {
+      const actual = ownSessions.filter((r) => r.groupId === g.id);
+      return actual.length ? actual.filter((r) => !r.cancelledAt) : [g];
+    });
   const others = await tx
-    .select({ startsAt: schema.groups.startsAt, endsAt: schema.groups.endsAt })
+    .select({
+      id: schema.groups.id,
+      startsAt: schema.groups.startsAt,
+      endsAt: schema.groups.endsAt,
+    })
     .from(schema.groups)
     .innerJoin(schema.courses, eq(schema.courses.id, schema.groups.courseId))
     .where(
@@ -107,7 +126,31 @@ export async function instructorHasConflict(
         eq(schema.groups.status, "PLANNED"),
       ),
     );
-  return own.some((a) => others.some((b) => instructorSchedulesOverlap(a, b)));
+  const otherSessions = others.length
+    ? await tx
+        .select()
+        .from(schema.groupSessions)
+        .where(
+          inArray(
+            schema.groupSessions.groupId,
+            others.map((g) => g.id),
+          ),
+        )
+    : [];
+  const operative = others.flatMap((g) => {
+    const actual = otherSessions.filter((r) => r.groupId === g.id);
+    return actual.length ? actual.filter((r) => !r.cancelledAt) : [g];
+  });
+  return own.some((a) =>
+    operative.some((b) => {
+      // Actual sessions may be weekends; recurrence must retain its weekday constraint.
+      const aActual = "ordinal" in a,
+        bActual = "ordinal" in b;
+      return aActual && bActual
+        ? a.startsAt < b.endsAt && b.startsAt < a.endsAt
+        : instructorSchedulesOverlap(a, b);
+    }),
+  );
 }
 
 export async function assertInstructorSchedule(

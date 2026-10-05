@@ -7,6 +7,7 @@ import { REGISTRATION_PARTICIPANT_TYPES } from "@/domain/pre-registrations/types
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MoneyInput from "./MoneyInput";
+import DatePicker from "@/components/ui/date-picker";
 import { boliviaToday } from "@/domain/pre-registrations/time";
 import ParticipantFields from "./ParticipantFields.astro";
 import RegistrationSelect from "./RegistrationSelect";
@@ -100,17 +101,6 @@ const unavailable =
   </p>
   <fieldset class="min-w-0" disabled={unavailable}>
     <legend class="mb-4 text-lg font-semibold">Persona participante</legend>
-    <p class="mb-5 text-sm text-muted-foreground">
-      El CI identifica la ficha global. No se crea una cuenta de acceso.
-    </p>
-    <p
-      data-source-origin
-      hidden={!form.sourceInterest}
-      class="mb-5 rounded-lg border bg-secondary p-3 text-sm"
-    >
-      Origen: interesado del curso. Completa el CI y revisa los datos; este
-      registro no modifica el interés público.
-    </p>
     <ParticipantFields
       id={id}
       readOnly={Astro.props.participantReadonly ?? false}
@@ -128,9 +118,6 @@ const unavailable =
     <legend class="mb-4 text-lg font-semibold">
       Grupo y tipo de participante
     </legend>
-    <p class="mb-5 text-sm text-muted-foreground">
-      {form.course.name} · Inicio {formatDate(form.course.startsAt)}
-    </p>
     <div class="registration-options grid min-w-0 gap-5">
       <RegistrationSelect
         client:load
@@ -150,7 +137,7 @@ const unavailable =
         client:load
         id={`${id}-participantType`}
         name="participantType"
-        label="Tipo (clasificación ADMIN)"
+        label="Tipo de participante"
         value={selectedType}
         error={errors.participantType}
         options={[
@@ -160,10 +147,6 @@ const unavailable =
         ]}
       />
     </div>
-    <p class="mt-3 text-sm text-muted-foreground">
-      Los grupos conservan la misma tarifa del curso. El cupo se confirma al
-      registrar.
-    </p>
   </fieldset>
   <fieldset class="min-w-0 border-t pt-6" disabled={unavailable}>
     <legend class="mb-4 text-lg font-semibold">Precio y primer pago</legend>
@@ -187,10 +170,12 @@ const unavailable =
         </dd>
       </div>
     </dl>
-    <p data-price-discount class="mb-4 text-sm text-muted-foreground">
-      {price.discountPercent
-        ? `Descuento auxiliar: ${price.discountPercent} % sobre tarifa estudiante.`
-        : "Sin descuento aplicado."}
+    <p
+      data-price-discount
+      hidden={selectedType !== "AUXILIARY"}
+      class="mb-4 text-sm text-muted-foreground"
+    >
+      {`Descuento auxiliar: ${price.discountPercent} % sobre tarifa estudiante.`}
     </p>
     {window.firstDay && (
       <label class="mb-5 flex items-start gap-3 text-sm">
@@ -207,8 +192,7 @@ const unavailable =
       </label>
     )}
     <p data-free-notice hidden={!free} class="mb-5 text-sm">
-      Sin movimiento de efectivo. La preinscripción conserva cupo y fechas
-      normales.
+      No requiere pago.
     </p>
     <fieldset
       data-cash-fields
@@ -232,11 +216,24 @@ const unavailable =
         },
         {
           name: "reason",
-          label: "Motivo del pago",
+          label: "Motivo del pago (opcional)",
           type: "text",
-          value: values.reason ?? "Primer pago presencial",
+          value: values.reason ?? "",
         },
       ].map((field) => {
+        if (field.name === "effectiveDate")
+          return (
+            <DatePicker
+              client:load
+              id={`${id}-effectiveDate`}
+              name="effectiveDate"
+              label="Fecha efectiva (Bolivia)"
+              value={field.value}
+              max={boliviaToday(new Date(serverNow))}
+              required={cashAlwaysRequired}
+              error={errors.effectiveDate}
+            />
+          );
         const Control = field.name === "amount" ? MoneyInput : Input;
         return (
           <div
@@ -250,7 +247,10 @@ const unavailable =
               id={`${id}-${field.name}`}
               name={field.name}
               type={field.type}
-              required={cashAlwaysRequired}
+              required={cashAlwaysRequired && field.name !== "reason"}
+              data-money-max={
+                field.name === "amount" ? price.totalPriceCents : undefined
+              }
               maxLength={field.name === "reason" ? 500 : undefined}
               defaultValue={field.value}
               aria-invalid={Boolean(errors[field.name])}
@@ -268,10 +268,6 @@ const unavailable =
         );
       })}
     </fieldset>
-    <p class="mt-4 text-sm text-muted-foreground">
-      Registra solo efectivo recibido. El servidor confirma tarifa, plazo y cupo
-      vigentes.
-    </p>
   </fieldset>
   {unavailable && (
     <p role="status" class="text-sm text-destructive">

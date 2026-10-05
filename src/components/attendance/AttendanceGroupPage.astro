@@ -1,0 +1,67 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
+import SessionList from "./SessionList.astro";
+import { getAttendanceGroup } from "@/application/attendance/manage-attendance";
+import { getAttendanceRepository } from "@/server/attendance/service";
+import { requireInternalUser } from "@/server/auth/context";
+import { attendanceFailure } from "@/server/attendance/http";
+import { attendanceGroupLabel } from "./group-label";
+import type { AttendanceGroupDto } from "@/domain/attendance/types";
+interface Props {
+  courseId: string;
+  groupId: string;
+  instructorRoute?: boolean;
+}
+const { courseId, groupId, instructorRoute = false } = Astro.props;
+const actor = requireInternalUser(Astro.locals);
+let group: AttendanceGroupDto | null = null,
+  label = "Grupo",
+  message = "";
+try {
+  group = await getAttendanceGroup(
+    getAttendanceRepository(),
+    actor,
+    courseId,
+    groupId,
+  );
+  label = await attendanceGroupLabel(actor, courseId, groupId, instructorRoute);
+} catch (error) {
+  group = null;
+  const failure = attendanceFailure(error);
+  message = failure.payload.message;
+  Astro.response.status = failure.status;
+}
+const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
+---
+
+<PrivateLayout title="Sesiones del grupo">
+  <nav
+    aria-label="Ruta de navegación"
+    class="flex flex-wrap gap-2 text-sm text-muted-foreground"
+  >
+    <a href={prefix} class="min-h-11 underline underline-offset-4">
+      {instructorRoute ? "Mis cursos" : "Cursos"}
+    </a>
+    <span aria-hidden="true">/</span>
+    <a
+      href={`${prefix}/${courseId}${instructorRoute ? "" : "/grupos"}`}
+      class="min-h-11 break-words underline underline-offset-4"
+    >
+      {group?.courseName ?? "Curso"}
+    </a>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">{label}</span>
+  </nav>
+  <h1 class="mt-5 text-3xl font-semibold tracking-tight">{label}</h1>
+  {group ? (
+    <div class="mt-8">
+      <SessionList
+        {group}
+        sessionBase={`${prefix}/${courseId}/grupos/${groupId}/sesiones`}
+      />
+    </div>
+  ) : (
+    <RegistrationPageError {message} retryHref={Astro.url.pathname} />
+  )}
+</PrivateLayout>
