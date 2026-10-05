@@ -1,0 +1,152 @@
+---
+import type {
+  AttendanceMarkDto,
+  AttendanceParticipantDto,
+} from "@/domain/attendance/types";
+import {
+  ATTENDANCE_LABELS,
+  ATTENDANCE_STATUSES,
+} from "@/domain/attendance/types";
+import RegistrationSelect from "@/components/pre-registrations/RegistrationSelect";
+import { buttonVariants } from "@/components/ui/button";
+import { markValue, dateLabel, timeLabel } from "./presentation";
+interface Props {
+  id: string;
+  name: string;
+  mark: AttendanceMarkDto;
+  revision: number;
+  action: string;
+  canEdit: boolean;
+  registrationId?: string;
+  participant?: AttendanceParticipantDto;
+  candidate?: boolean;
+  values?: Readonly<Record<string, string>>;
+  errors?: Readonly<Record<string, string>>;
+  message?: string | undefined;
+}
+const {
+  id,
+  name,
+  mark,
+  revision,
+  action,
+  canEdit,
+  registrationId,
+  participant,
+  candidate = false,
+  values = {},
+  errors = {},
+  message,
+} = Astro.props;
+const field = registrationId ? "marks" : "instructorStatus";
+const baseline = registrationId
+  ? markValue(registrationId, mark.status)
+  : mark.status === "PENDING"
+    ? ""
+    : mark.status;
+const options = ATTENDANCE_STATUSES.map((status) => ({
+  value: registrationId ? markValue(registrationId, status) : status,
+  label: ATTENDANCE_LABELS[status],
+}));
+---
+
+<article class="min-w-0 py-5" aria-labelledby={`${id}-name`}>
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <h3 id={`${id}-name`} class="break-words font-semibold">
+      {name}
+    </h3>
+    {participant && !participant.academicallyEligible ? (
+      <p class="text-sm text-destructive">
+        {participant.maximumConsecutiveAbsences} faltas consecutivas · Sin
+        reconocimiento
+      </p>
+    ) : (
+      participant?.warning && (
+        <p class="text-sm text-destructive">
+          {participant.consecutiveAbsences} faltas consecutivas
+        </p>
+      )
+    )}
+  </div>
+  {canEdit ? (
+    <form
+      id={id}
+      aria-labelledby={`${id}-name`}
+      method="post"
+      action={action}
+      data-attendance-form
+      data-attendance-operation="record"
+      data-baseline={JSON.stringify({ [field]: baseline })}
+      data-last-submitted={
+        Object.keys(values).length ? JSON.stringify(values) : undefined
+      }
+      class="mt-3 flex min-w-0 flex-col gap-3"
+    >
+      <input
+        type="hidden"
+        name="revision"
+        value={values.revision ?? revision}
+      />
+      <input
+        type="hidden"
+        name="requestKey"
+        value={values.requestKey ?? crypto.randomUUID()}
+      />
+      {candidate && registrationId && (
+        <input
+          type="hidden"
+          name="reviewRegistrationIds"
+          value={JSON.stringify([registrationId])}
+        />
+      )}
+      <div class="flex min-w-0 flex-col items-start gap-3 sm:flex-row sm:items-end">
+        <div class="w-full min-w-0 sm:max-w-xs">
+          <RegistrationSelect
+            client:load
+            id={`${id}-status`}
+            name={field}
+            label="Estado"
+            value={values[field] ?? baseline}
+            required
+            placeholder="Pendiente"
+            options={options}
+            error={errors[field]}
+          />
+        </div>
+        <button
+          type="submit"
+          class={buttonVariants({ className: "min-h-11 w-full sm:w-auto" })}
+        >
+          {candidate ? "Añadir y registrar" : "Guardar"}
+        </button>
+      </div>
+      <p
+        data-form-error
+        role="alert"
+        class="text-sm text-destructive empty:hidden"
+      >
+        {message}
+      </p>
+    </form>
+  ) : (
+    <p class="mt-2 text-sm">{ATTENDANCE_LABELS[mark.status]}</p>
+  )}
+  {mark.inferred ? (
+    <p class="mt-2 text-sm text-muted-foreground">
+      Sin marca al cierre del día.
+    </p>
+  ) : (
+    mark.markedByName &&
+    mark.markedAt && (
+      <p class="mt-2 text-sm text-muted-foreground">
+        Marcado por {mark.markedByName} ·{" "}
+        <time datetime={mark.markedAt}>
+          {dateLabel(mark.markedAt)}, {timeLabel(mark.markedAt)}
+        </time>
+      </p>
+    )
+  )}
+  {participant && !participant.currentlyEnrolled && (
+    <p class="mt-2 text-sm text-muted-foreground">Inscripción inactiva</p>
+  )}
+</article>

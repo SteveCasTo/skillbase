@@ -222,6 +222,12 @@ const prototype: Group = {
                 <h3 id={`group-${group.id}`} class="font-semibold">
                   Grupo {index + 1}
                 </h3>
+                <a
+                  href={`/app/cursos/${course.id}/grupos/${group.id}/sesiones`}
+                  class="inline-flex min-h-11 items-center text-sm underline underline-offset-4"
+                >
+                  Sesiones y asistencia
+                </a>
                 <span
                   data-group-inactive
                   hidden={group.status !== "CANCELLED"}

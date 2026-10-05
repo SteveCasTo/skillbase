@@ -12,6 +12,10 @@ import { RegistrationError } from "@/domain/pre-registrations/errors";
 import { validateRegistrationId } from "@/domain/pre-registrations/validation";
 import { registrationFailure } from "@/server/pre-registrations/http";
 import type { InstructorRosterEntryDto } from "@/domain/pre-registrations/types";
+import type { AttendanceGroupDto } from "@/domain/attendance/types";
+import { getAttendanceGroup } from "@/application/attendance/manage-attendance";
+import { getAttendanceRepository } from "@/server/attendance/service";
+import SessionList from "@/components/attendance/SessionList.astro";
 if (Astro.request.method !== "GET")
   return new Response(null, { status: 405, headers: { Allow: "GET" } });
 Astro.response.headers.set("Cache-Control", "private, no-store");
@@ -20,6 +24,8 @@ let assigned: Awaited<ReturnType<typeof getAssignedCourse>> = null;
 let entries: readonly InstructorRosterEntryDto[] = [];
 let available = false;
 let message = "";
+let attendanceGroup: AttendanceGroupDto | null = null;
+let attendanceMessage = "";
 try {
   const courseId = validateRegistrationId(Astro.params.id, "courseId");
   const groupId = validateRegistrationId(Astro.params.groupId, "groupId");
@@ -39,6 +45,18 @@ try {
       courseId,
       groupId,
     );
+  try {
+    attendanceGroup = await getAttendanceGroup(
+      getAttendanceRepository(),
+      actor,
+      courseId,
+      groupId,
+    );
+  } catch {
+    attendanceMessage =
+      "No se pudieron cargar las sesiones. Recarga para reintentar.";
+    Astro.response.status = 503;
+  }
 } catch (error) {
   const failure = registrationFailure(error);
   Astro.response.status = failure.status;
@@ -60,7 +78,18 @@ try {
   {message ? (
     <RegistrationPageError {message} />
   ) : (
-    <div class="mt-8">
+    <div class="mt-8 flex flex-col gap-8">
+      {attendanceGroup && (
+        <SessionList
+          group={attendanceGroup}
+          sessionBase={`/app/mis-cursos/${Astro.params.id}/grupos/${Astro.params.groupId}/sesiones`}
+        />
+      )}
+      {attendanceMessage && (
+        <p role="alert" class="text-sm text-destructive">
+          {attendanceMessage}
+        </p>
+      )}
       <InstructorRoster {entries} {available} />
     </div>
   )}

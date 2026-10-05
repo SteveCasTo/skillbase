@@ -142,7 +142,7 @@ export function bindRegistrationMutation<T>(
             peer.dispatchEvent(new Event("registration:updated")),
           );
       const firstError = form.querySelector<HTMLElement>(
-        '[aria-invalid="true"]:not([hidden])',
+        '[aria-invalid="true"]:not([hidden]):not([type="hidden"])',
       );
       if (firstError) firstError.focus();
       else if (

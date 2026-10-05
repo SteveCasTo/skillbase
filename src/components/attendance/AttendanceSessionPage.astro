@@ -1,0 +1,81 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
+import AttendanceSessionPanel from "./AttendanceSessionPanel.astro";
+import type { AttendanceSessionPageProps } from "./session-route";
+type Props = AttendanceSessionPageProps;
+const {
+  detail,
+  path,
+  groupLabel,
+  instructorRoute,
+  isAdmin,
+  correction,
+  fragment,
+  values,
+  errors,
+  message,
+  failedOperation,
+} = Astro.props;
+const listPath = path.slice(0, path.lastIndexOf("/"));
+---
+
+{fragment && detail ? (
+  <AttendanceSessionPanel {detail} {path} {isAdmin} {correction} />
+) : (
+  <PrivateLayout title="Asistencia de sesión">
+    <nav
+      aria-label="Ruta de navegación"
+      class="mb-5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+    >
+      <a
+        href={instructorRoute ? "/app/mis-cursos" : "/app/cursos"}
+        class="min-h-11 underline underline-offset-4"
+      >
+        {instructorRoute ? "Mis cursos" : "Cursos"}
+      </a>
+      <span aria-hidden="true">/</span>
+      {detail && (
+        <>
+          <a
+            href={`${instructorRoute ? "/app/mis-cursos" : "/app/cursos"}/${detail.group.courseId}${instructorRoute ? "" : "/grupos"}`}
+            class="min-h-11 break-words underline underline-offset-4"
+          >
+            {detail.group.courseName}
+          </a>
+          <span aria-hidden="true">/</span>
+        </>
+      )}
+      <a
+        href={listPath}
+        class="min-h-11 break-words underline underline-offset-4"
+      >
+        {groupLabel}
+      </a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">Asistencia</span>
+    </nav>
+    {Astro.url.searchParams.get("success") === "attendance" && (
+      <p role="status" class="mb-5 text-sm">
+        Operación registrada.
+      </p>
+    )}
+    {detail ? (
+      <AttendanceSessionPanel
+        {detail}
+        {path}
+        {isAdmin}
+        {correction}
+        {values}
+        {errors}
+        {message}
+        {failedOperation}
+      />
+    ) : (
+      <>
+        <h1 class="text-3xl font-semibold">Sesión no disponible</h1>
+        <RegistrationPageError {message} retryHref={path} />
+      </>
+    )}
+  </PrivateLayout>
+)}
