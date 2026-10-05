@@ -138,11 +138,12 @@ El runner financiero admite la extensión opcional de asistencia en
 ADMIN existente y reloj server-side, y no hace reset. Su PLAN es de solo lectura,
 exige destino/proyecto explícitos y verifica ownership/provenance; preserva
 settings e historial financiero y aborta ante colisiones/ediciones inesperadas.
-La carga APPLY local está en curso y no tiene resultado confirmado en este corte;
-producción no se ejecuta hasta el gate/release autorizado. Ver
-[`FINANCIAL_DEMO.md`](FINANCIAL_DEMO.md). Para sesiones históricas se establece
-roster/revisión explícitos; no se cambian timestamps financieros ni se crean
-cuentas Auth desde tests.
+APPLY local confirmado añadió 28 sesiones, 16 marcas de participante y 4 marcas
+de instructor junto con sus fixtures financieros; los totales y escenarios están
+en [`FINANCIAL_DEMO.md`](FINANCIAL_DEMO.md). Producción no se ejecuta hasta el
+gate/release autorizado. Para sesiones históricas se establece roster/revisión
+explícitos; no se cambian timestamps financieros ni se crean cuentas Auth desde
+tests.
 
 El backend reportó 12 pruebas unitarias y 12 de integración focales; la UI y el
 seed tienen cobertura dirigida propia documentada en el registro de milestone.

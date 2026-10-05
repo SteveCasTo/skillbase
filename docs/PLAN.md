@@ -632,7 +632,7 @@ Las correcciones aprobadas se integraron en `development` mediante PRs 196–199
 - [x] Usar calendario shadcn compartido, mostrar descuento solo para AUXILIARY, retirar copy/banner técnicos y presentar nombre humano del actor.
 - [x] Completar diálogos financieros con importes exactos/validados, razón opcional, UUID/loading/resultado y fallback SSR sin JavaScript.
 - [x] Integrar configuración SMTP protegida local/cloud. Recepción de prueba confirmada por el usuario en local; no se ha verificado clic de recovery/cambio de contraseña ni entrega cloud. Google OAuth real/callback continúa pendiente de forma independiente.
-- [x] Integrar un runner de demo financiero con extensión opcional de asistencia, PLAN de solo lectura, destinos explícitos, provenance estable y abortos conservadores. La carga canónica local está en curso y aún no hay evidencia de APPLY completado; no declarar datos demo aplicados. Producción se mantiene sin operaciones de seed hasta después del release/gate autorizado.
+- [x] Integrar y aplicar localmente el runner demo append-only, con extensión opcional de asistencia, PLAN de solo lectura, destinos explícitos y provenance estable. APPLY confirmado sobre `6813a4c`; los fixtures preservaron el historial previo y no tocaron Auth/roles/perfiles/sesiones/Storage/settings ni ledger. Producción se mantiene sin operaciones de seed hasta después del release/gate autorizado.
 
 El detalle UX se mantiene en `docs/DESIGN.md`, las reglas de secretos/demo en `docs/SECURITY.md` y la configuración de Auth en `docs/AUTHENTICATION.md`.
 
@@ -648,9 +648,9 @@ El módulo incluye calendario de grupo/sesión, permisos ADMIN/INSTRUCTOR, asist
 - [x] Generar/materializar sesiones desde el planificador vigente, preservando cronología y duración de la revisión; cancelación conserva razón y el original, los reemplazos quedan ligados y no extienden horas configuradas.
 - [x] Implementar configuración independiente de ausencia consecutiva (default 3), estados Present/Absent/Excused y `PENDING` derivado. No existe porcentaje ni retraso/tardanza.
 - [x] Integrar páginas SSR/POST para ADMIN e INSTRUCTOR y edición autorizada; roster solo nombres, sin CI/email/finanzas para instructor.
-- [x] Integrar generador de demo optativo para asistencia con PLAN y verificación de destinos/provenance; los scripts no resetean, no reescriben historial financiero y no hacen APPLY implícito. Resultado de APPLY en Supabase local aún no confirmado; producción no se ha tocado.
+- [x] Integrar y ejecutar el generador de demo optativo para asistencia; APPLY confirmado contra `6813a4c`. Se agregaron 5 cursos, 10 grupos, 15 registros, 12 movimientos financieros, 28 sesiones, 16 marcas de participante y 4 del instructor; totales actuales 12 cursos, 23 grupos, 16 registros y 13 movimientos incluyen las filas previas preservadas. Sin operaciones de seed en producción.
 - [x] Añadir cobertura focal de backend, UI y runner; los resultados por PR no constituyen gate completo.
-- [ ] Ejecutar una sola vez el gate combinado final de milestone después de concluir el APPLY/validación de demo local y coordinar el estado real de ese seed.
+- [ ] Completar el gate combinado final de milestone. Está en ejecución sobre un stack aislado congelado en `6813a4c`; aún no hay resultado global disponible.
 - [ ] Promover a `master`, aplicar migraciones autorizadas a cloud y desplegar únicamente tras superar el gate final. Hasta entonces, cloud permanece en ledger 18.
 
 ### Objetivos
@@ -676,7 +676,7 @@ Las reglas siguientes describen el comportamiento integrado en `development`; no
 - Estados de participante: `Presente`, `Ausente`, `Justificada`. La justificación cuenta para asistencia, pero interrumpe la racha de ausencias. No existe estado de tardanza. Para el instructor, la edición se limita al día civil de Bolivia de la clase; ADMIN puede corregir posteriormente con auditoría.
 - Durante el día de la sesión, una asistencia aún no registrada se considera pendiente; al finalizar el día se deriva como ausente. Este resultado debe derivarse sin un job global que inserte ausencias irreversibles; sesiones canceladas se excluyen. Las sesiones históricas generadas siguen pendientes hasta revisión ADMIN.
 - Configuración de asistencia se limita al umbral de ausencias consecutivas: valor inicial 3, configurable. Se advierte al alcanzarlo y se pierde elegibilidad al superarlo (N+1); una justificada interrumpe la racha. No hay subsistema independiente de alertas, expulsión, cancelación automática de cupo ni reembolso. La elegibilidad futura puede bloquear certificados (Fase 9); no se generan certificados en Fase 6.
-- El runner demo está integrado; se mantiene append-only y no repara ni elimina historial. Su APPLY local se encuentra en curso, sin resultado confirmado en este corte. La renovación de producción permanece autorizada solo después del gate/release y no se ha ejecutado.
+- El runner demo append-only aplicó localmente los fixtures descritos arriba sin reescribir historial ni modificar los 53 objetos/tablas previos. La carga demo de producción permanece autorizada solo después del gate/release y no se ha ejecutado.
 - La configuración SMTP cloud y local está aplicada sin exponer secretos; recepción de prueba local confirmada. Esto no verifica recovery end-to-end ni Google OAuth: el callback local actual `http://127.0.0.1:55321/auth/v1/callback` aún requiere autorización manual en Google Console.
 
 La suite de cada agente se limitará a pruebas focales de resultados observables; el gate full combinado se ejecutará una vez al final del milestone.
