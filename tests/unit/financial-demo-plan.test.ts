@@ -1,11 +1,61 @@
 import { expect, test } from "bun:test";
 import {
   assertFinancialTarget,
+  assertFinancialExecution,
   financialDemoPlan,
   financialDemoId,
   PRODUCTION_PROJECT,
 } from "../../scripts/financial-demo-plan";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+
+test("only the exact manual production master workflow may run in CI", () => {
+  const trusted = {
+    CI: "true",
+    GITHUB_ACTIONS: "true",
+    GITHUB_EVENT_NAME: "workflow_dispatch",
+    GITHUB_REF: "refs/heads/master",
+    GITHUB_REPOSITORY: "SteveCasTo/skillbase",
+    GITHUB_WORKFLOW_REF:
+      "SteveCasTo/skillbase/.github/workflows/production-demo.yml@refs/heads/master",
+    GITHUB_SHA: "a".repeat(40),
+    GITHUB_WORKFLOW_SHA: "a".repeat(40),
+  };
+  expect(() =>
+    assertFinancialExecution(trusted, true, "production", PRODUCTION_PROJECT),
+  ).not.toThrow();
+  for (const changed of [
+    { GITHUB_EVENT_NAME: "push" },
+    { GITHUB_EVENT_NAME: "pull_request" },
+    { GITHUB_REF: "refs/heads/development" },
+    { GITHUB_REPOSITORY: "other/skillbase" },
+    { GITHUB_WORKFLOW_REF: "other/workflow@refs/heads/master" },
+    { GITHUB_WORKFLOW_SHA: "b".repeat(40) },
+    { GITHUB_SHA: "invalid" },
+    { GITHUB_ACTIONS: "false" },
+    { CI: "false" },
+    { VERCEL: "1" },
+  ])
+    expect(() =>
+      assertFinancialExecution(
+        { ...trusted, ...changed },
+        true,
+        "production",
+        PRODUCTION_PROJECT,
+      ),
+    ).toThrow("Protected production operator");
+  expect(() =>
+    assertFinancialExecution(trusted, false, "production", PRODUCTION_PROJECT),
+  ).toThrow("Manual operator");
+  expect(() =>
+    assertFinancialExecution({}, true, "production", PRODUCTION_PROJECT),
+  ).toThrow();
+  expect(() =>
+    assertFinancialExecution(trusted, true, "local", "local"),
+  ).toThrow();
+  expect(() =>
+    assertFinancialExecution({}, false, "local", "local"),
+  ).not.toThrow();
+});
 
 test("versioned plan is stable, synthetic, minimum-aware and uses valid group duration", () => {
   const plan = financialDemoPlan("2026-10-04", 25);

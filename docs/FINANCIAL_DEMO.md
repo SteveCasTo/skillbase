@@ -30,6 +30,20 @@ Sin `--apply`, la transacción de inspección es READ ONLY. Consulta configuraci
 
 ## APPLY autorizado
 
+### Operador manual protegido en GitHub
+
+Cuando Vercel devuelve `[SENSITIVE]`, no intentar exportar secretos ni rotar la contraseña como atajo. `.github/workflows/production-demo.yml` usa el secreto existente `production.MIGRATION_DATABASE_URL` **in-place**, junto con `production.DEMO_SUPABASE_SERVICE_ROLE_KEY` y la variable `production.DEMO_ADMIN_ID` del ADMIN existente verificado. La clave servidor se obtiene legítimamente del owner API de Supabase y se guarda cifrada mediante stdin, nunca en Git/logs/artifacts. No se crea una cuenta ni se cambia la identidad del actor.
+
+El workflow solo admite `workflow_dispatch` sobre `master` del repositorio canónico, hace checkout del SHA exacto y respeta el environment `production`. No hay triggers push/PR/schedule ni ejecución en deploy; permisos `contents: read`, concurrencia única con `cancel-in-progress: false`. Las credenciales solo se entregan al paso operador, no a la instalación. La opción CLI `--approved-production-operator` verifica evento, repositorio, ref y workflow/SHA exactos; CI ordinaria, PRs, Vercel y targets alternativos siguen rechazados. No se fuerza `CI=false` ni se debilitan guards de datos/provenance.
+
+```sh
+gh workflow run production-demo.yml --ref master -f mode=plan
+# Revisar el PLAN completado antes de la única aplicación aprobada.
+gh workflow run production-demo.yml --ref master -f mode=apply
+```
+
+`plan` es el default y READ ONLY. Ambos modos fijan proyecto `fvzxqlezdrlzykyoevub`, destino producción y extensión `--attendance`. APPLY sigue usando los mismos casos de uso, transacción atómica y manifiestos append-only; una falla no autoriza reset ni reintento ciego. Verificar después mediante lecturas y un nuevo PLAN; no volver a APPLY solo para comprobar idempotencia.
+
 Solo después de revisar nombres, IDs, fechas y escenarios del PLAN y aprobar el destino:
 
 ```sh
