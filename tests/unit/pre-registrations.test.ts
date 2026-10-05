@@ -23,6 +23,7 @@ import {
 import {
   assertRegistrationPayment,
   assertEligibleDestination,
+  hasAvailableRegistrationDestination,
   assertAdditionalPayment,
   assertCancellation,
   assertTransfer,
@@ -484,6 +485,53 @@ test("phase5 cash date is civil Bolivia, strict and no future dates", () => {
   expect(() => validateCashEffectiveDate("2099-03-03", now)).toThrow();
   expect(() => validateCashEffectiveDate("2099-02-30", now)).toThrow();
   expect(() => validateCashEffectiveDate("2099-3-2", now)).toThrow();
+});
+test("course choices require a live registration window or first-day exception and an eligible group", () => {
+  const expired = new Date("2099-03-03T04:00:00Z");
+  const firstDayAfterClose = new Date("2099-03-02T16:00:00Z");
+  const previousDay = new Date("2099-03-01T16:00:00Z");
+
+  expect(hasAvailableRegistrationDestination(course, [group], before)).toBe(
+    true,
+  );
+  expect(
+    hasAvailableRegistrationDestination(course, [group], firstDayAfterClose),
+  ).toBe(true);
+  expect(
+    hasAvailableRegistrationDestination(course, [group], previousDay),
+  ).toBe(false);
+  expect(hasAvailableRegistrationDestination(course, [group], expired)).toBe(
+    false,
+  );
+  expect(
+    hasAvailableRegistrationDestination(
+      { ...course, status: "DRAFT" },
+      [group],
+      before,
+    ),
+  ).toBe(false);
+  expect(
+    hasAvailableRegistrationDestination(
+      { ...course, instructorActive: false },
+      [group],
+      before,
+    ),
+  ).toBe(false);
+  expect(
+    hasAvailableRegistrationDestination(
+      course,
+      [{ ...group, occupied: 1 }],
+      before,
+    ),
+  ).toBe(false);
+  expect(
+    hasAvailableRegistrationDestination(
+      course,
+      [{ ...group, status: "CANCELLED" }],
+      before,
+    ),
+  ).toBe(false);
+  expect(hasAvailableRegistrationDestination(course, [], before)).toBe(false);
 });
 test("phase5 command validation preserves null default cash date for stable retry fingerprints", () => {
   expect(
