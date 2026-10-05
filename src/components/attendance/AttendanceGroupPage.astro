@@ -1,0 +1,54 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
+import SessionList from "./SessionList.astro";
+import type { AttendanceGroupDto } from "@/domain/attendance/types";
+interface Props {
+  courseId: string;
+  groupId: string;
+  instructorRoute?: boolean;
+  group: AttendanceGroupDto | null;
+  label: string;
+  message: string;
+}
+const {
+  courseId,
+  groupId,
+  instructorRoute = false,
+  group,
+  label,
+  message,
+} = Astro.props;
+const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
+---
+
+<PrivateLayout title="Sesiones del grupo">
+  <nav
+    aria-label="Ruta de navegación"
+    class="flex flex-wrap gap-2 text-sm text-muted-foreground"
+  >
+    <a href={prefix} class="min-h-11 underline underline-offset-4">
+      {instructorRoute ? "Mis cursos" : "Cursos"}
+    </a>
+    <span aria-hidden="true">/</span>
+    <a
+      href={`${prefix}/${courseId}${instructorRoute ? "" : "/grupos"}`}
+      class="min-h-11 break-words underline underline-offset-4"
+    >
+      {group?.courseName ?? "Curso"}
+    </a>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">{label}</span>
+  </nav>
+  <h1 class="mt-5 text-3xl font-semibold tracking-tight">{label}</h1>
+  {group ? (
+    <div class="mt-8">
+      <SessionList
+        {group}
+        sessionBase={`${prefix}/${courseId}/grupos/${groupId}/sesiones`}
+      />
+    </div>
+  ) : (
+    <RegistrationPageError {message} retryHref={Astro.url.pathname} />
+  )}
+</PrivateLayout>

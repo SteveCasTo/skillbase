@@ -78,6 +78,12 @@ export function bindRegistrationMutation<T>(
     keyInput.value = key;
     form.dataset.pending = "true";
     form.setAttribute("aria-busy", "true");
+    if (form.hasAttribute("data-participant-edit"))
+      document
+        .querySelectorAll<HTMLFormElement>("[data-participant-edit]")
+        .forEach((peer) =>
+          peer.dispatchEvent(new Event("registration:updated")),
+        );
     const controls = [
       ...form.querySelectorAll<
         | HTMLInputElement
@@ -102,6 +108,7 @@ export function bindRegistrationMutation<T>(
       if (result.ok) {
         await adapter.onSuccess(result.value);
         notifications.success({ id: toastId, title: adapter.successMessage });
+        form.dispatchEvent(new Event("registration:saved"));
       } else {
         showFormIssues(form, { ...result.issues, form: result.message });
         notifications.error({
@@ -128,10 +135,22 @@ export function bindRegistrationMutation<T>(
       });
       if (button) button.textContent = label;
       form.dispatchEvent(new Event("registration:updated"));
+      if (form.hasAttribute("data-participant-edit"))
+        document
+          .querySelectorAll<HTMLFormElement>("[data-participant-edit]")
+          .forEach((peer) =>
+            peer.dispatchEvent(new Event("registration:updated")),
+          );
       const firstError = form.querySelector<HTMLElement>(
-        '[aria-invalid="true"]:not([hidden])',
+        '[aria-invalid="true"]:not([hidden]):not([type="hidden"])',
       );
-      (firstError ?? button)?.focus();
+      if (firstError) firstError.focus();
+      else if (
+        form.isConnected &&
+        form.querySelector<HTMLElement>("[data-inline-editor][hidden]")
+      )
+        form.querySelector<HTMLElement>("[data-inline-edit]")?.focus();
+      else if (form.isConnected) button?.focus();
     }
   };
   form.addEventListener("submit", handler);
@@ -152,7 +171,7 @@ export function initializeRegistrationForms() {
       ) as RegistrationFormDto;
       const serverNow = form.dataset.serverNow!;
       const touched = new Set<string>();
-      const update = (all = false) => {
+      const update = (all = false, show = true) => {
         const values = readFormValues(form);
         const cash =
           form.querySelector<HTMLFieldSetElement>("[data-cash-fields]");
@@ -162,6 +181,8 @@ export function initializeRegistrationForms() {
             values.participantType as Parameters<typeof pricePreview>[1],
           );
           const free = price.totalPriceCents === 0;
+          if (money instanceof HTMLInputElement)
+            money.dataset.moneyMax = String(price.totalPriceCents);
           if (cash) {
             cash.disabled = free;
             cash.hidden = free;
@@ -187,10 +208,10 @@ export function initializeRegistrationForms() {
                     ? price.totalPriceCents
                     : price.minimumPaymentCents,
                 );
-          if (discount)
-            discount.textContent = price.discountPercent
-              ? `Descuento auxiliar: ${price.discountPercent} % sobre tarifa estudiante.`
-              : "Sin descuento aplicado.";
+          if (discount) {
+            discount.hidden = values.participantType !== "AUXILIARY";
+            discount.textContent = `Descuento auxiliar: ${price.discountPercent} % sobre tarifa estudiante.`;
+          }
         } catch {
           /* Invalid raw selection is reported by domain validation below. */
         }
@@ -199,13 +220,17 @@ export function initializeRegistrationForms() {
           readFormValues(form),
           serverNow,
         );
-        showFormIssues(form, state.issues, all ? undefined : touched);
+        if (show) showFormIssues(form, state.issues, all ? undefined : touched);
         const button = form.querySelector<HTMLButtonElement>(
           'button[type="submit"]',
         );
+        const datesValid = [
+          ...form.querySelectorAll<HTMLInputElement>("[data-civil-control]"),
+        ].every((input) => input.disabled || input.validity.valid);
         if (button)
-          button.disabled = Boolean(form.dataset.pending) || !state.valid;
-        return state.valid;
+          button.disabled =
+            Boolean(form.dataset.pending) || !state.valid || !datesValid;
+        return state.valid && datesValid;
       };
       form.addEventListener("input", () => update());
       form.addEventListener("change", () => update());
@@ -217,7 +242,7 @@ export function initializeRegistrationForms() {
           touched.add(event.target.name);
         update();
       });
-      form.addEventListener("registration:updated", () => update());
+      form.addEventListener("registration:updated", () => update(false, false));
       form.addEventListener("submit", (event) => {
         if (form.dataset.pending || !update(true)) {
           event.preventDefault();

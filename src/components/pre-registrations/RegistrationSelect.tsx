@@ -31,6 +31,9 @@ export default function RegistrationSelect({
 }: Props) {
   const [enhanced, setEnhanced] = useState(false);
   const [selected, setSelected] = useState(value);
+  const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(
+    null,
+  );
   const fallback = useRef<HTMLSelectElement>(null);
   useEffect(() => {
     setSelected(fallback.current?.value ?? value);
@@ -85,7 +88,7 @@ export default function RegistrationSelect({
           >
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent container={portalContainer}>
             <SelectGroup>
               {!required && (
                 <SelectItem value="__registration_all__">
@@ -112,6 +115,7 @@ export default function RegistrationSelect({
       >
         {error}
       </p>
+      <div ref={setPortalContainer} className="contents" />
     </div>
   );
 }

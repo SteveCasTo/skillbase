@@ -86,6 +86,8 @@ export function validateRegisterInterest(
   if ([...email].length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email))
     issues.email = "Introduce un email válido.";
   const phone = value("phone", 32, false) || null;
+  if (phone && (!/^\+?[\d\s()-]+$/u.test(phone) || !/\d/u.test(phone)))
+    issues.phone = "Usa solo números, espacios, +, guiones y paréntesis.";
   const preferredGroupId = value("preferredGroupId", 36, false) || null;
   if (preferredGroupId && !UUID.test(preferredGroupId))
     issues.preferredGroupId = PREFERENCE_ISSUE;

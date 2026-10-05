@@ -127,6 +127,20 @@
       "when": 1791058656543,
       "tag": "0017_pre-registration-foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791129600000,
+      "tag": "0018_optional_payment_reason",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791151576201,
+      "tag": "0019_phase6_attendance",
+      "breakpoints": true
     }
   ]
 }

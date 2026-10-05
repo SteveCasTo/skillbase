@@ -23,6 +23,7 @@ export type ParticipantRow = typeof schema.participants.$inferSelect;
 type LedgerRow = typeof schema.registrationLedger.$inferSelect;
 interface RegistrationDisplay {
   readonly person: ParticipantRow;
+  readonly registeredByName?: string | null;
   readonly course: Pick<
     typeof schema.courses.$inferSelect,
     "name" | "startsAt"
@@ -37,14 +38,15 @@ export function registrationGroupName(
 ): string {
   return `${instantToBoliviaCivil(group.startsAt).slice(11)}–${instantToBoliviaCivil(group.endsAt).slice(11)}`;
 }
-export function ledgerDto(row: LedgerRow): LedgerEntryDto {
+export function ledgerDto(row: LedgerRow, actorName?: string): LedgerEntryDto {
   return {
     id: row.id,
     kind: row.kind,
     amountCents: Number(row.amountCents),
     effectiveDate: row.effectiveDate,
     actorId: row.actorId,
-    reason: row.reason,
+    ...(actorName ? { actorName } : {}),
+    reason: row.reason || null,
     recordedAt: row.recordedAt.toISOString(),
   };
 }
@@ -165,14 +167,21 @@ export async function ledgerEntries(
 ): Promise<LedgerEntryDto[]> {
   return (
     await tx
-      .select()
+      .select({
+        entry: schema.registrationLedger,
+        actorName: schema.users.name,
+      })
       .from(schema.registrationLedger)
+      .innerJoin(
+        schema.users,
+        eq(schema.users.id, schema.registrationLedger.actorId),
+      )
       .where(eq(schema.registrationLedger.registrationId, id))
       .orderBy(
         asc(schema.registrationLedger.recordedAt),
         asc(schema.registrationLedger.id),
       )
-  ).map(ledgerDto);
+  ).map(({ entry, actorName }) => ledgerDto(entry, actorName));
 }
 export async function registrationDto(
   tx: RegistrationTransaction,
@@ -187,6 +196,7 @@ export async function registrationDto(
       await tx
         .select({
           person: schema.participants,
+          registeredByName: schema.users.name,
           course: {
             name: schema.courses.name,
             startsAt: schema.courses.startsAt,
@@ -209,11 +219,15 @@ export async function registrationDto(
           schema.groups,
           eq(schema.groups.id, schema.preRegistrations.groupId),
         )
+        .leftJoin(
+          schema.users,
+          eq(schema.users.id, schema.preRegistrations.createdBy),
+        )
         .where(eq(schema.preRegistrations.id, row.id))
     )[0];
   if (!resolved)
     throw new RegistrationError("NOT_FOUND", "El registro no está disponible.");
-  const { person, course, group } = resolved;
+  const { person, course, group, registeredByName } = resolved;
   const price = priceDto(row);
   const finance = registrationFinance(
     price,
@@ -226,6 +240,7 @@ export async function registrationDto(
     groupId: row.groupId,
     courseName: course.name,
     groupName: registrationGroupName(group),
+    ...(registeredByName ? { registeredByName } : {}),
     participant: participantDto(person),
     state: row.state,
     membershipStatus: membershipStatus(

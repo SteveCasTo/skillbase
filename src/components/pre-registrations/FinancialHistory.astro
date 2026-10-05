@@ -12,8 +12,7 @@ const { detail, actorLabels = {} } = Astro.props;
   <h2 class="mb-5 text-lg font-semibold">Historial de efectivo</h2>
   {detail.ledger.length === 0 ? (
     <p class="rounded-lg border p-5 text-sm text-muted-foreground">
-      No hay movimientos de efectivo. Los registros gratuitos no generan pagos
-      de valor cero.
+      No hay movimientos de efectivo.
     </p>
   ) : (
     <ol class="flex min-w-0 flex-col divide-y rounded-xl border px-5">
@@ -36,7 +35,11 @@ const { detail, actorLabels = {} } = Astro.props;
           <div class="min-w-0 text-sm">
             <p class="break-words">{entry.reason}</p>
             <p class="mt-1 break-words text-muted-foreground">
-              Registrado por {actorLabels[entry.actorId] ?? entry.actorId} ·{" "}
+              Registrado por{" "}
+              {entry.actorName ??
+                actorLabels[entry.actorId] ??
+                "Datos no disponibles"}{" "}
+              ·{" "}
               <time datetime={entry.recordedAt}>
                 {formatDate(entry.recordedAt)}
               </time>

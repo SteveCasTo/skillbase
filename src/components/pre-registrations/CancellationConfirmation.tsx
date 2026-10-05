@@ -73,13 +73,13 @@ export default function CancellationConfirmation({
             </Button>
           </AlertDialog.Trigger>
           <AlertDialog.Portal>
-            <AlertDialog.Overlay className="bg-foreground/40 fixed inset-0" />
-            <AlertDialog.Content className="bg-background fixed top-1/2 left-1/2 flex w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-5 rounded-xl border p-6 shadow-lg">
+            <AlertDialog.Overlay className="bg-foreground/40 fixed inset-0 z-50" />
+            <AlertDialog.Content className="bg-background fixed top-1/2 left-1/2 z-50 flex w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-5 rounded-xl border p-6">
               <AlertDialog.Title className="text-lg font-semibold">
                 ¿Cancelar esta preinscripción?
               </AlertDialog.Title>
               <AlertDialog.Description className="text-muted-foreground text-sm">
-                {description}
+                {description} La cancelación no se puede deshacer.
               </AlertDialog.Description>
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <AlertDialog.Cancel asChild>

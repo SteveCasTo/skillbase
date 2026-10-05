@@ -7,6 +7,8 @@ import { instructorSchedulesOverlap } from "@/domain/instructors/schedule";
 import { boliviaCivilToInstant } from "@/domain/courses/bolivia-time";
 import { getPrivateRoutePolicy } from "@/server/auth/route-policy";
 import { assertInstructorChange } from "@/domain/instructors/assignment";
+import { groupScheduleReservations } from "@/server/db/repositories/instructor-schedule";
+import type { groupSessions } from "@/server/db/schema";
 
 test("assigned courses cannot clear their instructor; initially unassigned drafts preserve null", () => {
   const future = new Date("2099-03-01T04:00:00Z");
@@ -94,6 +96,64 @@ const schedule = (
 ) => ({
   startsAt: boliviaCivilToInstant(`${first}T${start}`),
   endsAt: boliviaCivilToInstant(`${last}T${end}`),
+});
+test("planned source reservations distinguish group cancellation from individual cancellation without restoring evidence", () => {
+  const group = { id: "group", ...schedule("2027-03-01", "2027-03-05") };
+  const session: typeof groupSessions.$inferSelect = {
+    id: "original",
+    groupId: group.id,
+    courseTypeRevisionId: "format",
+    ordinal: 1,
+    ...schedule("2027-03-01", "2027-03-01"),
+    administrativeReviewRequired: false,
+    rosterReviewedAt: null,
+    replacementForSessionId: null,
+    cancelledAt: new Date("2027-02-01T04:00:00Z"),
+    cancelledBy: "admin",
+    cancellationReason: "Grupo cancelado",
+    revision: 2,
+    createdAt: new Date("2027-01-01T04:00:00Z"),
+  };
+  expect(groupScheduleReservations(group, [])).toEqual([group]);
+  expect(groupScheduleReservations(group, [session])).toEqual([session]);
+  expect(session.cancelledAt).not.toBeNull();
+  expect(
+    groupScheduleReservations(group, [
+      {
+        ...session,
+        cancellationReason: "Calendario generado para grupo ya cancelado",
+      },
+    ]),
+  ).toHaveLength(1);
+  expect(
+    groupScheduleReservations(group, [
+      { ...session, cancellationReason: "Feriado" },
+    ]),
+  ).toEqual([]);
+  const recovery = {
+    ...session,
+    id: "recovery",
+    ordinal: null,
+    replacementForSessionId: session.id,
+    ...schedule("2027-03-06", "2027-03-06", "10:00", "11:30"),
+    cancelledAt: null,
+    cancelledBy: null,
+    cancellationReason: null,
+  };
+  expect(groupScheduleReservations(group, [session, recovery])).toEqual([
+    recovery,
+  ]);
+  expect(
+    groupScheduleReservations(group, [
+      session,
+      {
+        ...recovery,
+        cancelledAt: session.cancelledAt,
+        cancelledBy: "admin",
+        cancellationReason: "Feriado",
+      },
+    ]),
+  ).toEqual([]);
 });
 test("recurring conflicts intersect civil dates and half-open hours, including weekend-only intersections", () => {
   const a = schedule("2027-03-01", "2027-03-05");

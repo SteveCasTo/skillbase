@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { AttendanceCommandResult } from "@/domain/attendance/types";
 import {
   check,
   boolean,
@@ -16,6 +17,7 @@ import {
   uniqueIndex,
   unique,
   uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import type {
   AdminRegistrationDto,
@@ -116,6 +118,203 @@ export const instructorAccountDeletions = pgTable(
   },
   (table) => [
     index("instructor_account_deletions_actor_idx").on(table.actorId),
+  ],
+).enableRLS();
+
+export const attendanceState = pgEnum("attendance_state", [
+  "PRESENT",
+  "ABSENT",
+  "EXCUSED",
+]);
+export const attendanceSettings = pgTable(
+  "attendance_settings",
+  {
+    id: integer("id").primaryKey().default(1),
+    consecutiveAbsenceLimit: integer("consecutive_absence_limit")
+      .notNull()
+      .default(3),
+    revision: integer("revision").notNull().default(1),
+    updatedBy: uuid("updated_by").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check("attendance_settings_singleton_check", sql`${t.id} = 1`),
+    check(
+      "attendance_settings_count_check",
+      sql`${t.consecutiveAbsenceLimit} > 0 and ${t.revision} > 0 and (${t.revision} = 1 or ${t.updatedBy} is not null)`,
+    ),
+    index("attendance_settings_actor_idx").on(t.updatedBy),
+  ],
+).enableRLS();
+
+export const groupSessions = pgTable(
+  "group_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    courseTypeRevisionId: uuid("course_type_revision_id")
+      .notNull()
+      .references(() => courseTypeRevisions.id, { onDelete: "restrict" }),
+    ordinal: integer("ordinal"),
+    startsAt: timestamp("starts_at", {
+      withTimezone: true,
+      precision: 3,
+    }).notNull(),
+    endsAt: timestamp("ends_at", {
+      withTimezone: true,
+      precision: 3,
+    }).notNull(),
+    administrativeReviewRequired: boolean("administrative_review_required")
+      .notNull()
+      .default(false),
+    rosterReviewedAt: timestamp("roster_reviewed_at", {
+      withTimezone: true,
+      precision: 3,
+    }),
+    replacementForSessionId: uuid("replacement_for_session_id").references(
+      (): AnyPgColumn => groupSessions.id,
+      { onDelete: "restrict" },
+    ),
+    cancelledAt: timestamp("cancelled_at", {
+      withTimezone: true,
+      precision: 3,
+    }),
+    cancelledBy: uuid("cancelled_by").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    cancellationReason: text("cancellation_reason"),
+    revision: integer("revision").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("group_sessions_original_unique")
+      .on(t.groupId, t.ordinal)
+      .where(sql`${t.ordinal} is not null`),
+    uniqueIndex("group_sessions_active_replacement_unique")
+      .on(t.replacementForSessionId)
+      .where(sql`${t.cancelledAt} is null`),
+    index("group_sessions_group_calendar_idx").on(t.groupId, t.startsAt, t.id),
+    index("group_sessions_revision_idx").on(t.courseTypeRevisionId),
+    index("group_sessions_cancelled_actor_idx").on(t.cancelledBy),
+    index("group_sessions_replacement_idx").on(t.replacementForSessionId),
+    check(
+      "group_sessions_interval_check",
+      sql`${t.startsAt} < ${t.endsAt} and (${t.startsAt} at time zone 'America/La_Paz')::date = (${t.endsAt} at time zone 'America/La_Paz')::date and ${t.revision} > 0`,
+    ),
+    check(
+      "group_sessions_source_check",
+      sql`(${t.ordinal} is not null and ${t.ordinal} > 0 and ${t.replacementForSessionId} is null) or (${t.ordinal} is null and ${t.replacementForSessionId} is not null and ${t.replacementForSessionId} <> ${t.id})`,
+    ),
+    check(
+      "group_sessions_cancel_check",
+      sql`(${t.cancelledAt} is null and ${t.cancelledBy} is null and ${t.cancellationReason} is null) or (${t.cancelledAt} is not null and ${t.cancelledBy} is not null and char_length(coalesce(${t.cancellationReason}, '')) <= 500)`,
+    ),
+  ],
+).enableRLS();
+
+export const sessionRoster = pgTable(
+  "session_roster",
+  {
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => groupSessions.id, { onDelete: "restrict" }),
+    registrationId: uuid("registration_id")
+      .notNull()
+      .references(() => preRegistrations.id, { onDelete: "restrict" }),
+    establishedAt: timestamp("established_at", {
+      withTimezone: true,
+      precision: 3,
+    })
+      .notNull()
+      .defaultNow(),
+    reviewedBy: uuid("reviewed_by").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sessionId, t.registrationId] }),
+    index("session_roster_registration_idx").on(t.registrationId),
+    index("session_roster_review_actor_idx").on(t.reviewedBy),
+  ],
+).enableRLS();
+export const participantAttendance = pgTable(
+  "participant_attendance",
+  {
+    sessionId: uuid("session_id").notNull(),
+    registrationId: uuid("registration_id").notNull(),
+    status: attendanceState("status").notNull(),
+    markedBy: uuid("marked_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    markedAt: timestamp("marked_at", {
+      withTimezone: true,
+      precision: 3,
+    }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sessionId, t.registrationId] }),
+    foreignKey({
+      columns: [t.sessionId, t.registrationId],
+      foreignColumns: [sessionRoster.sessionId, sessionRoster.registrationId],
+    }).onDelete("restrict"),
+    index("participant_attendance_registration_idx").on(t.registrationId),
+    index("participant_attendance_actor_idx").on(t.markedBy),
+  ],
+).enableRLS();
+export const instructorAttendance = pgTable(
+  "instructor_attendance",
+  {
+    sessionId: uuid("session_id")
+      .primaryKey()
+      .references(() => groupSessions.id, { onDelete: "restrict" }),
+    instructorId: uuid("instructor_id")
+      .notNull()
+      .references(() => instructorProfiles.id, { onDelete: "restrict" }),
+    status: attendanceState("status").notNull(),
+    markedBy: uuid("marked_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    markedAt: timestamp("marked_at", {
+      withTimezone: true,
+      precision: 3,
+    }).notNull(),
+  },
+  (t) => [
+    index("instructor_attendance_instructor_idx").on(t.instructorId),
+    index("instructor_attendance_actor_idx").on(t.markedBy),
+  ],
+).enableRLS();
+export const attendanceCommandReceipts = pgTable(
+  "attendance_command_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    requestKey: uuid("request_key").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    result: jsonb("result").$type<AttendanceCommandResult>().notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("attendance_receipts_actor_key_unique").on(
+      t.actorId,
+      t.requestKey,
+    ),
+    check(
+      "attendance_receipts_fingerprint_check",
+      sql`${t.fingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
   ],
 ).enableRLS();
 
@@ -825,7 +1024,7 @@ export const registrationLedger = pgTable(
     ),
     check(
       "registration_ledger_reason_check",
-      sql`char_length(btrim(${t.reason})) between 1 and 500 and ${t.reason} !~ '[[:cntrl:]]'`,
+      sql`char_length(btrim(${t.reason})) between 0 and 500 and ${t.reason} !~ '[[:cntrl:]]'`,
     ),
   ],
 ).enableRLS();

@@ -35,6 +35,8 @@ export function validateParticipant(raw: unknown): ParticipantData {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email))
     issues.email = "Introduce un email válido.";
   const phone = text("phone", 32, true) || null;
+  if (phone && (!/^\+?[\d\s()-]+$/u.test(phone) || !/\d/u.test(phone)))
+    issues.phone = "Usa solo números, espacios, +, guiones y paréntesis.";
   if (Object.keys(issues).length)
     throw new RegistrationError(
       "VALIDATION_FAILED",

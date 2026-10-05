@@ -89,12 +89,27 @@ try {
   <RegistrationDetailPanel {detail} {form} serverNow={now.toISOString()} />
 ) : (
   <PrivateLayout title="Detalle de preinscripción">
-    <a
-      href="/app/preinscripciones"
-      class="text-sm underline underline-offset-4"
+    <nav
+      aria-label="Ruta de navegación"
+      class="flex flex-wrap items-center gap-2 text-sm"
     >
-      Preinscripciones
-    </a>
+      <a href="/app/preinscripciones" class="underline underline-offset-4">
+        Preinscripciones
+      </a>
+      {form && (
+        <>
+          <span aria-hidden="true">/</span>
+          <a
+            href={`/app/preinscripciones?courseId=${form.course.id}`}
+            class="break-words underline underline-offset-4"
+          >
+            {form.course.name}
+          </a>
+        </>
+      )}
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">Detalle</span>
+    </nav>
     {detail && form ? (
       <>
         <header class="mt-5 flex flex-wrap items-start justify-between gap-5">
@@ -122,7 +137,7 @@ try {
             href={`/app/participantes/${detail.registration.participant.id}?registrationId=${id}`}
             class="inline-flex min-h-11 items-center underline underline-offset-4"
           >
-            Editar ficha global
+            Datos del participante
           </a>
         </header>
         {Astro.url.searchParams.has("success") && (

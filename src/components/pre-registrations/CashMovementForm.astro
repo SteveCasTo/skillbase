@@ -9,6 +9,7 @@ import { boliviaToday } from "@/domain/pre-registrations/time";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MoneyInput from "./MoneyInput";
+import DatePicker from "@/components/ui/date-picker";
 import { formatMoney, moneyFieldIssues } from "./presentation";
 interface Props {
   id: string;
@@ -64,7 +65,12 @@ const fields = [
     type: "date",
     value: values.effectiveDate ?? boliviaToday(new Date(serverNow)),
   },
-  { name: "reason", label: "Motivo", type: "text", value: values.reason ?? "" },
+  {
+    name: "reason",
+    label: refund ? "Motivo" : "Motivo (opcional)",
+    type: "text",
+    value: values.reason ?? "",
+  },
 ];
 ---
 
@@ -92,15 +98,16 @@ const fields = [
     {refund ? "Registrar devolución" : "Registrar abono"}
   </h2>
   <p class="text-sm text-muted-foreground">
-    {refund
-      ? "Registra solo efectivo ya entregado; no ejecuta una transferencia bancaria."
-      : "Registra solo efectivo realmente recibido."}{" "}
     Máximo:{" "}
     {formatMoney(
       refund ? registration.refundDueCents : registration.balanceCents,
     )}
-    .
   </p>
+  <p
+    data-cash-remaining
+    role="status"
+    class="text-sm text-muted-foreground empty:hidden"
+  ></p>
   <p role="alert" data-form-error class="text-sm text-destructive empty:hidden">
     {message ?? errors.form}
   </p>
@@ -116,6 +123,19 @@ const fields = [
     >
       <legend class="sr-only">Datos del movimiento</legend>
       {fields.map((field) => {
+        if (field.name === "effectiveDate")
+          return (
+            <DatePicker
+              client:load
+              id={`${id}-effectiveDate`}
+              name="effectiveDate"
+              label={field.label}
+              value={field.value}
+              max={boliviaToday(new Date(serverNow))}
+              required
+              error={errors.effectiveDate}
+            />
+          );
         const Control = field.name === "amount" ? MoneyInput : Input;
         return (
           <div
@@ -136,7 +156,14 @@ const fields = [
               }
               maxLength={field.name === "reason" ? 500 : undefined}
               defaultValue={field.value}
-              required
+              required={field.name !== "reason" || refund}
+              data-money-max={
+                field.name === "amount"
+                  ? refund
+                    ? registration.refundDueCents
+                    : registration.balanceCents
+                  : undefined
+              }
               aria-invalid={Boolean(errors[field.name])}
               aria-describedby={`${id}-${field.name}-error`}
               className="min-h-11"
@@ -171,6 +198,7 @@ const fields = [
 </style>
 <script>
   import { cashFormState } from "./cash-state";
+  import { formatMoney, parseMoneyInput } from "./presentation";
   import { bindMoneyInput } from "./money-input";
   import { readFormValues, showFormIssues } from "./registration-client";
   import type {
@@ -193,7 +221,26 @@ const fields = [
           serverNow: string;
         };
         const touched = new Set<string>();
-        const update = (all = false) => {
+        const update = (all = false, show = true) => {
+          const remaining = form.querySelector<HTMLElement>(
+            "[data-cash-remaining]",
+          );
+          if (remaining) {
+            const amount = readFormValues(form).amount ?? "";
+            try {
+              const cents = parseMoneyInput(amount);
+              const max =
+                context.kind === "REFUND"
+                  ? context.registration.refundDueCents
+                  : context.registration.balanceCents;
+              remaining.textContent =
+                cents > 0 && cents <= max
+                  ? `${context.kind === "REFUND" ? "Por devolver" : "Saldo restante"}: ${formatMoney(max - cents)}`
+                  : "";
+            } catch {
+              remaining.textContent = "";
+            }
+          }
           const state = cashFormState(
             context.registration,
             context.kind,
@@ -201,13 +248,17 @@ const fields = [
             context.serverNow,
             readFormValues(form),
           );
-          showFormIssues(form, state.issues, all ? undefined : touched);
+          if (show)
+            showFormIssues(form, state.issues, all ? undefined : touched);
           const button = form.querySelector<HTMLButtonElement>(
             'button[type="submit"]',
           );
           if (button)
-            button.disabled = Boolean(form.dataset.pending) || !state.valid;
-          return state.valid;
+            button.disabled =
+              Boolean(form.dataset.pending) ||
+              !state.valid ||
+              !form.checkValidity();
+          return state.valid && form.checkValidity();
         };
         form.addEventListener("input", () => update());
         form.addEventListener("focusout", (event) => {
@@ -215,7 +266,9 @@ const fields = [
             touched.add(event.target.name);
           update();
         });
-        form.addEventListener("registration:updated", () => update());
+        form.addEventListener("registration:updated", () =>
+          update(false, false),
+        );
         form.addEventListener("submit", (event) => {
           if (form.dataset.pending || !update(true)) {
             event.preventDefault();

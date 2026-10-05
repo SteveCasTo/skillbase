@@ -229,21 +229,21 @@ Archivo recomendado: `src/styles/globals.css`.
   --popover-foreground: oklch(0.3353 0.0132 2.7676);
   --primary: oklch(0.7357 0.1641 34.7091);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.9596 0.0200 28.9029);
+  --secondary: oklch(0.9596 0.02 28.9029);
   --secondary-foreground: oklch(0.5587 0.1294 32.7364);
   --muted: oklch(0.9656 0.0176 39.4009);
   --muted-foreground: oklch(0.5534 0.0116 58.0708);
   --accent: oklch(0.8278 0.1131 57.9984);
   --accent-foreground: oklch(0.3353 0.0132 2.7676);
-  --destructive: oklch(0.6122 0.2082 22.2410);
+  --destructive: oklch(0.6122 0.2082 22.241);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.9296 0.0370 38.6868);
-  --input: oklch(0.9296 0.0370 38.6868);
+  --border: oklch(0.9296 0.037 38.6868);
+  --input: oklch(0.9296 0.037 38.6868);
   --ring: oklch(0.7357 0.1641 34.7091);
   --chart-1: oklch(0.7357 0.1641 34.7091);
   --chart-2: oklch(0.8278 0.1131 57.9984);
   --chart-3: oklch(0.8773 0.0763 54.9314);
-  --chart-4: oklch(0.8200 0.1054 40.8859);
+  --chart-4: oklch(0.82 0.1054 40.8859);
   --chart-5: oklch(0.6368 0.1306 32.0721);
   --sidebar: oklch(0.9656 0.0176 39.4009);
   --sidebar-foreground: oklch(0.3353 0.0132 2.7676);
@@ -251,7 +251,7 @@ Archivo recomendado: `src/styles/globals.css`.
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.8278 0.1131 57.9984);
   --sidebar-accent-foreground: oklch(0.3353 0.0132 2.7676);
-  --sidebar-border: oklch(0.9296 0.0370 38.6868);
+  --sidebar-border: oklch(0.9296 0.037 38.6868);
   --sidebar-ring: oklch(0.7357 0.1641 34.7091);
   --font-sans: "Montserrat", sans-serif;
   --font-serif: "Merriweather", serif;
@@ -259,11 +259,16 @@ Archivo recomendado: `src/styles/globals.css`.
   --radius: 0.625rem;
   --shadow-2xs: 0 6px 12px -3px hsl(0 0% 0% / 0.04);
   --shadow-xs: 0 6px 12px -3px hsl(0 0% 0% / 0.04);
-  --shadow-sm: 0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 1px 2px -4px hsl(0 0% 0% / 0.09);
-  --shadow: 0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 1px 2px -4px hsl(0 0% 0% / 0.09);
-  --shadow-md: 0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 2px 4px -4px hsl(0 0% 0% / 0.09);
-  --shadow-lg: 0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 4px 6px -4px hsl(0 0% 0% / 0.09);
-  --shadow-xl: 0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 8px 10px -4px hsl(0 0% 0% / 0.09);
+  --shadow-sm:
+    0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 1px 2px -4px hsl(0 0% 0% / 0.09);
+  --shadow:
+    0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 1px 2px -4px hsl(0 0% 0% / 0.09);
+  --shadow-md:
+    0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 2px 4px -4px hsl(0 0% 0% / 0.09);
+  --shadow-lg:
+    0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 4px 6px -4px hsl(0 0% 0% / 0.09);
+  --shadow-xl:
+    0 6px 12px -3px hsl(0 0% 0% / 0.09), 0 8px 10px -4px hsl(0 0% 0% / 0.09);
   --shadow-2xl: 0 6px 12px -3px hsl(0 0% 0% / 0.22);
 }
 
@@ -282,7 +287,7 @@ Archivo recomendado: `src/styles/globals.css`.
   --muted-foreground: oklch(0.8378 0.0237 52.6346);
   --accent: oklch(0.8278 0.1131 57.9984);
   --accent-foreground: oklch(0.2569 0.0169 352.4042);
-  --destructive: oklch(0.6122 0.2082 22.2410);
+  --destructive: oklch(0.6122 0.2082 22.241);
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.3637 0.0203 342.2664);
   --input: oklch(0.3637 0.0203 342.2664);
@@ -290,7 +295,7 @@ Archivo recomendado: `src/styles/globals.css`.
   --chart-1: oklch(0.7357 0.1641 34.7091);
   --chart-2: oklch(0.8278 0.1131 57.9984);
   --chart-3: oklch(0.8773 0.0763 54.9314);
-  --chart-4: oklch(0.8200 0.1054 40.8859);
+  --chart-4: oklch(0.82 0.1054 40.8859);
   --chart-5: oklch(0.6368 0.1306 32.0721);
   --sidebar: oklch(0.2569 0.0169 352.4042);
   --sidebar-foreground: oklch(0.9397 0.0119 51.3156);
@@ -426,7 +431,7 @@ Verificar cada componente en ambos temas.
 - El formulario de alta/edición tiene nombre y apellidos requeridos, email `type=email` requerido/normalizado (solo lectura al editar), teléfono opcional `type=tel` y password inicial solo al crear. La password nunca se repuebla ante fallo; límites y reglas se vuelven a validar en servidor. La cuenta se activa con el password asignado por ADMIN, sin paso forzado de cambio.
 - La sección «Perfil profesional» dentro de `/app/perfil` solo se presenta a usuarios con rol `INSTRUCTOR`; permite editar nombre, apellidos y teléfono, manteniendo email de cuenta como solo lectura. El perfil de acceso/password sigue siendo una sección distinta.
 - Administración puede elegir instructor registrado activo al crear/editar el curso; draft puede permanecer sin asignación, pero publicación no. El nombre completo asignado es el único dato del instructor proyectado en el detalle público; correo/teléfono no se exponen. Cursos históricos sin asignación conservan su texto libre.
-- Instructor navega a «Mis cursos» y ve únicamente listas/detalles de cursos que le pertenecen; no se exponen acciones ADMIN, interesados, formatos, asistencia ni sesiones. `/app/mis-cursos/[id]` muestra fechas/grupos/cupo/estado como consulta, no una vista de mutación.
+- Instructor navega a «Mis cursos» y ve únicamente listas/detalles de cursos que le pertenecen; no se exponen acciones ADMIN, interesados ni formatos. La gestión de asistencia por ownership se añadió en Fase 6, descrita abajo. `/app/mis-cursos/[id]` conserva la consulta de fechas/grupos/cupo/estado.
 - Formularios conservan HTML/POST y validación de servidor sin JavaScript; con JS la mutación muestra pending/success/error con el mismo ID de notificación, bloquea doble submit y sitúa foco en el error. La contraseña se limpia al fallar.
 - El skeleton de navegación conoce `/app/instructores` y `/app/mis-cursos` como listas, `/app/instructores/nuevo` y edición como formularios, y `/app/mis-cursos/[id]` como detalle; usa el ciclo real de navegación, no un retraso decorativo. El release PR 126 no incluía lifecycle de baja; su corrección fue implementada y validada después mediante PR 136, como se describe abajo.
 
@@ -446,13 +451,31 @@ Los comportamientos abajo están implementados en `8735d676fe0d96e7230b4636efa8c
 - En alta presencial, permitir alta directa o buscar interesados del curso por nombre/correo y prellenar la ficha editable; el origen es informativo/read-only y el vínculo de trazabilidad permanece interno, sin selector de asociación. Los filtros y resultados respetan foco, integridad/privacidad y errores inline; UI y permisos deben corresponder a los límites `ADMIN`/instructor readonly.
 - Si el total con descuento auxiliar es cero, mostrar preinscripción gratuita/saldo cero y mantener la misma ficha/snapshot/cupo, sin pedir ni registrar un abono de cero; para precios positivos, el primer pago mínimo debe mostrarse con moneda/centavos explícitos y validarse server-side.
 
-## Fase 5: administración de registros (implementación parcial)
+## Fase 5: administración de registros (release en producción)
 
 - PR 177 integró componentes reutilizables de formularios/listados/detalles de inscripción; PR 178 conectó la página de configuración global. PR 179 añadió route policy y montó `/app/preinscripciones`, nueva/detalle, `/app/participantes`/detalle, búsqueda/prellenado, operaciones de efectivo/devolución/cambio/cancelación, export y roster instructor. `PRIVATE_ROUTE_POLICIES` limita escrituras/listados financieros a ADMIN y roster al instructor asignado.
 - Los formularios muestran campos/errores pendientes según validez, feedback recuperable y valores preservados con HTML/SSR como base; con JS las mutaciones usan un adaptador `ok/value` o `ok:false/message/issues` y requestKey para idempotencia. Montos se presentan/transportan como BOB decimal y se convierten a centavos exactos server-side. Configuración responde settings o errores `code/message/fields`, incluyendo `409` revision conflict.
-- El UI integrado pasó el full canonical E2E reportado (125/125) y una revisión de 24 screenshots en 375/768/1440 px, light/dark, sin overflow. Los exportes presentan los campos actuales del backend: etiquetas curso/grupo, participante/CI, categoría, estados y cantidades del snapshot financiero. Fase 5 no está liberada a producción.
+- El UI integrado pasó el full canonical E2E reportado (125/125) y una revisión de 24 screenshots en 375/768/1440 px, light/dark, sin overflow. Los exportes presentan los campos actuales del backend: etiquetas curso/grupo, participante/CI, categoría, estados y cantidades del snapshot financiero. Fase 5 se liberó como `2e0eecb`; las correcciones post-release que siguen están integradas en `development` y esperan gate/release combinado.
 - Diseño funcional aprobado: registro directo o prellenado editable; origen del interesado de solo lectura e interno; roster instructor propio desde inicio oficial y solo nombre/apellidos; ADMIN conserva finanzas y mutaciones. Filtros/paginación con recuperación de errores, permisos server-side y cash ledger mantienen estados/foco; el total gratuito por AUXILIARY 100 % se ve como gratuidad, nunca como pago cero.
 - PR 179 integró esa UI; la rama reportó 34 pruebas dirigidas y 3 E2E (dos escenarios principales y uno temporal), además de quality PASS. No equivale a full canonical E2E ni a revisión visual/accesible final del módulo.
+
+### Correcciones de administración (integradas en development, PRs 197–199; gate/release final pendientes)
+
+- Configuración tiene copy reducido; ajustes y campos de participante se editan inline con lápiz/guardar/cancelar.
+- Filtros select de interesados aplican al cambio; texto parcial usa debounce y actualización parcial SSR/last-request-wins. Interesados consumidos se ocultan de candidatos posteriores preservando historial; email no fusiona ni identifica participantes.
+- Opciones compactas muestran nombre/correo; curso/intereses se limitan al registro seleccionado. Tarjetas seleccionables completas son teclado/clic accesibles y no filtran finanzas.
+- Participantes tiene grilla responsive de hasta tres columnas. La lista muestra nombre, CI, email y estado/curso; finanzas se ven en el detalle.
+- Calendario shadcn compartido reemplaza pickers nativos. El descuento solo aparece para AUXILIARY; se quitaron banners de origen, ficha técnica global y copy redundante de servidor.
+- El actor se presenta por nombre humano. Métricas de devolución solo aparecen cuando son pertinentes. Acciones financieras usan diálogos breves, importes al centavo acotados por saldo y motivo de pago opcional; teléfono/CI mantienen validación conservadora.
+- Operaciones mantienen UUID por solicitud, estados de carga/resultado y fallback SSR sin JavaScript. Tests se acoplan a resultados observables y no a copy/CSS/orden/conteos inestables.
+
+### Sesiones y asistencia (Fase 6, UI integrada en development por PR 203; gate/release pendientes)
+
+- `/app/configuracion/asistencia` y las vistas de grupo/sesión están montadas con SSR/POST y rutas específicas ADMIN/INSTRUCTOR. Fechas de recuperación usan calendario shadcn; cancelación y reemplazo usan diálogos breves y conservan el original en la cronología. No hay calendario global de feriados.
+- El roster de asistencia presenta nombres de participantes permitidos y asistencia propia del instructor cuando corresponde; no expone CI, email ni finanzas al instructor. ADMIN dispone de revisión/corrección de evidencia histórica.
+- `Pendiente` se deriva durante la fecha civil; tras el día se deriva ausencia para el roster establecido. Sesiones pasadas requieren revisión explícita ADMIN; sesiones canceladas no cuentan. El módulo presenta estado, racha y bandera de elegibilidad, sin porcentaje ni tardanza.
+- El umbral N (default 3) muestra aviso al llegar a N y marca inelegibilidad al superar N; justificada cuenta como asistencia e interrumpe racha. No hay emisión/bloqueo de certificados, expulsión automática, ni acciones automáticas de cupo/devolución.
+- La UI conserva foco/teclado, estados de carga/error/éxito y fallback sin JavaScript. PR 203 tiene cobertura focal propia; la revisión/gate combinado final del milestone está pendiente.
 
 ## CONSISTENCIA
 

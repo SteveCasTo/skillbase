@@ -391,7 +391,7 @@ El E2E cubre lifecycle ADMIN completo, perfil sin JavaScript, autorización desd
 
 #### Migraciones y release
 
-La migración `0016_instructor_lifecycle_outbox` se aplicó en los stacks temporales y después al Supabase local estándar, sin reset. Su ledger pasó de 16 a 17; cloud permanece en 16. No se afirma aplicación cloud, CI remoto PASS, SMTP propio, entrega de recovery ni Google OAuth real.
+La migración `0016_instructor_lifecycle_outbox` se aplicó en los stacks temporales y después al Supabase local estándar, sin reset. En este stage su ledger pasó de 16 a 17; cloud aún permanecía en 16. No se afirma aplicación cloud, CI remoto PASS, SMTP propio, entrega de recovery ni Google OAuth real para esta validación histórica.
 
 #### Cambio de puertos y smoke local (PR 135)
 
@@ -399,13 +399,13 @@ PR 135 (`ddd0f3d`) trasladó Supabase local desde API/Auth `127.0.0.1:54321` y P
 
 Después de mover puertos, `bun run db:migrate` aplicó 0016 normalmente a la base local estándar: ledger 16→17. No se hizo reset. Se conservaron Auth identities, ADMIN/roles/perfiles, sesiones, Storage, seis cursos y 35 interesados. Las diferencias esperadas observadas fueron la fila del ledger y el timestamp de inicio de sesión del usuario sintético del smoke. Smoke local PASS: seis rutas/páginas públicas y siete solicitudes de detalle/formulario/imagen; páginas de cursos propios del instructor, perfil y password 200; rutas ADMIN 303. Se cerró la sesión temporal. En el smoke el servidor Astro existente estaba activo en `127.0.0.1:4321`; esto no describe su PID/estado actual después de las corridas posteriores.
 
-Este smoke no prueba Google OAuth real ni entrega de recovery. El callback local actualizado `http://127.0.0.1:55321/auth/v1/callback` requiere allowlist manual en Google Console; no se afirma que ese cambio externo se haya realizado. La producción sigue en el release previo de Fase 4 (`master` `598b1f`, migraciones hasta 0015, ledger 16); no hubo escritura cloud ni deployment.
+Este smoke no prueba Google OAuth real ni entrega de recovery. El callback local actualizado `http://127.0.0.1:55321/auth/v1/callback` requiere allowlist manual en Google Console; no se afirma que ese cambio externo se haya realizado. En ese momento, la producción seguía en el release previo de Fase 4 (`master` `598b1f`, migraciones hasta 0015, ledger 16), sin escritura cloud ni deployment desde esta validación; el release posterior de Fase 5 se registra abajo.
 
 PR 136 (`8cdb38f`) integró el fix final de middleware request-context e hidratación SSR de password. El commit fuente validado `8735d676fe0d96e7230b4636efa8cb51045d1eca` (base `ddd0f3de`, 0 behind/1 ahead) pasó unit **178**, integration **98** y canonical full E2E **120/120**, además de lint, formatter, typecheck (0 errores/0 warnings), build, Drizzle y diff checks. No se informaron warnings/errores de hidratación `Astro.session`/React. La fuente explícita de request context evita expandir getters Astro en middleware; password controlled-state queda coherente antes/después de hidratar y se añade cobertura `request-client-context`/`password-hydration`. No se suprimieron warnings globalmente.
 
 El install directo previo falló por el estado de paquetes del entorno; `bun install --frozen-lockfile` restauró dependencias sin editar `package.json`/`bun.lock` ni cambiar la versión de Astro. No se clasifica como flaky de producto. PR 136 ya está integrado en `development`; la verificación anterior 119/119 y esta final 120/120 son runs separados de distintos trees, no se suman ni se afirma retry automático para el run final.
 
-### Fase 5 parcial: foundation, backend, settings y exportes (development)
+### Fase 5: validación local y release (development)
 
 - PR 173 incorporó foundation/migración 0017; quedó aplicada sin reset al Supabase local estándar y ledger 18. La verificación de preservación registró seis cursos, 35 interesados y cero preinscripciones; no se cargaron datos financieros/fixtures de participantes ni pagos.
 - PR 177 reportó **291 unit**, **125 integration** y quality PASS para la capa compartida de UI/settings integrada. PR 178 reportó **295 unit** y quality PASS para settings HTTP; en ese stage faltaba completar su route policy/UI.
@@ -413,7 +413,7 @@ El install directo previo falló por el estado de paquetes del entorno; `bun ins
 - PR 179 (`d13432d`) integró páginas HTTP de preinscripción/participante, exportes, roster y route policy. La rama UI reportó 34 tests dirigidos y tres E2E (dos escenarios principales y un harness temporal) PASS; después pasó el full canonical descrito abajo.
 - En `development` están integrados schema, operaciones de aplicación/repository, settings y páginas/listado/alta/detalle, acciones de efectivo/devolución/transfer/cancelación, export endpoint y roster. `/app/configuracion` ya está en `PRIVATE_ROUTE_POLICIES` y protegida ADMIN.
 
-La migración 0017 está aplicada solo al Supabase local estándar (`127.0.0.1:55322`), con ledger 18 y datos previos preservados; el proyecto cloud/master sigue en Fase 4/ledger 16. No se afirma deployment, Google OAuth real, allowlist actualizada en Google Console, SMTP propio ni entrega real de recovery.
+La migración 0017 está aplicada al Supabase local estándar (`127.0.0.1:55322`) y al cloud para el release Fase 5 (`2e0eecb`, cloud ledger 18). El gate local reportado fue 303 unit, 125 integration y E2E 125/125. Ese gate de release no prueba Google OAuth real ni autorización del callback local; SMTP se configuró posteriormente y su evidencia/alcance se registra abajo.
 
 #### Resultados parciales por PR y stage de interfaz
 
@@ -422,4 +422,22 @@ La migración 0017 está aplicada solo al Supabase local estándar (`127.0.0.1:5
 - La rama/stage UI basada en `7d164f1` reportó 34 pruebas dirigidas PASS, tres E2E focales (dos casos principales más un harness temporal) y quality PASS.
 - El full gate final se ejecutó en commit `25890143` e integró mediante PR 180 (`917a636`): **303 unit, 125 integration, canonical E2E 125/125**. Corrida inicial E2E: 119/125; seis fallos SSR 500/settings browser-only/hidratación se corrigieron y el run final pasó sin retries. Quality: 0 errores/0 warnings; revisión visual: 24 screenshots en 375/768/1440 px, light/dark, sin overflow. Esta documentación no ejecutó ni repitió tests.
 
-La aplicación local/migración 0017 no introdujo datos de prueba financieros: quedaron cero preinscripciones; se conservaron seis cursos y 35 interesados. La suite/configuración no equivale a despliegue ni a smoke de producción.
+La aplicación local/migración 0017 no introdujo datos de prueba financieros: quedaron cero preinscripciones en ese baseline; se conservaron seis cursos y 35 interesados. El release posterior a producción está registrado como `2e0eecb`; esta evidencia local no equivale por sí sola a un smoke manual de todos los flujos de producción.
+
+### Correcciones de Fase 5 y Fase 6 (development; gate combinado pendiente)
+
+PR 196 añadió configuración SMTP privada/plantilla; PRs 197–199 integraron los ajustes de administración e interesados; PRs 200–202 añadieron runner demo financiero/asistencia y PR 203 integró UI de sesiones/asistencia. User confirmó recepción de un correo de prueba local; esto no verifica clic/recovery, delivery cloud ni Google OAuth.
+
+Las migraciones 0018/0019 se aplicaron al Supabase local canónico hasta ledger 20, preservando las 53 tablas existentes. Cloud/`master` permanecen en Fase 5/ledger 18. Cobertura focal reportada por los cambios: backend de asistencia 12 unit + 12 integration; UI y correcciones 15 UI + 5 mock + 1 caso de feriado; runner demo 3 unit + 1 integración aislada. Estos resultados dirigidos no son un full gate combinado.
+
+PLAN verificó target/proyecto y provenance sin escrituras; el APPLY local posterior quedó confirmado sobre el árbol limpio `6813a4c`. Agregó 5 cursos, 10 grupos, 15 registros, 12 movimientos, 28 sesiones, 16 marcas de participante y 4 de instructor. Totales actuales: 12 cursos, 23 grupos, 16 registros y 13 movimientos; incluyen y preservan las filas previas. Se comprobaron escenarios financieros pagados/parciales/gratis, devoluciones y transferencia; asistencia PRESENT/ABSENT/EXCUSED, N=3 con aviso y restricción en N+1, revisión histórica pendiente, sesión de hoy sin marca, cancelación y reemplazos de 90 minutos. Ledger 20 y Auth/perfiles/roles/sesiones/settings/Storage previos quedaron intactos; la app original respondió HTTP 200. No hubo seed en cloud/producción. La evidencia de gate y de revisión visual se detalla a continuación; no hubo reinicio ni escrituras durante la validación visual.
+
+#### Evidencia consolidada hasta PR 209
+
+- El full unit/integration reportado pasó **332 unitarias y 137 integración** en `4b331ff9`. El backend de asistencia tuvo además sus 12 unit/12 integration focales PASS en su entrega.
+- En el source de aplicación `b681a365`, el full E2E ejecutó **126 PASS / 1 FAIL de 127**. El único fallo fue un strict locator del test sin JavaScript; no se documenta como fallo de producto corregido mediante retry.
+- PR 209 (`082dbbf`, test-only) corrigió ese locator. El escenario afectado se reejecutó focalmente y pasó 1/1, sin retry. En conjunto hay evidencia de los escenarios, pero no un full run único 127/127.
+- Build, Drizzle y quality pasaron en `b681a365`; typecheck registró cero errores, cero warnings y 204 hints. La última UI/source de pruebas es `development` `082dbbf`.
+- Revisión visual final sobre `development` `082dbbf` / app `b681a365`: seis vistas en 375 y 1440 px, light/dark, sin overflow; foco visible, diálogo cierra con Escape y devuelve foco al disparador; estado de asistencia N=3/inelegibilidad desde 4; instructor sin contactos/finanzas; sesión ajena devuelve 404; cero errores ni warnings de consola.
+- El gate local queda validado mediante esta evidencia por heads: full E2E 126/127 y escenario sin JavaScript corregido por PR 209 con ejecución focal 1/1 PASS, sin retry; unit/integration 332/137 PASS; build/Drizzle/quality PASS y typecheck 0 errores/0 warnings/204 hints. No se afirma un full E2E único 127/127. CI/release cloud/master sigue pendiente.
+- Se capturó un snapshot canónico pre-visual de 39 tablas con ledger 20. La comparación hash posterior quedó bloqueada porque Docker Desktop no estaba disponible. No se reinició Docker/Supabase ni se escribieron datos para la verificación visual; por tanto, no se afirma una comparación íntegra post-visual. Esto no invalida el snapshot de preservación del APPLY anterior, pero limita la evidencia de frescura tras la revisión visual.

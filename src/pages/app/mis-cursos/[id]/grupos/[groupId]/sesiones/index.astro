@@ -1,0 +1,13 @@
+---
+import AttendanceGroupPage from "@/components/attendance/AttendanceGroupPage.astro";
+import { prepareAttendanceGroupRoute } from "@/components/attendance/group-route";
+if (Astro.request.method !== "GET")
+  return new Response(null, {
+    status: 405,
+    headers: { Allow: "GET", "Cache-Control": "private, no-store" },
+  });
+const data = await prepareAttendanceGroupRoute(Astro, true);
+Astro.response.status = data.status;
+---
+
+<AttendanceGroupPage {...data} />

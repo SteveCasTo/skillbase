@@ -22,6 +22,8 @@ import type {
   RegistrationFormDto,
 } from "@/domain/pre-registrations/types";
 import { acceptsMoneyEdit } from "@/components/pre-registrations/money-input";
+import { acceptsPhoneEdit } from "@/components/pre-registrations/participant-fields";
+import DatePicker, { civilInput } from "@/components/ui/date-picker";
 
 const dto: RegistrationFormDto = {
   course: {
@@ -96,6 +98,55 @@ const registration: AdminRegistrationDto = {
   financialStatus: "PARTIAL",
 };
 describe("registration component presentation", () => {
+  test("payment reasons are optional while refund reasons remain required", () => {
+    expect(
+      registrationFormState(dto, { ...values, reason: "" }, now).valid,
+    ).toBe(true);
+    expect(
+      cashFormState(registration, "PAYMENT", dto.course.startsAt, now, {
+        ...values,
+        reason: "",
+      }).valid,
+    ).toBe(true);
+    const cancelled = {
+      ...registration,
+      state: "CANCELLED" as const,
+      refundDueCents: 2501,
+    };
+    expect(
+      cashFormState(cancelled, "REFUND", dto.course.startsAt, now, {
+        ...values,
+        reason: "",
+      }).valid,
+    ).toBe(false);
+  });
+  test("civil calendar has a working ISO SSR fallback and rejects impossible dates", () => {
+    const html = renderToStaticMarkup(
+      createElement(DatePicker, {
+        id: "payment-date",
+        name: "effectiveDate",
+        label: "Fecha efectiva",
+        value: "2026-10-03",
+        required: true,
+      }),
+    );
+    expect(html).toContain('name="effectiveDate"');
+    expect(html).toContain('value="2026-10-03"');
+    expect(html).not.toContain('type="date"');
+    expect(civilInput("03/10/2026")).toBe("2026-10-03");
+    expect(civilInput("29/02/2025")).toBe("");
+    expect(civilInput("29/02/2024")).toBe("2024-02-29");
+  });
+  test("money admission caps fractional cents and formatted phone admission does not remove leading zeros", () => {
+    expect(acceptsMoneyEdit("75,02", 7502)).toBe(true);
+    expect(acceptsMoneyEdit("75,03", 7502)).toBe(false);
+    expect(acceptsMoneyEdit("75.", 7502)).toBe(true);
+    expect(acceptsMoneyEdit("76", 7502)).toBe(false);
+    for (const value of ["", "+591 (707) 00-001", "00123456"])
+      expect(acceptsPhoneEdit(value)).toBe(true);
+    for (const value of ["abc", "591+123", "12e4"])
+      expect(acceptsPhoneEdit(value)).toBe(false);
+  });
   test("SSR currency field submits decimal BOB under amount, never amountCents", () => {
     const html = renderToStaticMarkup(
       createElement(MoneyInput, {

@@ -177,7 +177,7 @@ La reprogramación de sesiones individuales, las preinscripciones/inscripciones 
 
 La preinscripción presencial de Fase 5 ocupa cupo y puede registrar pagos parciales/totales; también puede ser gratuita si un descuento aprobado reduce el precio final a cero. Permanece `PREINSCRITO` hasta la fecha de inicio oficial; desde el inicio pasa a `INSCRITO` si el saldo está cubierto. La condición `INSCRITO` del proceso administrativo no significa culminación académica ni habilita módulos posteriores por sí sola.
 
-### Reglas confirmadas para Fase 5 (implementación parcial; ver estado)
+### Reglas confirmadas para Fase 5 (release de producción; ver estado)
 
 - La persona participante es ficha global ADMIN, sin cuenta de acceso, con CI como identidad única normalizada conservadoramente (trim/espacios/case, preserva ceros iniciales, letras y sufijos; no cast numérico, formato/checksum nacional ni escaneo documental). Nombre/apellidos y email son obligatorios; teléfono opcional. Máximo una preinscripción vigente por persona/curso; puede participar en varios cursos. CI nunca se publica.
 - ADMIN puede registrar directamente o buscar interesados del mismo curso por nombre/correo y prellenar datos editables para completar ficha. El origen se informa readonly y se conserva trazabilidad interna, sin selector de asociación/fusión. Email público no verificado no identifica a Participant ni modifica métricas de interesados.
@@ -194,7 +194,7 @@ La preinscripción presencial de Fase 5 ocupa cupo y puede registrar pagos parci
 
 El alcance funcional está confirmado, incluido el registro gratuito por descuento AUXILIARY del 100 %: no se registra pago cero y el mínimo se exime solo si el total final exacto es cero.
 
-Estado de implementación: modelo/migración 0017, dominio/repositorio transaccional, settings, generadores CSV/PDF y rutas/UI se integraron por PRs 173–179. Full local canonical gate reportado PASS (303 unit, 125 integration, 125/125 E2E; quality 0 errores/0 warnings y revisión responsive sin overflow). Fase 5 permanece en desarrollo y no está liberada; ver `docs/PLAN.md` para el release boundary, el alcance export actual y la verificación pendiente en producción.
+Estado de implementación: modelo/migración 0017, dominio/repositorio transaccional, settings, generadores CSV/PDF y rutas/UI se integraron por PRs 173–180. Fase 5 se liberó en producción como `2e0eecb` (cloud ledger 18); el gate local reportado pasó 303 unit, 125 integration y 125/125 E2E. Las correcciones post-release se integraron a `development` por PRs 197–199; sesiones/asistencia se implementaron en PRs 201–203, con gate combinado y release todavía pendientes. Ver `docs/PLAN.md`.
 
 ### RF-ENR-001
 
@@ -252,11 +252,11 @@ Para Fase 5, ADMIN selecciona manualmente el tipo `AUXILIARY` y se aplica de inm
 
 El descuento auxiliar descrito arriba no espera ni depende de obtener un certificado de finalización. No se automatiza un beneficio distinto posterior al certificado.
 
-## SESIONES
+## SESIONES (Fase 6; implementada en development, release pendiente)
 
 ### RF-SES-001
 
-Cada grupo debe tener sesiones.
+Cada grupo tiene calendario generado a partir de sus fechas, días L–V y duración de sesión de la revisión de formato. Los grupos existentes se materializan idempotentemente; las sesiones pasadas quedan pendientes de revisión ADMIN, sin inferir ausencias históricas antes de establecer el roster.
 
 ### RF-SES-002
 
@@ -264,8 +264,8 @@ Una sesión debe registrar:
 
 - fecha;
 - hora;
-- estado;
-- reemplazo si corresponde.
+- estado (incluye sesiones canceladas conservadas en cronología);
+- reemplazo si corresponde, conservando vínculo al encuentro original.
 
 ### Referencias iniciales
 
@@ -277,9 +277,9 @@ Una sesión debe registrar:
 
 - sesiones aproximadas de 1,5 horas.
 
-No asumir que estos valores nunca cambiarán.
+No asumir que estos valores nunca cambiarán. La generación toma la revisión de formato aplicable y no reescribe silenciosamente el calendario ya creado.
 
-## ASISTENCIA
+## ASISTENCIA (Fase 6; implementada en development, release pendiente)
 
 ### RF-ATT-001
 
@@ -289,15 +289,11 @@ El instructor debe poder registrar asistencia por sesión.
 
 Debe registrarse asistencia del instructor cuando corresponda.
 
-### RF-ATT-003
-
-El sistema debe calcular porcentaje de asistencia.
+Fase 6 no calcula ni presenta porcentaje de asistencia ni aplica un gate porcentual. Cualquier requerimiento porcentual queda fuera de este milestone.
 
 ### RF-ATT-004
 
-Debe poder detectar tres faltas continuas y aplicar/señalar la política definida.
-
-La naturaleza exacta de la sanción debe confirmarse.
+ADMIN configura el número N de ausencias consecutivas (inicialmente 3). Se advierte al llegar a N y se pierde elegibilidad académica al superar N. Una ausencia justificada cuenta para asistencia e interrumpe la racha. No se expulsa ni se cancela automáticamente una plaza, ni se inicia devolución.
 
 ### RF-ATT-005
 
@@ -307,7 +303,17 @@ La evidencia de presencia puede derivarse operativamente de:
 - trabajo/práctica;
 - examen diario teórico/práctico.
 
-El sistema inicialmente registra el resultado de asistencia, no necesariamente automatiza cada mecanismo de evidencia.
+El sistema registra el resultado, no automatiza esos mecanismos de evidencia. Los estados son `Presente`, `Ausente` y `Justificada`; no existe tardanza. Solo se registran participantes `INSCRITO` del grupo.
+
+### Reglas de calendario, acceso y edición
+
+- Las sesiones generadas de lunes a viernes incluyen fechas pasadas; la asistencia inicial de esas sesiones queda pendiente de revisión explícita ADMIN y no se convierte retroactivamente en ausencia.
+- ADMIN puede cancelar una sesión indicando `Feriado` u otro motivo y añadir reemplazos. No existe un calendario/módulo global de feriados. El reemplazo conserva duración y cronología; puede ocurrir el mismo día a una hora anterior o en otro día, incluido fin de semana, sujeto a evitar conflictos de instructor y grupo. La cancelación mantiene el encuentro original en el historial.
+- Instructor solo opera sus propios grupos y puede modificar asistencia durante el día civil de Bolivia de la sesión. ADMIN puede consultar/registrar asistencia de participantes e instructor y corregir posteriormente; las correcciones administrativas quedan auditadas.
+- Durante el día una marca faltante permanece pendiente; al finalizar el día se deriva como ausente para el roster establecido, sin insertar una marca falsa ni requerir un proceso global. Para sesiones históricas, ADMIN establece explícitamente el roster y completa su revisión; luego solo ese roster admite inferencias. Sesiones canceladas no participan en asistencia ni en rachas.
+- La configuración de esta fase se limita a N para rachas consecutivas; no define un porcentaje mínimo de asistencia. El bloqueo de elegibilidad académica podrá alimentar certificación futura (Fase 9), pero no hay emisión de certificados en Fase 6.
+
+Estado: el backend y la UI están integrados en `development` (PRs 201–203); migración 0019 solo en Supabase local, ledger 20 con 53 tablas preservadas. `master`/cloud continúan en Fase 5/ledger 18. El gate final de fase y release siguen pendientes. El contrato del módulo se detalla en [`docs/ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md).
 
 ## EVALUACIÓN
 
@@ -476,9 +482,7 @@ Protección de datos personales.
 
 ## PUNTOS PENDIENTES DE CONFIRMACIÓN
 
-- porcentaje exacto mínimo de asistencia;
-- significado definitivo de la regla indicada originalmente como “Asistencia <= 70”;
-- sanción exacta por tres faltas continuas;
+- requisitos académicos adicionales a la política de ausencias consecutivas aprobada para Fase 6, si se acuerdan para fases posteriores;
 - cuándo se consolida el descuento de auxiliares;
 - lista definitiva de auxiliares beneficiarios;
 - tipos definitivos de certificado;
