@@ -89,7 +89,7 @@ Los niveles iniciales son:
 - Corrección implementada/validada en la rama fuente e integrada mediante PR 134 (release no acreditado): un curso `PUBLISHED` debe conservar al menos un grupo activo además del instructor activo. Un `DRAFT` puede permanecer sin instructor; «Sin asignar…» es placeholder deshabilitado y editar otro campo no obliga a asignarlo ni permite seleccionarlo.
 - Cambiar instructor en curso publicado se permite antes del inicio oficial; desde el inicio queda bloqueado. Las validaciones se hacen en servidor y se mantienen las reglas actuales de retiro/archivo e historial.
 - Una asignación no puede hacer que un instructor esté en dos cursos cuyos calendarios L–V coincidan en fecha y horario civil de Bolivia (`America/La_Paz`). Se usan intervalos semiabiertos, por lo que turnos contiguos no se consideran conflicto. Mutaciones concurrentes de asignación, fecha de curso, horario/grupo, estado o publicación deben serializar conflicto y escritura para evitar carreras.
-- El release PR 126 no incorporó desactivación. La corrección pasó el full gate local en `8735d676fe0d96e7230b4636efa8cb51045d1eca` y se integró mediante PR 136 (`8cdb38f`); 0016 y smoke local están verificados. Producción permanece en PR 126. Instructor con historial asignado no se elimina físicamente y solo se activa/desactiva si no tiene cursos no archivados asignados; se muestran cursos y se requiere resolver asignaciones. Se permite desactivar si todas las asignaciones son a cursos archivados. Sin historial, eliminación solo con rol único `INSTRUCTOR` y sin dependencias, con Auth eliminado consistentemente. Desactivado pierde acceso en rutas/acciones server-side aun con sesión vigente. Ver `docs/AUTHENTICATION.md`.
+- El release inicial PR 126 no incorporó desactivación. La corrección pasó el full gate local en `8735d676fe0d96e7230b4636efa8cb51045d1eca` y se integró mediante PR 136 (`8cdb38f`); quedó incluida en el release posterior PR 211. Instructor con historial asignado no se elimina físicamente y solo se activa/desactiva si no tiene cursos no archivados asignados; se muestran cursos y se requiere resolver asignaciones. Se permite desactivar si todas las asignaciones son a cursos archivados. Sin historial, eliminación solo con rol único `INSTRUCTOR` y sin dependencias, con Auth eliminado consistentemente. Desactivado pierde acceso en rutas/acciones server-side aun con sesión vigente. Ver `docs/AUTHENTICATION.md`.
 - Incluir eventos de auditoría para creación/actualización de asignación y mutaciones de cuenta, sin credenciales. Auditoría como UI/reportes no es parte de este flujo.
 
 La migración 0014 agrega perfiles y asignación preservando cursos legados sin mapear automáticamente `instructorName`; las migraciones 0012–0015 se aplicaron a local y cloud mediante PR 126. La implementación incluye CRUD ADMIN de perfiles/asignaciones, edición propia de datos profesionales (correo no editable) y consulta instructor de `/app/mis-cursos` filtrada por ownership server-side; los flujos aprobados se liberaron a producción. Se auditan `INSTRUCTOR_CREATED`, `INSTRUCTOR_UPDATED`, cambios de asignación y `PASSWORD_CHANGED`, sin credenciales/tokens. El evento de password se escribe después de éxito Auth; si PostgreSQL falla, el cambio no se revierte y se registra un fallback sanitizado. La baja no tenía política ni endpoint/UI en dicho release; la política correctiva aprobada y su implementación en la rama fuente se describen arriba.
@@ -194,7 +194,7 @@ La preinscripción presencial de Fase 5 ocupa cupo y puede registrar pagos parci
 
 El alcance funcional está confirmado, incluido el registro gratuito por descuento AUXILIARY del 100 %: no se registra pago cero y el mínimo se exime solo si el total final exacto es cero.
 
-Estado de implementación: modelo/migración 0017, dominio/repositorio transaccional, settings, generadores CSV/PDF y rutas/UI se integraron por PRs 173–180. Fase 5 se liberó en producción como `2e0eecb` (cloud ledger 18); el gate local reportado pasó 303 unit, 125 integration y 125/125 E2E. Las correcciones post-release se integraron a `development` por PRs 197–199; sesiones/asistencia se implementaron en PRs 201–203, con gate combinado y release todavía pendientes. Ver `docs/PLAN.md`.
+Estado de implementación: modelo/migración 0017, dominio/repositorio transaccional, settings, generadores CSV/PDF y rutas/UI se integraron por PRs 173–180. Fase 5 se liberó en producción como `2e0eecb` (ledger 18); sus correcciones post-release y Fase 6 se integraron y liberaron después mediante PR 211. Ver el estado actualizado de Fase 6 y ledger en [`docs/ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md) y [`docs/PLAN.md`](PLAN.md).
 
 ### RF-ENR-001
 
@@ -252,7 +252,7 @@ Para Fase 5, ADMIN selecciona manualmente el tipo `AUXILIARY` y se aplica de inm
 
 El descuento auxiliar descrito arriba no espera ni depende de obtener un certificado de finalización. No se automatiza un beneficio distinto posterior al certificado.
 
-## SESIONES (Fase 6; implementada en development, release pendiente)
+## SESIONES (Fase 6; liberada en producción)
 
 ### RF-SES-001
 
@@ -279,7 +279,7 @@ Una sesión debe registrar:
 
 No asumir que estos valores nunca cambiarán. La generación toma la revisión de formato aplicable y no reescribe silenciosamente el calendario ya creado.
 
-## ASISTENCIA (Fase 6; implementada en development, release pendiente)
+## ASISTENCIA (Fase 6; liberada en producción)
 
 ### RF-ATT-001
 
