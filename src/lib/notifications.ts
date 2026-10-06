@@ -28,6 +28,7 @@ function withId(
 }
 
 export const notifications = {
+  dismiss: (id: string) => sileo.dismiss(id),
   success: (options: NotificationOptions) => sileo.success(withId(options)),
   error: (options: NotificationOptions) => sileo.error(withId(options)),
   info: (options: NotificationOptions) => sileo.info(withId(options)),
