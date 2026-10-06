@@ -5,6 +5,7 @@ import {
   showFormIssues,
 } from "@/components/pre-registrations/registration-client";
 import { initializeInlineFields } from "@/components/pre-registrations/inline-field-client";
+import { initializeSettingsInputs } from "@/components/pre-registrations/settings-input";
 import { validateAbsenceLimit } from "@/domain/attendance/rules";
 import {
   ATTENDANCE_STATUSES,
@@ -164,6 +165,7 @@ function state(form: HTMLFormElement) {
 }
 export function initializeAttendanceForms() {
   initializeInlineFields();
+  initializeSettingsInputs();
   document
     .querySelectorAll<HTMLFormElement>("[data-attendance-form]")
     .forEach((form) => {
