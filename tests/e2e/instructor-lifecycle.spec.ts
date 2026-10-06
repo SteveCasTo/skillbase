@@ -2,7 +2,12 @@ import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { createDatabase } from "@/server/db/client";
-import { authAttemptBuckets } from "@/server/db/schema";
+import {
+  authAttemptBuckets,
+  courseTypes,
+  courseTypeRevisions,
+  courses,
+} from "@/server/db/schema";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
@@ -28,26 +33,9 @@ test("instructor lifecycle confirmation and mutations remain available without J
       .click();
     await expect(page).toHaveURL(/\/editar\?success=saved$/u);
     const panel = page.locator("[data-instructor-lifecycle]");
-    await panel.getByText("Desactivar instructor", { exact: true }).click();
-    await panel
-      .getByRole("button", {
-        name: "Confirmar desactivar instructor",
-        exact: true,
-      })
-      .click();
     await expect(
-      panel.getByText("Cuenta desactivada", { exact: true }),
-    ).toBeVisible();
-    await panel.getByText("Activar instructor", { exact: true }).click();
-    await panel
-      .getByRole("button", {
-        name: "Confirmar activar instructor",
-        exact: true,
-      })
-      .click();
-    await expect(
-      panel.getByText("Cuenta activa", { exact: true }),
-    ).toBeVisible();
+      panel.getByText("Desactivar instructor", { exact: true }),
+    ).toBeHidden();
     await panel.getByText("Eliminar instructor", { exact: true }).click();
     await panel
       .getByRole("button", {
@@ -61,7 +49,7 @@ test("instructor lifecycle confirmation and mutations remain available without J
   }
 });
 
-test("ADMIN lifecycle preserves credentials on reactivation, denies existing sessions and removes unused accounts", async ({
+test("ADMIN lifecycle preserves credentials on reactivation and denies existing sessions for accounts with history", async ({
   context,
   page,
   browser,
@@ -98,6 +86,74 @@ test("ADMIN lifecycle preserves credentials on reactivation, denies existing ses
     /\/app\/instructores\/[0-9a-f-]+\/editar\?success=saved$/u,
   );
   const endpoint = new URL(page.url()).pathname;
+  // An assigned course blocks deactivation; an archived one preserves history.
+  const history = createDatabase(getTestSupabaseEnvironment().databaseUrl);
+  let blockingCourseId: string;
+  try {
+    const [format] = await history.db
+      .insert(courseTypes)
+      .values({ name: `Lifecycle ${randomUUID()}` })
+      .returning();
+    const [revision] = await history.db
+      .insert(courseTypeRevisions)
+      .values({
+        courseTypeId: format!.id,
+        revisionNumber: 1,
+        totalHours: 3,
+        sessionMinutes: 90,
+        studentAmount: "10",
+        externalAmount: "20",
+      })
+      .returning();
+    const [course] = await history.db
+      .insert(courses)
+      .values({
+        name: "Curso asignado sintético",
+        slug: `lifecycle-${randomUUID()}`,
+        description: "Fixture privado",
+        level: "BASIC",
+        courseTypeRevisionId: revision!.id,
+        instructorId: endpoint.split("/")[3]!,
+        startsAt: new Date("2027-09-01T04:00Z"),
+        endsAt: new Date("2027-09-03T03:59Z"),
+        schedule: "Horario sintético",
+        conditions: "Fixture",
+        minimumGrade: 70,
+      })
+      .returning();
+    blockingCourseId = course!.id;
+  } finally {
+    await history.close();
+  }
+  await page.reload();
+  const blocked = page.locator("[data-instructor-lifecycle]");
+  await expect(
+    blocked.getByText("Desactivar instructor", { exact: true }),
+  ).toHaveAttribute("aria-disabled", "true");
+  await expect(
+    blocked.getByRole("link", {
+      name: "Curso asignado sintético",
+      exact: true,
+    }),
+  ).toHaveAttribute("href", `/app/cursos/${blockingCourseId}/editar`);
+  const denied = await page.request.post(endpoint, {
+    headers: { Origin: new URL(page.url()).origin, Accept: "application/json" },
+    form: {
+      intent: "deactivate",
+      revision: await blocked.locator('input[name="revision"]').inputValue(),
+    },
+  });
+  expect(denied.status()).toBe(422);
+  const archive = createDatabase(getTestSupabaseEnvironment().databaseUrl);
+  try {
+    await archive.db
+      .update(courses)
+      .set({ status: "ARCHIVED" })
+      .where(eq(courses.id, blockingCourseId));
+  } finally {
+    await archive.close();
+  }
+  await page.reload();
   const instructorContext = await browser.newContext();
   try {
     const instructor = await instructorContext.newPage();
@@ -112,6 +168,9 @@ test("ADMIN lifecycle preserves credentials on reactivation, denies existing ses
     await expect(instructor).toHaveURL(/\/app$/u);
     const panel = page.locator("[data-instructor-lifecycle]");
     await expect(panel).toHaveAttribute("data-ready", "true");
+    await expect(
+      panel.getByText("Eliminar instructor", { exact: true }),
+    ).toBeHidden();
     const deactivate = panel
       .locator("summary")
       .filter({ hasText: /^Desactivar instructor$/u });
@@ -154,17 +213,6 @@ test("ADMIN lifecycle preserves credentials on reactivation, denies existing ses
       .getByRole("button", { name: "Iniciar sesión", exact: true })
       .click();
     await expect(instructor).toHaveURL(/\/app$/u);
-    await panel.getByText("Eliminar instructor", { exact: true }).click();
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Confirmar", exact: true })
-      .click();
-    await expect(page).toHaveURL(/\/app\/instructores\?success=deleted$/u);
-    await expect(
-      page.getByRole("status").filter({ hasText: "Instructor eliminado" }),
-    ).toBeVisible();
-    await instructor.goto("/app");
-    await expect(instructor).toHaveURL(/\/login(?:\?|$)/u);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -212,7 +260,7 @@ test("instructor lifecycle preserves inline error and shows pending feedback wit
       }),
     });
   });
-  await panel.getByText("Desactivar instructor", { exact: true }).click();
+  await panel.getByText("Eliminar instructor", { exact: true }).click();
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Confirmar", exact: true })

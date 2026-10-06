@@ -5,19 +5,11 @@ import { Eye, EyeOff } from "lucide-react";
 interface Props {
   values: Readonly<Record<string, string>>;
   errors: Readonly<Record<string, string>>;
-  revision?: string;
-  editing?: boolean;
+  error?: string | null;
   action?: string;
-  baseline?: Readonly<Record<string, string>>;
 }
-const {
-  values,
-  errors,
-  revision,
-  editing = false,
-  action,
-  baseline = values,
-} = Astro.props;
+const { values, errors, error, action } = Astro.props;
+const globalError = Object.keys(errors).length ? null : error;
 const fields = [
   {
     key: "firstName",
@@ -59,13 +51,14 @@ const fields = [
   action={action}
   class="mt-8 flex w-full min-w-0 flex-col gap-6"
   data-instructor-form
-  data-baseline={editing ? JSON.stringify(baseline) : undefined}
   data-astro-reload
 >
-  {revision && <input type="hidden" name="revision" value={revision} />}
-  <p role="alert" data-form-error class="hidden text-sm text-destructive"></p>
-  <p class="text-sm text-muted-foreground">
-    Todos los campos son obligatorios, excepto el teléfono.
+  <p
+    role="alert"
+    data-form-error
+    class:list={["text-sm text-destructive", { hidden: !globalError }]}
+  >
+    {globalError}
   </p>
   <fieldset class="instructor-fields min-w-0 grid gap-5">
     <legend class="mb-5 text-lg font-semibold">Datos del instructor</legend>
@@ -84,7 +77,6 @@ const fields = [
           autoComplete={field.autocomplete}
           maxLength={field.max}
           required={field.required}
-          readOnly={editing && field.key === "email"}
           defaultValue={values[field.key] ?? ""}
           aria-invalid={Boolean(errors[field.key])}
           aria-describedby={`${field.key}-error`}
@@ -100,67 +92,64 @@ const fields = [
       </div>
     ))}
   </fieldset>
-  {!editing && (
-    <fieldset class="min-w-0 flex flex-col gap-2">
-      <legend class="mb-3 text-lg font-semibold">Acceso inicial</legend>
-      <label for="password" class="text-sm font-medium">
-        Contraseña inicial
-      </label>
-      <div
-        class="flex max-w-xl items-center gap-2"
-        data-invalid={Boolean(errors.password)}
+  <fieldset class="min-w-0 flex flex-col gap-2">
+    <legend class="mb-3 text-lg font-semibold">Acceso inicial</legend>
+    <label for="password" class="text-sm font-medium">
+      Contraseña inicial
+    </label>
+    <div
+      class="flex max-w-xl items-center gap-2"
+      data-invalid={Boolean(errors.password)}
+    >
+      <Input
+        id="password"
+        name="password"
+        type="password"
+        autoComplete="new-password"
+        required
+        minLength={12}
+        maxLength={128}
+        aria-invalid={Boolean(errors.password)}
+        aria-describedby="password-help password-error"
+        className="min-h-11"
+      />
+      <button
+        type="button"
+        hidden
+        data-password-toggle
+        aria-controls="password"
+        aria-label="Mostrar contraseña inicial"
+        aria-pressed="false"
+        class={buttonVariants({
+          variant: "outline",
+          size: "icon",
+          className: "min-h-11 min-w-11 shrink-0",
+        })}
       >
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          required
-          minLength={12}
-          maxLength={128}
-          aria-invalid={Boolean(errors.password)}
-          aria-describedby="password-help password-error"
-          className="min-h-11"
-        />
-        <button
-          type="button"
-          hidden
-          data-password-toggle
-          aria-controls="password"
-          aria-label="Mostrar contraseña inicial"
-          aria-pressed="false"
-          class={buttonVariants({
-            variant: "outline",
-            size: "icon",
-            className: "min-h-11 min-w-11 shrink-0",
-          })}
-        >
-          <Eye data-password-show aria-hidden="true" />
-          <span data-password-hide hidden>
-            <EyeOff aria-hidden="true" />
-          </span>
-        </button>
-      </div>
-      <p
-        id="password-error"
-        data-field-error="password"
-        class="text-sm text-destructive empty:hidden"
-      >
-        {errors.password}
-      </p>
-      <p id="password-help" class="text-sm text-muted-foreground">
-        Elige entre 12 y 128 caracteres. No se guarda en el perfil; cambiarla
-        después es opcional.
-      </p>
-    </fieldset>
-  )}
+        <Eye data-password-show aria-hidden="true" />
+        <span data-password-hide hidden>
+          <EyeOff aria-hidden="true" />
+        </span>
+      </button>
+    </div>
+    <p
+      id="password-error"
+      data-field-error="password"
+      class="text-sm text-destructive empty:hidden"
+    >
+      {errors.password}
+    </p>
+    <p id="password-help" class="text-sm text-muted-foreground">
+      Usa entre 12 y 128 caracteres.
+    </p>
+  </fieldset>
   <button
     type="submit"
     class={buttonVariants({
       className: "min-h-11 w-full sm:w-auto sm:self-start",
     })}
   >
-    {editing ? "Guardar cambios" : "Crear instructor"}
+    Crear instructor
   </button>
 </form>
 <style>
@@ -172,17 +161,15 @@ const fields = [
   import { navigate } from "astro:transitions/client";
   import { notifications } from "@/lib/notifications";
   import { instructorFormState } from "./form-state";
+  import { bindPhoneInputs } from "@/components/pre-registrations/participant-fields";
   function initialize() {
+    bindPhoneInputs();
     document
       .querySelectorAll<HTMLFormElement>("[data-instructor-form]")
       .forEach((form) => {
         if (form.dataset.bound) return;
         form.dataset.bound = "true";
         form.noValidate = true;
-        const baseline: Record<string, string> | undefined = form.dataset
-          .baseline
-          ? JSON.parse(form.dataset.baseline)
-          : undefined;
         const button = form.querySelector<HTMLButtonElement>(
           'button[type="submit"]',
         );
@@ -201,7 +188,6 @@ const fields = [
             Object.fromEntries(
               inputs.map((input) => [input.name, input.value]),
             ),
-            baseline,
           );
         const update = (showAll = false) => {
           const current = state();
@@ -294,6 +280,8 @@ const fields = [
             .forEach((el) => {
               el.textContent = "";
             });
+          let fieldFailure = false;
+          let failureMessage = "";
           try {
             const response = await fetch(form.action, {
               method: "POST",
@@ -305,7 +293,13 @@ const fields = [
               error?: string;
               fieldErrors?: Record<string, string>;
             } = await response.json();
-            if (!response.ok || !result.destination) {
+            if (
+              !response.ok ||
+              !result.destination ||
+              !/^\/app\/instructores\/[0-9a-f-]+\/editar\?success=saved$/u.test(
+                result.destination,
+              )
+            ) {
               form
                 .querySelectorAll<HTMLElement>("[data-field-error]")
                 .forEach((el) => {
@@ -327,22 +321,24 @@ const fields = [
                     );
                   if (result.fieldErrors?.[input.name]) touched.add(input.name);
                 });
-              throw new Error(
-                result.error ?? "No se pudo guardar. Inténtalo nuevamente.",
+              fieldFailure = Boolean(
+                Object.keys(result.fieldErrors ?? {}).length,
               );
+              failureMessage =
+                result.error ?? "No se pudo guardar. Inténtalo nuevamente.";
+              throw new Error(failureMessage);
             }
             notifications.success({ id, title: "Instructor guardado" });
             await navigate(result.destination);
-          } catch (error) {
+          } catch {
             const message =
-              error instanceof Error
-                ? error.message
-                : "No se pudo guardar. Inténtalo nuevamente.";
+              failureMessage ||
+              "No se pudo guardar. Revisa tu conexión e inténtalo nuevamente.";
             if (alert) {
-              alert.textContent = message;
-              alert.classList.remove("hidden");
+              alert.textContent = fieldFailure ? "" : message;
+              alert.classList.toggle("hidden", fieldFailure);
             }
-            notifications.error({ id, title: message });
+            notifications.dismiss(id);
             const password =
               form.querySelector<HTMLInputElement>('[name="password"]');
             if (password) {
@@ -359,7 +355,7 @@ const fields = [
                 passwordError.textContent =
                   "Vuelve a introducir la contraseña inicial para reintentar.";
             }
-            if (alert) {
+            if (alert && !fieldFailure) {
               alert.tabIndex = -1;
               alert.focus();
             }

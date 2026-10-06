@@ -25,7 +25,7 @@ try {
 <PrivateLayout title="Instructores">
   {Astro.url.searchParams.get("success") === "deleted" && (
     <p role="status" class="mb-6">
-      Instructor eliminado. La auditoría se conserva.
+      Instructor eliminado.
     </p>
   )}
   <header class="flex flex-wrap items-start justify-between gap-5">
@@ -75,15 +75,6 @@ try {
                   ? "Cuenta desactivada"
                   : "Acceso no habilitado"}
             </p>
-          </a>
-          <a
-            href={`/app/instructores/${instructor.id}/editar#instructor-access-title`}
-            class={buttonVariants({
-              variant: "outline",
-              className: "min-h-11",
-            })}
-          >
-            Gestionar acceso
           </a>
         </li>
       ))}

@@ -2,6 +2,210 @@ import { expect, test } from "@playwright/test";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
 
+test("admin can inline-edit only its persisted account name", async ({
+  context,
+  page,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  await page.goto("/app/perfil");
+  const form = page.getByRole("form", { name: "Editar nombre", exact: true });
+  await expect(form).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Datos de la cuenta" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByLabel("Correo electrónico", { exact: true }),
+  ).toHaveCount(0);
+  await form
+    .getByRole("button", { name: "Editar nombre", exact: true })
+    .click();
+  const name = form.getByLabel("Nombre", { exact: true });
+  const original = await name.inputValue();
+  const staleRevision = await form
+    .locator('input[name="revision"]')
+    .inputValue();
+  await name.fill("Ada Admin editada");
+  await form.getByRole("button", { name: "Guardar", exact: true }).click();
+  await expect(form.locator("[data-inline-value]")).toHaveText(
+    "Ada Admin editada",
+  );
+  await page.reload();
+  await expect(form.locator("[data-inline-value]")).toHaveText(
+    "Ada Admin editada",
+  );
+  await form
+    .getByRole("button", { name: "Editar nombre", exact: true })
+    .click();
+  await form.getByLabel("Nombre", { exact: true }).fill("Cambio obsoleto");
+  await form.locator('input[name="revision"]').evaluate((input, value) => {
+    (input as HTMLInputElement).value = value;
+  }, staleRevision);
+  await form.getByRole("button", { name: "Guardar", exact: true }).click();
+  await expect(form.locator("[data-form-error]")).toContainText(
+    "El perfil cambió. Recarga y revisa antes de guardar.",
+  );
+  await expect(form.locator("[data-inline-value]")).toHaveText(
+    "Ada Admin editada",
+  );
+  await page.reload();
+  await form
+    .getByRole("button", { name: "Editar nombre", exact: true })
+    .click();
+  await form.getByLabel("Nombre", { exact: true }).fill(original);
+  await form.getByRole("button", { name: "Guardar", exact: true }).click();
+  await expect(form.locator("[data-inline-value]")).toHaveText(original);
+});
+
+test("own profile saves fields independently, preserves other edits and advances the revision", async ({
+  context,
+  page,
+}) => {
+  await signInFixture(context, AUTH_FIXTURES.instructor.email);
+  await page.goto("/app/perfil");
+  const nameForm = page.getByRole("form", {
+    name: "Editar nombre",
+    exact: true,
+  });
+  const surnameForm = page.getByRole("form", {
+    name: "Editar apellidos",
+    exact: true,
+  });
+  await nameForm
+    .getByRole("button", { name: "Editar nombre", exact: true })
+    .click();
+  await surnameForm
+    .getByRole("button", { name: "Editar apellidos", exact: true })
+    .click();
+  const originalName = await nameForm
+    .getByLabel("Nombre", { exact: true })
+    .inputValue();
+  const originalSurname = await surnameForm
+    .getByLabel("Apellidos", { exact: true })
+    .inputValue();
+  const revision = await nameForm
+    .locator('input[name="revision"]')
+    .inputValue();
+  await nameForm.getByLabel("Nombre", { exact: true }).fill("李 Élodie");
+  await surnameForm
+    .getByLabel("Apellidos", { exact: true })
+    .fill("Sin guardar");
+  const endpoint = /\/app\/perfil\?edit=professional$/u;
+  await page.route(endpoint, (route) =>
+    route.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: "Revisa los datos del instructor.",
+        fieldErrors: { firstName: "No se pudo guardar el nombre." },
+      }),
+    }),
+  );
+  await nameForm.getByRole("button", { name: "Guardar", exact: true }).click();
+  await expect(
+    nameForm.locator('[data-field-error="firstName"]'),
+  ).toBeVisible();
+  await expect(nameForm.getByLabel("Nombre", { exact: true })).toHaveValue(
+    "李 Élodie",
+  );
+  await expect(nameForm.getByRole("alert")).toBeHidden();
+  await expect(
+    page.locator('[data-sileo-toast][data-state="loading"]'),
+  ).toBeHidden();
+  await expect(
+    page.locator('[data-sileo-toast][data-state="error"]'),
+  ).toBeHidden();
+  await page.unroute(endpoint);
+  await nameForm.getByRole("button", { name: "Guardar", exact: true }).click();
+  await expect(
+    nameForm.getByRole("button", { name: "Editar nombre", exact: true }),
+  ).toBeFocused();
+  await expect(nameForm.getByLabel("Nombre", { exact: true })).toHaveAttribute(
+    "aria-invalid",
+    "false",
+  );
+  await expect(
+    surnameForm.getByLabel("Apellidos", { exact: true }),
+  ).toHaveValue("Sin guardar");
+  await expect(surnameForm.locator('input[name="revision"]')).not.toHaveValue(
+    revision,
+  );
+  // A malicious request cannot replace siblings or the readonly login email.
+  const response = await page.request.post("/app/perfil?edit=professional", {
+    headers: { Origin: new URL(page.url()).origin, Accept: "application/json" },
+    form: {
+      field: "phone",
+      phone: "+591 (700) 00-00",
+      email: "other@example.test",
+      firstName: "Forged",
+      revision: await surnameForm
+        .locator('input[name="revision"]')
+        .inputValue(),
+    },
+  });
+  expect(response.ok()).toBe(true);
+  const result = await response.json();
+  expect(result.values).toMatchObject({
+    firstName: "李 Élodie",
+    lastName: originalSurname,
+    email: AUTH_FIXTURES.instructor.email,
+    phone: "+591 (700) 00-00",
+  });
+  await page.reload();
+  await nameForm
+    .getByRole("button", { name: "Editar nombre", exact: true })
+    .click();
+  await nameForm.getByLabel("Nombre", { exact: true }).fill(originalName);
+  await nameForm.getByRole("button", { name: "Guardar", exact: true }).click();
+  await expect(
+    nameForm.getByRole("button", { name: "Editar nombre", exact: true }),
+  ).toBeFocused();
+});
+
+test("individual profile POST works without JavaScript and preserves invalid input", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  try {
+    await signInFixture(context, AUTH_FIXTURES.instructor.email);
+    const page = await context.newPage();
+    await page.goto("/app/perfil");
+    const form = page.getByRole("form", {
+      name: "Editar teléfono (opcional)",
+      exact: true,
+    });
+    await form
+      .getByLabel("Teléfono (opcional)", { exact: true })
+      .fill("+591 70000001");
+    await form.getByRole("button", { name: "Guardar", exact: true }).click();
+    await expect(page).toHaveURL(/\/app\/perfil\?status=profile_updated$/u);
+    await expect(
+      form.getByLabel("Teléfono (opcional)", { exact: true }),
+    ).toHaveValue("+591 70000001");
+    const nameForm = page.getByRole("form", {
+      name: "Editar nombre",
+      exact: true,
+    });
+    await nameForm.getByLabel("Nombre", { exact: true }).fill(" ");
+    const invalid = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().includes("edit=professional"),
+    );
+    await nameForm
+      .getByRole("button", { name: "Guardar", exact: true })
+      .click();
+    expect((await invalid).status()).toBe(422);
+    await expect(nameForm.getByLabel("Nombre", { exact: true })).toHaveValue(
+      " ",
+    );
+    await expect(
+      nameForm.getByLabel("Nombre", { exact: true }),
+    ).toHaveAttribute("aria-invalid", "true");
+  } finally {
+    await context.close();
+  }
+});
+
 test("creation gates valid input, exposes inline errors and toggles password by keyboard", async ({
   context,
   page,
@@ -25,6 +229,11 @@ test("creation gates valid input, exposes inline errors and toggles password by 
   await password.fill("a".repeat(12));
   await expect(submit).toBeDisabled();
   await form.getByLabel("Correo electrónico").fill("synthetic@example.test");
+  const phone = form.getByLabel("Teléfono (opcional)", { exact: true });
+  await phone.fill("+591 (700) 00-00");
+  await phone.press("End");
+  await page.keyboard.insertText("letters");
+  await expect(phone).toHaveValue("+591 (700) 00-00");
   await expect(submit).toBeEnabled();
   const eye = form.locator("[data-password-toggle]");
   await expect(eye).toHaveAccessibleName("Mostrar contraseña inicial");
@@ -45,12 +254,12 @@ test("professional edit requires a valid normalized change and undo disables sav
 }) => {
   await signInFixture(context, AUTH_FIXTURES.instructor.email);
   await page.goto("/app/perfil");
-  const form = page.locator("[data-instructor-form]");
+  const form = page.getByRole("form", { name: "Editar nombre", exact: true });
   await expect(form).toHaveAttribute("data-bound", "true");
-  const submit = form.getByRole("button", {
-    name: "Guardar cambios",
-    exact: true,
-  });
+  await form
+    .getByRole("button", { name: "Editar nombre", exact: true })
+    .click();
+  const submit = form.getByRole("button", { name: "Guardar", exact: true });
   const firstName = form.getByLabel("Nombre", { exact: true });
   const original = await firstName.inputValue();
   await expect(submit).toBeDisabled();
@@ -62,12 +271,12 @@ test("professional edit requires a valid normalized change and undo disables sav
   await expect(submit).toBeDisabled();
   await firstName.fill(original);
   await expect(submit).toBeDisabled();
+  await form.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(firstName).toBeHidden();
   await expect(
-    form.getByText(
-      "El correo de acceso se conserva para mantener la identidad de la cuenta.",
-    ),
-  ).toHaveCount(0);
-  await expect(form.getByLabel("Correo electrónico")).toHaveAttribute(
+    form.getByRole("button", { name: "Editar nombre", exact: true }),
+  ).toBeFocused();
+  await expect(page.getByLabel("Correo electrónico")).toHaveAttribute(
     "readonly",
     "",
   );
@@ -81,7 +290,7 @@ test("instructor and profile layouts fill available width without horizontal ove
   await page.goto("/app/perfil");
   for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    const form = page.locator("[data-instructor-form]");
+    const form = page.locator("[data-instructor-details]");
     await expect(form).toBeVisible();
     expect(
       await page.evaluate(

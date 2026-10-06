@@ -1,0 +1,108 @@
+---
+import InlineEditField from "@/components/pre-registrations/InlineEditField.astro";
+import { Input } from "@/components/ui/input";
+interface Props {
+  values: Readonly<Record<string, string>>;
+  baseline: Readonly<Record<string, string>>;
+  errors: Readonly<Record<string, string>>;
+  revision: string;
+  action?: string;
+  error?: string | null;
+  submittedField?: string | undefined;
+}
+const { values, baseline, errors, revision, action, error, submittedField } =
+  Astro.props;
+const fields = [
+  {
+    key: "firstName",
+    label: "Nombre",
+    max: 100,
+    autocomplete: "given-name",
+    type: "text",
+    required: true,
+  },
+  {
+    key: "lastName",
+    label: "Apellidos",
+    max: 150,
+    autocomplete: "family-name",
+    type: "text",
+    required: true,
+  },
+  {
+    key: "phone",
+    label: "Teléfono (opcional)",
+    max: 32,
+    autocomplete: "tel",
+    type: "tel",
+    required: false,
+  },
+] as const;
+---
+
+<div
+  data-instructor-details
+  class="mt-6 grid min-w-0 gap-x-8 gap-y-6 sm:grid-cols-2"
+>
+  {fields.map((field) => (
+    <form
+      method="post"
+      action={action}
+      data-instructor-field
+      data-baseline={JSON.stringify(baseline)}
+      data-last-submitted={submittedField === field.key ? field.key : undefined}
+      aria-label={`Editar ${field.label.toLowerCase()}`}
+      class="min-w-0"
+      data-astro-reload
+    >
+      <input type="hidden" name="field" value={field.key} />
+      <input type="hidden" name="revision" value={revision} />
+      <InlineEditField label={field.label} value={baseline[field.key] ?? ""}>
+        <label for={field.key} class="text-sm font-medium">
+          {field.label}
+        </label>
+        <Input
+          id={field.key}
+          name={field.key}
+          type={field.type}
+          autoComplete={field.autocomplete}
+          maxLength={field.max}
+          required={field.required}
+          defaultValue={values[field.key] ?? ""}
+          aria-invalid={Boolean(errors[field.key])}
+          aria-describedby={`${field.key}-error`}
+          className="min-h-11"
+        />
+        <p
+          id={`${field.key}-error`}
+          data-field-error={field.key}
+          class="text-sm text-destructive empty:hidden"
+        >
+          {errors[field.key]}
+        </p>
+        <p
+          data-form-error
+          role="alert"
+          tabindex="-1"
+          class="text-sm text-destructive empty:hidden"
+        >
+          {submittedField === field.key && !errors[field.key] ? error : ""}
+        </p>
+      </InlineEditField>
+    </form>
+  ))}
+  <div class="min-w-0 flex flex-col gap-2">
+    <label for="email" class="text-sm text-muted-foreground">
+      Correo electrónico
+    </label>
+    <Input
+      id="email"
+      name="email"
+      type="email"
+      readOnly
+      defaultValue={baseline.email ?? ""}
+      className="min-h-11"
+    />
+  </div>
+</div>
+<script src="./inline-profile-client.ts"></script>
