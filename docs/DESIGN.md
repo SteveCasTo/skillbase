@@ -437,7 +437,7 @@ Verificar cada componente en ambos temas.
 
 #### Correcciones UI de Fase 4 (implementadas, full-suite validadas e integradas en development)
 
-Los comportamientos abajo están implementados en `8735d676fe0d96e7230b4636efa8cb51045d1eca`, pasan la validación local completa y se integraron mediante PR 136 (`8cdb38f`). No atribuirlos a producción; el release de correcciones Fase 4 todavía no ocurrió.
+Los comportamientos abajo se implementaron en `8735d676fe0d96e7230b4636efa8cb51045d1eca`, pasaron la validación local completa y se integraron mediante PR 136 (`8cdb38f`). La nota original reflejaba el estado pre-release; las correcciones de administración quedaron después en producción con PR 211/Fase 6. La nueva pasada adicional se mantiene pendiente abajo.
 
 - Alta/edición de instructor y perfil usan el ancho útil disponible y son responsive. Submit de alta, login, recovery y cambio espera inputs requeridos válidos; edición solo activa guardar con cambios efectivos válidos. Password nunca se repuebla.
 - Se retiraron la frase de conservación de correo y los dos textos redundantes del login sobre acceso preaprovisionado/limitado e instrucciones Google/correo; el CTA Google muestra su icono.
@@ -459,7 +459,7 @@ Los comportamientos abajo están implementados en `8735d676fe0d96e7230b4636efa8c
 - Diseño funcional aprobado: registro directo o prellenado editable; origen del interesado de solo lectura e interno; roster instructor propio desde inicio oficial y solo nombre/apellidos; ADMIN conserva finanzas y mutaciones. Filtros/paginación con recuperación de errores, permisos server-side y cash ledger mantienen estados/foco; el total gratuito por AUXILIARY 100 % se ve como gratuidad, nunca como pago cero.
 - PR 179 integró esa UI; la rama reportó 34 pruebas dirigidas y 3 E2E (dos escenarios principales y uno temporal), además de quality PASS. No equivale a full canonical E2E ni a revisión visual/accesible final del módulo.
 
-### Correcciones de administración (integradas en development, PRs 197–199; gate/release final pendientes)
+### Correcciones de administración (PRs 197–199; incluidas en el release posterior de Fase 6)
 
 - Configuración tiene copy reducido; ajustes y campos de participante se editan inline con lápiz/guardar/cancelar.
 - Filtros select de interesados aplican al cambio; texto parcial usa debounce y actualización parcial SSR/last-request-wins. Interesados consumidos se ocultan de candidatos posteriores preservando historial; email no fusiona ni identifica participantes.
@@ -467,15 +467,25 @@ Los comportamientos abajo están implementados en `8735d676fe0d96e7230b4636efa8c
 - Participantes tiene grilla responsive de hasta tres columnas. La lista muestra nombre, CI, email y estado/curso; finanzas se ven en el detalle.
 - Calendario shadcn compartido reemplaza pickers nativos. El descuento solo aparece para AUXILIARY; se quitaron banners de origen, ficha técnica global y copy redundante de servidor.
 - El actor se presenta por nombre humano. Métricas de devolución solo aparecen cuando son pertinentes. Acciones financieras usan diálogos breves, importes al centavo acotados por saldo y motivo de pago opcional; teléfono/CI mantienen validación conservadora.
-- Operaciones mantienen UUID por solicitud, estados de carga/resultado y fallback SSR sin JavaScript. Tests se acoplan a resultados observables y no a copy/CSS/orden/conteos inestables.
+- Operaciones mantienen UUID por solicitud, estados de carga/resultado y fallback SSR sin JavaScript. Tests se acoplan a resultados observables y no a copy/CSS/orden/conteos inestables. Estas correcciones quedaron en producción con el release posterior; la siguiente pasada descrita abajo es un alcance adicional, aún pendiente.
 
-### Sesiones y asistencia (Fase 6, UI integrada en development por PR 203; gate/release pendientes)
+### Sesiones y asistencia (Fase 6, release de producción)
 
 - `/app/configuracion/asistencia` y las vistas de grupo/sesión están montadas con SSR/POST y rutas específicas ADMIN/INSTRUCTOR. Fechas de recuperación usan calendario shadcn; cancelación y reemplazo usan diálogos breves y conservan el original en la cronología. No hay calendario global de feriados.
 - El roster de asistencia presenta nombres de participantes permitidos y asistencia propia del instructor cuando corresponde; no expone CI, email ni finanzas al instructor. ADMIN dispone de revisión/corrección de evidencia histórica.
 - `Pendiente` se deriva durante la fecha civil; tras el día se deriva ausencia para el roster establecido. Sesiones pasadas requieren revisión explícita ADMIN; sesiones canceladas no cuentan. El módulo presenta estado, racha y bandera de elegibilidad, sin porcentaje ni tardanza.
 - El umbral N (default 3) muestra aviso al llegar a N y marca inelegibilidad al superar N; justificada cuenta como asistencia e interrumpe racha. No hay emisión/bloqueo de certificados, expulsión automática, ni acciones automáticas de cupo/devolución.
-- La UI conserva foco/teclado, estados de carga/error/éxito y fallback sin JavaScript. PR 203 tiene cobertura focal propia; la revisión/gate combinado final del milestone está pendiente.
+- La UI conserva foco/teclado, estados de carga/error/éxito y fallback sin JavaScript. El release Fase 6 y el gate remoto posterior pasaron; el detalle de evidencia vigente está en [`docs/ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md).
+
+### Próxima pasada de correcciones administrativas (aprobada; aún no implementada)
+
+Estos son criterios de diseño para trabajo posterior al release de Fase 6, no una descripción de UI que ya exista. El seguimiento de tareas está en [`docs/PLAN.md`](PLAN.md); las reglas de negocio de cancelación/reprogramación y evaluación están en [`docs/REQUIREMENTS.md`](REQUIREMENTS.md).
+
+- **Instructor/perfil:** edición inline independiente por campo, sin guardar global; acciones de ciclo de vida visibles en la cabecera y condicionadas por asignaciones e historial. Tarjetas de cursos completos deben navegar al detalle sin duplicar el nombre ni usar jerga técnica. Hacer alta evidente, quitar accesos duplicados/copy redundante y configurar password inicial de 12–128 caracteres. Mantener credenciales en el centro de perfil para ADMIN e INSTRUCTOR, evitando cards de datos repetidas y controles redundantes de Google/password. Breadcrumbs y submit completos; errores deben explicar la acción siguiente y no exponer información interna del proveedor.
+- **Campos y feedback compartidos:** error general consistente sin repetir los errores de campo; loading/Sileo debe tener un UUID por operación, mostrar carga y dejar visible el resultado de éxito o error. No esconder el resultado de creación. Preservar fallback SSR y errores recuperables. Teléfonos admiten entrada/paste de `+`, espacios, paréntesis y guiones, no letras; nombres Unicode se comparan case-insensitive sin alterar el texto persistido. Mantener los botones del sistema, no controles ad hoc.
+- **Configuración y participantes:** grilla responsive con edición independiente. Campos de participante inline; restaurar acción de reintegrar en cabecera y transferir/cancelar con idempotencia, una sola mutación de CI cuando corresponda y conservación de la página de detalle.
+- **Grupos y asistencia:** tarjeta de grupo clicable como destino único, sin enlaces duplicados. En cursos ADMIN, botón de asistencia con descripción clara. La página dedicada de participantes del grupo incluye breadcrumb, nombres permitidos para INSTRUCTOR y su propia asistencia por sesión, sin CI/contacto/finanzas. Evitar anchos rígidos que rompan contenido. Breadcrumbs y fecha visibles; no recargar siempre la página y mostrar el error real con reintento. Calendario navega a fechas pasadas, conserva tokens y muestra separadores solo entre elementos visibles. Estado alineado a la derecha: presente primario, ausente destructivo, pendiente muted y justificada distinguible. Una sesión cancelada muestra razón/reemplazo y no presenta controles de asistencia operativa. Acciones del roster en cabecera; diálogos con acciones «Cancelar»/«Confirmar» balanceadas 50/50 y checkbox alineado; no añadir edición histórica del día ni «Marcar todo» que cierre asistencia.
+- **Pruebas y alcance:** validar comportamiento mediante pruebas focales/reutilizadas, no assertions de CSS, copy ni número de elementos. No ampliar componentes compartidos si el patrón actual resuelve la interacción; mantener responsive, teclado, foco, loading/error/empty y fallback sin JS.
 
 ## CONSISTENCIA
 

@@ -13,14 +13,34 @@ La migración es `0019_phase6_attendance`, posterior a `0018_optional_payment_re
 Las seis tablas nuevas tienen RLS y grants Data API revocados. Las referencias
 están indexadas; roster y command receipts son append-only. El guard de sesión
 protege duración/revisión de formato, grupo del reemplazo y timestamps originales.
-Backend, UI y runner demo están integrados en `development` mediante PRs 201–203;
-los cambios posteriores de consistencia/pruebas están en PRs 204–205 y 207–209.
-Supabase local canónico aplicó 0018/0019 sin reset y quedó en ledger 20,
-preservando 53 tablas. Cloud/`master` permanecen en Fase 5/ledger 18; 0019
-no se ha aplicado en cloud. El E2E 126/127 y la revalidación focal 1/1 del
-locator corregido son ejecuciones separadas, no un solo full run 127/127. La
-revisión visual final y el gate local están cerrados con esa evidencia; release
-y migración cloud siguen pendientes.
+Backend, UI y runner demo se integraron inicialmente mediante PRs 201–203;
+PRs 204–205 y 207–209 cerraron consistencia y pruebas focales. Fase 6 se liberó
+después mediante PR 211 y las correcciones operativas/calendario-filtros mediante
+PRs 213, 214, 216–218. El commit de producción es
+`3c6ae7e2cff74faeb2f0f7de05d63b753418df4a`. CI remoto de release:
+`37405417986` y `37406246926`; 334 unitarias, 137 de integración y 127/127 E2E
+pasaron sin flaky tests. Evidencia del gate de PR 218: comentario 6008610515.
+
+La migración 0019 se aplicó a producción y al Supabase local sin reset; ambos
+quedaron en ledger 20 y se preservaron Auth, Storage, configuración y filas
+históricas. Producción tiene 22 grupos propios, 282 sesiones (280 originales,
+2 reemplazos), 3 cancelaciones, 16 marcas de participantes y 4 del instructor.
+El demo local contiene 12 cursos, 23 grupos, 16 registros y 13 movimientos de
+caja; los conteos de producción correspondientes son 11/22/15/12. El E2E
+histórico 126/127 y la revalidación focal 1/1 fueron ejecuciones previas
+separadas; no deben confundirse con el gate posterior 127/127 de release.
+
+### Próxima corrección operativa (aprobada, aún no implementada)
+
+Cancelar o reprogramar una sesión solo está permitido antes de `startsAt` y si
+no existe marca de asistencia de ningún participante ni del instructor, aunque
+la fecha civil sea hoy y la hora de clase aún no haya llegado. La fecha/hora del
+reemplazo debe estar en el futuro; se preservan duración, vínculo y controles
+vigentes de conflictos. Esta limitación no elimina las correcciones históricas
+que ADMIN puede hacer mediante el flujo de revisión/corrección de asistencia.
+La UI debe dejar claro motivo y reemplazo, y no ofrecer acciones operativas de
+asistencia para sesiones canceladas. Es un alcance correctivo aprobado; no se
+afirma que esté implementado o desplegado.
 
 ## Casos de uso para UI y loaders
 
