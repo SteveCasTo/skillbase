@@ -507,7 +507,7 @@ El ajuste UX de interesados (copy del formulario, submit progresivo, tarjetas/ba
 
 #### Estado de Fase 4 y release boundary
 
-El cierre de PR 126 en `master` permanece como registro histórico para los flujos que aprobó. Las correcciones post-release y cambio de puertos se integraron mediante PRs 134 (`b1855b1`), 135 (`ddd0f3d`) y 136 (`8cdb38f`). La migración 0016 se aplicó al Supabase local estándar sin reset (ledger 16→17) y el smoke local pasó, preservando datos existentes. La fuente final `8735d676fe0d96e7230b4636efa8cb51045d1eca` pasó full 178 unit, 98 integration y 120/120 E2E más los checks locales; no se atribuye release a `master` ni migración/deploy cloud. Esto no completa Fases 5–9 ni añade carrera académica, sesiones o asistencia a Fase 4.
+El cierre de PR 126 en `master` permanece como registro histórico de los flujos que aprobó entonces. Las correcciones post-release y cambio de puertos se integraron mediante PRs 134 (`b1855b1`), 135 (`ddd0f3d`) y 136 (`8cdb38f`); la migración 0016 se aplicó al Supabase local sin reset y se validó preservando datos. La fuente final `8735d676fe0d96e7230b4636efa8cb51045d1eca` pasó full 178 unit, 98 integration y 120/120 E2E más los checks locales. Estas correcciones quedaron después en producción mediante PR 211; consultar la evidencia de release Fase 6 arriba. Esto no completa Fases 7–9 ni cambia los límites académicos descritos abajo.
 
 La corrección agrega una baja controlada de instructor; PR 126 no la incluía. La evidencia local y sus límites se registran también en `docs/TESTING.md` y el modelo de persistencia en `docs/DATA_MODEL.md`.
 
@@ -570,7 +570,7 @@ Administración transforma demanda en grupos operativos.
 
 Las correcciones y el gate completo de Fase 4 se integraron mediante PR 136. PRs 173–180 integraron schema/dominio/persistencia transaccional, settings, exportes y rutas HTTP/de roster de Fase 5 en `development`. Fase 5 se promovió a producción como `2e0eecb`; cloud quedó migrado hasta 0017 (ledger 18). El full E2E canónico reportado pasó 125/125 y quality 303 unit / 125 integration; el detalle histórico está en el cierre de producción. La integración y validación local del alcance de fase 5 no incluían asistencia/sesiones ni habilitan módulos académicos.
 
-El cierre documental histórico de producción (`46fa1c0`) no forma parte de esta rama ni debe integrarse por cherry-pick/merge. Los cambios nuevos de corrección se proponen por PR a `development`; producción Fase 5 no implica que las correcciones UI o Fase 6 estén implementadas.
+Los cierres documentales históricos de producción (`46fa1c0`, `152f610`) son commits de documentación únicamente: no forman parte de esta rama ni deben integrarse por cherry-pick/merge. Esta nota reflejaba el límite del release de Fase 5: las correcciones existentes y Fase 6 se liberaron después mediante PR 211, con la evidencia registrada abajo. Las nuevas correcciones del bloque previo a Fase 7 siguen pendientes.
 
 #### Implementación integrada en development
 
@@ -583,7 +583,7 @@ El cierre documental histórico de producción (`46fa1c0`) no forma parte de est
 - [x] PR 179 (`c78bb81`, merge `d13432d`): integra las rutas `/app/preinscripciones` (listado, `/nueva`, detalle y acciones), `/app/participantes`/detalle, búsqueda/prellenado, `/app/preinscripciones/exportar?format=CSV|PDF` y roster propio `/app/mis-cursos/[id]/grupos/[groupId]`; actualiza route policy ADMIN/INSTRUCTOR. Montos HTTP son texto decimal BOB, parseados a centavos en servidor; mutaciones responden con contratos discriminados de éxito/error. La UI reportó 34 pruebas dirigidas y 3 E2E focales PASS; la suite full canonical también pasó (registro abajo).
 - [x] Gate local reportado tras PR 179: 303 unit, 125 integration, 125/125 E2E canónico; quality con 0 errores/0 warnings y 24 screenshots en 375/768/1440 px, ambos temas, sin overflow. Una corrida inicial pasó 119/125 por fallos reales SSR 500/settings browser-only e hidración; se corrigieron y el full final pasó sin retries.
 - [x] Resultado final de `25890143` quedó integrado mediante PR 180 (`917a636`): 303 unit, 125 integration y full canonical E2E 125/125. La corrida inicial 119/125 expuso seis fallos SSR/settings/hidratación; el source se corrigió y la corrida final pasó sin retries. No quedan avisos de calidad en el resultado reportado.
-- [x] Completar la promoción de Fase 5 a `master` y migrar cloud de forma autorizada. El release de producción es `2e0eecb`; no confundirlo con el cierre documental histórico `46fa1c0`.
+- [x] Completar la promoción de Fase 5 a `master` y migrar cloud de forma autorizada. El release de producción es `2e0eecb`; no confundirlo con los cierres documentales históricos `46fa1c0`/`152f610`, que no se deben integrar.
 
 #### Alcance confirmado para Fase 5 (implementado y liberado)
 
@@ -620,11 +620,11 @@ El registro público de interesados de Fase 3 no cobra ni ocupa cupo. La preinsc
 
 ### Resultado demostrable
 
-Administración puede gestionar preinscripciones presenciales con persona global, efectivo cuando corresponda, gratuidad aprobada, snapshots de tarifa/descuento, cupo y movimientos financieros/cancelación. Instructor consulta roster propio mínimo desde inicio. `INSCRITO` y `SALDOVENCIDO` no habilitan módulos académicos. Fase 5 está liberada en producción en `2e0eecb`; la asistencia/sesiones continúan pendientes.
+Administración puede gestionar preinscripciones presenciales con persona global, efectivo cuando corresponda, gratuidad aprobada, snapshots de tarifa/descuento, cupo y movimientos financieros/cancelación. Instructor consulta roster propio mínimo desde inicio. `INSCRITO` y `SALDOVENCIDO` no habilitan módulos académicos. Fase 5 se liberó en producción en `2e0eecb`; en ese momento asistencia/sesiones continuaban pendientes y se liberaron después en Fase 6/PR 211.
 
-## CORRECCIONES POST-RELEASE DE ADMINISTRACIÓN (integradas en development)
+## CORRECCIONES POST-RELEASE DE ADMINISTRACIÓN (development; incluidas después en producción)
 
-Las correcciones aprobadas se integraron en `development` mediante PRs 196–199; no equivalen a un nuevo release a `master`. El commit documental histórico `46fa1c0` no se cherry-pickea ni mergea.
+Las correcciones aprobadas se integraron en `development` mediante PRs 196–199 y quedaron incluidas en producción con PR 211. Los commits documentales históricos `46fa1c0` y `152f610` no se cherry-pickean ni mergean.
 
 - [x] Simplificar Configuración y editar ajustes/campos de participantes en línea.
 - [x] Corregir selección/búsqueda de interesados, ocultar candidatos consumidos preservando historial y no inferir identidad por email.
@@ -632,15 +632,17 @@ Las correcciones aprobadas se integraron en `development` mediante PRs 196–199
 - [x] Usar calendario shadcn compartido, mostrar descuento solo para AUXILIARY, retirar copy/banner técnicos y presentar nombre humano del actor.
 - [x] Completar diálogos financieros con importes exactos/validados, razón opcional, UUID/loading/resultado y fallback SSR sin JavaScript.
 - [x] Integrar configuración SMTP protegida local/cloud. Recepción de prueba confirmada por el usuario en local; no se ha verificado clic de recovery/cambio de contraseña ni entrega cloud. Google OAuth real/callback continúa pendiente de forma independiente.
-- [x] Integrar y aplicar localmente el runner demo append-only, con extensión opcional de asistencia, PLAN de solo lectura, destinos explícitos y provenance estable. APPLY confirmado sobre `6813a4c`; los fixtures preservaron el historial previo y no tocaron Auth/roles/perfiles/sesiones/Storage/settings ni ledger. Producción se mantiene sin operaciones de seed hasta después del release/gate autorizado.
+- [x] Integrar y aplicar localmente el runner demo append-only, con extensión opcional de asistencia, PLAN de solo lectura, destinos explícitos y provenance estable. APPLY confirmado sobre `6813a4c`; los fixtures preservaron historial, Auth/roles/perfiles/sesiones/Storage/settings y ledger. Tras el gate autorizado, se aplicó también en producción; los conteos antes/después constan en el cierre de Fase 6.
 
 El detalle UX se mantiene en `docs/DESIGN.md`, las reglas de secretos/demo en `docs/SECURITY.md` y la configuración de Auth en `docs/AUTHENTICATION.md`.
 
 ## FASE 6 — SESIONES Y ASISTENCIA
 
-### Estado (integrada en development; gate final/release pendientes)
+### Estado (release Fase 6 en producción; correcciones posteriores integradas)
 
-PRs 201–203 integraron dominio, migraciones, demo y UI; PRs 204–205 corrigieron hallazgos de validación/consistencia y PRs 207–209 ajustaron pruebas focales. El último `development` observado es `082dbbf`; la aplicación validada por gate corresponde a `b681a365`. El Supabase local quedó en ledger 20 tras aplicar 0018/0019, preservando las 53 tablas del baseline. Cloud/`master` siguen en Fase 5, ledger 18. No declarar release ni aplicación de 0019 en cloud.
+PRs 201–203 integraron dominio, migraciones, demo y UI; PRs 204–205 corrigieron hallazgos de validación/consistencia y PRs 207–209 ajustaron pruebas focales. El milestone se liberó en producción mediante PR 211; PRs 213/214 añadieron herramientas operativas y PRs 216–218 completaron cambios de calendario/filtros y su gate. Producción está en `3c6ae7e2cff74faeb2f0f7de05d63b753418df4a`; la evidencia de CI del release es `37405417986` y `37406246926`, con 334 unitarias, 137 de integración y 127/127 E2E PASS, sin flakes. Evidencia del gate de PR 218: comentario 6008610515.
+
+La migración 0019 se aplicó en local y producción sin reset; ambos ledgers quedaron en 20 y se preservaron Auth, Storage, configuración y filas históricas. Producción registra 22 grupos propios, 282 sesiones (280 originales y 2 reemplazos), 3 canceladas, 16 marcas de participantes y 4 de instructor. La demo local registra 12 cursos, 23 grupos, 16 registros y 13 movimientos de caja; los conteos de producción para estos cuatro conjuntos son 11/22/15/12. El histórico 126/127 + revalidación focal 1/1 no es el gate final 127/127. SMTP local solo tiene recepción de prueba confirmada; clic de recovery/cambio de contraseña y entrega cloud no están verificados. OAuth real sigue pendiente; el callback local es `http://127.0.0.1:55321/auth/v1/callback`. La propuesta de retención de 12 meses no está aprobada.
 
 El módulo incluye calendario de grupo/sesión, permisos ADMIN/INSTRUCTOR, asistencia del roster elegible, asistencia del instructor, revisiones administrativas de rosters históricos, reemplazos/cancelaciones y configuración del umbral. La implementación se describe en [`docs/ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md); esto no incluye evaluaciones, porcentajes ni certificados.
 
@@ -648,14 +650,14 @@ El módulo incluye calendario de grupo/sesión, permisos ADMIN/INSTRUCTOR, asist
 - [x] Generar/materializar sesiones desde el planificador vigente, preservando cronología y duración de la revisión; cancelación conserva razón y el original, los reemplazos quedan ligados y no extienden horas configuradas.
 - [x] Implementar configuración independiente de ausencia consecutiva (default 3), estados Present/Absent/Excused y `PENDING` derivado. No existe porcentaje ni retraso/tardanza.
 - [x] Integrar páginas SSR/POST para ADMIN e INSTRUCTOR y edición autorizada; roster solo nombres, sin CI/email/finanzas para instructor.
-- [x] Integrar y ejecutar el generador de demo optativo para asistencia; APPLY confirmado contra `6813a4c`. Se agregaron 5 cursos, 10 grupos, 15 registros, 12 movimientos financieros, 28 sesiones, 16 marcas de participante y 4 del instructor; totales actuales 12 cursos, 23 grupos, 16 registros y 13 movimientos incluyen las filas previas preservadas. Sin operaciones de seed en producción.
+- [x] Integrar y ejecutar el generador de demo optativo para asistencia; APPLY confirmado contra `6813a4c`. Se agregaron 5 cursos, 10 grupos, 15 registros, 12 movimientos financieros, 28 sesiones, 16 marcas de participante y 4 del instructor; totales locales 12 cursos, 23 grupos, 16 registros y 13 movimientos incluyen filas previas preservadas. La operación autorizada de producción y sus conteos están documentados arriba.
 - [x] Añadir cobertura focal de backend, UI y runner. La cobertura combinada documentada no es un único full E2E verde: unit 332 e integration 137 PASS en `4b331ff9`; E2E 126/127 PASS en `b681a365`, con un fallo de strict locator en prueba sin JavaScript. Tras el cambio de test-only PR 209, el escenario afectado pasó en una corrida focal, sin retry; la evidencia combinada cubre los escenarios pero no se afirma full 127/127 en una sola ejecución.
 - [x] Pasar build, Drizzle y quality en `b681a365`; typecheck: cero errores, cero warnings y 204 hints. El backend mantuvo sus 12 unit y 12 integration focales PASS.
 - [x] Revalidar mediante PR 209 el locator del test sin JavaScript: un caso focal PASS, sin repetir la suite completa.
 - [x] Completar revisión visual final responsive/accesible: seis vistas (375/1440 px, light/dark), sin overflow; foco visible, diálogo con Escape y retorno de foco; estado de asistencia N=3 y restricción desde N+1; instructor sin datos de contacto/finanzas; sesión no autorizada 404; cero errores/warnings de consola.
 - [x] Cerrar el gate local mediante evidencia combinada: unit/integration, full E2E más revalidación focal del único locator test-only fallido, build/Drizzle/quality y revisión visual. No se afirma un único full E2E 127/127.
-- [ ] Completar promoción a `master`, migración cloud y release autorizados. Cloud/`master` permanecen en Fase 5/ledger 18.
-- [ ] Promover a `master`, aplicar migraciones autorizadas a cloud y desplegar únicamente tras superar el gate final. Hasta entonces, cloud permanece en ledger 18.
+- [x] Promover Fase 6 a `master`, aplicar 0018/0019 a cloud y desplegar tras el gate requerido (PR 211; release `3c6ae7e2cff74faeb2f0f7de05d63b753418df4a`).
+- [x] Completar el gate combinado de release y la verificación posterior de calendario/filtros (CI `37405417986`, `37406246926`; PR 218, evidencia 6008610515).
 
 ### Objetivos
 
@@ -670,9 +672,9 @@ El módulo incluye calendario de grupo/sesión, permisos ADMIN/INSTRUCTOR, asist
 
 Instructor gestiona asistencia diaria de un grupo.
 
-### Alcance implementado en development
+### Alcance implementado y liberado en producción
 
-Las reglas siguientes describen el comportamiento integrado en `development`; no afirman disponibilidad en `master`/producción:
+Las reglas siguientes describen el comportamiento implementado para Fase 6 y actualmente disponible en producción tras PR 211. Los cambios correctivos aprobados que se detallan antes de Fase 7 son un alcance posterior y todavía no se consideran implementados:
 
 - Generar sesiones según fechas/duración de la revisión del formato. Las sesiones existentes no se sobrescriben al regenerar; cambios se representan mediante cancelación/reemplazo conservando el original y la cronología. El calendario L–V incluye fechas pasadas sin inferir ausencias históricas: quedan pendientes de revisión explícita de ADMIN. La generación no produce ausencias retroactivas.
 - ADMIN puede cancelar una sesión por feriado (o indicar otro motivo) y crear reemplazos conservando la sesión original cancelada y la cronología. No hay módulo/calendario global de feriados. Un reemplazo conserva duración, puede ser el mismo día a hora anterior o caer otro día (incluido fin de semana), y debe evitar conflictos del instructor/grupo.
@@ -680,10 +682,31 @@ Las reglas siguientes describen el comportamiento integrado en `development`; no
 - Estados de participante: `Presente`, `Ausente`, `Justificada`. La justificación cuenta para asistencia, pero interrumpe la racha de ausencias. No existe estado de tardanza. Para el instructor, la edición se limita al día civil de Bolivia de la clase; ADMIN puede corregir posteriormente con auditoría.
 - Durante el día de la sesión, una asistencia aún no registrada se considera pendiente; al finalizar el día se deriva como ausente. Este resultado debe derivarse sin un job global que inserte ausencias irreversibles; sesiones canceladas se excluyen. Las sesiones históricas generadas siguen pendientes hasta revisión ADMIN.
 - Configuración de asistencia se limita al umbral de ausencias consecutivas: valor inicial 3, configurable. Se advierte al alcanzarlo y se pierde elegibilidad al superarlo (N+1); una justificada interrumpe la racha. No hay subsistema independiente de alertas, expulsión, cancelación automática de cupo ni reembolso. La elegibilidad futura puede bloquear certificados (Fase 9); no se generan certificados en Fase 6.
-- El runner demo append-only aplicó localmente los fixtures descritos arriba sin reescribir historial ni modificar los 53 objetos/tablas previos. La carga demo de producción permanece autorizada solo después del gate/release y no se ha ejecutado.
+- El runner demo append-only se aplicó en local y, tras el release autorizado, en producción sin reset, preservando Auth/Storage/settings y filas históricas. Producción contiene 22 grupos propios, 282 sesiones (280 originales y 2 reemplazos), 3 cancelaciones, 16 marcas de participantes y 4 del instructor; el demo local se registra en 12 cursos, 23 grupos, 16 registros y 13 movimientos de caja. Producción conserva 11/22/15/12 cursos/grupos/registros/movimientos. No confundir la carga de datos sintéticos con los gates de release ni con el historial legítimo preservado.
 - La configuración SMTP cloud y local está aplicada sin exponer secretos; recepción de prueba local confirmada. Esto no verifica recovery end-to-end ni Google OAuth: el callback local actual `http://127.0.0.1:55321/auth/v1/callback` aún requiere autorización manual en Google Console.
 
-Las pruebas focales y full citadas corresponden a sus heads, no a una única ejecución agregada. Revisión visual y gate local están cerrados con el alcance de evidencia detallado arriba; no se afirma un full E2E único 127/127. El release cloud/master permanece pendiente.
+Las pruebas focales y full citadas corresponden a sus heads, no a una única ejecución agregada. La corrida inicial 126/127 más la revalidación focal 1/1 documentan el gate local previo; el gate remoto de release posterior sí reportó 127/127 en una corrida, sin flakes. La revisión visual y el release cloud/master están cerrados para Fase 6.
+
+## CORRECCIONES DE EXPERIENCIA ADMINISTRATIVA (planificadas antes de Fase 7)
+
+Fase 6 está liberada. El siguiente bloque de trabajo acordado es una pasada focal de UX y correcciones de la administración antes de implementar Fase 7. **Ninguna de estas nuevas correcciones se considera implementada en este estado**; este contrato registra alcance/orden, no evidencia de código. Mantener el trabajo en correcciones de comportamiento y reutilización; evitar cambios cosméticos aislados, conteo/copy/CSS como objetivos de prueba y crecimiento de componentes duplicados. Los criterios detallados de interfaz están en [`docs/DESIGN.md`](DESIGN.md).
+
+- [ ] Perfil de instructor: edición inline por campo y acciones propias de cada campo (sin guardado global); cabecera con lifecycle; baja/reactivación/desactivación protegidas por asignaciones e historial; tarjetas de cursos asignados sin nombre repetido ni jerga.
+- [ ] Acceso/perfil: enlazar la tarjeta completa de curso con el detalle, quitar el CTA redundante «Manage Access»; hacer obvio el alta; retirar copy redundante; exigir password inicial de 12–128 caracteres al crear; conservar la gestión de credenciales en el perfil para ambos roles, sin tarjetas duplicadas de datos ni controles Google/password redundantes; simplificar centro de contraseña, breadcrumbs, submit y errores, quitar información del proveedor que no ayuda a resolverlos.
+- [ ] Campos compartidos: mostrar un error general común sin duplicar errores; mostrar un solo estado transitorio de Sileo con UUID y estado final visible; durante creación mostrar loading sin ocultar el resultado de éxito/error; conservar SSR fallback. Aceptar teléfono pegado con `+`, espacios, paréntesis y guiones, rechazando letras; aceptar nombres Unicode y comparación case-insensitive sin alterar el texto guardado; mantener botones estándar.
+- [ ] Ajustes: grilla responsive con campos independientes. Participantes: edición inline y reponer acción de reintegrar en cabecera, con transferencia/cancelación idempotente y una sola actualización de CI cuando aplique; preservar la página de participante.
+- [ ] Grupos/calendario/asistencia: tarjeta completa de grupo navegable, sin enlaces duplicados; botón de asistencia con descripción en cursos ADMIN; habilitar la página dedicada de participantes del grupo, con breadcrumb y solo nombres para INSTRUCTOR, además de su asistencia propia por sesión. Evitar anchos rígidos/ruptura de texto. Breadcrumbs y fecha visibles, sin reload forzado y con error/reintento real; permitir navegación a fechas pasadas con tokens del calendario y separadores solo entre elementos visibles. Alinear estado a la derecha y distinguir presente (primario), ausente (destructivo), pendiente (muted) y justificada claramente. Sesión cancelada muestra motivo/reemplazo y no ofrece asistencia operativa. Acciones de roster en cabecera, diálogos proporcionales 50/50 con «Cancelar»/«Confirmar» y checkbox alineado; no añadir edición histórica de día ni cierre por «Marcar todo».
+- [ ] Validar con pruebas focales reutilizando cobertura de comportamiento existente. No modificar snapshots/expectativas para ocultar defectos. Dejar gate final y checks remotos obligatorios para el cierre; no forzar merges, degradar gates, ocultar retries ni ejecutar auditorías no requeridas antes del cierre.
+
+Los controles de cancelación/reprogramación aprobados para Fase 6 se limitan a antes de `startsAt` y a sesiones sin marcas de ningún participante ni instructor, incluso antes de la hora de clase en el mismo día. El reemplazo debe estar en el futuro, conservar duración y evitar conflictos. Una vez iniciada la sesión se preservan las correcciones históricas ADMIN permitidas por el contrato vigente; no se amplía la edición operativa.
+
+## CONTRATO DE EVALUACIONES (Fase 7; definición aprobada, implementación pendiente)
+
+El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). Antes de implementar, quedan confirmadas la aritmética decimal exacta, el congelamiento de componentes/pesos desde la primera nota persistida, el alcance de roles/participantes y la relación con `minimum_grade`. La evaluación no cierra grupos/cursos ni emite certificados.
+
+- [x] Acordar contrato funcional y técnico antes del diseño de datos/UI.
+- [ ] Diseñar e implementar persistencia, dominio, casos de uso, autorización, UI y auditoría conforme al contrato.
+- [ ] Añadir pruebas unitarias, integración y E2E focales; completar gates local/remoto antes de declarar Fase 7 terminada.
 
 ## FASE 7 — EVALUACIONES Y NOTAS
 

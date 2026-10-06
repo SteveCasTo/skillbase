@@ -8,8 +8,71 @@ import { buttonVariants } from "@/components/ui/button";
 import { isGoogleAssociated } from "@/domain/auth/identity";
 import { accountIdentity } from "@/server/auth/identity";
 import { instructorEditor } from "@/server/instructors/editor";
-import InstructorForm from "@/components/instructors/InstructorForm.astro";
+import InstructorDetails from "@/components/instructors/InstructorDetails.astro";
+import AdminOwnName from "@/components/auth/AdminOwnName.astro";
+import {
+  getAdminOwnProfile,
+  updateAdminOwnName,
+} from "@/server/auth/admin-own-profile";
+import { InstructorError } from "@/domain/instructors/profile";
 const user = requireInternalUser(Astro.locals);
+const adminOwn =
+  user.roles.includes("ADMIN") && !user.roles.includes("INSTRUCTOR");
+let adminProfile = adminOwn ? await getAdminOwnProfile(user.id) : null;
+let adminNameError: string | null = null;
+let adminNameSubmitted = false;
+if (
+  Astro.request.method === "POST" &&
+  Astro.url.searchParams.get("edit") === "name"
+) {
+  adminNameSubmitted = true;
+  try {
+    if (Astro.request.headers.get("accept")?.includes("application/json"))
+      return new Response(
+        JSON.stringify(
+          await updateAdminOwnName({
+            request: Astro.request,
+            locals: Astro.locals,
+            response: Astro.response,
+          }).then(({ name, revision }) => ({ revision, values: { name } })),
+        ),
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "private, no-store",
+          },
+        },
+      );
+    await updateAdminOwnName({
+      request: Astro.request,
+      locals: Astro.locals,
+      response: Astro.response,
+    });
+    return Astro.redirect("/app/perfil?status=profile_updated", 303);
+  } catch (cause) {
+    adminNameError =
+      cause instanceof InstructorError
+        ? (cause.fieldErrors.name ?? cause.message)
+        : "No pudimos guardar el nombre. Revisa el dato e inténtalo nuevamente.";
+    if (Astro.request.headers.get("accept")?.includes("application/json"))
+      return new Response(
+        JSON.stringify({
+          error:
+            cause instanceof InstructorError ? cause.message : adminNameError,
+          fieldErrors:
+            cause instanceof InstructorError ? cause.fieldErrors : {},
+        }),
+        {
+          status: Astro.response.status === 403 ? 403 : 422,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "private, no-store",
+          },
+        },
+      );
+  }
+  adminProfile = await getAdminOwnProfile(user.id);
+}
 const professionalRequest =
   Astro.url.searchParams.get("edit") === "professional";
 const professional = user.roles.includes("INSTRUCTOR")
@@ -40,21 +103,17 @@ const status = Astro.url.searchParams.get("status");
 <PrivateLayout title="Mi perfil">
   <header class="min-w-0">
     <h1 class="text-3xl font-semibold tracking-tight">Mi perfil</h1>
-    <p class="mt-3 leading-7 text-muted-foreground">
-      Administra el acceso a tu cuenta. Tus roles y tu correo los gestiona el
-      equipo administrador.
-    </p>
   </header>
-  <div class="mt-8 grid min-w-0 gap-6 xl:grid-cols-2 xl:items-start">
+  <div class="mt-8 grid min-w-0 gap-6 md:grid-cols-2">
     {professional?.previous && (
       <section
-        class="min-w-0 xl:col-span-2"
+        class="min-w-0 md:col-span-2"
         aria-labelledby="professional-title"
       >
         <h2 id="professional-title" class="text-xl font-semibold">
           Perfil profesional
         </h2>
-        {professional.error && (
+        {professional.error && !professional.submittedField && (
           <p role="alert" class="mt-4 text-destructive">
             {professional.error}
           </p>
@@ -64,7 +123,7 @@ const status = Astro.url.searchParams.get("status");
             Perfil actualizado.
           </p>
         )}
-        <InstructorForm
+        <InstructorDetails
           values={professional.values}
           errors={professional.errors}
           revision={professional.revision}
@@ -74,14 +133,15 @@ const status = Astro.url.searchParams.get("status");
             email: professional.previous.email,
             phone: professional.previous.phone ?? "",
           }}
-          editing
+          submittedField={professional.submittedField}
+          error={professional.error}
           action="/app/perfil?edit=professional"
         />
       </section>
     )}
     {status === "recovery_sent" && (
       <p
-        class="rounded-lg border bg-muted p-4 text-sm xl:col-span-2"
+        class="rounded-lg border bg-muted p-4 text-sm md:col-span-2"
         role="status"
       >
         Si podemos procesar la solicitud para una cuenta habilitada, enviaremos
@@ -92,7 +152,7 @@ const status = Astro.url.searchParams.get("status");
       status === "linked" ||
       status === "confirmed") && (
       <p
-        class="rounded-lg border bg-muted p-4 text-sm xl:col-span-2"
+        class="rounded-lg border bg-muted p-4 text-sm md:col-span-2"
         role="status"
       >
         {status === "password_changed"
@@ -104,41 +164,47 @@ const status = Astro.url.searchParams.get("status");
     )}
     {Astro.url.searchParams.get("error") && (
       <p
-        class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm xl:col-span-2"
+        class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm md:col-span-2"
         role="alert"
       >
         No pudimos asociar Google. Utiliza la cuenta con el mismo correo e
         inténtalo nuevamente.
       </p>
     )}
-    <section
-      class="min-w-0 rounded-xl border bg-card p-5 sm:p-6"
-      aria-labelledby="account-title"
-    >
-      <h2 id="account-title" class="text-lg font-semibold">
-        Datos de la cuenta
-      </h2>
-      <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2">
-        <div>
-          <dt class="text-muted-foreground">Nombre</dt>
-          <dd class="mt-1 break-words font-medium">{user.name}</dd>
-        </div>
-        <div>
-          <dt class="text-muted-foreground">Correo electrónico</dt>
-          <dd class="mt-1 break-all font-medium">{user.email}</dd>
-        </div>
-        <div>
-          <dt class="text-muted-foreground">Roles</dt>
-          <dd class="mt-1 font-medium">
-            {user.roles
-              .map((role) =>
-                role === "ADMIN" ? "Administrador" : "Instructor",
-              )
-              .join(", ")}
-          </dd>
-        </div>
-      </dl>
-    </section>
+    {adminProfile && (
+      <AdminOwnName
+        profile={adminProfile}
+        error={adminNameError}
+        submitted={adminNameSubmitted}
+      />
+    )}
+    {!professional?.previous && !adminProfile && (
+      <section class="min-w-0 md:col-span-2" aria-labelledby="account-title">
+        <h2 id="account-title" class="text-lg font-semibold">
+          Datos de la cuenta
+        </h2>
+        <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt class="text-muted-foreground">Nombre</dt>
+            <dd class="mt-1 break-words font-medium">{user.name}</dd>
+          </div>
+          <div>
+            <dt class="text-muted-foreground">Correo electrónico</dt>
+            <dd class="mt-1 break-all font-medium">{user.email}</dd>
+          </div>
+          <div>
+            <dt class="text-muted-foreground">Roles</dt>
+            <dd class="mt-1 font-medium">
+              {user.roles
+                .map((role) =>
+                  role === "ADMIN" ? "Administrador" : "Instructor",
+                )
+                .join(", ")}
+            </dd>
+          </div>
+        </dl>
+      </section>
+    )}
     <ProfilePasswordEntry hasPassword={hasPassword} />
     <section
       class="min-w-0 rounded-xl border bg-card p-5 sm:p-6"

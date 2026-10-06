@@ -53,7 +53,7 @@ test("email login, keyboard password toggle, own profile and secure password cha
     .getByRole("button", { name: "Cambiar contraseña", exact: true })
     .click();
   await expect(
-    page.locator("form[data-auth-enhanced]").getByRole("alert"),
+    page.locator('[data-auth-field-error="currentPassword"]'),
   ).toContainText("La contraseña actual es incorrecta");
   await page
     .getByLabel("Contraseña actual", { exact: true })
@@ -68,7 +68,7 @@ test("email login, keyboard password toggle, own profile and secure password cha
     .getByRole("button", { name: "Cambiar contraseña", exact: true })
     .click();
   await expect(
-    page.locator("form[data-auth-enhanced]").getByRole("alert"),
+    page.locator('[data-auth-field-error="password"]'),
   ).toContainText("diferente de la actual");
   await page
     .getByLabel("Contraseña actual", { exact: true })
