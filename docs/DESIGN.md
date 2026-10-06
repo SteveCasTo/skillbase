@@ -477,15 +477,27 @@ Los comportamientos abajo se implementaron en `8735d676fe0d96e7230b4636efa8cb510
 - El umbral N (default 3) muestra aviso al llegar a N y marca inelegibilidad al superar N; justificada cuenta como asistencia e interrumpe racha. No hay emisión/bloqueo de certificados, expulsión automática, ni acciones automáticas de cupo/devolución.
 - La UI conserva foco/teclado, estados de carga/error/éxito y fallback sin JavaScript. El release Fase 6 y el gate remoto posterior pasaron; el detalle de evidencia vigente está en [`docs/ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md).
 
-### Próxima pasada de correcciones administrativas (aprobada; aún no implementada)
+### Correcciones administrativas posteriores a Fase 6 (integradas en development; release pendiente)
 
-Estos son criterios de diseño para trabajo posterior al release de Fase 6, no una descripción de UI que ya exista. El seguimiento de tareas está en [`docs/PLAN.md`](PLAN.md); las reglas de negocio de cancelación/reprogramación y evaluación están en [`docs/REQUIREMENTS.md`](REQUIREMENTS.md).
+PRs 219, 221, 222 y 223 cambiaron el comportamiento en `development`; **no se han liberado a producción**. C3 quedó integrado mediante PR 223. El progreso verificable está en [`docs/PLAN.md`](PLAN.md), con evidencia de tests focales y sus límites en [`docs/TESTING.md`](TESTING.md).
 
-- **Instructor/perfil:** edición inline independiente por campo, sin guardar global; acciones de ciclo de vida visibles en la cabecera y condicionadas por asignaciones e historial. Tarjetas de cursos completos deben navegar al detalle sin duplicar el nombre ni usar jerga técnica. Hacer alta evidente, quitar accesos duplicados/copy redundante y configurar password inicial de 12–128 caracteres. Mantener credenciales en el centro de perfil para ADMIN e INSTRUCTOR, evitando cards de datos repetidas y controles redundantes de Google/password. Breadcrumbs y submit completos; errores deben explicar la acción siguiente y no exponer información interna del proveedor.
-- **Campos y feedback compartidos:** error general consistente sin repetir los errores de campo; loading/Sileo debe tener un UUID por operación, mostrar carga y dejar visible el resultado de éxito o error. No esconder el resultado de creación. Preservar fallback SSR y errores recuperables. Teléfonos admiten entrada/paste de `+`, espacios, paréntesis y guiones, no letras; nombres Unicode se comparan case-insensitive sin alterar el texto persistido. Mantener los botones del sistema, no controles ad hoc.
-- **Configuración y participantes:** grilla responsive con edición independiente. Campos de participante inline; restaurar acción de reintegrar en cabecera y transferir/cancelar con idempotencia, una sola mutación de CI cuando corresponda y conservación de la página de detalle.
-- **Grupos y asistencia:** tarjeta de grupo clicable como destino único, sin enlaces duplicados. En cursos ADMIN, botón de asistencia con descripción clara. La página dedicada de participantes del grupo incluye breadcrumb, nombres permitidos para INSTRUCTOR y su propia asistencia por sesión, sin CI/contacto/finanzas. Evitar anchos rígidos que rompan contenido. Breadcrumbs y fecha visibles; no recargar siempre la página y mostrar el error real con reintento. Calendario navega a fechas pasadas, conserva tokens y muestra separadores solo entre elementos visibles. Estado alineado a la derecha: presente primario, ausente destructivo, pendiente muted y justificada distinguible. Una sesión cancelada muestra razón/reemplazo y no presenta controles de asistencia operativa. Acciones del roster en cabecera; diálogos con acciones «Cancelar»/«Confirmar» balanceadas 50/50 y checkbox alineado; no añadir edición histórica del día ni «Marcar todo» que cierre asistencia.
-- **Pruebas y alcance:** validar comportamiento mediante pruebas focales/reutilizadas, no assertions de CSS, copy ni número de elementos. No ampliar componentes compartidos si el patrón actual resuelve la interacción; mantener responsive, teclado, foco, loading/error/empty y fallback sin JS.
+#### Integrado en development
+
+- **Sesión C1/C2 (PR 219, backend):** cancelación/reprogramación exige `startsAt > now` y cero marcas de participantes/instructor. El backend vuelve a revisar marcas y reloj tras adquirir locks. Los DTOs incluyen `canCancel`/`canReplace`; una familia admite una sola ocurrencia activa y conserva el historial. Esto no habilita la nueva UI de C3 ni está desplegado.
+- **Instructor/identidad (PR 222):** edición inline independiente del perfil profesional del instructor, compatible con multirol, con email readonly; acciones de lifecycle separadas y tarjetas de cursos bloqueantes. Un ADMIN puro edita únicamente su `users.name`; el email es readonly y no se inventan apellidos/teléfono/perfil profesional para ese actor. Ver el contrato de identidad en [`docs/AUTHENTICATION.md`](AUTHENTICATION.md).
+- **Configuración/participant (PR 221):** grilla de ajustes con campos independientes; edición inline de participante mantiene drafts/revisión durante las operaciones relacionadas, incluida reintegración y transferencia/cancelación.
+- **Feedback de formulario:** los errores de campo se muestran inline; se descarta el aviso loading si el resultado ya se comunica junto a campos, para evitar toast duplicado. Los fallos generales usan un solo toast. El host de notificaciones permite descartar el aviso de la operación.
+
+#### UI C3 integrada en development (PR 223; release pendiente)
+
+`fix/course-group-attendance-ui` aportó los commits `2f91395`, `a10bc7b`, `a3332c4` y `2881760`; PR 223 integró la página de participantes/calendario y sus cambios de UI a `development`. El conflicto con `RegistrationActionDialog` se resolvió durante esa integración preservando el resolver compartido de PR 221. La integración no equivale a release ni a gate combinado final.
+
+- La página dedicada del grupo presenta breadcrumb, participantes permitidos y para INSTRUCTOR únicamente nombres y su propia asistencia por sesión; no expone CI, contacto ni finanzas.
+- Mantener la tarjeta del grupo como destino semántico claro, sin enlaces repetidos; errores/reintentos reales sin reload incondicional; calendario con navegación a fechas pasadas, tokens y separadores solo entre elementos visibles.
+- Sesión cancelada muestra motivo y reemplazo, sin acciones operativas de asistencia. Estados alineados a la derecha y diferenciados semánticamente; acciones de roster en cabecera; diálogos «Cancelar»/«Confirmar» 50/50 y checkbox alineado.
+- No añadir edición de la asistencia de un día histórico desde ese flujo ni acción «Marcar todo» que cierre asistencia. Conservar SSR, teclado, foco, privacidad e idempotencia.
+
+La UI integrada conserva SSR, teclado, foco, privacidad e idempotencia conforme a sus pruebas focales. El gate combinado del milestone sigue pendiente; no inferir gate/release desde las corridas focales.
 
 ## CONSISTENCIA
 

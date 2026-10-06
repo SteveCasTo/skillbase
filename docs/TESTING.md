@@ -441,3 +441,17 @@ PLAN verificó target/proyecto y provenance sin escrituras; el APPLY local poste
 - Revisión visual final sobre `development` `082dbbf` / app `b681a365`: seis vistas en 375 y 1440 px, light/dark, sin overflow; foco visible, diálogo cierra con Escape y devuelve foco al disparador; estado de asistencia N=3/inelegibilidad desde 4; instructor sin contactos/finanzas; sesión ajena devuelve 404; cero errores ni warnings de consola.
 - El gate local queda validado mediante esta evidencia por heads: full E2E 126/127 y escenario sin JavaScript corregido por PR 209 con ejecución focal 1/1 PASS, sin retry; unit/integration 332/137 PASS; build/Drizzle/quality PASS y typecheck 0 errores/0 warnings/204 hints. No se afirma un full E2E único 127/127. CI/release cloud/master sigue pendiente.
 - Se capturó un snapshot canónico pre-visual de 39 tablas con ledger 20. La comparación hash posterior quedó bloqueada porque Docker Desktop no estaba disponible. No se reinició Docker/Supabase ni se escribieron datos para la verificación visual; por tanto, no se afirma una comparación íntegra post-visual. Esto no invalida el snapshot de preservación del APPLY anterior, pero limita la evidencia de frescura tras la revisión visual.
+
+### Cobertura focal de correcciones posteriores (PRs 219–223; gate combinado pendiente)
+
+Estos resultados corresponden a pruebas focales por PR/head y **no** constituyen una ejecución unificada ni el full gate del milestone. PR 219 integra C1/C2 backend, PR 221 configuración/feedback, PR 222 perfil de instructor/ADMIN y PR 223 UI C3 de grupo/participantes. Los cambios siguen en `development` (`c6f98d3c0dba721d4c0f73450b68c8c31de8be90`), no en producción.
+
+- Backend C1/C2: 13 pruebas unitarias y 13 de integración HTTP PASS.
+- PR 221: 37 unitarias de configuración; dos E2E de configuración y un caso financiero PASS tras corregir su locator; ocho pruebas focales de notificaciones PASS.
+- PR 222: 39 unitarias de perfiles. Una corrida E2E previa dio 15/16; luego el caso de foco se revalidó 1/1, **no** equivale a un full rerun 16/16. El E2E de nombre propio de ADMIN pasó 1/1 sin retry en el puerto `44891`.
+- PR 223: 10 pruebas focales de UI de asistencia y 41 pruebas de integración UI (254 assertions) PASS; asistencia conectada 2/2 PASS.
+- Corrida combinada asistencia/configuración/registro: 6/7. El locator esperaba el antiguo banner `NETWORKERROR`, mientras la respuesta observable fue el toast «Sin Confirmación» después de una respuesta HTTP 200 cuya recepción se abortó/volvió incierta. Se corrigieron locators conservando draft y request-key para reintento; un caso de reintento de pago de `0.01` pasó 1/1 con retries deshabilitados. La cobertura focal no es una corrida única 7/7 y no se presenta como flaky retry.
+
+En el trabajo de validación final sobre el source `c6f98d3c0dba721d4c0f73450b68c8c31de8be90`, lint PASS. `format:check` se detuvo únicamente en `docs/EVALUATIONS_CONTRACT.md`; el detalle está en `C:/Users/Steve/AppData/Local/Temp/opencode/corrections-final-validation-evidence/format-check.log`. Typecheck, unit/integration completos, E2E, build y el full gate no se iniciaron ni se consumieron en ese intento. No inferir salud actual del servidor local: el puerto `4321` fue rechazado en ese entorno, dato independiente de este resultado documental.
+
+Después de corregir/formatear el contrato, debe verificarse el formato de todos los documentos modificados y dejar el gate integrado pendiente para que lo ejecute el coordinador cuando corresponda. No repetir corridas completas antes de esa coordinación.
