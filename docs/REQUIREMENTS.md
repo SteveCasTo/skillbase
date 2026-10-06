@@ -313,7 +313,17 @@ El sistema registra el resultado, no automatiza esos mecanismos de evidencia. Lo
 - Durante el día una marca faltante permanece pendiente; al finalizar el día se deriva como ausente para el roster establecido, sin insertar una marca falsa ni requerir un proceso global. Para sesiones históricas, ADMIN establece explícitamente el roster y completa su revisión; luego solo ese roster admite inferencias. Sesiones canceladas no participan en asistencia ni en rachas.
 - La configuración de esta fase se limita a N para rachas consecutivas; no define un porcentaje mínimo de asistencia. El bloqueo de elegibilidad académica podrá alimentar certificación futura (Fase 9), pero no hay emisión de certificados en Fase 6.
 
-Estado: el backend y la UI están integrados en `development` (PRs 201–203); migración 0019 solo en Supabase local, ledger 20 con 53 tablas preservadas. `master`/cloud continúan en Fase 5/ledger 18. El gate final de fase y release siguen pendientes. El contrato del módulo se detalla en [`docs/ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md).
+Regla aprobada para las acciones correctivas de cancelación/reprogramación: solo antes de `startsAt` y si no existe ninguna marca de participante ni de instructor, incluso antes de la hora de clase del mismo día. La nueva fecha/hora de reemplazo debe ser futura, preservar duración y evitar conflictos. Las correcciones históricas que ADMIN ya puede realizar quedan separadas de esas acciones operativas. Esta regla está acordada para la pasada correctiva posterior al release; no se declara implementada en el estado actual.
+
+Estado: Fase 6 se liberó mediante PR 211 y las correcciones de calendario/filtros se integraron por PRs 216–218; evidencia de release y estado persistente en [`docs/ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md). La regla correctiva del párrafo anterior aún requiere implementación/verificación. El contrato implementado del módulo se detalla allí.
+
+## Evaluación y notas (Fase 7; reglas acordadas, implementación pendiente)
+
+La definición de Fase 7 está aprobada antes de su implementación. Cada curso tiene un esquema de componentes con pesos decimales exactos cuya suma debe ser exactamente 100 %; nombres de componentes son libres y la modalidad se deriva como `THEORY`, `PRACTICAL` o mixta. Las notas admiten dos decimales dentro de 0–100. La nota final usa la precisión decimal persistida, redondea solo el resultado final a dos decimales y compara ese mismo valor mostrado con la `minimum_grade` vigente del curso (70 por defecto provisional).
+
+Una persona sin todas las notas requeridas tiene resultado incompleto/pendiente, no una exención; el cálculo incompleto se trata como 0 de forma explícita para la decisión académica, sin presentar silenciosamente una nota final aprobatoria. Al persistir la primera nota, incluso 0, quedan congelados los componentes y sus pesos; correcciones de notas son auditables. No se aprueba todavía editar componentes/pesos después de ese punto.
+
+Solo registros `INSCRITO` participan de la evaluación. Instructor solo opera cursos propios desde su inicio oficial; ADMIN puede operar para cualquier curso y conserva su regla de acceso actual incluso con rol adicional. La elegibilidad por asistencia no bloquea la calificación. El detalle técnico, límites y casos de borde están en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). Esto no incluye cierre/reapertura de Fase 8 ni certificados de Fase 9.
 
 ## EVALUACIÓN
 

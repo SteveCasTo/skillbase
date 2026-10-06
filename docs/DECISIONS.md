@@ -640,3 +640,60 @@ Supabase Auth puede asociar automáticamente una identidad Google cuando el prov
 - La frontera de confianza de proveedor y la aprobación de acceso de SkillBase quedan separadas; tanto ingreso normal como callback de asociación deben validar método de sesión y estado interno.
 - Las migraciones 0012–0015, hook/provider config y secret Auth se desplegaron mediante PR 126; el release pasó CI/deploy. Google OAuth real y SMTP/entrega recovery no se probaron. El fallback de recuperación email no se debe describir como operativo.
 - Este ADR implementa el requerimiento de asociación explícita a nivel de la aplicación y no reemplaza ni debilita ADR-023 sobre no fusionar usuarios internos automáticamente.
+
+---
+
+## ADR-025 — CONTRATO DE EVALUACIÓN Y PRECISIÓN DE NOTAS
+
+**Fecha:** 2026-10-06
+
+**Estado:** Accepted — definición aprobada; implementación pendiente
+
+### Contexto
+
+Fase 7 necesita componentes ponderados y notas, preservando resultados
+reproducibles en PostgreSQL y haciendo inequívoco cuándo una evaluación está
+incompleta. También debe separar la calificación de la elegibilidad por
+asistencia, del cierre administrativo de Fase 8 y de certificados de Fase 9.
+
+### Decisión
+
+- Definir componentes con nombre libre por curso y pesos decimales exactos cuya
+  suma sea exactamente 100 %. Derivar modalidad como `THEORY`, `PRACTICAL` o
+  mixta según los componentes.
+- Aceptar notas de 0–100 con hasta dos decimales. No usar punto flotante ni
+  redondear cálculos intermedios; redondear la nota final a dos decimales y
+  compararla contra `minimum_grade` usando el mismo valor que se muestra. 70 es
+  el default provisional de esa configuración, no un valor universal fijo.
+- Congelar componentes/pesos al persistir la primera nota del curso, incluido
+  un 0; correcciones de notas deben ser auditables. No se aprueba cambiar pesos
+  tras ese punto.
+- Tratar como incompleta/pendiente cualquier evaluación con nota requerida
+  ausente. No hay exención: la evaluación incompleta equivale explícitamente a
+  0 para decisión académica y debe distinguirse de una nota completa igual a 0.
+- Admitir notas solo para `INSCRITO`; Instructor se limita a curso propio desde
+  su inicio oficial, mientras `ADMIN` puede gestionar cualquier curso con sus
+  roles actuales. La inelegibilidad por asistencia no bloquea la calificación.
+- Limitar Fase 7 a evaluación/notas, sin cierre/reapertura o planilla de Fase 8
+  ni emisión/certificados de Fase 9.
+
+### Alternativas
+
+- Calcular con `float` o aplicar tolerancia a la suma de pesos.
+- Redondear cada subtotal antes de sumar.
+- Permitir cambiar pesos después de comenzar a calificar.
+- Tratar notas faltantes como exención o confundirlas con notas completas cero.
+- Hacer que la elegibilidad por asistencia bloquee el ingreso de notas.
+
+### Consecuencias
+
+- Persistencia, validadores y cálculos deben usar representación decimal exacta
+  en base de datos y aplicación; UI y servidor muestran/comparan el mismo valor
+  final redondeado.
+- El primer guardado de una nota incluso en cero es una frontera de inmutabilidad
+  del esquema, así que su aplicación debe ser atómica ante concurrencia.
+- Las correcciones de notas requieren trazabilidad; pesos y componentes no
+  podrán ajustarse retrospectivamente dentro de Fase 7.
+- Contrato y casos límite detallados en
+  [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). La decisión no
+  afirma que el módulo esté implementado.
