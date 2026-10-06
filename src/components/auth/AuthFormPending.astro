@@ -1,5 +1,6 @@
 <script>
   import { notifications } from "@/lib/notifications";
+  import { navigate } from "astro:transitions/client";
   interface AuthResult {
     error?: string | null;
     fields?: Record<string, string>;
@@ -18,6 +19,9 @@
         if (!button) return;
         const original = button.innerHTML;
         const enhanced = form.hasAttribute("data-auth-enhanced");
+        const inlineErrorsOnly = form.hasAttribute(
+          "data-auth-field-errors-only",
+        );
         if (enhanced) form.noValidate = true;
         let pending = false;
         const fields = () =>
@@ -142,14 +146,18 @@
               const message =
                 result.error ??
                 "No pudimos procesar la solicitud. Inténtalo nuevamente.";
-              resultNode.textContent = message;
+              resultNode.textContent =
+                inlineErrorsOnly && Object.keys(result.fields ?? {}).length
+                  ? ""
+                  : message;
               resultNode.setAttribute("role", "alert");
               resultNode.classList.add("text-destructive");
               fields().forEach((input) => {
                 if (input.autocomplete.includes("password")) input.value = "";
                 displayFieldError(input, result.fields?.[input.name] ?? "");
               });
-              notifications.error({ id, title: message });
+              if (inlineErrorsOnly) notifications.dismiss(id);
+              else notifications.error({ id, title: message });
               const invalid = fields().find(
                 (input) => result.fields?.[input.name],
               );
@@ -164,7 +172,9 @@
                 result.redirect.startsWith("/") &&
                 !result.redirect.startsWith("//")
               ) {
-                window.location.assign(result.redirect);
+                if (form.hasAttribute("data-auth-client-redirect"))
+                  await navigate(result.redirect);
+                else window.location.assign(result.redirect);
                 return;
               }
               resultNode.textContent =
@@ -178,7 +188,8 @@
               "No pudimos procesar la solicitud. Revisa tu conexión e inténtalo nuevamente.";
             resultNode.textContent = message;
             resultNode.setAttribute("role", "alert");
-            notifications.error({ id, title: message });
+            if (inlineErrorsOnly) notifications.dismiss(id);
+            else notifications.error({ id, title: message });
             resultNode.focus();
           } finally {
             restore();

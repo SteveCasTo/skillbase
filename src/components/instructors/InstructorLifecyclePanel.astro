@@ -17,65 +17,119 @@ const deleteReason = lifecycleBlockReason(
   { ...state, deletionPending: false },
   "delete",
 );
-const actions = [
-  {
-    intent: statusAction,
-    label:
-      statusAction === "activate"
-        ? "Activar instructor"
-        : "Desactivar instructor",
-    reason: statusReason,
-    copy:
-      statusAction === "activate"
-        ? "Se habilitará el acceso con la misma cuenta y credenciales."
-        : "Se bloqueará el acceso por contraseña y Google, incluidas las sesiones existentes. Su historial se conserva.",
-  },
-  ...(!deleteReason
-    ? [
-        {
-          intent: "delete",
-          label: state.deletionPending
-            ? "Completar eliminación"
-            : "Eliminar instructor",
-          reason: null,
-          copy: "Se eliminarán el perfil y sus credenciales. La auditoría se conserva. Esta acción no se puede deshacer.",
-        },
-      ]
-    : []),
-];
+const actions = deleteReason
+  ? [
+      {
+        intent: statusAction,
+        label:
+          statusAction === "activate"
+            ? "Activar instructor"
+            : "Desactivar instructor",
+        reason: statusReason,
+        copy:
+          statusAction === "activate"
+            ? "Se habilitará el acceso a su cuenta."
+            : "Se bloqueará el acceso a su cuenta. Su historial se conserva.",
+      },
+    ]
+  : [
+      {
+        intent: "delete",
+        label: state.deletionPending
+          ? "Completar eliminación"
+          : "Eliminar instructor",
+        reason: null,
+        copy: "Se eliminarán el perfil y el acceso a su cuenta. Esta acción no se puede deshacer.",
+      },
+    ];
 ---
 
-<section
-  data-instructor-lifecycle
-  class="mt-8 flex flex-col gap-4"
-  aria-labelledby="instructor-access-title"
->
-  <h2 id="instructor-access-title" class="text-xl font-semibold">
-    Acceso de la cuenta
-  </h2>
-  <p>
-    {state.deletionPending
-      ? "Eliminación pendiente · acceso bloqueado"
-      : state.status === "ACTIVE"
-        ? "Cuenta activa"
-        : "Cuenta desactivada"}
-  </p>
-  {statusReason && <p class="text-sm text-muted-foreground">{statusReason}</p>}
-  {state.courses.length > 0 && (
-    <ul class="flex flex-col gap-2">
-      {state.courses.map((course) => (
-        <li>
-          <a
-            class="break-words underline underline-offset-4"
-            href={`/app/cursos/${course.id}/editar`}
+<section data-instructor-lifecycle class="mt-5 flex min-w-0 flex-col gap-5">
+  <header class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex min-w-0 flex-wrap items-center gap-3">
+      <slot />
+      <p class="text-sm text-muted-foreground">
+        {state.deletionPending
+          ? "Eliminación pendiente · acceso bloqueado"
+          : state.status === "ACTIVE"
+            ? "Cuenta activa"
+            : state.status === "DISABLED"
+              ? "Cuenta desactivada"
+              : "Acceso no habilitado"}
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      {actions.map((action) => (
+        <details data-lifecycle-confirm class="max-w-full">
+          <summary
+            class={buttonVariants({
+              variant: action.intent === "delete" ? "destructive" : "outline",
+              className:
+                "min-h-11 cursor-pointer aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
+            })}
+            aria-disabled={Boolean(action.reason)}
           >
-            {course.name}
-          </a>
-        </li>
+            {action.label}
+          </summary>
+          <form
+            method="post"
+            action={endpoint}
+            data-lifecycle-form
+            class="mt-3 flex max-w-lg flex-col gap-3 rounded-xl border bg-card p-4"
+          >
+            <p>{action.copy}</p>
+            <input type="hidden" name="intent" value={action.intent} />
+            <input type="hidden" name="revision" value={revision} />
+            <button
+              type="submit"
+              disabled={Boolean(action.reason)}
+              class={buttonVariants({
+                variant: action.intent === "delete" ? "destructive" : "default",
+                className: "min-h-11",
+              })}
+            >
+              Confirmar {action.label.toLowerCase()}
+            </button>
+          </form>
+        </details>
       ))}
-    </ul>
+    </div>
+  </header>
+  {deleteReason &&
+    statusReason &&
+    (!state.exclusiveInstructor || state.courses.length === 0) && (
+      <p class="text-sm text-muted-foreground">
+        {state.exclusiveInstructor
+          ? state.status === "INVITED"
+            ? "El acceso todavía no está habilitado."
+            : statusReason
+          : "Esta cuenta también tiene acceso administrativo. No se puede dar de baja desde Instructores."}
+      </p>
+    )}
+  {state.courses.length > 0 && (
+    <section
+      aria-labelledby="blocking-courses-title"
+      class="flex min-w-0 flex-col gap-3"
+    >
+      <h2 id="blocking-courses-title" class="text-sm font-medium">
+        {state.exclusiveInstructor
+          ? "Reasigna o archiva estos cursos antes de desactivar al instructor:"
+          : "Cursos asignados:"}
+      </h2>
+      <ul class="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {state.courses.map((course) => (
+          <li class="min-w-0">
+            <a
+              class="block h-full break-words rounded-lg border bg-card p-4 text-sm font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+              href={`/app/cursos/${course.id}/editar`}
+            >
+              {course.name}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
   )}
-  {deleteReason && <p class="text-sm text-muted-foreground">{deleteReason}</p>}
   <p
     data-lifecycle-error
     role="alert"
@@ -85,42 +139,6 @@ const actions = [
   >
     {error}
   </p>
-  <div class="flex flex-wrap gap-3">
-    {actions.map((action) => (
-      <details data-lifecycle-confirm class="max-w-full">
-        <summary
-          class={buttonVariants({
-            variant: action.intent === "delete" ? "destructive" : "outline",
-            className:
-              "min-h-11 cursor-pointer aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
-          })}
-          aria-disabled={Boolean(action.reason)}
-        >
-          {action.label}
-        </summary>
-        <form
-          method="post"
-          action={endpoint}
-          data-lifecycle-form
-          class="mt-3 flex max-w-lg flex-col gap-3 rounded-xl border bg-card p-4"
-        >
-          <p>{action.copy}</p>
-          <input type="hidden" name="intent" value={action.intent} />
-          <input type="hidden" name="revision" value={revision} />
-          <button
-            type="submit"
-            disabled={Boolean(action.reason)}
-            class={buttonVariants({
-              variant: action.intent === "delete" ? "destructive" : "default",
-              className: "min-h-11",
-            })}
-          >
-            Confirmar {action.label.toLowerCase()}
-          </button>
-        </form>
-      </details>
-    ))}
-  </div>
   <dialog
     data-lifecycle-dialog
     aria-labelledby="lifecycle-dialog-title"
@@ -206,8 +224,9 @@ const actions = [
             panel.setAttribute("aria-busy", "true");
             dialog.close();
             error.hidden = true;
-            const id = `notification-${crypto.randomUUID()}`;
+            const id = crypto.randomUUID();
             notifications.loading({ id, title: "Actualizando cuenta…" });
+            let failureMessage = "";
             try {
               const response = await fetch(submitted.action, {
                 method: "POST",
@@ -227,34 +246,33 @@ const actions = [
                 throw new Error(
                   "No se pudo confirmar la operación. Recarga para comprobar el estado de la cuenta.",
                 );
-              if (!response.ok)
-                throw new Error(
+              if (!response.ok) {
+                failureMessage =
                   "error" in result && typeof result.error === "string"
                     ? result.error
-                    : "No se pudo actualizar la cuenta.",
-                );
+                    : "No se pudo actualizar la cuenta.";
+                throw new Error(failureMessage);
+              }
               if (
                 !("destination" in result) ||
-                typeof result.destination !== "string"
+                typeof result.destination !== "string" ||
+                !/^\/app\/instructores(?:\?success=deleted|\/[0-9a-f-]+\/editar\?success=(?:activate|deactivate))$/u.test(
+                  result.destination,
+                )
               )
                 throw new Error(
                   "Recarga para comprobar el estado de la cuenta.",
                 );
               notifications.success({ id, title: "Cuenta actualizada" });
               await navigate(result.destination);
-            } catch (cause) {
+            } catch {
               const message =
-                cause instanceof Error
-                  ? cause.message
-                  : "No se pudo actualizar la cuenta. Recarga para comprobar su estado.";
+                failureMessage ||
+                "No se pudo actualizar la cuenta. Recarga para comprobar su estado.";
               error.textContent = message;
               error.hidden = false;
               error.focus();
-              notifications.error({
-                id,
-                title: "No se completó la operación",
-                description: message,
-              });
+              notifications.dismiss(id);
             } finally {
               pending = false;
               controls.forEach((control) => {
