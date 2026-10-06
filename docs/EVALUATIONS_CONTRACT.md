@@ -40,8 +40,7 @@ Si falta una nota requerida, el resultado se marca explícitamente incompleto o
 pendiente. No se exime al participante ni se muestra el resultado como completo:
 para la decisión académica, una evaluación incompleta equivale explícitamente a
 0 hasta completar las notas faltantes. La interfaz debe distinguir ese 0
-provisional/incompleto de una evaluación completa cuya nota final sea realmente
-0.
+provisional/incompleto de una evaluación completa cuya nota final sea realmente 0.
 
 No hay tolerancias ocultas en la suma de pesos ni doble redondeo. Toda validación
 repite las reglas en servidor; los controles de interfaz no son autoridad.

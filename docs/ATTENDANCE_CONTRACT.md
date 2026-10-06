@@ -30,17 +30,36 @@ caja; los conteos de producción correspondientes son 11/22/15/12. El E2E
 histórico 126/127 y la revalidación focal 1/1 fueron ejecuciones previas
 separadas; no deben confundirse con el gate posterior 127/127 de release.
 
-### Próxima corrección operativa (aprobada, aún no implementada)
+Después del release, PR 219 integró C1/C2 backend; PR 223 integró la UI C3 de
+grupo/participantes a `development` hasta `c6f98d3c0dba721d4c0f73450b68c8c31de8be90`.
+El conflicto con el componente compartido `RegistrationActionDialog` se resolvió
+al preservar el resolver de PR 221. Ninguno de estos cambios posteriores está
+desplegado en producción. El gate final combinado sigue pendiente y no se
+sustituye con pruebas focales.
 
-Cancelar o reprogramar una sesión solo está permitido antes de `startsAt` y si
-no existe marca de asistencia de ningún participante ni del instructor, aunque
-la fecha civil sea hoy y la hora de clase aún no haya llegado. La fecha/hora del
-reemplazo debe estar en el futuro; se preservan duración, vínculo y controles
-vigentes de conflictos. Esta limitación no elimina las correcciones históricas
-que ADMIN puede hacer mediante el flujo de revisión/corrección de asistencia.
-La UI debe dejar claro motivo y reemplazo, y no ofrecer acciones operativas de
-asistencia para sesiones canceladas. Es un alcance correctivo aprobado; no se
-afirma que esté implementado o desplegado.
+### C1/C2 — límites backend de cancelación y reprogramación (PR 219)
+
+Cancelación y reprogramación ADMIN solo proceden mientras `startsAt > now` y no
+existe ninguna marca de participante ni del instructor, también en la mañana
+del mismo día. La comprobación server-side ocurre dentro de la transacción: se
+adquieren primero las barreras de horario/sesión, se vuelve a consultar la
+presencia de marcas y se muestrea el reloj después de esperar por los locks. Así
+se rechazan acciones con fecha/hora vencida o cambios de asistencia concurrentes.
+
+`AttendanceSessionDto` expone `canCancel` y `canReplace` explícitos; son guía de
+interfaz, no sustituyen la validación transaccional. `canReplace` además requiere
+grupo `PLANNED` y que la familia no tenga otro encuentro activo. La fecha/hora de
+reemplazo debe ser futura, mantener duración y superar la validación de conflictos
+de instructor/grupo. Una familia de original/reemplazos tiene como máximo un
+encuentro activo, mientras los cancelados y sus razones permanecen en cronología.
+El backend está en `development` por PR 219 y la página de participantes/calendario
+se integró mediante PR 223; ambos siguen fuera de producción.
+
+La limitación operativa no impide la corrección histórica ADMIN por el flujo de
+asistencia: una sesión cancelada no recibe marcas nuevas, pero evidencia ya
+existente puede revisarse/corregirse conforme al contrato histórico. La UI C3
+debe mostrar motivo y reemplazo y no presentar acciones operativas para la sesión
+cancelada.
 
 ## Casos de uso para UI y loaders
 
