@@ -107,6 +107,60 @@ export function replacementInterval(startsAt: string, minutes: number) {
     );
   return { startsAt: start, endsAt: end };
 }
+export function canAdjustSession(
+  startsAt: Date,
+  now: Date,
+  hasAttendance: boolean,
+): boolean {
+  return startsAt > now && !hasAttendance;
+}
+export function assertSessionAdjustable(
+  startsAt: Date,
+  now: Date,
+  hasAttendance: boolean,
+): void {
+  if (!canAdjustSession(startsAt, now, hasAttendance))
+    throw new AttendanceError(
+      "VALIDATION_FAILED",
+      "Solo se puede cancelar o reprogramar antes del inicio y sin marcas de asistencia.",
+    );
+}
+type EncounterSession = {
+  id: string;
+  replacementForSessionId: string | null;
+  cancelledAt: Date | null;
+};
+export function hasOtherActiveEncounter(
+  selected: EncounterSession,
+  family: readonly EncounterSession[],
+): boolean {
+  const rootOf = (row: EncounterSession): string => {
+    let current = row;
+    const visited = new Set<string>();
+    while (current.replacementForSessionId) {
+      if (visited.has(current.id))
+        throw new AttendanceError(
+          "VALIDATION_FAILED",
+          "El vínculo de reemplazo no es válido.",
+        );
+      visited.add(current.id);
+      const parent = family.find(
+        (r) => r.id === current.replacementForSessionId,
+      );
+      if (!parent)
+        throw new AttendanceError(
+          "VALIDATION_FAILED",
+          "El vínculo de reemplazo no es válido.",
+        );
+      current = parent;
+    }
+    return current.id;
+  };
+  const root = rootOf(selected);
+  return family.some(
+    (row) => row.id !== selected.id && !row.cancelledAt && rootOf(row) === root,
+  );
+}
 export const intervalsOverlap = (
   a: { startsAt: Date; endsAt: Date },
   b: { startsAt: Date; endsAt: Date },
