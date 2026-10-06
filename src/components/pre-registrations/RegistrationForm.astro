@@ -97,7 +97,20 @@ const unavailable =
     value={form.sourceInterest?.id ?? ""}
   />
   <p role="alert" data-form-error class="text-sm text-destructive empty:hidden">
-    {message ?? errors.form}
+    {[
+      "ci",
+      "firstName",
+      "lastName",
+      "email",
+      "phone",
+      "groupId",
+      "participantType",
+      "amount",
+      "effectiveDate",
+      "reason",
+    ].some((name) => errors[name])
+      ? ""
+      : (message ?? errors.form)}
   </p>
   <fieldset class="min-w-0" disabled={unavailable}>
     <legend class="mb-4 text-lg font-semibold">Persona participante</legend>

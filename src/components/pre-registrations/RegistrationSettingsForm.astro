@@ -9,6 +9,7 @@ interface Props {
   values?: Readonly<Record<string, string>>;
   requestKey?: string;
   staleConflict?: boolean;
+  message?: string | undefined;
 }
 const {
   settings,
@@ -17,27 +18,26 @@ const {
   values = {},
   requestKey = crypto.randomUUID(),
   staleConflict = false,
+  message,
 } = Astro.props;
 const fields = [
   {
     name: "minimumPaymentPercent",
     label: "Pago mínimo para confirmar inscripción",
-    min: 1,
   },
   {
     name: "auxiliaryDiscountPercent",
     label: "Descuento para auxiliares elegibles",
-    min: 0,
   },
 ] as const;
 ---
 
-<div class="flex min-w-0 flex-col divide-y">
+<div class="contents">
   {fields.map((field, index) => (
     <form
       method="post"
       action={action}
-      class="min-w-0 py-5 first:pt-0 last:pb-0"
+      class="min-w-0"
       data-registration-settings-form
       data-edit-field={field.name}
       data-baseline={JSON.stringify(settings)}
@@ -68,11 +68,11 @@ const fields = [
           <Input
             id={field.name}
             name={field.name}
-            type="number"
+            type="text"
             inputMode="numeric"
-            min={field.min}
-            max={100}
-            step={1}
+            pattern="[0-9]+"
+            data-settings-integer
+            data-integer-max="100"
             required
             defaultValue={values[field.name] ?? settings[field.name]}
             aria-invalid={Boolean(errors[field.name])}
@@ -93,7 +93,11 @@ const fields = [
           data-form-error
           role="alert"
           class="text-sm text-destructive empty:hidden"
-        ></p>
+        >
+          {!fields.some((item) => errors[item.name]) && index === 0
+            ? message
+            : ""}
+        </p>
       </InlineEditField>
       <a
         href="/app/configuracion"

@@ -23,6 +23,7 @@ import type {
 } from "@/domain/pre-registrations/types";
 import { acceptsMoneyEdit } from "@/components/pre-registrations/money-input";
 import { acceptsPhoneEdit } from "@/components/pre-registrations/participant-fields";
+import { acceptsSettingsIntegerEdit } from "@/components/pre-registrations/settings-input";
 import DatePicker, { civilInput } from "@/components/ui/date-picker";
 
 const dto: RegistrationFormDto = {
@@ -98,6 +99,21 @@ const registration: AdminRegistrationDto = {
   financialStatus: "PARTIAL",
 };
 describe("registration component presentation", () => {
+  test("settings admission preserves integer drafts without accepting decimals, exponents or oversized pastes", () => {
+    for (const value of ["", "0", "01", "100"])
+      expect(acceptsSettingsIntegerEdit(value, 100)).toBe(true);
+    for (const value of [
+      "101",
+      "1000",
+      "1e2",
+      "25.5",
+      "25,5",
+      "-1",
+      "+25",
+      " 25",
+    ])
+      expect(acceptsSettingsIntegerEdit(value, 100)).toBe(false);
+  });
   test("payment reasons are optional while refund reasons remain required", () => {
     expect(
       registrationFormState(dto, { ...values, reason: "" }, now).valid,

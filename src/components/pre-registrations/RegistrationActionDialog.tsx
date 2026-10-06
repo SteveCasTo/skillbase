@@ -6,7 +6,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -97,7 +97,10 @@ export default function RegistrationActionDialog({
       <a
         href={`#${targetId}`}
         data-operation-trigger={targetId}
-        className="inline-flex min-h-11 items-center rounded-md border px-4 text-sm font-medium"
+        className={buttonVariants({
+          variant: destructive ? "destructive" : "outline",
+          className: "min-h-11",
+        })}
       >
         {title}
       </a>
@@ -114,6 +117,7 @@ export default function RegistrationActionDialog({
           type="button"
           variant={destructive ? "destructive" : "outline"}
           data-operation-trigger={targetId}
+          className="min-h-11"
         >
           {title}
         </Button>
