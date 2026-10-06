@@ -92,20 +92,14 @@ const {
           role="alert"
           class="text-sm text-destructive empty:hidden"
         >
-          {errors[field.name] ? message : ""}
+          {!participantFields.some((item) => errors[item.name]) && index === 0
+            ? message
+            : ""}
         </p>
       </InlineEditField>
     </form>
   ))}
 </div>
-{message &&
-  !Object.keys(errors).some((name) =>
-    participantFields.some((field) => field.name === name),
-  ) && (
-    <p role="alert" class="mt-4 text-sm text-destructive">
-      {message}
-    </p>
-  )}
 <script>
   import type { ParticipantDto } from "@/domain/pre-registrations/types";
   import { RegistrationError } from "@/domain/pre-registrations/errors";

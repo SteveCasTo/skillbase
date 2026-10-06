@@ -129,15 +129,12 @@ try {
               {detail.registration.courseName ?? form.course.name} ·{" "}
               {detail.registration.groupName ?? "Grupo asignado"}
             </p>
-            <p class="mt-2 text-sm text-muted-foreground">
-              CI: {detail.registration.participant.ci}
-            </p>
           </div>
           <a
             href={`/app/participantes/${detail.registration.participant.id}?registrationId=${id}`}
             class="inline-flex min-h-11 items-center underline underline-offset-4"
           >
-            Datos del participante
+            Abrir ficha del participante
           </a>
         </header>
         {Astro.url.searchParams.has("success") && (

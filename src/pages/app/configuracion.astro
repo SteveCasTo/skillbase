@@ -131,7 +131,7 @@ try {
       Configuración guardada.
     </p>
   )}
-  {pageError && (
+  {pageError && (!settings || !Object.keys(values).length) && (
     <p
       role="alert"
       class="mt-6 rounded-lg border border-destructive/40 bg-card px-4 py-3 text-sm text-destructive"
@@ -141,7 +141,7 @@ try {
   )}
   {settings || attendanceSettings ? (
     <section
-      class="mt-8 w-full rounded-xl border bg-card p-5 sm:p-7"
+      class="mt-8 grid w-full min-w-0 gap-6 rounded-xl border bg-card p-5 sm:grid-cols-2 sm:p-7 xl:grid-cols-3"
       aria-label="Ajustes generales"
     >
       {settings && (
@@ -152,12 +152,13 @@ try {
           errors={errors}
           requestKey={values.requestKey ?? crypto.randomUUID()}
           staleConflict={pageStatus === 409}
+          message={
+            pageError && Object.keys(values).length ? pageError : undefined
+          }
         />
       )}
       {attendanceSettings && (
-        <div class:list={[settings ? "mt-5 border-t pt-5" : ""]}>
-          <AttendanceSettingsForm settings={attendanceSettings} />
-        </div>
+        <AttendanceSettingsForm settings={attendanceSettings} />
       )}
       {attendanceSettingsError && (
         <p role="alert" class="mt-5 text-sm text-destructive">

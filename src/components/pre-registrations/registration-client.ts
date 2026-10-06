@@ -110,17 +110,33 @@ export function bindRegistrationMutation<T>(
         notifications.success({ id: toastId, title: adapter.successMessage });
         form.dispatchEvent(new Event("registration:saved"));
       } else {
-        showFormIssues(form, { ...result.issues, form: result.message });
-        notifications.error({
-          id: toastId,
-          title: "No se pudo registrar",
-          description: result.message,
-        });
+        const fieldIssues = moneyFieldIssues(result.issues);
+        const hasFieldIssues = [
+          ...form.querySelectorAll<HTMLElement>("[data-field-error]"),
+        ].some((error) => Boolean(fieldIssues[error.dataset.fieldError ?? ""]));
+        showFormIssues(
+          form,
+          hasFieldIssues
+            ? result.issues
+            : { ...result.issues, form: result.message },
+        );
+        if (hasFieldIssues) notifications.dismiss(toastId);
+        else {
+          const alert = form.querySelector<HTMLElement>("[data-form-error]");
+          if (alert) alert.textContent = "";
+          notifications.error({
+            id: toastId,
+            title: "No se pudo registrar",
+            description: result.message,
+          });
+        }
       }
     } catch {
       showFormIssues(form, {
         form: "No se pudo confirmar el registro. Conservamos tus datos; reintenta para comprobar el mismo movimiento.",
       });
+      const alert = form.querySelector<HTMLElement>("[data-form-error]");
+      if (alert) alert.textContent = "";
       notifications.error({
         id: toastId,
         title: "Sin confirmación",

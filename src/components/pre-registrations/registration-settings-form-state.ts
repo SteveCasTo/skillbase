@@ -27,8 +27,8 @@ export function registrationSettingsFormState(
   };
 
   for (const name of settingsFields) {
-    const raw = input[name]?.trim() ?? "";
-    values[name] = raw === "" ? Number.NaN : Number(raw);
+    const raw = input[name] ?? "";
+    values[name] = /^\d+$/u.test(raw) ? Number(raw) : Number.NaN;
   }
 
   try {
