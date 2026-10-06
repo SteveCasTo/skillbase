@@ -31,7 +31,7 @@ if (!assigned && !loadError) Astro.response.status = 404;
       <h1 class="mt-5 text-3xl font-semibold tracking-tight">
         {assigned.course.name}
       </h1>
-      <p class="mt-3 max-w-2xl text-muted-foreground">
+      <p class="mt-3 break-words text-muted-foreground">
         {assigned.course.description}
       </p>
       <p class="mt-5">
@@ -45,22 +45,21 @@ if (!assigned && !loadError) Astro.response.status = 404;
       ) : (
         <ul class="mt-4 grid gap-4 sm:grid-cols-2">
           {assigned.groups.map((group, index) => (
-            <li class="rounded-xl border bg-card p-5">
-              <h3 class="font-semibold">Grupo {index + 1}</h3>
-              <p class="mt-2">
-                Lunes a viernes,{" "}
-                {instantToBoliviaCivil(group.startsAt).slice(11)}–
-                {instantToBoliviaCivil(group.endsAt).slice(11)}
-              </p>
-              <p class="mt-2 text-sm text-muted-foreground">
-                Cupo máximo: {group.capacity} ·{" "}
-                {group.status === "PLANNED" ? "Planificado" : "Cancelado"}
-              </p>
+            <li class="min-w-0">
               <a
-                href={`/app/mis-cursos/${assigned.course.id}/grupos/${group.id}`}
-                class="mt-4 inline-flex min-h-11 items-center underline underline-offset-4"
+                href={`/app/mis-cursos/${assigned.course.id}/grupos/${group.id}/sesiones`}
+                class="block h-full rounded-xl border bg-card p-5 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
               >
-                Sesiones y participantes
+                <h3 class="font-semibold">Grupo {index + 1}</h3>
+                <p class="mt-2">
+                  Lunes a viernes,{" "}
+                  {instantToBoliviaCivil(group.startsAt).slice(11)}–
+                  {instantToBoliviaCivil(group.endsAt).slice(11)}
+                </p>
+                <p class="mt-2 text-sm text-muted-foreground">
+                  Cupo máximo: {group.capacity} ·{" "}
+                  {group.status === "PLANNED" ? "Planificado" : "Cancelado"}
+                </p>
               </a>
             </li>
           ))}

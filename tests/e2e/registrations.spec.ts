@@ -178,15 +178,22 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
     await page.unroute(interrupted);
   });
   await payment.getByRole("button", { name: "Registrar abono" }).click();
-  await expect(payment.locator("[data-form-error]")).toContainText(
-    "No se pudo confirmar",
-  );
+  await expect(
+    page.getByRole("button", {
+      name: /Sin confirmación.*Reintenta sin cambiar los datos/u,
+    }),
+  ).toBeVisible();
   await expect(payment.getByLabel("Importe (Bs)")).toHaveValue("0.01");
   await expect(payment.locator('[name="requestKey"]')).toHaveValue(receiptKey);
   await payment.getByRole("button", { name: "Registrar abono" }).click();
   await expect(
     page.getByRole("region", { name: "Resumen financiero" }),
   ).toContainText("Bs 74,49");
+  await expect(
+    page
+      .getByRole("region", { name: "Historial de efectivo" })
+      .getByText("Bs 0,01", { exact: true }),
+  ).toHaveCount(1);
   expect(
     await page.evaluate(
       () =>
@@ -390,7 +397,7 @@ test("same-course interest prefill preserves demand and instructor roster expose
       .where(eq(schema.interestRegistrations.courseId, f.id));
     expect(interests).toEqual([{ status: "ACTIVE" }]);
     await signInFixture(context, AUTH_FIXTURES.instructor.email);
-    const rosterUrl = `/app/mis-cursos/${f.id}/grupos/${f.groups[0]!.id}`;
+    const rosterUrl = `/app/mis-cursos/${f.id}/grupos/${f.groups[0]!.id}/participantes`;
     await page.goto(rosterUrl);
     await expect(
       page.getByRole("region", { name: "Participantes del grupo" }),
@@ -475,7 +482,7 @@ test("same-course interest prefill preserves demand and instructor roster expose
       admin.id,
     );
     await page.goto(
-      `/app/mis-cursos/${started!.id}/grupos/${startedGroup!.id}`,
+      `/app/mis-cursos/${started!.id}/grupos/${startedGroup!.id}/participantes`,
     );
     await expect(
       page.getByRole("region", { name: "Participantes del grupo" }),
@@ -483,7 +490,7 @@ test("same-course interest prefill preserves demand and instructor roster expose
     expect(await page.content()).not.toContain(ci);
     expect(await page.content()).not.toContain(email);
     const foreignRoster = await page.request.get(
-      `/app/mis-cursos/${foreign.id}/grupos/${foreign.groups[0]!.id}`,
+      `/app/mis-cursos/${foreign.id}/grupos/${foreign.groups[0]!.id}/participantes`,
     );
     expect(foreignRoster.status()).toBe(404);
   } finally {

@@ -10,6 +10,8 @@ import {
 import RegistrationSelect from "@/components/pre-registrations/RegistrationSelect";
 import { buttonVariants } from "@/components/ui/button";
 import { markValue, dateLabel, timeLabel } from "./presentation";
+import { cn } from "@/lib/utils";
+import { CheckCircle2, XCircle, ShieldCheck, Clock } from "lucide-react";
 interface Props {
   id: string;
   name: string;
@@ -48,25 +50,54 @@ const options = ATTENDANCE_STATUSES.map((status) => ({
   value: registrationId ? markValue(registrationId, status) : status,
   label: ATTENDANCE_LABELS[status],
 }));
+const StatusIcon = {
+  PRESENT: CheckCircle2,
+  ABSENT: XCircle,
+  EXCUSED: ShieldCheck,
+  PENDING: Clock,
+}[mark.status];
 ---
 
 <article class="min-w-0 py-5" aria-labelledby={`${id}-name`}>
   <div class="flex flex-wrap items-start justify-between gap-3">
-    <h3 id={`${id}-name`} class="break-words font-semibold">
-      {name}
-    </h3>
-    {participant && !participant.academicallyEligible ? (
-      <p class="text-sm text-destructive">
-        {participant.maximumConsecutiveAbsences} faltas consecutivas · Sin
-        reconocimiento
-      </p>
-    ) : (
-      participant?.warning && (
+    <div class="min-w-0">
+      <h3 id={`${id}-name`} class="break-words font-semibold">
+        {name}
+      </h3>
+      {participant && !participant.academicallyEligible ? (
         <p class="text-sm text-destructive">
-          {participant.consecutiveAbsences} faltas consecutivas
+          {participant.maximumConsecutiveAbsences} faltas consecutivas · Sin
+          reconocimiento
         </p>
-      )
-    )}
+      ) : (
+        participant?.warning && (
+          <p class="text-sm text-destructive">
+            {participant.consecutiveAbsences} faltas consecutivas
+          </p>
+        )
+      )}
+    </div>
+    <span
+      class={cn(
+        "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium",
+        {
+          "bg-primary/15 text-foreground": mark.status === "PRESENT",
+          "bg-destructive/15 text-foreground": mark.status === "ABSENT",
+          "bg-secondary text-foreground": mark.status === "EXCUSED",
+          "bg-muted text-muted-foreground": mark.status === "PENDING",
+        },
+      )}
+    >
+      <StatusIcon
+        size={16}
+        aria-hidden="true"
+        className={cn("shrink-0", {
+          "text-primary": mark.status === "PRESENT",
+          "text-destructive": mark.status === "ABSENT",
+        })}
+      />
+      {ATTENDANCE_LABELS[mark.status]}
+    </span>
   </div>
   {canEdit ? (
     <form
@@ -99,7 +130,7 @@ const options = ATTENDANCE_STATUSES.map((status) => ({
           value={JSON.stringify([registrationId])}
         />
       )}
-      <div class="flex min-w-0 flex-col items-start gap-3 sm:flex-row sm:items-end">
+      <div class="flex min-w-0 flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-end">
         <div class="w-full min-w-0 sm:max-w-xs">
           <RegistrationSelect
             client:load
@@ -128,23 +159,14 @@ const options = ATTENDANCE_STATUSES.map((status) => ({
         {message}
       </p>
     </form>
-  ) : (
-    <p class="mt-2 text-sm">{ATTENDANCE_LABELS[mark.status]}</p>
-  )}
-  {mark.inferred ? (
+  ) : null}
+  {!mark.inferred && mark.markedByName && mark.markedAt && (
     <p class="mt-2 text-sm text-muted-foreground">
-      Sin marca al cierre del día.
+      Marcado por {mark.markedByName} ·{" "}
+      <time datetime={mark.markedAt}>
+        {dateLabel(mark.markedAt)}, {timeLabel(mark.markedAt)}
+      </time>
     </p>
-  ) : (
-    mark.markedByName &&
-    mark.markedAt && (
-      <p class="mt-2 text-sm text-muted-foreground">
-        Marcado por {mark.markedByName} ·{" "}
-        <time datetime={mark.markedAt}>
-          {dateLabel(mark.markedAt)}, {timeLabel(mark.markedAt)}
-        </time>
-      </p>
-    )
   )}
   {participant && !participant.currentlyEnrolled && (
     <p class="mt-2 text-sm text-muted-foreground">Inscripción inactiva</p>
