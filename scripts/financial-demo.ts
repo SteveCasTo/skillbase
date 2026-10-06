@@ -39,6 +39,7 @@ import {
   type FinancialDemoPlan,
 } from "./financial-demo-plan";
 import { runAttendanceDemo } from "./attendance-demo";
+import { completeDemoCalendars, type DemoCalendarPlan } from "./demo-calendars";
 import {
   ATTENDANCE_DEMO_TABLES,
   type AttendanceDemoPlan,
@@ -57,6 +58,7 @@ export interface FinancialDemoOptions {
   readonly identities: FinancialIdentityReader;
   readonly preview?: (plan: FinancialDemoPlan, existing: boolean) => void;
   readonly attendance?: boolean;
+  readonly calendarsPreview?: (plan: readonly DemoCalendarPlan[]) => void;
   readonly attendancePreview?: (
     plan: AttendanceDemoPlan,
     existing: boolean,
@@ -480,6 +482,14 @@ export async function runFinancialDemo(
           options.apply,
           options.attendancePreview,
         );
+      if (options.attendance)
+        await completeDemoCalendars(
+          tx,
+          actor,
+          options.apply,
+          options.now ?? new Date(),
+          options.calendarsPreview,
+        );
       return context;
     }
     await assertNoCollisions(tx, plan);
@@ -513,7 +523,17 @@ export async function runFinancialDemo(
         false,
         options.attendancePreview,
       );
-    if (!options.apply) return plannedContext;
+    if (!options.apply) {
+      if (options.attendance)
+        await completeDemoCalendars(
+          tx,
+          actor,
+          false,
+          options.now ?? new Date(),
+          options.calendarsPreview,
+        );
+      return plannedContext;
+    }
     const context = await createFixtures(tx, plan, actor, instructors);
     await tx.insert(schema.auditEvents).values({
       id: markerId,
@@ -532,6 +552,14 @@ export async function runFinancialDemo(
       },
     });
     if (options.attendance) await runAttendanceDemo(tx, actor, context, true);
+    if (options.attendance)
+      await completeDemoCalendars(
+        tx,
+        actor,
+        true,
+        options.now ?? new Date(),
+        options.calendarsPreview,
+      );
     return context;
   });
 }
@@ -665,6 +693,26 @@ if (import.meta.main) {
               attendanceTables: ATTENDANCE_DEMO_TABLES,
               resetAllowed: false,
               globalSettingsChanged: false,
+            },
+            null,
+            2,
+          ),
+        );
+      },
+      calendarsPreview(plan) {
+        console.info(
+          JSON.stringify(
+            {
+              calendarOwner: "skillbase-demo-calendars-v1",
+              mode: apply ? "APPLY" : "PLAN",
+              ownedGroups: plan.length,
+              missingCalendars: plan.filter((row) => row.missing).length,
+              newOriginalSessions: plan
+                .filter((row) => row.missing)
+                .reduce((n, row) => n + row.expectedOriginals, 0),
+              groups: plan,
+              preserveExistingSessions: true,
+              unownedCoursesExcluded: true,
             },
             null,
             2,

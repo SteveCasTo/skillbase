@@ -115,4 +115,20 @@ bun test tests/unit/attendance-demo-plan.test.ts tests/unit/financial-demo-plan.
 bun scripts/test-attendance-demo.ts
 ```
 
+## Completitud de calendarios seed-owned
+
+`--attendance` incluye `scripts/demo-calendars.ts` al final de la misma transacción de operador, tanto en la carga inicial como en el camino de manifiestos ya aplicados. No necesita otro flag ni cambios al workflow manual. APPLY sobre manifiestos válidos no repite efectivo ni marcas: materializa exclusivamente calendarios inexistentes. No corre automáticamente al desplegar.
+
+La allowlist finita combina los IDs deterministas de seis cursos base, cuatro financieros y uno de asistencia. Cada curso debe tener su marcador exacto `DEMO_SEEDED`, entidad COURSE y namespace reconocido, y exactamente sus dos IDs de grupo conocidos con revisión coincidente. Slugs parecidos, metadata sin ID esperado, grupos agregados o calendarios parciales/ajenos abortan. `Cursillo` y cursos sin esa prueba quedan excluidos, aunque sean ficticios.
+
+PLAN utiliza solo SELECT y `planWeekdaySchedule`, sin loaders lazy. En una primera carga informa calendarios ya persistidos; los nuevos previstos aparecen en los planes financiero/asistencia y se descubren de nuevo en APPLY. APPLY llama a `getAttendanceGroup(new DrizzleAttendanceRepository(tx, clock), actor, courseId, groupId)` solo cuando el grupo no tiene ninguna sesión. ADMIN se revalida bajo la barrera de horarios. Revisiones 90/150 minutos, horarios y fechas históricas permanecen iguales. Sesiones pasadas nuevas quedan pendientes de revisión ADMIN: no se escriben marcas ni se inventan ausencias/evidencia retroactiva.
+
+Series existentes, cancelaciones y recuperaciones se validan y conservan íntegramente. No se restauran clases canceladas ni se reparan series parciales. El marcador append-only `skillbase-demo-calendars-v1` solo se añade al generar una serie; marcador sin serie aborta sin restauración.
+
+Con los once cursos/22 grupos del fixture, los 20 calendarios faltantes agregan **254 originales** (150 base + 104 financieros). Más los 26 originales + 2 recuperaciones de asistencia son **282 sesiones**; se conservan sus 3 canceladas, 16 marcas de participante y 4 de instructor. Con solo los financieros y asistencia son 132 sesiones. Son conteos del fixture versionado, no de datos ajenos.
+
+`renew-demo.ts` queda intacto: local-only, guards financieros/reset preservados y sin nueva dependencia de 0019. La completitud de cursos base se obtiene explícitamente con el runner financiero `--attendance` después de 0019 y el PLAN → APPLY coordinado.
+
+Prueba dirigida: `bun scripts/test-demo-calendars.ts`, Supabase temporal propio. Cubre manifiestos previamente aplicados, los 22 grupos probados, curso ajeno excluido, PLAN sin escrituras, cancelaciones/recuperaciones/efectivo/marcas intactos, históricos pendientes, rerun sin auditorías duplicadas y cuarentena de grupo inesperado. Esta implementación no ejecuta backfill canónico/cloud.
+
 La integración dirigida usa únicamente su Supabase temporal propio, aplica 0018/0019 allí y comprueba PLAN sin escrituras, cuarentena de CI ajeno, rollback intermedio, estados/rachas reales, recuperación/cancelación/duración, idempotencia, cash/settings/usuarios/perfiles preservados y rechazo de replay tras una corrección administrativa. No crea identidades Auth, envía correo ni accede a puertos canónicos/cloud. Esta suite temporal es distinta del APPLY local confirmado arriba. El gate combinado completo queda para el cierre coordinado con UI; no se ejecutó carga productiva.
