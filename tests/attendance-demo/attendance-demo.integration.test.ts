@@ -136,7 +136,7 @@ test("isolated extension is atomic, quarantines collisions and preserves finance
       courses: 5,
       registrations: 15,
       cash: 12,
-      sessions: 28,
+      sessions: 132,
       marks: 16,
       instructor_marks: 4,
       receipts: 7,

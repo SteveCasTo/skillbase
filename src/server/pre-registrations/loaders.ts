@@ -10,10 +10,12 @@ import { getDatabase } from "@/server/db/client";
 import { loadAdminInterestCourse } from "@/server/interests/http";
 import { RegistrationError } from "@/domain/pre-registrations/errors";
 import type { RegistrationFormDto } from "@/domain/pre-registrations/types";
+import { hasAvailableRegistrationDestination } from "@/domain/pre-registrations/policies";
 import { filterAvailableInterestCandidates } from "./prefill-interest-candidates";
 
 export async function loadRegistrationChoices(
   actor: InternalUser,
+  now = new Date(),
 ): Promise<readonly RegistrationFormDto[]> {
   const courses = await listAdminCourses(
     new DrizzleCourseRepository(getDatabase()),
@@ -23,7 +25,33 @@ export async function loadRegistrationChoices(
   const forms = await Promise.all(
     courses.map((course) => getRegistrationForm(repository, actor, course.id)),
   );
-  return forms.filter((form): form is RegistrationFormDto => form !== null);
+  return forms.filter(
+    (form): form is RegistrationFormDto =>
+      form !== null &&
+      hasAvailableRegistrationDestination(
+        {
+          id: form.course.id,
+          status: form.course.status,
+          startsAt: new Date(form.course.startsAt),
+          registrationEndAt: form.course.registrationEndAt
+            ? new Date(form.course.registrationEndAt)
+            : null,
+          instructorActive: form.course.instructorActive,
+          courseTypeRevisionId: form.course.courseTypeRevisionId,
+          studentAmount: form.course.studentAmount,
+          externalAmount: form.course.externalAmount,
+        },
+        form.groups.map((group) => ({
+          id: group.id,
+          courseId: form.course.id,
+          courseTypeRevisionId: form.course.courseTypeRevisionId,
+          status: group.status,
+          capacity: group.capacity,
+          occupied: group.occupied,
+        })),
+        now,
+      ),
+  );
 }
 export async function lookupRegistrationPeople(
   actor: InternalUser,
