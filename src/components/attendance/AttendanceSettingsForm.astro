@@ -50,11 +50,11 @@ const {
     <Input
       id="attendance-limit"
       name="consecutiveAbsenceLimit"
-      type="number"
+      type="text"
       inputMode="numeric"
-      min={1}
-      max={2147483647}
-      step={1}
+      pattern="[0-9]+"
+      data-settings-integer
+      data-integer-max="2147483647"
       required
       defaultValue={
         values.consecutiveAbsenceLimit ?? settings.consecutiveAbsenceLimit

@@ -343,7 +343,7 @@ test("same-course interest prefill preserves demand and instructor roster expose
       .where(eq(schema.interestRegistrations.courseId, f.id));
     expect(interests).toEqual([{ status: "ACTIVE" }]);
     await signInFixture(context, AUTH_FIXTURES.instructor.email);
-    const rosterUrl = `/app/mis-cursos/${f.id}/grupos/${f.groups[0]!.id}`;
+    const rosterUrl = `/app/mis-cursos/${f.id}/grupos/${f.groups[0]!.id}/participantes`;
     await page.goto(rosterUrl);
     await expect(
       page.getByRole("region", { name: "Participantes del grupo" }),
@@ -428,7 +428,7 @@ test("same-course interest prefill preserves demand and instructor roster expose
       admin.id,
     );
     await page.goto(
-      `/app/mis-cursos/${started!.id}/grupos/${startedGroup!.id}`,
+      `/app/mis-cursos/${started!.id}/grupos/${startedGroup!.id}/participantes`,
     );
     await expect(
       page.getByRole("region", { name: "Participantes del grupo" }),
@@ -436,7 +436,7 @@ test("same-course interest prefill preserves demand and instructor roster expose
     expect(await page.content()).not.toContain(ci);
     expect(await page.content()).not.toContain(email);
     const foreignRoster = await page.request.get(
-      `/app/mis-cursos/${foreign.id}/grupos/${foreign.groups[0]!.id}`,
+      `/app/mis-cursos/${foreign.id}/grupos/${foreign.groups[0]!.id}/participantes`,
     );
     expect(foreignRoster.status()).toBe(404);
   } finally {

@@ -302,6 +302,9 @@ export function initializeAttendanceForms() {
             if (error)
               error.textContent =
                 "Operación guardada. Recarga la sesión para ver los cambios.";
+            document
+              .querySelector<HTMLElement>("[data-attendance-refresh]")
+              ?.removeAttribute("hidden");
           }
         },
         successMessage:

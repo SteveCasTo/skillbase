@@ -2,6 +2,8 @@
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
 import SessionList from "./SessionList.astro";
+import AttendanceBreadcrumbs from "./AttendanceBreadcrumbs.astro";
+import { buttonVariants } from "@/components/ui/button";
 import type { AttendanceGroupDto } from "@/domain/attendance/types";
 interface Props {
   courseId: string;
@@ -23,24 +25,25 @@ const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
 ---
 
 <PrivateLayout title="Sesiones del grupo">
-  <nav
-    aria-label="Ruta de navegación"
-    class="flex flex-wrap gap-2 text-sm text-muted-foreground"
-  >
-    <a href={prefix} class="min-h-11 underline underline-offset-4">
-      {instructorRoute ? "Mis cursos" : "Cursos"}
-    </a>
-    <span aria-hidden="true">/</span>
-    <a
-      href={`${prefix}/${courseId}${instructorRoute ? "" : "/grupos"}`}
-      class="min-h-11 break-words underline underline-offset-4"
-    >
-      {group?.courseName ?? "Curso"}
-    </a>
-    <span aria-hidden="true">/</span>
-    <span aria-current="page">{label}</span>
-  </nav>
-  <h1 class="mt-5 text-3xl font-semibold tracking-tight">{label}</h1>
+  <AttendanceBreadcrumbs
+    {courseId}
+    {groupId}
+    {instructorRoute}
+    courseName={group?.courseName ?? "Curso"}
+    groupLabel={label}
+    current="calendar"
+  />
+  <header class="flex flex-wrap items-start justify-between gap-4">
+    <h1 class="text-3xl font-semibold tracking-tight">{label}</h1>
+    {group && (
+      <a
+        href={`${prefix}/${courseId}/grupos/${groupId}/participantes`}
+        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+      >
+        Participantes del grupo
+      </a>
+    )}
+  </header>
   {group ? (
     <div class="mt-8">
       <SessionList

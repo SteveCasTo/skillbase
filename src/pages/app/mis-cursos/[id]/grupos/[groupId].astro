@@ -1,96 +1,14 @@
 ---
-import PrivateLayout from "@/layouts/PrivateLayout.astro";
-import InstructorRoster from "@/components/pre-registrations/InstructorRoster.astro";
-import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
-import { getAssignedCourse } from "@/application/instructors/assigned-courses";
-import { getInstructorRoster } from "@/application/pre-registrations/manage-registrations";
-import { DrizzleAssignedCourseRepository } from "@/server/db/repositories/assigned-course-repository";
-import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
-import { getDatabase } from "@/server/db/client";
-import { requireInternalUser } from "@/server/auth/context";
-import { RegistrationError } from "@/domain/pre-registrations/errors";
-import { validateRegistrationId } from "@/domain/pre-registrations/validation";
-import { registrationFailure } from "@/server/pre-registrations/http";
-import type { InstructorRosterEntryDto } from "@/domain/pre-registrations/types";
-import type { AttendanceGroupDto } from "@/domain/attendance/types";
-import { getAttendanceGroup } from "@/application/attendance/manage-attendance";
-import { getAttendanceRepository } from "@/server/attendance/service";
-import SessionList from "@/components/attendance/SessionList.astro";
+import AttendanceGroupPage from "@/components/attendance/AttendanceGroupPage.astro";
+import { prepareAttendanceGroupRoute } from "@/components/attendance/group-route";
 if (Astro.request.method !== "GET")
-  return new Response(null, { status: 405, headers: { Allow: "GET" } });
+  return new Response(null, {
+    status: 405,
+    headers: { Allow: "GET", "Cache-Control": "private, no-store" },
+  });
+const data = await prepareAttendanceGroupRoute(Astro, true);
+Astro.response.status = data.status;
 Astro.response.headers.set("Cache-Control", "private, no-store");
-const actor = requireInternalUser(Astro.locals);
-let assigned: Awaited<ReturnType<typeof getAssignedCourse>> = null;
-let entries: readonly InstructorRosterEntryDto[] = [];
-let available = false;
-let message = "";
-let attendanceGroup: AttendanceGroupDto | null = null;
-let attendanceMessage = "";
-try {
-  const courseId = validateRegistrationId(Astro.params.id, "courseId");
-  const groupId = validateRegistrationId(Astro.params.groupId, "groupId");
-  assigned = await getAssignedCourse(
-    new DrizzleAssignedCourseRepository(getDatabase()),
-    actor,
-    courseId,
-  );
-  if (!assigned || !assigned.groups.some((group) => group.id === groupId))
-    throw new RegistrationError("NOT_FOUND", "Grupo no disponible.");
-  available = new Date() >= assigned.course.startsAt;
-  // No roster query/serialization before start. Repository rechecks ownership and start.
-  if (available)
-    entries = await getInstructorRoster(
-      createRegistrationRepository(),
-      actor,
-      courseId,
-      groupId,
-    );
-  try {
-    attendanceGroup = await getAttendanceGroup(
-      getAttendanceRepository(),
-      actor,
-      courseId,
-      groupId,
-    );
-  } catch {
-    attendanceMessage =
-      "No se pudieron cargar las sesiones. Recarga para reintentar.";
-    Astro.response.status = 503;
-  }
-} catch (error) {
-  const failure = registrationFailure(error);
-  Astro.response.status = failure.status;
-  message = failure.payload.message;
-  entries = [];
-}
 ---
 
-<PrivateLayout title="Participantes del grupo">
-  <a
-    href={`/app/mis-cursos/${Astro.params.id}`}
-    class="text-sm underline underline-offset-4"
-  >
-    Volver al curso
-  </a>
-  <h1 class="mt-5 break-words text-3xl font-semibold">
-    {assigned?.course.name ?? "Grupo no disponible"}
-  </h1>
-  {message ? (
-    <RegistrationPageError {message} />
-  ) : (
-    <div class="mt-8 flex flex-col gap-8">
-      {attendanceGroup && (
-        <SessionList
-          group={attendanceGroup}
-          sessionBase={`/app/mis-cursos/${Astro.params.id}/grupos/${Astro.params.groupId}/sesiones`}
-        />
-      )}
-      {attendanceMessage && (
-        <p role="alert" class="text-sm text-destructive">
-          {attendanceMessage}
-        </p>
-      )}
-      <InstructorRoster {entries} {available} />
-    </div>
-  )}
-</PrivateLayout>
+<AttendanceGroupPage {...data} />

@@ -5,7 +5,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,6 +22,8 @@ interface Props {
   description: string;
   destructive?: boolean;
   initialOpen?: boolean;
+  disabled?: boolean;
+  formFooter?: boolean;
 }
 /** Move the existing SSR form, retaining its inputs, bindings and React islands. */
 export default function RegistrationActionDialog({
@@ -30,6 +32,8 @@ export default function RegistrationActionDialog({
   description,
   destructive = false,
   initialOpen = false,
+  disabled = false,
+  formFooter = false,
 }: Props) {
   const enhanced = useSyncExternalStore(
     () => () => {},
@@ -38,6 +42,7 @@ export default function RegistrationActionDialog({
   );
   const [open, setOpen] = useState(initialOpen);
   const [pending, setPending] = useState(false);
+  const [cancelHost, setCancelHost] = useState<HTMLElement | null>(null);
   const target = useRef<HTMLElement | null>(null);
   const source = useRef<HTMLElement | null>(null);
   const moveForm = useCallback((host: HTMLDivElement | null) => {
@@ -56,6 +61,13 @@ export default function RegistrationActionDialog({
     if (source.current) source.current.hidden = true;
     const form = target.current?.querySelector("form");
     if (!form) return;
+    if (formFooter) {
+      const fallback = form.querySelector<HTMLElement>(
+        "[data-dialog-cancel-fallback]",
+      );
+      if (fallback) fallback.hidden = true;
+      setCancelHost(form.querySelector<HTMLElement>("[data-dialog-cancel]"));
+    }
     const observe = new MutationObserver(() =>
       setPending(Boolean(form.dataset.pending)),
     );
@@ -69,7 +81,17 @@ export default function RegistrationActionDialog({
       observe.disconnect();
       form.removeEventListener("registration:closing", close);
     };
-  }, [targetId, initialOpen]);
+  }, [targetId, initialOpen, formFooter]);
+  if (disabled)
+    return (
+      <Button
+        type="button"
+        variant={destructive ? "destructive" : "outline"}
+        disabled
+      >
+        {title}
+      </Button>
+    );
   if (!enhanced)
     return (
       <a
@@ -98,6 +120,7 @@ export default function RegistrationActionDialog({
       </DialogTrigger>
       <DialogContent
         showCloseButton={false}
+        {...(!description ? { "aria-describedby": undefined } : {})}
         onInteractOutside={(event) => {
           if (pending) event.preventDefault();
         }}
@@ -107,19 +130,35 @@ export default function RegistrationActionDialog({
       >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         <div data-dialog-host ref={moveForm} />
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={pending}
-            onClick={() => setOpen(false)}
-          >
-            Cerrar
-          </Button>
-        </DialogFooter>
+        {!formFooter && (
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={pending}
+              onClick={() => setOpen(false)}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        )}
+        {formFooter &&
+          cancelHost &&
+          createPortal(
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 w-full"
+              disabled={pending}
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>,
+            cancelHost,
+          )}
       </DialogContent>
     </Dialog>
   );

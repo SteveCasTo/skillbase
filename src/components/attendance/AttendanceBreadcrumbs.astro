@@ -1,0 +1,74 @@
+---
+import { dateLabel } from "./presentation";
+interface Props {
+  courseId: string;
+  groupId: string;
+  courseName: string;
+  groupLabel: string;
+  instructorRoute?: boolean;
+  current: "calendar" | "participants" | "session";
+  startsAt?: string | undefined;
+}
+const {
+  courseId,
+  groupId,
+  courseName,
+  groupLabel,
+  instructorRoute = false,
+  current,
+  startsAt,
+} = Astro.props;
+const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
+const calendarPath = `${prefix}/${courseId}/grupos/${groupId}/sesiones`;
+---
+
+<nav aria-label="Ruta de navegación" class="mb-5 text-sm text-muted-foreground">
+  <ol class="flex flex-wrap items-center gap-x-2 gap-y-1">
+    <li>
+      <a
+        href={prefix}
+        class="inline-flex min-h-11 items-center underline underline-offset-4"
+      >
+        {instructorRoute ? "Mis cursos" : "Cursos"}
+      </a>
+    </li>
+    <li aria-hidden="true">/</li>
+    <li class="min-w-0">
+      <a
+        href={`${prefix}/${courseId}${instructorRoute ? "" : "/grupos"}`}
+        class="inline-flex min-h-11 items-center break-words underline underline-offset-4"
+      >
+        {courseName}
+      </a>
+    </li>
+    <li aria-hidden="true">/</li>
+    <li class="break-words">{groupLabel}</li>
+    <li aria-hidden="true">/</li>
+    <li>
+      {current === "calendar" ? (
+        <span aria-current="page">Calendario</span>
+      ) : (
+        <a
+          href={calendarPath}
+          class="inline-flex min-h-11 items-center underline underline-offset-4"
+        >
+          Calendario
+        </a>
+      )}
+    </li>
+    {current !== "calendar" && (
+      <>
+        <li aria-hidden="true">/</li>
+        <li aria-current="page">
+          {current === "participants" ? (
+            "Participantes"
+          ) : startsAt ? (
+            <time datetime={startsAt}>{dateLabel(startsAt)}</time>
+          ) : (
+            "Sesión"
+          )}
+        </li>
+      </>
+    )}
+  </ol>
+</nav>
