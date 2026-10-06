@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   assertAttendanceDay,
+  assertSessionAdjustable,
   attendanceSummary,
   civilDay,
   effectiveAttendance,
@@ -75,6 +76,24 @@ describe("attendance policies", () => {
     for (const count of [0, -1, 1.5, NaN, Infinity, 2147483648])
       expect(() => validateAbsenceLimit(count)).toThrow();
     expect(validateAbsenceLimit(3)).toBe(3);
+  });
+  test("session lifecycle uses exact start instant and any mark, not the civil day attendance window", () => {
+    const start = civil("2026-10-02T18:00");
+    expect(() =>
+      assertSessionAdjustable(start, new Date(start.getTime() - 1), false),
+    ).not.toThrow();
+    for (const now of [
+      start,
+      new Date(start.getTime() + 1),
+      civil("2026-10-03T00:00"),
+    ])
+      expect(() => assertSessionAdjustable(start, now, false)).toThrow();
+    expect(() =>
+      assertSessionAdjustable(start, civil("2026-10-02T06:00"), true),
+    ).toThrow();
+    expect(() =>
+      assertAttendanceDay(start, civil("2026-10-03T00:00"), true),
+    ).not.toThrow();
   });
   test("fixed full sessions preserve configured format hours and weekday rounding", () => {
     const plan = planWeekdaySchedule({

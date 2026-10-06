@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import * as s from "@/server/db/schema";
 import type { AttendanceRepository } from "@/application/attendance/attendance-repository";
 import {
@@ -11,6 +11,9 @@ import {
 import {
   AttendanceError,
   assertAttendanceDay,
+  assertSessionAdjustable,
+  canAdjustSession,
+  hasOtherActiveEncounter,
   attendanceSummary,
   civilDay,
   effectiveAttendance,
@@ -241,6 +244,14 @@ async function groupDto(
     )
     .leftJoin(s.users, eq(s.users.id, s.instructorAttendance.markedBy))
     .where(eq(s.groupSessions.groupId, ctx.group.id));
+  const participantMarks = await tx
+    .selectDistinct({ sessionId: s.participantAttendance.sessionId })
+    .from(s.participantAttendance)
+    .innerJoin(
+      s.groupSessions,
+      eq(s.groupSessions.id, s.participantAttendance.sessionId),
+    )
+    .where(eq(s.groupSessions.groupId, ctx.group.id));
   const [instructor] = ctx.course.instructorId
     ? await tx
         .select({
@@ -266,6 +277,12 @@ async function groupDto(
       : null,
     settings: await settings(tx),
     sessions: rows.map((row) => {
+      const adjustable = canAdjustSession(
+        row.startsAt,
+        now,
+        instructorMarks.some((m) => m.sessionId === row.id) ||
+          participantMarks.some((m) => m.sessionId === row.id),
+      );
       const dto = sessionDto(
         row,
         now,
@@ -274,6 +291,12 @@ async function groupDto(
       );
       return {
         ...dto,
+        canCancel: ctx.admin && !row.cancelledAt && adjustable,
+        canReplace:
+          ctx.admin &&
+          ctx.group.status === "PLANNED" &&
+          adjustable &&
+          !hasOtherActiveEncounter(row, rows),
         canRecord:
           dto.canRecord && (ctx.admin || ctx.group.status === "PLANNED"),
         instructorAttendance: ctx.course.instructorId
@@ -295,6 +318,29 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
     private readonly db: AttendanceDatabase,
     private readonly clock: () => Date = () => new Date(),
   ) {}
+  private async assertAdjustable(
+    tx: AttendanceTransaction,
+    session: SessionRow,
+  ) {
+    const [participant] = await tx
+      .select({ sessionId: s.participantAttendance.sessionId })
+      .from(s.participantAttendance)
+      .where(eq(s.participantAttendance.sessionId, session.id))
+      .limit(1);
+    const [instructor] = await tx
+      .select({ sessionId: s.instructorAttendance.sessionId })
+      .from(s.instructorAttendance)
+      .where(eq(s.instructorAttendance.sessionId, session.id))
+      .limit(1);
+    // Sample after acquiring the schedule/session locks, not before a potentially long wait.
+    const now = this.clock();
+    assertSessionAdjustable(
+      session.startsAt,
+      now,
+      Boolean(participant || instructor),
+    );
+    return now;
+  }
   async getGroup(actorId: string, courseId: string, groupId: string) {
     return this.db.transaction(async (tx) => {
       const now = this.clock();
@@ -723,10 +769,11 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
               "SESSION_CANCELLED",
               "La sesión ya está cancelada.",
             );
+          const mutationNow = await this.assertAdjustable(tx, session);
           await tx
             .update(s.groupSessions)
             .set({
-              cancelledAt: now,
+              cancelledAt: mutationNow,
               cancelledBy: actorId,
               cancellationReason: input.reason?.trim() ?? "",
               revision: session.revision + 1,
@@ -771,51 +818,11 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
               "SESSION_CANCELLED",
               "El grupo está cancelado.",
             );
-          const [active] = await tx
-            .select({ id: s.groupSessions.id })
-            .from(s.groupSessions)
-            .where(
-              and(
-                eq(s.groupSessions.replacementForSessionId, original.id),
-                isNull(s.groupSessions.cancelledAt),
-              ),
-            );
-          if (active)
-            throw new AttendanceError(
-              "CONCURRENT_UPDATE",
-              "La sesión ya tiene un reemplazo activo.",
-            );
           const family = await tx
             .select()
             .from(s.groupSessions)
             .where(eq(s.groupSessions.groupId, input.groupId));
-          const rootOf = (row: SessionRow): string => {
-            let current = row;
-            const visited = new Set<string>();
-            while (current.replacementForSessionId) {
-              if (visited.has(current.id))
-                throw new AttendanceError(
-                  "VALIDATION_FAILED",
-                  "El vínculo de reemplazo no es válido.",
-                );
-              visited.add(current.id);
-              const parent = family.find(
-                (r) => r.id === current.replacementForSessionId,
-              );
-              if (!parent) break;
-              current = parent;
-            }
-            return current.id;
-          };
-          const root = rootOf(original);
-          if (
-            family.some(
-              (row) =>
-                row.id !== original.id &&
-                !row.cancelledAt &&
-                rootOf(row) === root,
-            )
-          )
+          if (hasOtherActiveEncounter(original, family))
             throw new AttendanceError(
               "CONCURRENT_UPDATE",
               "El encuentro original ya tiene una recuperación activa en su cadena.",
@@ -832,11 +839,18 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
             interval,
             original.id,
           );
+          const mutationNow = await this.assertAdjustable(tx, original);
+          if (interval.startsAt <= mutationNow)
+            throw new AttendanceError(
+              "VALIDATION_FAILED",
+              "El reemplazo debe comenzar en el futuro.",
+              { startsAt: "Selecciona una hora futura." },
+            );
           if (!original.cancelledAt) {
             await tx
               .update(s.groupSessions)
               .set({
-                cancelledAt: now,
+                cancelledAt: mutationNow,
                 cancelledBy: actorId,
                 cancellationReason: input.reason?.trim() ?? "Reprogramación",
                 revision: original.revision + 1,
@@ -853,8 +867,7 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
               groupId: input.groupId,
               courseTypeRevisionId: original.courseTypeRevisionId,
               replacementForSessionId: original.id,
-              administrativeReviewRequired:
-                civilDay(interval.startsAt) < civilDay(now),
+              administrativeReviewRequired: false,
             })
             .returning();
           if (!replacement) throw new Error("Session insert failed");
