@@ -51,7 +51,7 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
   page,
   context,
 }) => {
-  const fixture = await createAttendanceFlowFixture("2020-05-04", "10:00");
+  const fixture = await createAttendanceFlowFixture("2020-05-04");
   try {
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     const path = route(
@@ -84,11 +84,18 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     expect(corrected.attendance.status).toBe("EXCUSED");
     expect(corrected.consecutiveAbsences).toBe(0);
 
-    const actions = page.getByRole("group", {
+    const adjustablePath = route(
+      "cursos",
+      fixture.adjustable.courseId,
+      fixture.adjustable.groupId,
+      fixture.adjustable.session.id,
+    );
+    await page.goto(adjustablePath);
+    const adjustableActions = page.getByRole("group", {
       name: "Acciones de sesión",
       exact: true,
     });
-    await actions
+    await adjustableActions
       .getByRole("button", { name: "Cancelar sesión", exact: true })
       .click();
     const cancellation = page.getByRole("dialog", {
@@ -105,63 +112,71 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     await cancellation.getByRole("checkbox").check();
     const cancelled = page.waitForResponse(
       (response) =>
-        new URL(response.url()).pathname === path &&
+        new URL(response.url()).pathname === adjustablePath &&
         response.request().method() === "POST",
     );
     await cancellation
-      .getByRole("button", { name: "Confirmar cancelación", exact: true })
+      .getByRole("button", { name: "Confirmar", exact: true })
       .click();
     expect((await cancelled).status()).toBe(200);
     await expect(cancellation).not.toBeVisible();
-    expect((await detail(page, path)).session).toMatchObject({
+    expect((await detail(page, adjustablePath)).session).toMatchObject({
       status: "CANCELLED",
       cancellationReason: "Feriado",
       canRecord: false,
     });
 
-    await actions
+    await adjustableActions
       .getByRole("button", { name: "Reprogramar sesión", exact: true })
       .click();
     const replacement = page.getByRole("dialog", {
       name: "Reprogramar sesión",
       exact: true,
     });
-    const date = civilDay(new Date(Date.now() + 86_400_000));
+    const date = civilDay(
+      new Date(
+        Date.parse(fixture.adjustable.session.startsAt) + 7 * 86_400_000,
+      ),
+    );
     await replacement
       .getByRole("textbox", { name: "Fecha de recuperación", exact: true })
       .fill(`${date.slice(8)}/${date.slice(5, 7)}/${date.slice(0, 4)}`);
     await replacement
       .getByLabel("Hora de inicio (Bolivia)", { exact: true })
-      .fill("12:30");
+      .fill(fixture.replacementTime);
     await replacement
-      .getByRole("button", { name: "Reprogramar sesión", exact: true })
+      .getByRole("button", { name: "Reemplazar", exact: true })
       .click();
-    await expect(page).not.toHaveURL(new RegExp(`${fixture.session.id}$`));
+    await expect(page).not.toHaveURL(
+      new RegExp(`${fixture.adjustable.session.id}$`),
+    );
     const recovered = await detail(page, new URL(page.url()).pathname);
-    expect(recovered.session.replacementForSessionId).toBe(fixture.session.id);
+    expect(recovered.session.replacementForSessionId).toBe(
+      fixture.adjustable.session.id,
+    );
     expect(
       new Date(recovered.session.endsAt).getTime() -
         new Date(recovered.session.startsAt).getTime(),
     ).toBe(
-      new Date(fixture.session.endsAt).getTime() -
-        new Date(fixture.session.startsAt).getTime(),
+      new Date(fixture.adjustable.session.endsAt).getTime() -
+        new Date(fixture.adjustable.session.startsAt).getTime(),
     );
     expect(
       recovered.group.sessions.find(
-        (session) => session.id === fixture.session.id,
+        (session) => session.id === fixture.adjustable.session.id,
       ),
     ).toMatchObject({ status: "CANCELLED", cancellationReason: "Feriado" });
-    const listPath = path.slice(0, path.lastIndexOf("/"));
+    const listPath = adjustablePath.slice(0, adjustablePath.lastIndexOf("/"));
     await page.goto(listPath);
     const original = page
       .getByRole("link")
       .filter({ has: page.getByText("Feriado", { exact: true }) });
-    await expect(original).toHaveAttribute("href", path);
+    await expect(original).toHaveAttribute("href", adjustablePath);
     await expect(
       page
         .getByRole("link")
         .filter({ hasText: /Recuperación de/u })
-        .filter({ has: page.getByText(/12:30/u) }),
+        .filter({ hasText: new RegExp(fixture.replacementTime, "u") }),
     ).toHaveAttribute("href", `${listPath}/${recovered.session.id}`);
   } finally {
     await fixture.close();
@@ -172,11 +187,7 @@ test("INSTRUCTOR records only enrolled own participants without contacts or fina
   page,
   context,
 }) => {
-  const fixture = await createAttendanceFlowFixture(
-    "2020-06-01",
-    "15:00",
-    true,
-  );
+  const fixture = await createAttendanceFlowFixture("2020-06-01", true);
   try {
     await signInFixture(context, AUTH_FIXTURES.instructor.email);
     const path = route(
@@ -229,8 +240,8 @@ test("INSTRUCTOR records only enrolled own participants without contacts or fina
 
     const past = route(
       "mis-cursos",
-      fixture.courseId,
-      fixture.groupId,
+      fixture.historyCourseId,
+      fixture.historyGroupId,
       fixture.pastSession.id,
     );
     await page.goto(past);
@@ -245,7 +256,7 @@ test("INSTRUCTOR records only enrolled own participants without contacts or fina
         requestKey: crypto.randomUUID(),
         revision: String(history.session.revision),
         marks: JSON.stringify([
-          { registrationId: fixture.paid.id, status: "PRESENT" },
+          { registrationId: fixture.historyPaid.id, status: "PRESENT" },
         ]),
       },
     });

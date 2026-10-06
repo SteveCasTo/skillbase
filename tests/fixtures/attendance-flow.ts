@@ -16,7 +16,6 @@ import { createInstructorFixture } from "./instructors";
 /** Trusted setup only, on the runner's verified ephemeral DB. HTTP uses real time. */
 export async function createAttendanceFlowFixture(
   startDate: string,
-  todayTime: string,
   withForeign = false,
 ) {
   const database = createDatabase(getTestSupabaseEnvironment().databaseUrl);
@@ -33,7 +32,7 @@ export async function createAttendanceFlowFixture(
     await database.close();
     throw new Error("Isolated attendance actors missing");
   }
-  const clock = new Date("2019-12-01T12:00:00.000Z");
+  const clock = new Date("2020-01-01T12:00:00.000Z");
   const [format] = await db
     .insert(schema.courseTypes)
     .values({ name: `Attendance E2E ${crypto.randomUUID()}` })
@@ -50,7 +49,12 @@ export async function createAttendanceFlowFixture(
     })
     .returning();
   const courseIds: string[] = [];
-  async function course(instructorId: string, date: string) {
+  async function course(
+    instructorId: string,
+    date: string,
+    createdAt = clock,
+    startTime = "08:00",
+  ) {
     const dates = planCourseDates({
       startDate: date,
       weekdaysMask: 31,
@@ -73,32 +77,48 @@ export async function createAttendanceFlowFixture(
         endsAt: dates.endsAt,
         minimumGrade: 70,
         status: "PUBLISHED",
-        createdAt: clock,
-        updatedAt: clock,
+        createdAt,
+        updatedAt: createdAt,
       })
       .returning();
     courseIds.push(created!.id);
-    const group = await new DrizzleGroupRepository(db, () => clock).create(
+    const group = await new DrizzleGroupRepository(db, () => createdAt).create(
       created!.id,
-      "08:00",
+      startTime,
       5,
       admin!.id,
     );
     return { course: created!, group };
   }
-  const own = await course(teacher.id, startDate);
-  const finance = createRegistrationRepository(db, () => clock);
+  const history = await course(teacher.id, startDate);
+  const now = new Date();
+  const today = civilDay(now);
+  const todayWeekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  if (todayWeekday === 0 || todayWeekday === 6) {
+    await database.close();
+    throw new Error("Attendance E2E fixture requires a weekday Bolivia run");
+  }
+  const own = await course(
+    teacher.id,
+    today,
+    now,
+    withForeign ? "18:00" : "08:00",
+  );
+  const finance = createRegistrationRepository(db, () => now);
   const settings = await finance.settings(admin.id);
-  async function enroll(full: boolean) {
-    return finance.create(
+  async function enroll(full: boolean, historical = !full) {
+    const target = historical ? history : own;
+    return createRegistrationRepository(db, () =>
+      historical ? clock : now,
+    ).create(
       {
         requestKey: crypto.randomUUID(),
-        courseId: own.course.id,
-        groupId: own.group.id,
-        courseRevision: own.course.updatedAt.toISOString(),
+        courseId: target.course.id,
+        groupId: target.group.id,
+        courseRevision: target.course.updatedAt.toISOString(),
         settingsRevision: settings.revision,
         sourceInterestId: null,
-        firstDayException: false,
+        firstDayException: !historical,
         participantType: "STUDENT",
         participant: {
           ci: `ATT-${crypto.randomUUID()}`,
@@ -116,32 +136,39 @@ export async function createAttendanceFlowFixture(
       admin!.id,
     );
   }
-  const paid = await enroll(true),
-    partial = await enroll(false);
+  const paid = await enroll(true, false),
+    partial = await enroll(false),
+    historyPaid = await enroll(true, true);
   const attendance = new DrizzleAttendanceRepository(db);
   const calendar = await attendance.getGroup(
     admin.id,
     own.course.id,
     own.group.id,
   );
-  const original = calendar.sessions[0]!;
-  const today = civilDay(new Date());
-  const recovery = await attendance.replace(admin.id, {
-    requestKey: crypto.randomUUID(),
-    courseId: own.course.id,
-    groupId: own.group.id,
-    sessionId: original.id,
-    revision: original.revision,
-    startsAt: `${today}T${todayTime}`,
-    reason: "Trusted fixture scheduled for today's attendance",
-  });
-  if (recovery.kind !== "session")
-    throw new Error("Session fixture not created");
-  const current = await attendance.getSession(
+  const current = calendar.sessions[0]!;
+  const historyCalendar = await attendance.getGroup(
     admin.id,
-    own.course.id,
-    own.group.id,
-    recovery.sessionId,
+    history.course.id,
+    history.group.id,
+  );
+  const adjustableStart = new Date(`${today}T00:00:00Z`);
+  do {
+    adjustableStart.setUTCDate(adjustableStart.getUTCDate() + 1);
+  } while (
+    adjustableStart.getUTCDay() === 0 ||
+    adjustableStart.getUTCDay() === 6
+  );
+  const adjustableDate = adjustableStart.toISOString().slice(0, 10);
+  const adjustable = await course(
+    teacher.id,
+    adjustableDate,
+    new Date(),
+    withForeign ? "20:00" : "12:00",
+  );
+  const adjustableCalendar = await attendance.getGroup(
+    admin.id,
+    adjustable.course.id,
+    adjustable.group.id,
   );
   let foreign:
     { courseId: string; groupId: string; sessionId: string } | undefined;
@@ -166,10 +193,19 @@ export async function createAttendanceFlowFixture(
     instructorId: teacher.id,
     courseId: own.course.id,
     groupId: own.group.id,
-    session: current.session,
-    pastSession: calendar.sessions.find((row) => row.id !== original.id)!,
+    session: current,
+    historyCourseId: history.course.id,
+    historyGroupId: history.group.id,
+    adjustable: {
+      courseId: adjustable.course.id,
+      groupId: adjustable.group.id,
+      session: adjustableCalendar.sessions[0]!,
+    },
+    replacementTime: withForeign ? "22:00" : "15:00",
+    pastSession: historyCalendar.sessions[0]!,
     paid,
     partial,
+    historyPaid,
     foreign,
     async close() {
       // Keep append-only evidence; retire only these fixtures' courses so later
