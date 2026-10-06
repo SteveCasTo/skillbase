@@ -5,6 +5,7 @@ import * as s from "@/server/db/schema";
 import { DrizzleAttendanceRepository } from "@/server/db/repositories/attendance-repository";
 import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
 import { DrizzleGroupRepository } from "@/server/db/repositories/group-repository";
+import { handleAttendancePost } from "@/server/attendance/http";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { createInstructorFixture } from "../fixtures/instructors";
 const connection = createDatabase(getTestSupabaseEnvironment().databaseUrl, {
@@ -422,6 +423,137 @@ test("attendance replacement conflicts rollback cancellation, supports weekends/
   ).rejects.toMatchObject({ code: "CONCURRENT_UPDATE" });
   expect(second.revision).toBe(1);
 });
+test("attendance lifecycle allows same-day future changes but rejects started, past targets and either attendance mark", async () => {
+  const f = await fixture();
+  const registration = await enroll(f);
+  const group = await repo.getGroup(f.admin.id, f.course.id, f.group.id);
+  const first = group.sessions[0]!;
+  now = new Date("2099-03-02T11:00:00Z");
+  await expect(
+    repo.replace(f.admin.id, {
+      ...command(f, first),
+      startsAt: "2099-03-02T07:00",
+    }),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  await expect(
+    repo.replace(f.admin.id, {
+      ...command(f, first),
+      startsAt: "2099-03-01T08:00",
+    }),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  const result = await repo.replace(f.admin.id, {
+    ...command(f, first),
+    startsAt: "2099-03-02T07:30",
+  });
+  if (result.kind !== "session") throw new Error("Expected replacement");
+  const calendar = await repo.getGroup(f.admin.id, f.course.id, f.group.id);
+  const recovery = calendar.sessions.find((r) => r.id === result.sessionId)!;
+  expect(
+    new Date(recovery.endsAt).getTime() - new Date(recovery.startsAt).getTime(),
+  ).toBe(5400000);
+  expect(recovery).toMatchObject({ canCancel: true, canReplace: true });
+  now = new Date(recovery.startsAt);
+  await expect(
+    repo.cancel(f.admin.id, command(f, recovery)),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  await expect(
+    repo.replace(f.admin.id, {
+      ...command(f, recovery),
+      startsAt: "2099-03-21T08:00",
+    }),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  now = new Date("2099-03-03T11:00:00Z");
+  const second = group.sessions[1]!;
+  await repo.record(f.instructor.id, {
+    ...command(f, second),
+    marks: [{ registrationId: registration.id, status: "EXCUSED" }],
+  });
+  await expect(
+    repo.cancel(f.admin.id, command(f, { ...second, revision: 2 })),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  await expect(
+    repo.replace(f.admin.id, {
+      ...command(f, { ...second, revision: 2 }),
+      startsAt: "2099-03-21T08:00",
+    }),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  now = new Date("2099-03-04T11:00:00Z");
+  const third = group.sessions[2]!;
+  await repo.record(f.admin.id, {
+    ...command(f, third),
+    marks: [],
+    instructorStatus: "ABSENT",
+  });
+  const marked = (
+    await repo.getGroup(f.admin.id, f.course.id, f.group.id)
+  ).sessions.find((r) => r.id === third.id)!;
+  expect(marked).toMatchObject({ canCancel: false, canReplace: false });
+  for (const operation of ["cancel", "replace"] as const) {
+    const siteUrl = new URL("https://test.invalid");
+    const response = await handleAttendancePost({
+      request: new Request(siteUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: siteUrl.origin },
+        body: JSON.stringify({
+          requestKey: crypto.randomUUID(),
+          revision: marked.revision,
+          ...(operation === "replace" ? { startsAt: "2099-03-21T08:00" } : {}),
+        }),
+      }),
+      actor: { ...f.admin, roles: ["ADMIN"] },
+      repository: repo,
+      siteUrl,
+      operation,
+      courseId: f.course.id,
+      groupId: f.group.id,
+      sessionId: marked.id,
+    });
+    expect(response).toMatchObject({
+      status: 422,
+      payload: { ok: false, code: "VALIDATION_FAILED" },
+    });
+  }
+  now = new Date("2099-03-05T12:00:00Z");
+  await repo.record(f.admin.id, {
+    ...command(f, marked),
+    marks: [],
+    instructorStatus: "PRESENT",
+  });
+  expect(
+    (await repo.getSession(f.admin.id, f.course.id, f.group.id, third.id))
+      .session.instructorAttendance.status,
+  ).toBe("PRESENT");
+  const fourth = group.sessions[3]!;
+  let samples = 0;
+  const crossingRepo = new DrizzleAttendanceRepository(
+    db,
+    () =>
+      new Date(new Date(fourth.startsAt).getTime() - (samples++ === 0 ? 1 : 0)),
+  );
+  await expect(
+    crossingRepo.cancel(f.admin.id, command(f, fourth)),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  now = new Date(new Date(fourth.startsAt).getTime() - 1);
+  await repo.cancel(f.admin.id, command(f, fourth));
+  expect(
+    (await repo.getGroup(f.admin.id, f.course.id, f.group.id)).sessions.find(
+      (r) => r.id === fourth.id,
+    )!.status,
+  ).toBe("CANCELLED");
+  await db
+    .update(s.users)
+    .set({ status: "DISABLED" })
+    .where(eq(s.users.id, f.admin.id));
+  await expect(
+    repo.cancel(f.admin.id, command(f, group.sessions[4]!)),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  await expect(
+    repo.replace(f.admin.id, {
+      ...command(f, group.sessions[4]!),
+      startsAt: "2099-03-21T08:00",
+    }),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+});
 test("attendance settings are independent, positive, optimistic and auditable without financial lost updates", async () => {
   const f = await fixture();
   const financial = await finance.settings(f.admin.id);
@@ -500,6 +632,43 @@ test("attendance cross-course instructor conflicts and cancelled recovery chains
     calendar.sessions.filter((row) => row.status !== "CANCELLED"),
   ).toHaveLength(13);
   expect(calendar.sessions).toHaveLength(15);
+  if (replacedAgain.kind !== "session") throw new Error("Expected replacement");
+  await repo.cancel(
+    f.admin.id,
+    command(f, { id: replacedAgain.sessionId, revision: 1 }),
+  );
+  const attempts = await Promise.allSettled([
+    repo.replace(f.admin.id, {
+      ...command(f, { ...first, revision: 2 }),
+      startsAt: "2099-03-21T08:00",
+    }),
+    repo.replace(f.admin.id, {
+      ...command(f, { id: replacedAgain.sessionId, revision: 2 }),
+      startsAt: "2099-03-22T08:00",
+    }),
+  ]);
+  expect(attempts.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  expect(attempts.find((r) => r.status === "rejected")).toMatchObject({
+    reason: { code: "CONCURRENT_UPDATE" },
+  });
+  // Both cancelled recovery intervals are released; a different encounter can reserve the unused one.
+  const won = attempts[0]!.status === "fulfilled";
+  await repo.replace(f.admin.id, {
+    ...command(f, firstGroup.sessions[1]!),
+    startsAt: won ? "2099-03-22T08:00" : "2099-03-21T08:00",
+  });
+  const finalCalendar = await repo.getGroup(
+    f.admin.id,
+    f.course.id,
+    f.group.id,
+  );
+  expect(
+    finalCalendar.sessions.filter((row) => row.status !== "CANCELLED"),
+  ).toHaveLength(13);
+  expect(
+    finalCalendar.sessions.find((row) => row.id === replacedAgain.sessionId)!
+      .status,
+  ).toBe("CANCELLED");
 });
 
 test("attendance pre-start group schedule changes preserve original timestamps as linked replacements", async () => {
