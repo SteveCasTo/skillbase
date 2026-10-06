@@ -178,15 +178,22 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
     await page.unroute(interrupted);
   });
   await payment.getByRole("button", { name: "Registrar abono" }).click();
-  await expect(payment.locator("[data-form-error]")).toContainText(
-    "No se pudo confirmar",
-  );
+  await expect(
+    page.getByRole("button", {
+      name: /Sin confirmación.*Reintenta sin cambiar los datos/u,
+    }),
+  ).toBeVisible();
   await expect(payment.getByLabel("Importe (Bs)")).toHaveValue("0.01");
   await expect(payment.locator('[name="requestKey"]')).toHaveValue(receiptKey);
   await payment.getByRole("button", { name: "Registrar abono" }).click();
   await expect(
     page.getByRole("region", { name: "Resumen financiero" }),
   ).toContainText("Bs 74,49");
+  await expect(
+    page
+      .getByRole("region", { name: "Historial de efectivo" })
+      .getByText("Bs 0,01", { exact: true }),
+  ).toHaveCount(1);
   expect(
     await page.evaluate(
       () =>
