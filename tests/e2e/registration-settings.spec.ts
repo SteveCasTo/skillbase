@@ -75,10 +75,19 @@ test("ADMIN settings save stays in place, reports conflicts, and restores only t
     const nextAuxiliary = savedAuxiliary === "100" ? "99" : "100";
     await page
       .getByRole("button", {
+        name: "Editar pago mínimo para confirmar inscripción",
+      })
+      .click();
+    const minimumDraft = savedMinimum === "100" ? "99" : "100";
+    await minimum.fill(minimumDraft);
+    await page
+      .getByRole("button", {
         name: "Editar descuento para auxiliares elegibles",
       })
       .click();
     await auxiliary.fill(nextAuxiliary);
+    await auxiliary.fill("25,5");
+    await expect(auxiliary).toHaveValue(nextAuxiliary);
     const submit = form.getByRole("button", {
       name: "Guardar",
       exact: true,
@@ -91,7 +100,23 @@ test("ADMIN settings save stays in place, reports conflicts, and restores only t
         name: "Editar descuento para auxiliares elegibles",
       }),
     ).toBeFocused();
-    await expect(minimum).toHaveValue(savedMinimum);
+    // Saving this field neither submits nor clears the other open editor.
+    await expect(minimum).toHaveValue(minimumDraft);
+    const minimumForm = page
+      .locator("[data-registration-settings-form]")
+      .filter({ has: minimum });
+    await expect(minimumForm.locator('[name="revision"]')).toHaveValue(
+      await form.locator('[name="revision"]').inputValue(),
+    );
+    await minimumForm
+      .getByRole("button", { name: "Guardar", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", {
+        name: "Editar pago mínimo para confirmar inscripción",
+      }),
+    ).toBeFocused();
+    await expect(auxiliary).toHaveValue(nextAuxiliary);
 
     const response = await page.request.post("/app/configuracion", {
       headers: {

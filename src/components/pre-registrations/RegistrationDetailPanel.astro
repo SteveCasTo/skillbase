@@ -10,6 +10,7 @@ import CashMovementForm from "./CashMovementForm.astro";
 import CancellationForm from "./CancellationForm.astro";
 import TransferForm from "./TransferForm.astro";
 import RegistrationActionDialog from "./RegistrationActionDialog";
+import ParticipantEditForm from "./ParticipantEditForm.astro";
 interface Props {
   detail: RegistrationDetailDto;
   form: RegistrationFormDto;
@@ -44,10 +45,50 @@ const key = (operation: RegistrationOperation) =>
 ---
 
 <div data-registration-panel class="mt-8 flex min-w-0 flex-col gap-8">
+  <section aria-labelledby="registration-participant-title" class="min-w-0">
+    <header class="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <h2 id="registration-participant-title" class="text-xl font-semibold">
+        Datos del participante
+      </h2>
+      <div
+        role="group"
+        class="flex flex-wrap items-center gap-3"
+        aria-label="Acciones de preinscripción"
+      >
+        {registration.state === "ACTIVE" && (
+          <>
+            <RegistrationActionDialog
+              client:load
+              targetId="registration-transfer-panel"
+              title="Cambiar de grupo"
+              description={form.course.name}
+              initialOpen={attempted("transfer")}
+            />
+            <RegistrationActionDialog
+              client:load
+              targetId="registration-cancel-panel"
+              title="Cancelar preinscripción"
+              description="Revisa el motivo antes de confirmar."
+              destructive
+              initialOpen={attempted("cancel")}
+            />
+          </>
+        )}
+      </div>
+    </header>
+    <div data-registration-participant-fields>
+      <ParticipantEditForm
+        id="registration-participant"
+        participant={registration.participant}
+        action={`/app/participantes/${registration.participant.id}?registrationId=${registration.id}`}
+        requestKey={crypto.randomUUID()}
+      />
+    </div>
+  </section>
   <div
     role="group"
+    aria-label="Acciones financieras"
     class="flex flex-wrap gap-3"
-    aria-label="Acciones de preinscripción"
   >
     {registration.state === "ACTIVE" && registration.balanceCents > 0 && (
       <RegistrationActionDialog
@@ -57,25 +98,6 @@ const key = (operation: RegistrationOperation) =>
         description="Registra el efectivo recibido."
         initialOpen={attempted("payment")}
       />
-    )}
-    {registration.state === "ACTIVE" && (
-      <>
-        <RegistrationActionDialog
-          client:load
-          targetId="registration-transfer-panel"
-          title="Cambiar de grupo"
-          description={form.course.name}
-          initialOpen={attempted("transfer")}
-        />
-        <RegistrationActionDialog
-          client:load
-          targetId="registration-cancel-panel"
-          title="Cancelar preinscripción"
-          description="Revisa el motivo antes de confirmar."
-          destructive
-          initialOpen={attempted("cancel")}
-        />
-      </>
     )}
     {registration.state === "CANCELLED" && registration.refundDueCents > 0 && (
       <RegistrationActionDialog

@@ -55,7 +55,17 @@ async function refreshDetail(value: RegistrationHttpValue) {
     "[data-registration-panel]",
   );
   if (!updated || !current) throw new Error("Missing panel");
-  current.replaceWith(document.importNode(updated, true));
+  const next = document.importNode(updated, true);
+  // Financial refresh must not discard independent participant drafts/bindings.
+  const participantFields = current.querySelector<HTMLElement>(
+    "[data-registration-participant-fields]",
+  );
+  const nextParticipantFields = next.querySelector<HTMLElement>(
+    "[data-registration-participant-fields]",
+  );
+  if (participantFields && nextParticipantFields)
+    nextParticipantFields.replaceWith(participantFields);
+  current.replaceWith(next);
   const registration = value.detail.registration;
   const personName = document.querySelector<HTMLElement>(
     "[data-registration-person-name]",
@@ -118,6 +128,11 @@ function bindForms() {
             return;
           }
           if (value.kind === "participant") {
+            const heading = document.querySelector<HTMLElement>(
+              "[data-registration-person-name]",
+            );
+            if (heading)
+              heading.textContent = `${value.participant.firstName} ${value.participant.lastName}`;
             document
               .querySelectorAll<HTMLFormElement>("[data-participant-edit]")
               .forEach((peer) => {

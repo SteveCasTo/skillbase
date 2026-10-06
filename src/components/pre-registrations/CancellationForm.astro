@@ -84,7 +84,7 @@ const description =
         data-form-error
         class="text-sm text-destructive empty:hidden"
       >
-        {errors.form}
+        {errors.reason ? "" : errors.form}
       </p>
       <div class="flex flex-col gap-2" data-invalid={Boolean(errors.reason)}>
         <label for={`${id}-reason`} class="text-sm font-medium">
