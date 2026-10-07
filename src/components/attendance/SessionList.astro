@@ -17,7 +17,6 @@ const { group, sessionBase, id = "attendance-sessions" } = Astro.props;
 ---
 
 <section aria-label="Sesiones del grupo" class="min-w-0">
-  <h2 class="mb-5 text-xl font-semibold">Sesiones</h2>
   {group.sessions.length === 0 ? (
     <p class="py-5 text-sm text-muted-foreground">
       No hay sesiones disponibles.
@@ -44,17 +43,21 @@ const { group, sessionBase, id = "attendance-sessions" } = Astro.props;
             (row) => row.replacementForSessionId === session.id,
           );
           return (
-            <li data-session-day={session.civilDate} class="min-w-0">
+            <li
+              data-session-day={session.civilDate}
+              data-session-status={session.status}
+              class="min-w-0"
+            >
               <a
                 href={`${sessionBase}/${session.id}`}
                 class="flex min-h-11 min-w-0 flex-col gap-2 p-4 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring sm:p-5"
               >
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                  <h3 class="font-semibold">
+                  <h2 class="font-semibold">
                     <time datetime={session.startsAt}>
                       {dateLabel(session.startsAt)}
                     </time>
-                  </h3>
+                  </h2>
                   <span class="text-sm text-muted-foreground">
                     {sessionLabels[session.status]}
                   </span>
@@ -87,6 +90,15 @@ const { group, sessionBase, id = "attendance-sessions" } = Astro.props;
           );
         })}
       </ol>
+      <p
+        data-session-empty
+        hidden
+        role="status"
+        class="py-5 text-sm text-muted-foreground"
+      >
+        No hay sesiones con esta fecha y estado. Cambia el filtro o consulta
+        todas las fechas.
+      </p>
     </div>
   )}
   {group.operationalEndsAt &&
@@ -105,7 +117,20 @@ const { group, sessionBase, id = "attendance-sessions" } = Astro.props;
   }
   @media (min-width: 64rem) {
     .session-layout[data-calendar-ready="true"] {
-      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-columns: 20rem minmax(0, 1fr);
+    }
+    [data-session-calendar] {
+      position: sticky;
+      top: 1.5rem;
+      max-height: calc(100svh - 3rem);
+      overflow-y: auto;
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .session-layout[data-calendar-ready="true"] .session-rows,
+    .session-layout[data-calendar-ready="true"] [data-session-empty] {
+      grid-column: 2;
+      grid-row: 1;
     }
   }
 </style>

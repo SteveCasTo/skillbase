@@ -65,6 +65,31 @@ function initializeGroupManagement() {
     Array.from(list.querySelectorAll<HTMLElement>("[data-group-id]"));
   const rowFor = (id: string) =>
     rows().find((row) => row.dataset.groupId === id);
+  const syncSubmit = (form: HTMLFormElement) => {
+    const button = form.querySelector<HTMLButtonElement>(
+      'button[type="submit"]',
+    );
+    if (!button) return;
+    const inputs = Array.from(
+      form.querySelectorAll<HTMLInputElement>('input:not([type="hidden"])'),
+    );
+    const values = new FormData(form);
+    const key = String(values.get("groupId") || "create");
+    const inline = Boolean(form.closest("[data-edit-fallback]"));
+    const dirty = inputs.some((input) =>
+      input.type === "number"
+        ? Number(input.value) !== Number(input.defaultValue)
+        : input.value !== input.defaultValue,
+    );
+    button.disabled =
+      pending.has(key) ||
+      !inputs.every((input) => input.checkValidity()) ||
+      (inline && !dirty);
+  };
+  const syncSubmits = () =>
+    document
+      .querySelectorAll<HTMLFormElement>("[data-group-form]")
+      .forEach(syncSubmit);
   let occupied = rows().map((row) => ({
     id: row.dataset.groupId ?? "",
     startTime: row.dataset.startTime ?? "",
@@ -246,6 +271,7 @@ function initializeGroupManagement() {
         action;
     if (created) enhance(row);
     empty();
+    syncSubmits();
     return row;
   };
   const readResponse = async (response: Response) => {
@@ -348,6 +374,7 @@ function initializeGroupManagement() {
       pending.delete(key);
       for (const { control, disabled } of controls) control.disabled = disabled;
       row?.removeAttribute("aria-busy");
+      syncSubmits();
     }
   };
   document
@@ -413,6 +440,7 @@ function initializeGroupManagement() {
                 : "El grupo volverá a estar activo.";
           target.querySelector('button[type="submit"]')!.textContent =
             `Sí, ${verb} grupo`;
+          syncSubmit(target);
           actionDialog.showModal();
         });
       });
@@ -432,6 +460,7 @@ function initializeGroupManagement() {
           form.reset();
           clearFields(form);
           syncPreviews();
+          syncSubmit(form);
           details
             .querySelector<HTMLElement>("summary")
             ?.focus({ preventScroll: true });
@@ -447,6 +476,8 @@ function initializeGroupManagement() {
       .querySelectorAll<HTMLFormElement>("[data-group-form]")
       .forEach((form) => {
         if (form.closest("[data-group-template]")) return;
+        form.addEventListener("input", () => syncSubmit(form));
+        syncSubmit(form);
         form
           .querySelector<HTMLInputElement>('[name="startTime"]')
           ?.addEventListener("input", syncPreviews);
@@ -462,6 +493,7 @@ function initializeGroupManagement() {
           );
           if (!button || button.disabled) return;
           pending.add(key);
+          syncSubmits();
           advance(id);
           const sharedConfirmation = Boolean(
             form.closest("[data-action-dialog]"),
@@ -562,25 +594,28 @@ function initializeGroupManagement() {
                   ?.focus({ preventScroll: true });
             }
           })();
-          void notifications.promise(operation, {
-            loading: { title: "Guardando grupo…" },
-            success: { title: messages[intent] ?? "Grupo actualizado." },
-            error: (failure: unknown) => ({
-              title:
-                failure instanceof Error
-                  ? failure.message
-                  : "No se pudo completar la acción.",
-            }),
+          const notificationId = crypto.randomUUID();
+          notifications.loading({
+            id: notificationId,
+            title: "Guardando grupo…",
           });
           void operation
+            .then(() =>
+              notifications.success({
+                id: notificationId,
+                title: messages[intent] ?? "Grupo actualizado.",
+              }),
+            )
             .catch((failure: unknown) => {
-              showError(
-                failure instanceof Error
-                  ? failure.message
-                  : "No se pudo completar la acción.",
-                () => refresh(id),
-                invalidField === null,
-              );
+              // Persistent field/recovery feedback owns errors: no duplicate toast.
+              notifications.dismiss(notificationId);
+              if (!invalidField)
+                showError(
+                  failure instanceof Error
+                    ? failure.message
+                    : "No se pudo completar la acción. Reintenta o consulta los datos actuales.",
+                  () => refresh(id),
+                );
             })
             .finally(() => {
               pending.delete(key);
@@ -593,6 +628,7 @@ function initializeGroupManagement() {
               }
               row?.removeAttribute("aria-busy");
               if (trigger) trigger.disabled = false;
+              syncSubmits();
               if (row && document.activeElement === row)
                 trigger?.focus({ preventScroll: true });
               invalidField?.focus({ preventScroll: true });
