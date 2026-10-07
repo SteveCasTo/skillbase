@@ -121,12 +121,14 @@ El backend y las páginas UI se liberaron mediante PR 235. El detalle de modelo/
   de nombres/IDs académicos, notas y asistencia, excluyendo CI, categorías y datos
   financieros, incluso si aparecieran nuevos campos sensibles en el snapshot.
   Pruebas focales inspeccionan JSON serializado y campos futuros sintéticos. La
-  policy UI comprueba patrón/ruta y role prefix; el backend revalida actor,
+  policy de UI comprueba patrones acotados y role prefix; el backend revalida actor,
   ownership y estado.
-- Los PDF/CSV deben usar el DTO autorizado por actor/contexto de los loaders,
-  nunca la fila snapshot JSONB directamente. Mantener la allowlist INSTRUCTOR sin
-  CI/contacto/finanzas; los route adapters de descarga están en otro feature y
-  aún no se integran con este policy/UI.
+- Los renderers PDF/CSV y seis GET adapters están presentes en el árbol combinado
+  actual. Los adapters usan el DTO autorizado de la versión histórica obtenida por
+  loaders server-side, nunca el snapshot JSONB crudo. La policy permite solo las
+  rutas de artefacto acotadas bajo ADMIN/instructor y el middleware falla cerrado
+  para otras rutas. La proyección INSTRUCTOR sigue excluyendo CI/contacto/finanzas;
+  la descarga por navegador todavía no se ha verificado.
 - Migration 0021 solo se aplicó en stacks QA temporales; no se aplicó a DB
   canónica/cloud. Integridad/privacidad y estado parcial están en
   [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y

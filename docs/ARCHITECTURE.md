@@ -277,13 +277,13 @@ presentación SSR/POST sobre esos helpers. El cierre transaccional
 reutiliza el advisory lock de horarios, bloquea curso/grupo y serializa estado,
 snapshot, receipt y auditoría con las escrituras de notas, asistencia,
 calendario y membresía destino. Los guards se comparten entre repositorios;
-0021 añade trigger DB para evidencia cerrada. El route policy fail-closed ahora
-incluye patrones acotados `/app/cursos|mis-cursos/:courseId/grupos/:groupId/cierre`
-y versión hija: ADMIN para cursos, INSTRUCTOR para cursos propios con ownership
-revalidado por loader. Los GET PDF/CSV del feature export siguen en branch
-separado; sus paths están cubiertos por el policy pero no hay aún descarga
-implementada en este source/árbol integrado. No agregar wildcards amplios para
-resolver esta integración. El contrato y límites en
+0021 añade trigger DB para evidencia cerrada. El feature de interfaz incluye
+páginas SSR y route policy fail-closed con patrones acotados para workspace,
+historial y documentos; ADMIN opera bajo `/app/cursos`, INSTRUCTOR bajo
+`/app/mis-cursos`, con ownership revalidado por loader. El árbol combinado
+incorpora renderers CSV/PDF y seis GET adapters que cargan la versión autorizada.
+No agregar wildcards amplios. El código está en el feature actual; la verificación
+de descargas por navegador sigue pendiente. Contrato y límites en
 [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md).
 
 El POST público limita y parsea el body en el adaptador server-side, valida Origin y llama el caso de uso de interés. Un limiter persistente usa PostgreSQL y un HMAC server-only sobre `Astro.clientAddress`; no confía en forwarded headers. Sin secreto válido o dirección de cliente confiable, el flujo falla cerrado. Los defaults técnicos y requisitos de despliegue se describen en el contrato y en `docs/DEPLOYMENT.md`; no implican que los valores cloud estén configurados.
