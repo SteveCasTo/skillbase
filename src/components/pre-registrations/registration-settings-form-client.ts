@@ -231,10 +231,8 @@ function enhance(form: HTMLFormElement): void {
     controls.forEach((control) => {
       control.disabled = true;
     });
-    const originalLabel = submit?.textContent ?? "Guardar configuración";
     if (submit) {
       submit.disabled = true;
-      submit.textContent = "Guardando…";
       submit.setAttribute("aria-busy", "true");
     }
     formError?.setAttribute("hidden", "");
@@ -246,21 +244,10 @@ function enhance(form: HTMLFormElement): void {
     }
     void (async () => {
       const toastId = `settings-${crypto.randomUUID()}`;
+      let failureFocus: HTMLElement | undefined;
+      notifications.loading({ id: toastId, title: "Guardando configuración…" });
       try {
-        const settings = await notifications.promise(
-          () => saveSettings(form, values),
-          {
-            id: toastId,
-            loading: { title: "Guardando configuración…" },
-            success: { title: "Configuración guardada." },
-            error: (failure) => ({
-              title:
-                failure instanceof SettingsRequestError
-                  ? failure.message
-                  : "No se pudo guardar la configuración. Inténtalo nuevamente.",
-            }),
-          },
-        );
+        const settings = await saveSettings(form, values);
         document
           .querySelectorAll<HTMLFormElement>(
             "[data-registration-settings-form]",
@@ -291,6 +278,10 @@ function enhance(form: HTMLFormElement): void {
           formError.hidden = false;
         }
         form.dispatchEvent(new Event("registration:saved"));
+        notifications.success({
+          id: toastId,
+          title: "Configuración guardada.",
+        });
         updateButton();
       } catch (failure) {
         const requestError =
@@ -314,10 +305,11 @@ function enhance(form: HTMLFormElement): void {
             input.setAttribute("aria-invalid", String(Boolean(error)));
         }
         const hasFieldErrors = fields.some((name) => requestError.fields[name]);
-        if (hasFieldErrors) notifications.dismiss(toastId);
+        if (hasFieldErrors || formError) notifications.dismiss(toastId);
+        else notifications.error({ id: toastId, title: requestError.message });
         if (formError) {
-          formError.textContent = "";
-          formError.setAttribute("hidden", "");
+          formError.textContent = hasFieldErrors ? "" : requestError.message;
+          formError.hidden = hasFieldErrors;
         }
         const firstInvalid = fields
           .map((name) => form.elements.namedItem(name))
@@ -326,7 +318,12 @@ function enhance(form: HTMLFormElement): void {
               input instanceof HTMLInputElement &&
               requestError.fields[input.name],
           );
-        if (firstInvalid instanceof HTMLInputElement) firstInvalid.focus();
+        if (firstInvalid instanceof HTMLInputElement)
+          failureFocus = firstInvalid;
+        else if (formError && !formError.hidden) {
+          formError.tabIndex = -1;
+          failureFocus = formError;
+        }
       } finally {
         submissionGuard.finish();
         delete form.dataset.pending;
@@ -335,10 +332,10 @@ function enhance(form: HTMLFormElement): void {
           control.disabled = disabled[index]!;
         });
         if (submit) {
-          submit.textContent = originalLabel;
           submit.removeAttribute("aria-busy");
         }
-        if (form.querySelector("[data-inline-editor][hidden]"))
+        if (failureFocus?.isConnected) failureFocus.focus();
+        else if (form.querySelector("[data-inline-editor][hidden]"))
           form.querySelector<HTMLElement>("[data-inline-edit]")?.focus();
         updateButton();
         document

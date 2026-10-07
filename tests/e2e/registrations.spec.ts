@@ -238,12 +238,12 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
     .filter({ has: page.getByLabel("Teléfono (opcional)", { exact: true }) });
   const phone = phoneForm.getByLabel("Teléfono (opcional)", { exact: true });
   await expect(
-    phoneForm.getByRole("button", { name: "Guardar", exact: true }),
+    phoneForm.getByRole("button", { name: /^Guardar / }),
   ).toBeDisabled();
   await phone.fill("+591 70000000");
   await phone.fill("+591 letras");
   await expect(phone).toHaveValue("+591 70000000");
-  await phoneForm.getByRole("button", { name: "Guardar", exact: true }).click();
+  await phoneForm.getByRole("button", { name: /^Guardar / }).click();
   await expect(
     page.getByRole("button", {
       name: "Editar teléfono (opcional)",
@@ -258,7 +258,7 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
   await expect(nameForm.locator('[name="revision"]')).toHaveValue(
     await phoneForm.locator('[name="revision"]').inputValue(),
   );
-  await nameForm.getByRole("button", { name: "Guardar", exact: true }).click();
+  await nameForm.getByRole("button", { name: /^Guardar / }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Sintética Registration",
   );

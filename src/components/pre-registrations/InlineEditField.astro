@@ -1,6 +1,6 @@
 ---
 import { buttonVariants } from "@/components/ui/button";
-import { Pencil } from "lucide-react";
+import { Check, Pencil, X } from "lucide-react";
 interface Props {
   label: string;
   value: string;
@@ -8,50 +8,88 @@ interface Props {
 const { label, value } = Astro.props;
 ---
 
-<div data-inline-field class="flex min-w-0 flex-col gap-3">
+<div data-inline-field class="inline-field flex min-w-0 flex-col gap-1">
+  <p class="text-sm text-muted-foreground">{label}</p>
   <div
     data-inline-display
     hidden
-    class="flex min-w-0 items-center justify-between gap-3"
+    class="flex min-h-11 min-w-0 items-start gap-2"
   >
-    <div class="min-w-0">
-      <p class="text-sm text-muted-foreground">{label}</p>
-      <p data-inline-value class="mt-1 break-words font-medium">
+    <div class="flex min-h-11 min-w-0 flex-1 items-center">
+      <p data-inline-value class="min-w-0 break-words font-medium">
         {value || "No indicado"}
       </p>
     </div>
-    <button
-      type="button"
-      data-inline-edit
-      aria-label={`Editar ${label.toLowerCase()}`}
-      class={buttonVariants({
-        variant: "ghost",
-        size: "icon",
-        className: "size-11 shrink-0",
-      })}
-    >
-      <Pencil aria-hidden="true" />
-    </button>
+    <div class="flex w-24 shrink-0 justify-end">
+      <button
+        type="button"
+        data-inline-edit
+        aria-label={`Editar ${label.toLowerCase()}`}
+        title={`Editar ${label.toLowerCase()}`}
+        class={buttonVariants({
+          variant: "outline",
+          size: "icon",
+          className: "size-11 shrink-0",
+        })}
+      >
+        <Pencil aria-hidden="true" />
+      </button>
+    </div>
   </div>
-  <div data-inline-editor class="flex min-w-0 flex-col gap-3">
-    <slot />
-    <div class="flex flex-wrap gap-2">
+  <div
+    data-inline-editor
+    class="grid min-h-11 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1"
+  >
+    <div class="inline-control contents">
+      <slot />
+    </div>
+    <div class="col-start-2 row-start-1 flex shrink-0 gap-2">
       <button
         type="submit"
         data-inline-save
-        class={buttonVariants({ className: "min-h-11" })}
+        aria-label={`Guardar ${label.toLowerCase()}`}
+        title={`Guardar ${label.toLowerCase()}`}
+        class={buttonVariants({ size: "icon", className: "size-11" })}
       >
-        Guardar
+        <Check aria-hidden="true" />
       </button>
       <button
         type="button"
         data-inline-cancel
         hidden
-        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+        aria-label={`Cancelar edición de ${label.toLowerCase()}`}
+        title={`Cancelar edición de ${label.toLowerCase()}`}
+        class={buttonVariants({
+          variant: "outline",
+          size: "icon",
+          className: "size-11",
+        })}
       >
-        Cancelar
+        <X aria-hidden="true" />
       </button>
     </div>
   </div>
+  <slot name="help" />
+  <p data-inline-pending role="status" class="sr-only"></p>
 </div>
+<style>
+  /* Keep the consumer's associated label and validation without a second heading. */
+  .inline-field :global(.inline-control > label) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .inline-field :global(.inline-control > :not(label):not(p)) {
+    grid-column: 1;
+    min-width: 0;
+  }
+  .inline-field :global(.inline-control > p) {
+    grid-column: 1 / -1;
+  }
+</style>
 <script src="./inline-field-client.ts"></script>
