@@ -34,17 +34,26 @@ const prefix = evaluationPrefix(instructorRoute);
     {groupId && (
       <>
         <li aria-hidden="true">/</li>
+        <li>
+          <a
+            href={`${prefix}/${courseId}/evaluaciones`}
+            class="inline-flex min-h-11 items-center underline underline-offset-4"
+          >
+            Evaluaciones del curso
+          </a>
+        </li>
+        <li aria-hidden="true">/</li>
         <li class="min-w-0">
           <a
-            href={`${prefix}/${courseId}/grupos/${groupId}/sesiones`}
+            href={`${prefix}/${courseId}/grupos/${groupId}/participantes`}
             class="inline-flex min-h-11 items-center break-words underline underline-offset-4"
           >
-            {groupLabel ?? "Grupo"}
+            Grupo {groupLabel ?? ""}
           </a>
         </li>
       </>
     )}
     <li aria-hidden="true">/</li>
-    <li aria-current="page">Evaluaciones</li>
+    <li aria-current="page">{groupId ? "Notas" : "Evaluaciones"}</li>
   </ol>
 </nav>

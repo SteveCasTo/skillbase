@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,6 +22,7 @@ import type {
 } from "@/domain/evaluations/types";
 import { notifications } from "@/lib/notifications";
 import { evaluationTypeLabels, gradeLabel } from "./presentation";
+import { acceptsWeightDraft, weightTotal } from "./editing";
 import type { SaveScheme } from "./mutation-types";
 
 interface Props {
@@ -45,17 +46,12 @@ export function SchemeEditor({
   initialIssues = {},
   initialMessage = "",
 }: Props) {
+  const canEdit = data.scheme.canEdit && !data.scheme.frozenAt;
+  const persisted = data.scheme.components.map(
+    ({ id, name, weight, type }) => ({ id, name, weight, type }),
+  );
   const [components, setComponents] = useState<EvaluationComponentInput[]>(
-    () =>
-      (data.scheme.canEdit && !data.scheme.frozenAt
-        ? attemptedComponents
-        : undefined) ??
-      data.scheme.components.map(({ id, name, weight, type }) => ({
-        id,
-        name,
-        weight,
-        type,
-      })),
+    () => (canEdit ? attemptedComponents : undefined) ?? persisted,
   );
   const [revision, setRevision] = useState(
     attemptedRevision === undefined
@@ -65,6 +61,7 @@ export function SchemeEditor({
   const [editing, setEditing] = useState<string | null>(
     attemptedComponents?.[0]?.id ?? null,
   );
+  const editingBaseline = useRef<EvaluationComponentInput | null>(null);
   const [pending, setPending] = useState(false);
   const [issues, setIssues] =
     useState<Readonly<Record<string, string>>>(initialIssues);
@@ -76,36 +73,38 @@ export function SchemeEditor({
     fingerprint: string;
     requestKey: string;
   } | null>(null);
-  const canEdit = data.scheme.canEdit && !data.scheme.frozenAt;
-  const displayedComponents = canEdit ? components : data.scheme.components;
+  const total = weightTotal(components.map(({ weight }) => weight));
+  const totalLabel =
+    total === null
+      ? "—"
+      : gradeLabel(
+          `${Math.floor(total / 100)}.${String(total % 100).padStart(2, "0")}`,
+        );
+  const otherTotal = weightTotal(
+    components.filter(({ id }) => id !== editing).map(({ weight }) => weight),
+  );
+  const budget = otherTotal === null ? 0 : Math.max(0, 10000 - otherTotal);
+  const edited = components.find(({ id }) => id === editing);
+  let componentValid = false;
   let valid = false;
-  let total: number | null = 0;
   try {
     validateEvaluationComponents(components);
     valid = true;
   } catch {
-    valid = false;
+    /* A draft need not total 100 yet. */
   }
-  try {
-    total = components.reduce(
-      (sum, component) =>
-        sum + evaluationHundredths(component.weight, "weight"),
-      0,
-    );
-  } catch {
-    total = null;
+  if (edited) {
+    try {
+      validateEvaluationComponents([{ ...edited, weight: "100" }]);
+      componentValid = evaluationHundredths(edited.weight, "weight") <= budget;
+    } catch {
+      /* Empty and transient decimal drafts cannot be confirmed. */
+    }
   }
-  const totalLabel =
-    total === null
-      ? "—"
-      : `${Math.floor(total / 100)},${String(total % 100).padStart(2, "0")}`;
-  const modality = evaluationModality(
-    components.map((component) => component.type),
-  );
-  const persisted = data.scheme.components.map(
-    ({ id, name, weight, type }) => ({ id, name, weight, type }),
-  );
   const dirty = JSON.stringify(components) !== JSON.stringify(persisted);
+  const modality = evaluationModality(
+    (canEdit ? components : data.scheme.components).map(({ type }) => type),
+  );
   const change = (id: string, patch: Partial<EvaluationComponentInput>) => {
     setComponents((current) =>
       current.map((component) =>
@@ -114,14 +113,38 @@ export function SchemeEditor({
     );
     setIssues({});
     setMessage("");
+    transaction.current = null;
   };
-
+  const closeEditor = () => {
+    setEditing(null);
+    editingBaseline.current = null;
+    requestAnimationFrame(() =>
+      (
+        form.current?.querySelector<HTMLElement>(
+          `[data-edit-component="${editing}"]`,
+        ) ?? form.current?.querySelector<HTMLElement>("[data-add-component]")
+      )?.focus({ preventScroll: true }),
+    );
+  };
+  const cancelEditor = () => {
+    const baseline =
+      editingBaseline.current ?? persisted.find(({ id }) => id === editing);
+    setComponents((current) =>
+      baseline
+        ? current.map((item) => (item.id === editing ? baseline : item))
+        : current.filter(({ id }) => id !== editing),
+    );
+    setIssues({});
+    setMessage("");
+    transaction.current = null;
+    closeEditor();
+  };
   return (
     <section
-      className="flex min-w-0 flex-col gap-5"
+      className="flex min-w-0 flex-col gap-4"
       aria-labelledby="scheme-title"
     >
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="scheme-title" className="text-xl font-semibold">
           Componentes del curso
         </h2>
@@ -131,19 +154,30 @@ export function SchemeEditor({
           </p>
         )}
       </header>
-      <p className="text-muted-foreground text-sm">
-        {data.scheme.frozenAt
-          ? "El esquema ya no puede modificarse porque se guardó la primera nota del curso."
-          : canEdit
-            ? "Los pesos deben sumar 100 %. El esquema se conserva para todos los grupos y queda fijo al guardar la primera nota."
-            : unavailableReason}
-      </p>
+      {canEdit ? (
+        <p className="text-muted-foreground text-sm">
+          Los pesos deben sumar 100%. Puedes usar hasta dos decimales.
+        </p>
+      ) : (
+        unavailableReason && (
+          <p className="text-muted-foreground text-sm">{unavailableReason}</p>
+        )
+      )}
       <form
         ref={form}
-        className="flex min-w-0 flex-col gap-5"
+        className="flex min-w-0 flex-col gap-4"
+        aria-busy={pending}
         onSubmit={async (event) => {
           event.preventDefault();
-          if (!valid || !dirty || !canEdit || busy.current) return;
+          if (
+            !valid ||
+            !dirty ||
+            !canEdit ||
+            editing !== null ||
+            latest ||
+            busy.current
+          )
+            return;
           busy.current = true;
           setPending(true);
           setIssues({});
@@ -192,48 +226,64 @@ export function SchemeEditor({
               const invalidIndex = Object.keys(result.issues)
                 .map((key) => /^components\.(\d+)\./u.exec(key)?.[1])
                 .find((index) => index !== undefined);
-              if (invalidIndex !== undefined)
-                setEditing(components[Number(invalidIndex)]?.id ?? null);
-              notifications.dismiss(notificationId);
-              requestAnimationFrame(() => {
-                const target =
+              if (invalidIndex !== undefined) {
+                const component = components[Number(invalidIndex)];
+                editingBaseline.current = component ? { ...component } : null;
+                setEditing(component?.id ?? null);
+              }
+              if (Object.keys(result.issues).length)
+                notifications.dismiss(notificationId);
+              else
+                notifications.error({
+                  id: notificationId,
+                  title: "No se guardó el esquema",
+                });
+              requestAnimationFrame(() =>
+                (
                   form.current?.querySelector<HTMLElement>(
                     '[aria-invalid="true"]',
                   ) ??
-                  form.current?.querySelector<HTMLElement>('[role="alert"]');
-                target?.focus({ preventScroll: true });
-              });
+                  form.current?.querySelector<HTMLElement>('[role="alert"]')
+                )?.focus({ preventScroll: true }),
+              );
             }
           } catch {
             setMessage(
-              "No se pudo confirmar el guardado. Conservamos los cambios para que puedas revisarlos e intentarlo de nuevo.",
+              "No se pudo confirmar el guardado. Reintenta sin cambiar los valores para recuperar la misma operación.",
             );
-            notifications.dismiss(notificationId);
+            notifications.error({
+              id: notificationId,
+              title: "No se guardó el esquema",
+            });
           } finally {
             busy.current = false;
             setPending(false);
           }
         }}
       >
-        {displayedComponents.length ? (
-          <ul className="bg-card divide-y rounded-xl border px-5">
-            {displayedComponents.map((component, index) => {
-              const open = canEdit && editing === component.id;
-              const prefix = `component-${component.id}`;
-              const errorFor = (field: string) =>
-                issues[`components.${index}.${field}`];
-              return (
-                <li key={component.id} className="py-5">
-                  {open ? (
-                    <fieldset
-                      disabled={pending}
-                      className="flex min-w-0 flex-col gap-4"
-                    >
-                      <legend className="mb-3 font-semibold">
-                        Editar componente
-                      </legend>
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                        <div className="flex min-w-0 flex-col gap-2">
+        {(canEdit ? components : data.scheme.components).length ? (
+          <ul className="bg-card divide-y rounded-xl border px-4">
+            {(canEdit ? components : data.scheme.components).map(
+              (component, index) => {
+                const open = canEdit && editing === component.id;
+                const prefix = `component-${component.id}`;
+                const errorFor = (field: string) =>
+                  issues[`components.${index}.${field}`];
+                return (
+                  <li key={component.id} className="py-3">
+                    {open ? (
+                      <fieldset
+                        disabled={pending}
+                        className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_7rem_auto]"
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") {
+                            event.preventDefault();
+                            cancelEditor();
+                          }
+                        }}
+                      >
+                        <legend className="sr-only">Editar componente</legend>
+                        <div className="flex min-w-0 flex-col gap-1 sm:col-span-2 lg:col-span-1">
                           <label
                             htmlFor={`${prefix}-name`}
                             className="text-sm font-medium"
@@ -266,7 +316,7 @@ export function SchemeEditor({
                             </p>
                           )}
                         </div>
-                        <div className="flex min-w-0 flex-col gap-2">
+                        <div className="flex min-w-0 flex-col gap-1">
                           <label
                             htmlFor={`${prefix}-type`}
                             className="text-sm font-medium"
@@ -284,6 +334,7 @@ export function SchemeEditor({
                           >
                             <SelectTrigger
                               id={`${prefix}-type`}
+                              className="min-h-11 w-full"
                               aria-invalid={Boolean(errorFor("type"))}
                               aria-describedby={
                                 errorFor("type")
@@ -311,7 +362,7 @@ export function SchemeEditor({
                             </p>
                           )}
                         </div>
-                        <div className="flex min-w-0 flex-col gap-2">
+                        <div className="flex min-w-0 flex-col gap-1">
                           <label
                             htmlFor={`${prefix}-weight`}
                             className="text-sm font-medium"
@@ -320,7 +371,7 @@ export function SchemeEditor({
                           </label>
                           <Input
                             id={`${prefix}-weight`}
-                            className="min-h-11"
+                            className="min-h-11 tabular-nums"
                             inputMode="decimal"
                             value={component.weight}
                             required
@@ -330,11 +381,14 @@ export function SchemeEditor({
                                 ? `${prefix}-weight-error`
                                 : undefined
                             }
-                            onChange={(event) =>
-                              change(component.id, {
-                                weight: event.target.value,
-                              })
-                            }
+                            onChange={(event) => {
+                              if (
+                                acceptsWeightDraft(event.target.value, budget)
+                              )
+                                change(component.id, {
+                                  weight: event.target.value,
+                                });
+                            }}
                           />
                           {errorFor("weight") && (
                             <p
@@ -345,123 +399,118 @@ export function SchemeEditor({
                             </p>
                           )}
                         </div>
+                        <div className="flex items-end justify-end gap-1 sm:col-span-2 lg:col-span-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="min-h-11 min-w-11"
+                            aria-label={`Confirmar ${component.name || "componente"}`}
+                            title="Confirmar componente"
+                            disabled={pending || !componentValid}
+                            onClick={closeEditor}
+                          >
+                            <Check aria-hidden="true" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="min-h-11 min-w-11"
+                            aria-label={`Cancelar edición de ${component.name || "componente"}`}
+                            title="Cancelar edición"
+                            disabled={pending}
+                            onClick={cancelEditor}
+                          >
+                            <X aria-hidden="true" />
+                          </Button>
+                        </div>
+                      </fieldset>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="font-medium break-words">
+                            {component.name || "Componente sin nombre"}
+                          </h3>
+                          <p className="text-muted-foreground mt-1 text-sm">
+                            {evaluationTypeLabels[component.type]}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <p className="mr-2 font-semibold tabular-nums">
+                            {gradeLabel(component.weight) || "—"} %
+                          </p>
+                          {canEdit && (
+                            <>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="min-h-11 min-w-11"
+                                data-edit-component={component.id}
+                                disabled={pending || editing !== null}
+                                aria-label={`Editar ${component.name || "componente"}`}
+                                title="Editar componente"
+                                onClick={() => {
+                                  editingBaseline.current = { ...component };
+                                  setEditing(component.id);
+                                }}
+                              >
+                                <Pencil aria-hidden="true" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="min-h-11 min-w-11"
+                                disabled={pending || editing !== null}
+                                aria-label={`Quitar ${component.name || "componente"} del esquema`}
+                                title="Quitar componente"
+                                onClick={() => {
+                                  setComponents((current) =>
+                                    current.filter(
+                                      ({ id }) => id !== component.id,
+                                    ),
+                                  );
+                                  setIssues({});
+                                  setMessage("");
+                                  transaction.current = null;
+                                }}
+                              >
+                                <Trash2 aria-hidden="true" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          disabled={pending}
-                          onClick={() => {
-                            const saved = persisted.find(
-                              (item) => item.id === component.id,
-                            );
-                            setComponents((current) =>
-                              saved
-                                ? current.map((item) =>
-                                    item.id === component.id ? saved : item,
-                                  )
-                                : current.filter(
-                                    (item) => item.id !== component.id,
-                                  ),
-                            );
-                            setEditing(null);
-                            setIssues({});
-                          }}
-                        >
-                          <X aria-hidden="true" />
-                          Cancelar edición
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={pending}
-                          onClick={() => setEditing(null)}
-                        >
-                          Continuar
-                        </Button>
-                      </div>
-                    </fieldset>
-                  ) : (
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="font-medium break-words">
-                          {component.name || "Componente sin nombre"}
-                        </h3>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                          {evaluationTypeLabels[component.type]}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <p className="font-semibold tabular-nums">
-                          {gradeLabel(component.weight) || "—"} %
-                        </p>
-                        {canEdit && (
-                          <>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="min-h-11 min-w-11"
-                              disabled={pending}
-                              aria-label={`Editar ${component.name || "componente"}`}
-                              onClick={() => setEditing(component.id)}
-                            >
-                              <Pencil aria-hidden="true" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="min-h-11 min-w-11"
-                              disabled={pending}
-                              aria-label={`Quitar ${component.name || "componente"} del esquema`}
-                              onClick={() => {
-                                setComponents((current) =>
-                                  current.filter(
-                                    (item) => item.id !== component.id,
-                                  ),
-                                );
-                                setIssues({});
-                              }}
-                            >
-                              <Trash2 aria-hidden="true" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
+                    )}
+                  </li>
+                );
+              },
+            )}
           </ul>
         ) : (
           <p className="text-muted-foreground text-sm">
-            Todavía no hay componentes. Define qué se evaluará y el peso de cada
-            componente.
+            Todavía no hay componentes de evaluación.
           </p>
         )}
         {canEdit && (
           <>
             {latest && (
               <section
-                className="flex flex-col gap-3"
+                className="flex flex-col items-start gap-3"
                 aria-labelledby="current-scheme-title"
               >
                 <h3 id="current-scheme-title" className="font-semibold">
                   Esquema vigente
                 </h3>
-                <ul className="flex flex-col gap-1 text-sm">
+                <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
                   {latest.scheme.components.map((component) => (
                     <li key={component.id}>
-                      {component.name} · {gradeLabel(component.weight)} %
+                      {component.name}: {gradeLabel(component.weight)} %
                     </li>
                   ))}
                 </ul>
-                <p className="text-muted-foreground text-sm">
-                  Revisa estos valores antes de guardar tu borrador sobre el
-                  esquema vigente.
-                </p>
                 <Button
                   type="button"
                   variant="outline"
@@ -482,15 +531,25 @@ export function SchemeEditor({
               <Button
                 type="button"
                 variant="outline"
-                disabled={pending || components.length >= 100}
+                data-add-component
+                disabled={
+                  pending ||
+                  editing !== null ||
+                  components.length >= 100 ||
+                  total === null ||
+                  total >= 10000
+                }
                 onClick={() => {
                   const id = crypto.randomUUID();
+                  editingBaseline.current = null;
                   setComponents((current) => [
                     ...current,
                     { id, name: "", type: "THEORY", weight: "" },
                   ]);
                   setEditing(id);
                   setIssues({});
+                  setMessage("");
+                  transaction.current = null;
                 }}
               >
                 <Plus aria-hidden="true" />
@@ -503,12 +562,6 @@ export function SchemeEditor({
                 Total: {totalLabel} % / 100 %
               </p>
             </div>
-            {!valid && components.length > 0 && (
-              <p className="text-muted-foreground text-sm">
-                Completa los nombres y pesos de 0 a 100, con hasta dos
-                decimales. La suma debe ser exactamente 100 %.
-              </p>
-            )}
             {issues.components && (
               <p
                 role="alert"
@@ -540,20 +593,39 @@ export function SchemeEditor({
                   setComponents(persisted);
                   setRevision(data.scheme.revision);
                   setEditing(null);
+                  setLatest(null);
                   setIssues({});
                   setMessage("");
+                  transaction.current = null;
                 }}
               >
                 Descartar cambios
               </Button>
               <Button
                 type="submit"
-                disabled={pending || !valid || !dirty || Boolean(latest)}
+                disabled={
+                  pending ||
+                  editing !== null ||
+                  !valid ||
+                  !dirty ||
+                  Boolean(latest)
+                }
               >
+                {pending && (
+                  <LoaderCircle
+                    className="motion-safe:animate-spin"
+                    aria-hidden="true"
+                  />
+                )}
                 {pending ? "Guardando…" : "Guardar esquema"}
               </Button>
             </div>
           </>
+        )}
+        {!canEdit && message && (
+          <p role="alert" tabIndex={-1} className="text-destructive text-sm">
+            {message}
+          </p>
         )}
       </form>
     </section>
