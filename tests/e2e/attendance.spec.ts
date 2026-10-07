@@ -31,7 +31,7 @@ async function save(page: Page, form: Locator, path: string) {
       new URL(response.url()).pathname === path &&
       response.request().method() === "POST",
   );
-  await form.getByRole("button", { name: /^Guardar / }).click();
+  await form.getByRole("button", { name: "Guardar", exact: true }).click();
   expect((await response).status()).toBe(200);
   await expect(form.locator('input[name="revision"]')).not.toHaveValue(
     revision,
