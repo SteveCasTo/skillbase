@@ -279,7 +279,13 @@ disponibilidad navegable desde ese feature. El cierre transaccional
 reutiliza el advisory lock de horarios, bloquea curso/grupo y serializa estado,
 snapshot, receipt y auditoría con las escrituras de notas, asistencia,
 calendario y membresía destino. Los guards se comparten entre repositorios;
-0021 añade trigger DB para evidencia cerrada. El contrato y límites están en
+0021 añade trigger DB para evidencia cerrada. PR 281 integró a development los
+renderers PDF/CSV y seis GET adapters que cargan versiones mediante el loader
+autorizado; estos adapters están presentes en la integración actual, pero sus
+paths aún no están en `PRIVATE_ROUTE_POLICIES` y el middleware fail-closed los
+bloquea. Las páginas SSR de workspace/historial y su policy existen en
+`feat/academic-closure-interface`, aún no integrada; por ello no hay navegación
+de cierre/descarga disponible en el árbol de development. Contrato y límites en
 [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md).
 
 ### Gestión de cuentas ADMIN (Fase 8, backend feature)
@@ -295,8 +301,9 @@ transacción PostgreSQL, y el repositorio transaccional es responsable de la
 revisión, actividad/dependencias, actor vigente y guard global de último ADMIN.
 `loadAdminAccounts`, `loadAdminAccount` y `handleAdminAccountPost` son helpers,
 no páginas/endpoints Astro registrados. El módulo está en
-`feat/admin-account-management` (commit `4bed53b`), todavía sin integrar ni
-exponer en route policy/UI; ver [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
+`feat/admin-account-management` (implementado en el feature cuya integración está
+en curso), sin página/ruta ni entrada de route policy; no está disponible desde
+la aplicación. Ver [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
 
 El POST público limita y parsea el body en el adaptador server-side, valida Origin y llama el caso de uso de interés. Un limiter persistente usa PostgreSQL y un HMAC server-only sobre `Astro.clientAddress`; no confía en forwarded headers. Sin secreto válido o dirección de cliente confiable, el flujo falla cerrado. Los defaults técnicos y requisitos de despliegue se describen en el contrato y en `docs/DEPLOYMENT.md`; no implican que los valores cloud estén configurados.
 

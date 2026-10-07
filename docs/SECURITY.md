@@ -153,9 +153,11 @@ El backend y las páginas UI se liberaron mediante PR 235. El detalle de modelo/
   sintéticos; el fix está en el source WIP y aún no hay ruta HTTP/página de cierre
   integrada ni release.
 - Futuros PDF/CSV deben usar el DTO autorizado por actor/contexto a través de los
-  loaders server-side, nunca la fila snapshot JSONB directamente. No añadir
-  CI/contacto/finanzas a la salida de instructor; mantenerlo protegido por
-  servidor y Data API grants revocados.
+  loaders server-side, nunca la fila snapshot JSONB directamente. Los renderers
+  PDF/CSV y seis GET adapter files existen en el worktree exports y reciben la
+  versión autorizada; todavía no se registraron en `PRIVATE_ROUTE_POLICIES`, así
+  que el middleware falla cerrado. No añadir CI/contacto/finanzas a la salida de
+  instructor; mantenerla protegida por servidor y Data API grants revocados.
 - Migration 0021 solo se aplicó en stacks QA temporales; no se aplicó a DB
   canónica/cloud. Integridad/privacidad y estado parcial están en
   [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y

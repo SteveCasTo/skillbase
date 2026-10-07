@@ -797,7 +797,10 @@ asistencia y cambios de membresía.
   elegibilidad combinada, balance informativo y datos de CI. El DTO actual no
   redacciona CI en la variante instructor; antes de montar una ruta/UI se debe
   corregir la proyección para cumplir la política de privacidad vigente.
-- El backend y el contrato están en
-  [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md); pruebas/QA
-  focales y límites en [`TESTING.md`](TESTING.md). El feature worktree no tiene
-  todavía ruta Astro, UI ni PDF/CSV, y no representa el milestone Fase 8 completo.
+- Los renderers PDF/CSV y seis GET route module files se añadieron en el feature
+  worktree `feat/academic-closure-exports`, usando snapshots autorizados y DTOs
+  por rol. Todavía no se registran en `PRIVATE_ROUTE_POLICIES` ni existe UI
+  integrada; middleware los bloquea fail-closed, por lo que no hay descarga
+  disponible. No es el milestone completo de Fase 8. Ver contrato/evidencia en
+  [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y
+  [`TESTING.md`](TESTING.md).
