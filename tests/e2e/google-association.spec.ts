@@ -86,8 +86,15 @@ test("mismatched Google restores the owner; unsolicited attachment leaves passwo
   await page.goto(`/auth/callback?code=${encodeURIComponent(mismatchedCode)}`);
   await expect(page).toHaveURL("/app/perfil?error=link");
   await expect(
-    page.getByText(fixture.name, { exact: true }).last(),
-  ).toBeVisible();
+    page
+      .getByRole("form", { name: "Editar nombre" })
+      .getByLabel("Nombre", { exact: true }),
+  ).toHaveValue("Association");
+  await expect(
+    page
+      .getByRole("form", { name: "Editar apellidos" })
+      .getByLabel("Apellidos", { exact: true }),
+  ).toHaveValue("Owner");
   await expect(
     page.getByRole("button", { name: "Asociar Google" }),
   ).toBeVisible();
@@ -277,5 +284,11 @@ test("Google-only ADMIN creates a password with recent approved OAuth, then reco
     .first()
     .click();
   await login(page, { email: fixture.email, password: recoveredPassword });
-  await expect(page.getByText("Administrador", { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole("form", { name: "Editar nombre" })
+      .getByLabel("Nombre", { exact: true }),
+  ).toHaveValue(fixture.name);
+  await page.goto("/app/configuracion");
+  await expect(page).toHaveURL("/app/configuracion");
 });
