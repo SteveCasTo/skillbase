@@ -330,9 +330,9 @@ Solo registros `INSCRITO` participan de la evaluación. Instructor solo opera cu
 
 Corrección post-release: la UI permite editar notas por celda, pero guarda todas las calificaciones modificadas de una persona atómicamente en una transacción. Campo vacío sigue pendiente, no cero ni borrado; el fallback HTML conserva envíos individuales. PR 258 backend y PR 262 UI implementaron esta modificación; evidencia focal, sin full gate combinado, en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md) y [`docs/TESTING.md`](TESTING.md).
 
-### Alcance aprobado para Fase 8 (backend parcial; aún no liberada)
+### Alcance aprobado para Fase 8 (backend/UI parcial; aún no liberada)
 
-El usuario aprobó cierre por grupo, snapshots e informes con estas reglas. El backend base está implementado parcialmente en `feat/academic-group-closure`, sin rutas/UI ni release; la migración 0021 solo se aplicó en stacks QA. No afirmar disponible el flujo completo:
+El usuario aprobó cierre por grupo, snapshots y exports con estas reglas. El core backend fue integrado por PR 280; UI SSR/rutas workspace e historial están implementadas en el feature branch `feat/academic-closure-interface`. Los route adapters PDF/CSV están en branch separado y aún no combinados con la policy/UI. La migración 0021 solo se aplicó en stacks QA. No afirmar disponible el flujo completo:
 
 - El cierre es por grupo y requiere sus sesiones activas finalizadas, notas completas de cada persona `INSCRITO` de ese grupo y asistencia resuelta (incluida revisión histórica). Una sesión cancelada es resolución válida; no se exige reactivarla ni crear marcas/ausencias ocultas. La elegibilidad/racha se incluye en resultado, pero no bloquea cierre. El saldo se muestra como información y no bloquea cierre.
 - El instructor solo cierra un grupo de un curso propio. `ADMIN` puede cerrar cualquier grupo y es el único rol autorizado para reabrir; la reapertura exige motivo y auditoría. Mientras esté cerrado, servidor debe rechazar toda mutación de notas o asistencia que afecte evidencia oficial. Reabrir no desbloquea componentes/pesos congelados de Fase 7.
@@ -343,7 +343,7 @@ El usuario aprobó cierre por grupo, snapshots e informes con estas reglas. El b
 - Guardar varias notas cambiadas de una fila es atómico. La UI puede editar celdas individualmente. Nota vacía es pendiente; no convierte a cero ni autoriza borrar una nota existente.
 - Las cuentas ADMIN tienen permisos iguales; no hay `ROOT` ni privilegio especial del primer usuario. ADMIN puede crear otra cuenta ADMIN en servidor y fijar la contraseña inicial usando Supabase Auth privilegiado; la contraseña no se persiste ni se registra en DTOs/logs/auditoría y el nuevo usuario cambia su propia contraseña después. El lifecycle muestra una sola acción válida: eliminar una cuenta ADMIN sin actividad de actor ni dependencias históricas; si tiene actividad, desactivar/reactivar conservando su UUID y todo el historial. No se permite que el lifecycle deje cero ADMIN activos. No se añade perfil/rol `INSTRUCTOR` ni se alteran roles existentes como efecto lateral. La política está aprobada y planificada, no implementada; límites técnicos en [`docs/PLAN.md`](PLAN.md).
 
-El scope de Fase 8 está aprobado, pero solo su backend base de cierre/snapshot/guards existe en el worktree de feature. UI/routes/export PDF/CSV y lifecycle multi-ADMIN siguen pendientes; no está integrado ni desplegado. El contrato técnico está en [`docs/ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md), estado y QA en [`docs/PLAN.md`](PLAN.md) y [`docs/TESTING.md`](TESTING.md).
+El scope de Fase 8 está aprobado. Core está en development; la UI workspace/history tiene implementación en branch no integrado, y los exports usan otro branch pendiente de combinación. Lifecycle multi-ADMIN, combinación route policy/exports, navegación final, HTTP/download E2E y release siguen pendientes. No hay migración 0021 en DB canónica/cloud. Contrato en [`docs/ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md), plan/evidencia en [`docs/PLAN.md`](PLAN.md) y [`docs/TESTING.md`](TESTING.md).
 
 ## EVALUACIÓN
 

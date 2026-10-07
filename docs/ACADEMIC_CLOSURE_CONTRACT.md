@@ -4,7 +4,7 @@
 
 El alcance funcional de Fase 8 está aprobado. El backend base de cierre por grupo está en el worktree `feat/academic-group-closure`, basado en `development` `7807fc1`; el source aún es WIP, no está integrado ni liberado. La migración candidata es `drizzle/0021_phase8_academic_group_closure.sql`. Solo se aplicó a stacks Supabase temporales de QA (ledger temporal 21→22); no se aplicó al Supabase local canónico ni a cloud. El release `master` sigue en `91beccf8`, cloud ledger 21.
 
-Este contrato describe helpers/repositorio backend, **no una aplicación disponible al usuario**: no se montaron rutas Astro, route policies, páginas/UI ni exportadores PDF/CSV. La implementación es parcial; el milestone Fase 8 sigue abierto. El progreso y las pruebas por entrega están en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
+El backend/helper y la interfaz SSR están implementados en branches de feature, pero Fase 8 no es aún una entrega disponible completa: la interfaz está en `feat/academic-closure-interface` sin integrar y los GET exportadores viven en otro branch. La policy de workspace/history ya está en el source UI, pero la integración con los seis adapters PDF/CSV y una prueba navegable de descarga quedan pendientes. Fase 8 permanece parcial; multi-ADMIN y release/gate completo siguen pendientes. El progreso/pruebas por etapa están en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 
 ## Responsabilidades y helpers actuales
 
@@ -21,6 +21,17 @@ src/domain/academic-closure
 - `loadAcademicClosure({actor, courseId, groupId, repository?})` devuelve disponibilidad más `ClosureStateDto` con estado/version, blockers, provisional u oficial e historial.
 - `loadAcademicClosureVersion({actor, courseId, groupId, version, repository?})` carga una versión histórica inmutable.
 - `handleClosurePost({request, actor, repository, siteUrl, operation, courseId, groupId})` acepta la operación de contexto `close` o `reopen`; el actor y grupo/curso vienen del servidor/ruta, no de una identidad declarada por el cliente.
+
+La UI/adapter SSR se encuentra en `feat/academic-closure-interface`. Sus rutas
+son `/app/cursos/:id/grupos/:groupId/cierre` y `/:version`, con equivalentes
+`/app/mis-cursos/:id/grupos/:groupId/cierre` y `/:version`. El route policy
+fail-closed fija ADMIN para cursos y INSTRUCTOR/ownership para Mis cursos. Los
+route module files de export PDF/CSV están en el feature separado
+`feat/academic-closure-exports`; la policy contempla paths `planilla.pdf`,
+`planilla.csv`, `informe.pdf`, pero estos archivos aún no forman parte del branch
+de interfaz. Por tanto, la UI puede mostrar enlaces de descarga acordados, pero
+su destino real espera integrar el branch export; no afirmar que el download fue
+probado desde la UI.
 
 El comando requiere `requestKey` UUID y `revision`; `reopen` requiere además `reason` (1–500 caracteres). El body admite opcionalmente `courseId`/`groupId` solo como referencias que deben coincidir con el contexto de ruta; para reabrir no se aceptan campos desconocidos. El helper valida origen y límite de 65 536 bytes. Respuestas usan `{ok:true,value,message}` o `{ok:false,code,message,issues}`, JSON `private, no-store` y `nosniff`. Mapeo: autorización 403, contexto inexistente/ajeno 404, revisión/idempotencia/estado cerrado o bloqueo 409, validación 422 y fallo inesperado 503 saneado. Esto no constituye todavía endpoint HTTP desplegado.
 

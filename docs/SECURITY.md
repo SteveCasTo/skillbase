@@ -107,7 +107,9 @@ El backend y las páginas UI se liberaron mediante PR 235. El detalle de modelo/
 - Loader/casos de uso de cierre revalidan actor `ACTIVE`, rol y ownership en el
   repositorio: ADMIN puede cualquier grupo; INSTRUCTOR solo grupo propio y desde
   inicio oficial. Reabrir es ADMIN-only, con razón y auditoría transaccional.
-  No hay route Astro/policy/UI montada en este source.
+  El feature `feat/academic-closure-interface` implementa rutas SSR/JSON para
+  workspace/history con policy fail-closed acotada, pero todavía no está
+  integrado a `development`.
 - La migración 0021 candidata habilita RLS y revoca grants Data API en estado,
   versiones, reaperturas y receipts. Triggers hacen inmutable la historia y
   protegen notas/sesiones/roster/asistencia con el advisory lock compartido.
@@ -118,13 +120,13 @@ El backend y las páginas UI se liberaron mediante PR 235. El detalle de modelo/
   un DTO discriminado `access`; la proyección INSTRUCTOR es allowlist recursiva
   de nombres/IDs académicos, notas y asistencia, excluyendo CI, categorías y datos
   financieros, incluso si aparecieran nuevos campos sensibles en el snapshot.
-  Pruebas focales inspeccionan el JSON serializado y los campos futuros
-  sintéticos; el fix está en el source WIP y aún no hay ruta HTTP/página de cierre
-  integrada ni release.
-- Futuros PDF/CSV deben usar el DTO autorizado por actor/contexto a través de los
-  loaders server-side, nunca la fila snapshot JSONB directamente. No añadir
-  CI/contacto/finanzas a la salida de instructor; mantenerlo protegido por
-  servidor y Data API grants revocados.
+  Pruebas focales inspeccionan JSON serializado y campos futuros sintéticos. La
+  policy UI comprueba patrón/ruta y role prefix; el backend revalida actor,
+  ownership y estado.
+- Los PDF/CSV deben usar el DTO autorizado por actor/contexto de los loaders,
+  nunca la fila snapshot JSONB directamente. Mantener la allowlist INSTRUCTOR sin
+  CI/contacto/finanzas; los route adapters de descarga están en otro feature y
+  aún no se integran con este policy/UI.
 - Migration 0021 solo se aplicó en stacks QA temporales; no se aplicó a DB
   canónica/cloud. Integridad/privacidad y estado parcial están en
   [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y
