@@ -151,6 +151,7 @@ test("interest is available before presencial opening; JS submits optional group
   await page
     .getByRole("option", { name: "Lunes a viernes, 18:00–19:30" })
     .click();
+  await expect(form.getByRole("button", { name: submitName })).toBeEnabled();
   await page.evaluate(() => {
     (
       window as Window & { publicInterestMarker?: boolean }
@@ -210,6 +211,132 @@ test("interest is available before presencial opening; JS submits optional group
   const second = await secondResponse;
   expect(second.status()).toBe(200);
   expect(await second.json()).toEqual(firstPayload);
+  await expect(page.locator(".interest-success")).toContainText(successMessage);
+});
+
+test("contact entered before interest hydration remains valid after choosing a group", async ({
+  page,
+  context,
+}) => {
+  let release!: () => void;
+  const hydration = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/PublicInterestForm.tsx*", async (route) => {
+    await hydration;
+    await route.continue();
+  });
+  const { path, groupId } = await publicCourse(page, context, {
+    group: true,
+    window: "future",
+  });
+  const { form, email } = await fillContact(page);
+  await expect(form).not.toHaveAttribute("novalidate");
+  release();
+  await expect(form).toHaveAttribute("novalidate", "");
+  await expect(form.getByLabel("Nombre", { exact: true })).toHaveValue(
+    "María José",
+  );
+  await expect(form.getByLabel("Apellidos", { exact: true })).toHaveValue(
+    "Pérez García",
+  );
+  await expect(form.getByLabel("Email", { exact: true })).toHaveValue(email);
+  const group = form.getByRole("combobox", {
+    name: "Preferencia de grupo (opcional)",
+  });
+  await group.click();
+  await page
+    .getByRole("option", { name: "Lunes a viernes, 18:00–19:30" })
+    .click();
+  await expect(form.getByRole("button", { name: submitName })).toBeEnabled();
+  const posted = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === path,
+  );
+  await submitNativeInterest(form);
+  const response = await posted;
+  expect(response.status()).toBe(200);
+  const values = new URLSearchParams(response.request().postData() ?? "");
+  expect(values.get("email")).toBe(email);
+  expect(values.getAll("preferredGroupId")).toEqual([groupId]);
+  await expect(page.locator(".interest-success")).toContainText(successMessage);
+});
+
+test("contact entered between hydration effect and its first frame enables submit", async ({
+  page,
+  context,
+}) => {
+  let frameScheduled!: () => void;
+  const scheduled = new Promise<void>((resolve) => {
+    frameScheduled = resolve;
+  });
+  await page.exposeFunction("interestFrameScheduled", frameScheduled);
+  await page.addInitScript(() => {
+    const original = window.requestAnimationFrame.bind(window);
+    const scope = window as Window & {
+      interestFrameScheduled?: () => Promise<void>;
+      releaseInterestFrame?: () => void;
+    };
+    let held = false;
+    // Hold only this component's reconciliation frame, not unrelated layout
+    // frames. This deterministically exposes input during the hydration effect
+    // without sleeps, disabling constraints, or retrying a failed submission.
+    window.requestAnimationFrame = (callback) => {
+      const form = document.querySelector<HTMLFormElement>(".interest-form");
+      if (
+        form &&
+        !form.noValidate &&
+        !held &&
+        new Error().stack?.includes("/PublicInterestForm.tsx")
+      ) {
+        held = true;
+        scope.releaseInterestFrame = () => original(callback);
+        void scope.interestFrameScheduled?.();
+        return 0;
+      }
+      return original(callback);
+    };
+  });
+  const { path } = await publicCourse(page, context, { window: "future" });
+  await scheduled;
+  const emptyForm = page.getByRole("form", { name: submitName });
+  await expect(emptyForm).not.toHaveAttribute("novalidate");
+  expect(
+    await emptyForm.evaluate((element) =>
+      (element as HTMLFormElement).checkValidity(),
+    ),
+  ).toBe(false);
+  const { form } = await fillContact(page);
+  await expect(form).not.toHaveAttribute("novalidate");
+  expect(
+    await form.evaluate((element) =>
+      (element as HTMLFormElement).checkValidity(),
+    ),
+  ).toBe(true);
+  await page.evaluate(() => {
+    (
+      window as Window & { releaseInterestFrame?: () => void }
+    ).releaseInterestFrame?.();
+  });
+  await expect(form).toHaveAttribute("novalidate", "");
+  await expect(form.getByRole("button", { name: submitName })).toBeEnabled();
+  const group = form.getByRole("combobox", {
+    name: "Preferencia de grupo (opcional)",
+  });
+  await group.focus();
+  await group.press("ArrowDown");
+  await page
+    .getByRole("option", { name: "Lunes a viernes, 18:00–19:30" })
+    .click();
+  await expect(form.getByRole("button", { name: submitName })).toBeEnabled();
+  const posted = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === path,
+  );
+  await submitNativeInterest(form);
+  expect((await posted).status()).toBe(200);
   await expect(page.locator(".interest-success")).toContainText(successMessage);
 });
 
