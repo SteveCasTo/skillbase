@@ -125,7 +125,170 @@ async function fixture() {
     components,
   };
 }
+test("evaluation row saves atomically with scoped authorization, revisions, exact results and one receipt", async () => {
+  now = new Date("2099-02-01T12:00:00Z");
+  const f = await fixture();
+  await repo.saveScheme(f.admin.id, {
+    courseId: f.course.id,
+    requestKey: crypto.randomUUID(),
+    schemeRevision: 0,
+    components: f.components,
+  });
+  const row = {
+    courseId: f.course.id,
+    groupId: f.groups[0]!.id,
+    registrationId: f.paid.id,
+    requestKey: crypto.randomUUID(),
+    schemeRevision: 1,
+    grades: f.components.map((c) => ({
+      componentId: c.id,
+      gradeRevision: 0,
+      score: "0",
+    })),
+  };
+  await expect(repo.saveRow(f.instructor.id, row)).rejects.toMatchObject({
+    code: "FORBIDDEN",
+  });
+  now = new Date("2099-03-02T04:00:00Z");
+  await expect(repo.saveRow(f.foreign.id, row)).rejects.toMatchObject({
+    code: "NOT_FOUND",
+  });
+  await expect(
+    repo.saveRow(f.instructor.id, { ...row, registrationId: f.unpaid.id }),
+  ).rejects.toMatchObject({ code: "NOT_ENROLLED" });
+  await expect(
+    repo.saveRow(f.admin.id, { ...row, groupId: f.groups[1]!.id }),
+  ).rejects.toMatchObject({ code: "NOT_ENROLLED" });
+  for (const bad of [
+    { ...row, grades: [row.grades[0]!, { ...row.grades[1]!, score: "101" }] },
+    {
+      ...row,
+      grades: [row.grades[0]!, { ...row.grades[1]!, gradeRevision: 1 }],
+    },
+    {
+      ...row,
+      grades: [
+        row.grades[0]!,
+        { ...row.grades[1]!, componentId: crypto.randomUUID() },
+      ],
+    },
+  ])
+    await expect(repo.saveRow(f.instructor.id, bad)).rejects.toThrow();
+  let loaded = await repo.getCourse(f.admin.id, f.course.id);
+  expect(loaded.scheme).toMatchObject({ revision: 1, frozenAt: null });
+  expect(
+    loaded.participants
+      .find((p) => p.registrationId === f.paid.id)!
+      .grades.every((g) => g.score === null),
+  ).toBe(true);
+  expect(
+    await db
+      .select()
+      .from(s.evaluationCommandReceipts)
+      .where(eq(s.evaluationCommandReceipts.requestKey, row.requestKey)),
+  ).toHaveLength(0);
+  const zero = await repo.saveRow(f.instructor.id, row);
+  expect(zero).toMatchObject({
+    kind: "row",
+    schemeRevision: 2,
+    result: { status: "COMPLETE", finalGrade: "0.00" },
+  });
+  expect(await repo.saveRow(f.instructor.id, row)).toEqual(zero);
+  await expect(
+    repo.saveRow(f.instructor.id, {
+      ...row,
+      grades: row.grades.map((g) => ({ ...g, score: "1" })),
+    }),
+  ).rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT" });
+  const correction = {
+    ...row,
+    requestKey: crypto.randomUUID(),
+    schemeRevision: 2,
+    grades: row.grades.map((g, i) => ({
+      ...g,
+      gradeRevision: 1,
+      score: i ? "70" : "69.99",
+    })),
+  };
+  await expect(
+    repo.saveRow(f.admin.id, {
+      ...correction,
+      grades: [
+        correction.grades[0]!,
+        { ...correction.grades[1]!, gradeRevision: 0 },
+      ],
+    }),
+  ).rejects.toMatchObject({ code: "CONCURRENT_UPDATE" });
+  loaded = await repo.getCourse(f.admin.id, f.course.id);
+  expect(
+    loaded.participants
+      .find((p) => p.registrationId === f.paid.id)!
+      .grades.map((g) => g.score),
+  ).toEqual(["0.00", "0.00"]);
+  const saved = await repo.saveRow(f.admin.id, correction);
+  expect(saved).toMatchObject({
+    kind: "row",
+    result: { finalGrade: "70.00", passed: true },
+  });
+  if (saved.kind !== "row") throw new Error("Expected row");
+  expect(saved.grades.map((g) => g.recordedBy)).toEqual([
+    f.admin.id,
+    f.admin.id,
+  ]);
+  expect(saved.grades.map((g) => g.revision)).toEqual([2, 2]);
+  const audit = await db
+    .select()
+    .from(s.auditEvents)
+    .where(
+      and(
+        eq(s.auditEvents.entityId, f.course.id),
+        eq(s.auditEvents.action, "EVALUATION_GRADE_RECORDED"),
+      ),
+    );
+  expect(audit).toHaveLength(4);
+  await expect(
+    repo.saveRow(f.admin.id, {
+      ...correction,
+      requestKey: crypto.randomUUID(),
+      schemeRevision: 1,
+    }),
+  ).rejects.toMatchObject({ code: "CONCURRENT_UPDATE" });
+  const pending = await repo.saveRow(f.instructor.id, {
+    ...row,
+    requestKey: crypto.randomUUID(),
+    schemeRevision: 2,
+    groupId: f.groups[1]!.id,
+    registrationId: f.otherGroup.id,
+    grades: [row.grades[0]!],
+  });
+  expect(pending).toMatchObject({
+    kind: "row",
+    result: {
+      status: "PENDING",
+      finalGrade: null,
+      missingComponentIds: [f.components[1]!.id],
+    },
+  });
+  if (pending.kind !== "row") throw new Error("Expected row");
+  expect(pending.grades.map((g) => g.score)).toEqual(["0.00", null]);
+  await db
+    .update(s.users)
+    .set({ status: "DISABLED" })
+    .where(eq(s.users.id, f.instructor.id));
+  await expect(repo.saveRow(f.instructor.id, row)).rejects.toMatchObject({
+    code: "FORBIDDEN",
+  });
+  await expect(
+    repo.saveScheme(f.admin.id, {
+      courseId: f.course.id,
+      requestKey: crypto.randomUUID(),
+      schemeRevision: 2,
+      components: f.components,
+    }),
+  ).rejects.toMatchObject({ code: "SCHEME_FROZEN" });
+});
 test("evaluation course scheme, zero freeze, corrections and provisional results preserve scoped membership, history and concurrent writes", async () => {
+  now = new Date("2099-02-01T12:00:00Z");
   const f = await fixture();
   const command = {
     courseId: f.course.id,

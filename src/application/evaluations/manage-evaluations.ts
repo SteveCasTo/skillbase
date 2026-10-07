@@ -8,6 +8,7 @@ import {
 import type {
   EvaluationCommand,
   SaveEvaluationGradeInput,
+  SaveEvaluationRowInput,
   SaveEvaluationSchemeInput,
 } from "@/domain/evaluations/types";
 import type { EvaluationRepository } from "./evaluation-repository";
@@ -45,6 +46,56 @@ export function validateSaveGrade(input: SaveEvaluationGradeInput): void {
     throw new EvaluationError("VALIDATION_FAILED", "Recarga la nota vigente.", {
       gradeRevision: "Revisión no válida.",
     });
+}
+export function validateSaveRow(input: SaveEvaluationRowInput): void {
+  validateEvaluationCommand(input);
+  evaluationId(input.registrationId, "registrationId");
+  if (
+    !Array.isArray(input.grades) ||
+    input.grades.length < 1 ||
+    input.grades.length > 100
+  )
+    throw new EvaluationError(
+      "VALIDATION_FAILED",
+      "Indica entre 1 y 100 notas modificadas.",
+    );
+  const ids = new Set<string>();
+  input.grades.forEach((grade, index) => {
+    if (
+      !grade ||
+      typeof grade !== "object" ||
+      Object.keys(grade).some(
+        (key) => !["componentId", "gradeRevision", "score"].includes(key),
+      )
+    )
+      throw new EvaluationError(
+        "VALIDATION_FAILED",
+        "La nota contiene campos no admitidos.",
+      );
+    const id = evaluationId(grade.componentId, `grades.${index}.componentId`);
+    if (ids.has(id))
+      throw new EvaluationError(
+        "VALIDATION_FAILED",
+        "Los componentes están duplicados.",
+      );
+    ids.add(id);
+    evaluationHundredths(grade.score, `grades.${index}.score`);
+    if (!Number.isSafeInteger(grade.gradeRevision) || grade.gradeRevision < 0)
+      throw new EvaluationError(
+        "VALIDATION_FAILED",
+        "Recarga la nota vigente.",
+        { [`grades.${index}.gradeRevision`]: "Revisión no válida." },
+      );
+  });
+}
+export async function saveEvaluationRow(
+  repo: EvaluationRepository,
+  actor: InternalUser,
+  input: SaveEvaluationRowInput,
+) {
+  requireEvaluationActor(actor);
+  validateSaveRow(input);
+  return repo.saveRow(actor.id, input);
 }
 export async function getCourseEvaluations(
   repo: EvaluationRepository,

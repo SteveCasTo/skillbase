@@ -82,7 +82,23 @@ export interface SaveEvaluationGradeInput extends EvaluationCommand {
   gradeRevision: number;
   score: string;
 }
+export interface SaveEvaluationRowInput extends EvaluationCommand {
+  registrationId: string;
+  grades: readonly {
+    componentId: string;
+    gradeRevision: number;
+    score: string;
+  }[];
+}
 export type EvaluationCommandResult =
+  | {
+      kind: "row";
+      schemeRevision: number;
+      participantId: string;
+      registrationId: string;
+      grades: EvaluationGradeDto[];
+      result: EvaluationResultDto;
+    }
   | { kind: "scheme"; schemeRevision: number }
   | {
       kind: "grade";
