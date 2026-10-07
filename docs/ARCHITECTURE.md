@@ -208,6 +208,8 @@ El agregado `pre-registrations` sigue los límites del monolito modular: dominio
 
 PR 178 añadió `/app/configuracion` (SSR/POST/JSON, éxito `{settings}`, error `{code,message,fields}` y conflictos de revisión `409`) con guard ADMIN; PR 179 la registró en `PRIVATE_ROUTE_POLICIES` e integró el resto de páginas/rutas ADMIN de `/app/preinscripciones`, `/app/participantes` y el roster INSTRUCTOR de `/app/mis-cursos/[id]/grupos/[groupId]`. La política es fail-closed; operaciones y repositorios vuelven a autorizar al actor activo. El roster revalida ownership/start server-side y serializa solo nombre/apellidos. En la interfaz, montos se envían como strings BOB decimales y se convierten a centavos en servidor; las mutaciones tienen respuesta discriminada de éxito/error e issues. Los generadores exportan etiquetas de curso/grupo, participante/CI, tipo, estados y montos financieros. El full canonical E2E integrado pasó 125/125; Fase 5 se liberó en producción como `2e0eecb` con cloud ledger 18. Las correcciones UX posteriores se integraron por PRs 197–199; sesiones/asistencia se implementaron después en la sección siguiente.
 
+Corrección post-release en el source actual (`fix/pre-registration-interface`, integrada a `development`): se retiraron las páginas/directorio UI `/app/participantes` y las rutas de edición asociadas. La ficha global se consulta/edita desde las páginas de preinscripción y la operación HTTP se ubica bajo el contexto de preinscripciones; no se conserva una ruta de participantes fantasma solo porque un formulario enviaba POST allí. La política privada, enlaces y skeletons reflejan las rutas presentes. La lógica de identidad, CI, historial financiero y multi-curso sigue en los casos de uso/repositorio existentes; el cambio de pantalla/ruta no reemplaza ni duplica reglas de dominio. Ver pruebas focales/límites en [`TESTING.md`](TESTING.md).
+
 ### Sesiones y asistencia (Fase 6, release en producción)
 
 El módulo conserva límites del monolito: reglas en `src/domain/attendance`, casos de uso/port en `src/application/attendance`, servicio/HTTP en `src/server/attendance`, persistencia en `src/server/db/repositories/attendance-*` y schema Drizzle. La migración `0019_phase6_attendance` añade calendario, roster, marcas, configuración y receipts; migration 0018 hace opcional el motivo del movimiento de efectivo. Ambas se aplicaron al Supabase local canónico y producción mediante el release PR 211 (ledger 20 observado en ese release). Las correcciones C1/C2/C3 se integraron después en PRs 219/223 y se liberaron mediante PR 228; no requirieron cambios de schema.
@@ -252,6 +254,14 @@ pre/post de todas las filas. Evidencia de preservación local y límites de clou
 `docs/DATA_MODEL.md`, `docs/SECURITY.md` y `docs/EVALUATIONS_CONTRACT.md`. Fase 7
 está liberada dentro de su alcance. No incluye cierre de curso/planilla de Fase 8
 o certificados de Fase 9.
+
+Corrección de Fase 7 en PR 258: el caso de uso expone guardado atómico de una
+fila de notas mediante `saveRow`; la interfaz puede editar celdas por separado,
+pero persiste el conjunto cambiado en una transacción del repositorio. El
+fallback HTML conserva comandos de nota individuales. No se añadió migración ni
+se movieron reglas desde dominio/repositorio a React. El detalle de contrato y
+verificación focal está en [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md)
+y [`TESTING.md`](TESTING.md).
 
 El POST público limita y parsea el body en el adaptador server-side, valida Origin y llama el caso de uso de interés. Un limiter persistente usa PostgreSQL y un HMAC server-only sobre `Astro.clientAddress`; no confía en forwarded headers. Sin secreto válido o dirección de cliente confiable, el flujo falla cerrado. Los defaults técnicos y requisitos de despliegue se describen en el contrato y en `docs/DEPLOYMENT.md`; no implican que los valores cloud estén configurados.
 

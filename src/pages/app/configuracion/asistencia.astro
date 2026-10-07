@@ -1,5 +1,6 @@
 ---
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import PrivateBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import AttendanceSettingsForm from "@/components/attendance/AttendanceSettingsForm.astro";
 import { requireInternalUser } from "@/server/auth/context";
 import { getPublicAuthEnvironment } from "@/server/environment";
@@ -41,12 +42,13 @@ try {
 ---
 
 <PrivateLayout title="Configuración">
-  <a
-    href="/app/configuracion"
-    class="min-h-11 text-sm underline underline-offset-4"
-  >
-    Configuración
-  </a>
+  <PrivateBreadcrumbs
+    current="Asistencia"
+    parents={[
+      { label: "Resumen", href: "/app" },
+      { label: "Configuración", href: "/app/configuracion" },
+    ]}
+  />
   <h1 class="mt-5 text-3xl font-semibold">Configuración</h1>
   <div class="mt-8 rounded-xl border bg-card p-5 sm:p-7">
     {settings ? (

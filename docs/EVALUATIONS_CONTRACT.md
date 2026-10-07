@@ -23,9 +23,11 @@ La semántica de `passed` es clasificación académica de nota y no emite ni cie
 certificados/cursos.
 
 Los comandos de POST llevan `requestKey`, `courseId`, `schemeRevision` y
-`groupId` opcional; guardar nota agrega `registrationId`, `componentId`,
-`gradeRevision` y `score`, mientras guardar esquema envía la lista completa de
-componentes. El helper HTTP valida origen, body de hasta 65 536 bytes y allowlist
+`groupId` opcional; el fallback HTML de guardar una nota lleva `registrationId`,
+`componentId`, `gradeRevision` y `score`. La UI interactiva guarda las
+calificaciones modificadas de una fila en una sola operación `row`, que contiene
+`registrationId` y la lista de `{componentId, gradeRevision, score}` modificados;
+guardar esquema envía la lista completa de componentes. El helper HTTP valida origen, body de hasta 65 536 bytes y allowlist
 de campos; curso/grupo se fijan desde el contexto de ruta. Respuestas correctas
 son `{ok:true,value,message}`; errores son `{ok:false,code,message,issues}`.
 Errores de validación: 422; autorización: 403; contexto ajeno/inexistente: 404;
@@ -42,10 +44,20 @@ completos se derivan tras cada nota; mientras falte alguna se conserva estado
 
 La UI integrada expone el esquema global en páginas de curso y el roster de
 calificaciones en páginas de grupo, para ADMIN y para INSTRUCTOR en sus cursos
-propios. La edición de esquema/notas es individual; el estado incompleto se
-distingue de una nota completa cero, y ADMIN puede consultar historial de
-correcciones. Mantiene valores borrador independientes y fallback SSR. La
-verificación actual de interfaz es focal, no el gate completo del módulo.
+propios. El esquema conserva drafts por atributo y una confirmación global; las
+notas se editan visualmente por celda, pero la variante JavaScript guarda todos
+los cambios de la fila atómicamente. Un valor vacío continúa como pendiente y no
+es una petición para borrar una nota persistida. El fallback SSR/HTML conserva
+formularios individuales de componente. El estado incompleto se distingue de una
+nota completa cero, y ADMIN puede consultar historial de correcciones.
+
+PR 258 integró `saveRow` en dominio/aplicación/repositorio y el adaptador HTTP.
+Las escrituras de notas y sus triggers existentes se ejecutan dentro de la misma
+transacción; un fallo no deja una fila parcialmente persistida. No fue necesaria
+migración. La validación de PR 258 fue focal: 5 unitarias y 2 de integración,
+63 assertions; no equivale a suite completa. PR 262 actualizó la UI de evaluación;
+ver E2E focal y QA visual segmentada en [`TESTING.md`](TESTING.md). El gate
+combinado del milestone de correcciones sigue pendiente.
 
 Fase 7 configura componentes de evaluación por curso, registra notas y calcula
 un resultado académico final. No incluye cierre/reapertura de curso, planilla

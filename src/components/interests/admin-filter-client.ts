@@ -1,4 +1,3 @@
-import { notifications } from "@/lib/notifications";
 import type {
   TransitionBeforePreparationEvent,
   TransitionBeforeSwapEvent,
@@ -201,10 +200,6 @@ export function initializeInterestFilters(
         root
           .querySelector<HTMLElement>("#interest-list-title")
           ?.focus({ preventScroll: true });
-      notifications.error({
-        id: `notification-${crypto.randomUUID()}`,
-        title: message,
-      });
     } finally {
       if (abortWait) request.signal.removeEventListener("abort", abortWait);
       window.clearTimeout(timeout);

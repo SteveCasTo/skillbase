@@ -17,7 +17,6 @@
           'button[type="submit"]',
         );
         if (!button) return;
-        const original = button.innerHTML;
         const enhanced = form.hasAttribute("data-auth-enhanced");
         const inlineErrorsOnly = form.hasAttribute(
           "data-auth-field-errors-only",
@@ -72,7 +71,7 @@
         const restore = () => {
           pending = false;
           form.removeAttribute("aria-busy");
-          button.innerHTML = original;
+          button.removeAttribute("aria-busy");
           sync();
         };
         form.addEventListener("auth:restore", restore);
@@ -111,7 +110,7 @@
           pending = true;
           form.setAttribute("aria-busy", "true");
           button.disabled = true;
-          button.textContent = "Procesando…";
+          button.setAttribute("aria-busy", "true");
           if (!enhanced) return;
           const id = `notification-${crypto.randomUUID()}`;
           notifications.loading({ id, title: "Procesando solicitud…" });
@@ -156,8 +155,7 @@
                 if (input.autocomplete.includes("password")) input.value = "";
                 displayFieldError(input, result.fields?.[input.name] ?? "");
               });
-              if (inlineErrorsOnly) notifications.dismiss(id);
-              else notifications.error({ id, title: message });
+              notifications.dismiss(id);
               const invalid = fields().find(
                 (input) => result.fields?.[input.name],
               );
@@ -188,8 +186,7 @@
               "No pudimos procesar la solicitud. Revisa tu conexión e inténtalo nuevamente.";
             resultNode.textContent = message;
             resultNode.setAttribute("role", "alert");
-            if (inlineErrorsOnly) notifications.dismiss(id);
-            else notifications.error({ id, title: message });
+            notifications.dismiss(id);
             resultNode.focus();
           } finally {
             restore();

@@ -42,23 +42,26 @@ const calendarPath = `${prefix}/${courseId}/grupos/${groupId}/sesiones`;
       </a>
     </li>
     <li aria-hidden="true">/</li>
-    <li class="break-words">{groupLabel}</li>
-    <li aria-hidden="true">/</li>
-    <li>
+    <li class="min-w-0 break-words">
       {current === "calendar" ? (
-        <span aria-current="page">Calendario</span>
+        groupLabel
       ) : (
         <a
           href={calendarPath}
-          class="inline-flex min-h-11 items-center underline underline-offset-4"
+          class="inline-flex min-h-11 items-center break-words underline underline-offset-4"
         >
-          Calendario
+          {groupLabel}
         </a>
       )}
     </li>
+    <li aria-hidden="true">/</li>
+    {current === "calendar" && (
+      <li>
+        <span aria-current="page">Calendario</span>
+      </li>
+    )}
     {current !== "calendar" && (
       <>
-        <li aria-hidden="true">/</li>
         <li aria-current="page">
           {current === "participants" ? (
             "Participantes"

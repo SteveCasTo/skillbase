@@ -11,6 +11,7 @@ import type { AttendanceSettingsDto } from "@/domain/attendance/types";
 import { RegistrationError } from "@/domain/pre-registrations/errors";
 import type { RegistrationSettings } from "@/domain/pre-registrations/types";
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import PrivateBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import { requireInternalUser } from "@/server/auth/context";
 import { requestHasExpectedOrigin } from "@/server/auth/redirects";
 import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
@@ -117,6 +118,12 @@ try {
 ---
 
 <PrivateLayout title="Configuración">
+  <div class="mb-5">
+    <PrivateBreadcrumbs
+      current="Configuración"
+      parents={[{ label: "Resumen", href: "/app" }]}
+    />
+  </div>
   <header>
     <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">
       Configuración

@@ -1,5 +1,6 @@
 ---
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import { getAssignedCourse } from "@/application/instructors/assigned-courses";
 import { requireInternalUser } from "@/server/auth/context";
 import { getDatabase } from "@/server/db/client";
@@ -24,9 +25,13 @@ if (!assigned && !loadError) Astro.response.status = 404;
 ---
 
 <PrivateLayout title={assigned?.course.name ?? "Curso no disponible"}>
-  <a href="/app/mis-cursos" class="text-sm underline underline-offset-4">
-    Mis cursos
-  </a>
+  <CourseBreadcrumbs
+    current={assigned?.course.name ?? "Curso no disponible"}
+    parents={[
+      { label: "Resumen", href: "/app" },
+      { label: "Mis cursos", href: "/app/mis-cursos" },
+    ]}
+  />
   {assigned ? (
     <>
       <header class="mt-5 flex flex-wrap items-start justify-between gap-4">
