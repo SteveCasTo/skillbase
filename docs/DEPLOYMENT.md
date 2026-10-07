@@ -333,3 +333,11 @@ El inventario cloud post-release observó 11 cursos, 22 grupos, 15 preinscripcio
 La verificación cloud fue de solo lectura y **no** comparó hashes pre/post de todas las filas; no afirmar preservación hash completa de filas cloud a través del release. La preservación verificada de 2 802 filas/59 tablas corresponde a la migración local descrita en [`TESTING.md`](TESTING.md). Las cinco tablas F7 están vacías: no se cargó demo/seed de notas. Las intermitencias E2E históricas de `public-interest` y guardado de grupos siguen sin causa raíz identificada, aunque el full master run final pasó sin flakes reportados.
 
 Fase 7 quedó liberada dentro de su alcance. Fases 8 (cierre/planilla/reapertura) y 9 (certificados) no se iniciaron. Recovery/cambio de contraseña con entrega de correo, entrega cloud de SMTP, OAuth Google real y política de retención siguen pendientes según [`AUTHENTICATION.md`](AUTHENTICATION.md) y [`PLAN.md`](PLAN.md).
+
+## Correcciones post-release Fase 7 — validación local; publicación bloqueada
+
+El source final local `6b87d24d80df3810889139aa776604b0041b2802` (base `274db4cfdb7c927b3a69552eb8c0342fd363dbd2`) tiene validación local combinada completada, documentada con límites en [`TESTING.md`](TESTING.md). Los 132 casos E2E distintos están cubiertos por corridas separadas; no se afirma un full local único 132/132. Calidad/format/lint/typecheck/Drizzle/build están PASS según sus fuentes, con integración 142/142 reutilizada desde una fuente con aplicación/schema sin cambios.
+
+La publicación del commit quedó bloqueada: el push Git y las escrituras de blobs GitData REST reportaron HTTP 500; el publicador detuvo el intento. No se afirma recuperación, creación de PR ni CI remoto verde. `origin/development` sigue reportado en `274db4c`; el commit `6b87d24` es local y no está mergeado. No se cambiaron branch protections ni se promovió código.
+
+Producción sigue en el release Fase 7 `master` `4afa485`, Vercel `READY`, Supabase cloud ledger 21. Esta verificación no ejecutó migraciones, DDL, SQL canónico, Auth/cloud writes, seeds ni deploys; tampoco revalidó ni cambió los conteos cloud. Esperar a poder publicar el commit y completar el CI remoto full requerido antes de release. Las correcciones no implementan Fase 8; su inicio sigue separado y posterior al release de este milestone.
