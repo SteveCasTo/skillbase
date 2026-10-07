@@ -49,6 +49,7 @@ export async function createAttendanceFlowFixture(
     })
     .returning();
   const courseIds: string[] = [];
+  const groupsToCancel: { id: string; updatedAt: Date }[] = [];
   async function course(
     instructorId: string,
     date: string,
@@ -88,6 +89,7 @@ export async function createAttendanceFlowFixture(
       5,
       admin!.id,
     );
+    groupsToCancel.push({ id: group.id, updatedAt: group.updatedAt });
     return { course: created!, group };
   }
   const history = await course(teacher.id, startDate);
@@ -208,14 +210,17 @@ export async function createAttendanceFlowFixture(
     historyPaid,
     foreign,
     async close() {
-      // Keep append-only evidence; retire only these fixtures' courses so later
-      // E2Es do not inherit active assignments on the shared isolated actor.
+      // Archive fixture-owned courses and cancel their groups so recurring
+      // reservations do not block later E2Es on the shared isolated actor.
       try {
         for (const id of courseIds)
           await db
             .update(schema.courses)
             .set({ status: "ARCHIVED" })
             .where(eq(schema.courses.id, id));
+        const groups = new DrizzleGroupRepository(db);
+        for (const group of groupsToCancel)
+          await groups.cancel(group.id, admin.id, group.updatedAt);
       } finally {
         await database.close();
       }
