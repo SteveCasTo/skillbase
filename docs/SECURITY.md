@@ -68,6 +68,37 @@ No confiar únicamente en ocultar botones.
 - Las pruebas locales del feature branch no son verificación de entrega real. Configurar y verificar SMTP/recovery es trabajo aprobado pendiente; Google OAuth real continúa pendiente de forma independiente.
 - Fase 5 trata CI, email y roster como datos personales. No exponer CI públicamente; exportación CSV/PDF es solo ADMIN, debe neutralizar fórmula CSV y no constituye recibo/boleta. No hay pasarela de cobro ni upload de comprobantes.
 
+### Lifecycle multi-ADMIN (backend feature Fase 8, no integrado)
+
+- El backend `feat/admin-account-management` revalida ADMIN activo en loader,
+  caso de uso y transacción; el actor, target y rol provienen de contexto/ruta
+  server-side. El helper HTTP valida Origin, limita el body a 8192 bytes,
+  rechaza campos extra y devuelve `private, no-store`/`nosniff`. Todavía no hay
+  ruta/página ni route-policy registrada, por lo que estos helpers no exponen el
+  flujo al browser.
+- Las credenciales se envían solo al Admin API server-side; contraseña nunca se
+  persiste, devuelve ni audita. En creación se reautoriza al actor tras Auth y
+  una compensación solo puede borrar el UUID creado por esa operación. Auth y DB
+  no son una transacción distribuida; una falla al compensar podría dejar una
+  identidad Auth huérfana que requiere reconciliación operativa protegida; no se
+  afirma que exista reconciliador automático.
+- La baja Auth sucede fuera de una transacción PostgreSQL: primero guarda
+  intención durable y bloquea la cuenta; ante error queda DISABLED/pending y el
+  único reintento se dirige a esa identidad. Solo `user_not_found` explícito se
+  acepta como identidad ya eliminada; error genérico/404 no es éxito. Se retira
+  el acceso/identificadores internos solo al completar; UUID, evidencia y fila
+  tombstone se conservan.
+- Uso actor/dependencia bloquea eliminación y fuerza desactivar/reactivar. El
+  guard serializa lifecycle global y mantiene al menos un ADMIN ACTIVE; la
+  coordinación con escritores de actividad evita carreras entre baja y nueva
+  evidencia. No se aprobó prohibición general de auto-baja: puede proceder si
+  hay otro ADMIN activo y se satisfacen los demás guards. No administrar roles
+  multirol ni convertir ADMIN en INSTRUCTOR.
+- `0022_phase8_admin_accounts` revoca grants Data API y protege la intención de
+  eliminación con RLS/trigger; la migración solo se probó en QA. Ninguna política
+  de migración, route o Auth aquí descrita equivale a implementación integrada o
+  release. Contrato: [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
+
 #### Seguridad de preinscripciones (rutas integradas; full-suite local PASS)
 
 - `participants`, `pre_registrations`, `registration_settings`, command receipts y ledger tienen RLS habilitada y privilegios Data API revocados. Las lecturas/escrituras usan repositorios server-side.

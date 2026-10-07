@@ -169,6 +169,20 @@ La migración aditiva 0014 vincula el perfil profesional con el ID interno estab
 
 El full E2E Auth PR 118 pasó 104/104 y PR 120 había pasado 107/107 antes de cambios posteriores. Tras restaurar la dependencia opcional Astro Sharp con `bun install --frozen-lockfile`, la fuente final pasó full E2E 107/107 en `127.0.0.1:4321`; el smoke público/privado pasó y el release CI/deploy de PR 126 se completó. Google OAuth real y SMTP/recovery no estaban probados en ese release histórico. El estado operacional vigente de SMTP (configuración cloud/local y receipt local confirmada, límites de recovery/cloud pendientes) está arriba y en `docs/DEPLOYMENT.md`.
 
-### Gestión multi-ADMIN aprobada para Fase 8 (planificada; no implementada)
+### Gestión multi-ADMIN aprobada para Fase 8 (backend en feature branch)
 
-El release actual todavía no permite crear/gestionar cuentas ADMIN adicionales; la afirmación histórica de Fase 4 sigue describiendo lo implementado. Para Fase 8 se aprobó creación ADMIN server-side con contraseña inicial vía Supabase Auth privilegiado y lifecycle/guard descritos en [`PLAN.md`](PLAN.md). Las cuentas tendrán iguales permisos: sin `ROOT` ni privilegio especial del primero; las cuentas usadas por actores conservan UUID/historial. La rama de cierre sólo añade referencias actor-dependientes para snapshots/reaperturas/receipts al inventario que el futuro lifecycle deberá revisar; no crea cuentas, cambia Auth ni implementa su baja.
+La implementación `feat/admin-account-management` (commit `4bed53b`, aún no
+integrada) añade helpers server-side para aprovisionamiento y lifecycle ADMIN;
+no hay página/ruta montada ni cambio de Auth disponible en la aplicación
+integrada. Las cuentas tienen iguales permisos, sin `ROOT` ni privilegio del
+primero. Un ADMIN activo crea otra cuenta confirmada con contraseña inicial vía
+Supabase Auth privilegiado; el secreto no se guarda ni se expone y el flujo no
+fuerza cambio al primer login. El nombre se puede editar con revisión; correo es
+readonly. Lifecycle ofrece una única acción: eliminar si no existe actividad de
+actor/dependencia, o desactivar/reactivar conservando identidad e historial si
+existe uso. La baja Auth es externa a la transacción DB, con intención durable,
+reintento acotado y tombstone; un guard serializa cambios para mantener al menos
+un ADMIN activo. No se permite gestión incidental de roles/perfil profesional.
+Contrato detallado: [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
+La aplicación de 0022 se limita a QA aislado; no migrar el estado de Auth/modelo
+de producción por inferencia desde este feature.
