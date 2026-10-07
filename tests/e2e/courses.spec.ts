@@ -931,11 +931,23 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
   });
   await page.getByRole("button", { name: "Guardar cambios" }).click();
-  await expect(
-    page
-      .locator('[data-sileo-toast][data-state="loading"]')
-      .filter({ hasText: "Guardando" }),
-  ).toBeVisible();
+  // Dismissed validation notices remain in the DOM during Sileo's exit animation.
+  // There must be one live save notice, not one arbitrary match among old notices.
+  const activeSaveToast = page
+    .locator('[data-sileo-toast][data-exiting="false"]')
+    .filter({ hasText: "Guardando" });
+  await expect(activeSaveToast).toHaveCount(1);
+  await expect(activeSaveToast).toHaveAttribute("data-state", "loading");
+  await expect(activeSaveToast).toBeVisible();
+  // Sileo derives its SVG filter identifier from the stable notification UUID.
+  // Follow that operation through its state transition, rather than matching copy anew.
+  const saveOperationId = await activeSaveToast
+    .locator("filter")
+    .getAttribute("id");
+  expect(saveOperationId).toMatch(/^sileo-gooey-notification-[0-9a-f-]{36}$/u);
+  const saveToast = page.locator("[data-sileo-toast]").filter({
+    has: page.locator(`filter[id="${saveOperationId}"]`),
+  });
   await page.getByLabel("Descripción").fill("Edición mientras se guarda");
   await expect(save).toBeDisabled();
   await expect(
@@ -960,9 +972,11 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   expect(saveIntentCount.count).toBe(0);
   page.off("request", countEditorial);
   releaseSave();
-  await expect(
-    page.locator("[data-sileo-toast]").filter({ hasText: "Cambios guardados" }),
-  ).toBeVisible();
+  await expect(saveToast).toHaveCount(1);
+  await expect(saveToast).toHaveAttribute("data-state", "success");
+  await expect(saveToast).toHaveAttribute("data-exiting", "false");
+  await expect(saveToast).toContainText("Cambios guardados");
+  await expect(saveToast).toBeVisible();
   expect(page.url()).toBe(editUrl);
   await expect(page.getByLabel("Descripción")).toHaveValue(
     "Edición mientras se guarda",
