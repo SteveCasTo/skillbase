@@ -8,6 +8,7 @@ import { DrizzleAttendanceRepository } from "@/server/db/repositories/attendance
 import { handleEvaluationPost } from "@/server/evaluations/http";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { createInstructorFixture } from "../fixtures/instructors";
+import { evaluationFixtureTables } from "../fixtures/evaluation-cleanup";
 const connection = createDatabase(getTestSupabaseEnvironment().databaseUrl, {
   max: 8,
 });
@@ -16,9 +17,10 @@ let now = new Date("2099-02-01T12:00:00Z");
 const repo = new DrizzleEvaluationRepository(db, () => now);
 const finance = createRegistrationRepository(db, () => now);
 afterAll(async () => {
-  // Only verified isolated QA; removes this suite's FK dependencies before other suites clean up.
+  // Verified isolated QA: also remove this suite's financial fixtures, not just
+  // its evaluation rows, so later renewal tests do not inherit synthetic history.
   await db.execute(
-    sql`truncate evaluation_grades, evaluation_results, evaluation_components, evaluation_schemes, evaluation_command_receipts restrict`,
+    sql`truncate ${evaluationFixtureTables}, participant_attendance, instructor_attendance, session_roster, attendance_command_receipts, group_sessions, registration_ledger, registration_command_receipts, pre_registrations, participants restrict`,
   );
   await connection.close();
 });
