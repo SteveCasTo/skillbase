@@ -5,6 +5,7 @@ import * as s from "@/server/db/schema";
 import type { EvaluationRepository } from "@/application/evaluations/evaluation-repository";
 import {
   validateSaveGrade,
+  validateSaveRow,
   validateSaveScheme,
 } from "@/application/evaluations/manage-evaluations";
 import {
@@ -20,6 +21,7 @@ import type {
   EvaluationCommand,
   EvaluationCommandResult,
   SaveEvaluationGradeInput,
+  SaveEvaluationRowInput,
   SaveEvaluationSchemeInput,
 } from "@/domain/evaluations/types";
 import { membershipStatus } from "@/domain/pre-registrations/policies";
@@ -387,6 +389,144 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
           },
         });
         return { kind: "scheme", schemeRevision: revision };
+      });
+    });
+  }
+  async saveRow(actorId: string, input: SaveEvaluationRowInput) {
+    validateSaveRow(input);
+    return this.db.transaction(async (tx) => {
+      const ctx = await context(
+        tx,
+        actorId,
+        input.courseId,
+        this.clock,
+        input.groupId,
+      );
+      return this.command(tx, actorId, input, "ROW", input, async () => {
+        assertSchemeRevision(ctx.scheme?.revision ?? 0, input.schemeRevision);
+        const items = await components(tx, input.courseId);
+        const person = (await roster(tx, ctx.course, ctx.now)).find(
+          (p) => p.id === input.registrationId,
+        );
+        if (
+          !person ||
+          person.membershipStatus !== "INSCRITO" ||
+          (input.groupId !== undefined && person.groupId !== input.groupId)
+        )
+          throw new EvaluationError(
+            "NOT_ENROLLED",
+            "Solo participantes inscritos pueden recibir notas.",
+          );
+        const previous = await tx
+          .select()
+          .from(s.evaluationGrades)
+          .where(
+            and(
+              eq(s.evaluationGrades.courseId, input.courseId),
+              eq(s.evaluationGrades.participantId, person.participantId),
+            ),
+          )
+          .for("update");
+        // Validate the entire observed row before any write, including the first-note freeze.
+        const changes = input.grades
+          .map((grade, index) => {
+            const componentId = evaluationId(
+              grade.componentId,
+              `grades.${index}.componentId`,
+            );
+            if (!items.some((c) => c.id === componentId))
+              throw new EvaluationError(
+                "NOT_FOUND",
+                "El componente no está disponible.",
+              );
+            const old = previous.find((g) => g.componentId === componentId);
+            if ((old?.revision ?? 0) !== grade.gradeRevision)
+              throw new EvaluationError(
+                "CONCURRENT_UPDATE",
+                "La nota cambió. Recarga antes de guardar.",
+                {
+                  [`grades.${index}.gradeRevision`]: "Recarga la nota vigente.",
+                },
+              );
+            return {
+              componentId,
+              old,
+              scoreHundredths: evaluationHundredths(
+                grade.score,
+                `grades.${index}.score`,
+              ),
+              revision: grade.gradeRevision + 1,
+            };
+          })
+          .filter(
+            (change) => change.old?.scoreHundredths !== change.scoreHundredths,
+          );
+        for (const change of changes) {
+          const value = {
+            scoreHundredths: change.scoreHundredths,
+            revision: change.revision,
+            recordedBy: actorId,
+            recordedAt: ctx.now,
+          };
+          if (change.old)
+            await tx
+              .update(s.evaluationGrades)
+              .set(value)
+              .where(
+                and(
+                  eq(s.evaluationGrades.courseId, input.courseId),
+                  eq(s.evaluationGrades.participantId, person.participantId),
+                  eq(s.evaluationGrades.componentId, change.componentId),
+                ),
+              );
+          else
+            await tx.insert(s.evaluationGrades).values({
+              ...value,
+              courseId: input.courseId,
+              participantId: person.participantId,
+              registrationId: person.id,
+              componentId: change.componentId,
+            });
+        }
+        const marks = await tx
+          .select({ grade: s.evaluationGrades, actorName: s.users.name })
+          .from(s.evaluationGrades)
+          .leftJoin(s.users, eq(s.users.id, s.evaluationGrades.recordedBy))
+          .where(
+            and(
+              eq(s.evaluationGrades.courseId, input.courseId),
+              eq(s.evaluationGrades.participantId, person.participantId),
+            ),
+          );
+        const [scheme] = await tx
+          .select()
+          .from(s.evaluationSchemes)
+          .where(eq(s.evaluationSchemes.courseId, input.courseId));
+        if (!scheme) throw new Error("Evaluation scheme unavailable");
+        return {
+          kind: "row",
+          schemeRevision: scheme.revision,
+          participantId: person.participantId,
+          registrationId: person.id,
+          grades: items.map((item) => {
+            const mark = marks.find((m) => m.grade.componentId === item.id);
+            return {
+              componentId: item.id,
+              score: mark
+                ? evaluationDecimal(mark.grade.scoreHundredths)
+                : null,
+              revision: mark?.grade.revision ?? 0,
+              recordedBy: mark?.grade.recordedBy ?? null,
+              recordedByName: mark?.actorName ?? null,
+              recordedAt: mark?.grade.recordedAt.toISOString() ?? null,
+            };
+          }),
+          result: evaluationResult(
+            items,
+            marks.map((m) => m.grade),
+            ctx.course.minimumGrade,
+          ),
+        };
       });
     });
   }

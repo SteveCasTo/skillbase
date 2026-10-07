@@ -11,6 +11,7 @@ import {
 import { getPrivateRoutePolicy } from "@/server/auth/route-policy";
 import type { EvaluationRepository } from "@/application/evaluations/evaluation-repository";
 import type { InternalUser } from "@/domain/auth/types";
+import { validateSaveRow } from "@/application/evaluations/manage-evaluations";
 
 test("evaluations parse decimal hundredths exactly and validate exact weights without tolerance", () => {
   for (const [text, expected] of [
@@ -137,6 +138,7 @@ test("evaluation HTTP binds private course/group IDs and rejects unexpected fiel
   const repository: EvaluationRepository = {
     getCourse: unused,
     saveScheme: unused,
+    saveRow: unused,
     saveGrade: async (_actor, input) => {
       calls++;
       return { kind: "scheme", schemeRevision: input.schemeRevision + 1 };
@@ -185,4 +187,73 @@ test("evaluation HTTP binds private course/group IDs and rejects unexpected fiel
         access: "ROLES",
         roles: prefix === "cursos" ? ["ADMIN"] : ["INSTRUCTOR"],
       });
+});
+test("evaluation row HTTP validates all changed grades and binds actor from server", async () => {
+  const actor: InternalUser = {
+    id: crypto.randomUUID(),
+    authUserId: crypto.randomUUID(),
+    email: "test@test.invalid",
+    name: "Test",
+    status: "ACTIVE",
+    roles: ["ADMIN"],
+  };
+  const courseId = crypto.randomUUID(),
+    registrationId = crypto.randomUUID();
+  const grades = [0, 1].map(() => ({
+    componentId: crypto.randomUUID(),
+    gradeRevision: 0,
+    score: "69,99",
+  }));
+  const base = {
+    requestKey: crypto.randomUUID(),
+    schemeRevision: 1,
+    registrationId,
+    grades,
+  };
+  const unused = async (): Promise<never> => {
+    throw new Error("Unexpected operation");
+  };
+  let calls = 0;
+  const repository: EvaluationRepository = {
+    getCourse: unused,
+    saveScheme: unused,
+    saveGrade: unused,
+    saveRow: async (id, input) => {
+      expect(id).toBe(actor.id);
+      expect(input.grades).toEqual(grades);
+      calls++;
+      return { kind: "scheme", schemeRevision: 2 };
+    },
+  };
+  const siteUrl = new URL("https://test.invalid");
+  for (const [body, status] of [
+    [base, 200],
+    [{ ...base, grades: [grades[0], { ...grades[1], score: "" }] }, 422],
+    [{ ...base, grades: [grades[0], grades[0]] }, 422],
+    [{ ...base, grades: [{ ...grades[0], actorId: actor.id }] }, 422],
+    [{ ...base, actorId: actor.id }, 422],
+    [{ ...base, grades: [] }, 422],
+  ] as const) {
+    const response = await handleEvaluationPost({
+      request: new Request(siteUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: siteUrl.origin },
+        body: JSON.stringify(body),
+      }),
+      actor,
+      repository,
+      siteUrl,
+      operation: "grade",
+      courseId,
+    });
+    expect(response.status).toBe(status);
+  }
+  expect(calls).toBe(1);
+  expect(() =>
+    validateSaveRow({
+      ...base,
+      courseId,
+      grades: [{ ...grades[0]!, gradeRevision: -1 }],
+    }),
+  ).toThrow();
 });

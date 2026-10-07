@@ -2,9 +2,14 @@ import type {
   CourseEvaluationsDto,
   EvaluationCommandResult,
   SaveEvaluationGradeInput,
+  SaveEvaluationRowInput,
   SaveEvaluationSchemeInput,
 } from "@/domain/evaluations/types";
 export interface EvaluationRepository {
+  saveRow(
+    actorId: string,
+    input: SaveEvaluationRowInput,
+  ): Promise<EvaluationCommandResult>;
   getCourse(
     actorId: string,
     courseId: string,
