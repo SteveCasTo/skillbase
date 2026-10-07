@@ -157,6 +157,52 @@ Crear grupos genera el calendario en la transacción del alta; grupos existentes
 
 Los command receipts son append-only e idempotentes por actor+request key/fingerprint. Las mutaciones validan actor/rol/ownership en servidor, estado del grupo/sesión, revisión optimista y conflicto temporal bajo la barrera de horarios existente. Fase 6 se liberó mediante PR 211; el contrato C1/C2 de cancelación/reprogramación (antes de inicio y sin marcas) se integró en PR 219 y salió en PR 228, sin cambio de schema/migración. Pruebas y límites del release en [`ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md) y [`TESTING.md`](TESTING.md). El boceto `Session`/`Attendance`/`InstructorAttendance` inmediatamente debajo de esta sección es conceptual legado, no representa nombres de las tablas Drizzle reales.
 
+### Evaluaciones y notas (Fase 7, backend PR 230 en development)
+
+La migración versionada `0020_phase7_evaluations.sql` y el schema Drizzle definen
+cinco tablas. La migración fue probada en stacks de test temporales aislados;
+no se aplicó al Supabase local canónico ni a cloud, no avanzó sus ledgers y no
+se hicieron operaciones sobre datos. PR 230 integra el modelo/backend en
+`development`; la UI y el cierre de Fase 7 siguen pendientes.
+
+- `evaluation_schemes`: una fila por curso, con revisión, `frozen_at`, actor y
+  timestamp de actualización.
+- `evaluation_components`: componentes del curso con `name`, tipo enum
+  `THEORY`/`PRACTICAL`, `weight_hundredths` entero y `sort_order`; nombre/rango/
+  orden acotados, máximo 100 componentes y pesos con suma diferida exactamente
+  10 000 (100 %).
+- `evaluation_grades`: una fila por curso/participante/componente; vincula la
+  inscripción válida y conserva nota en centésimas enteras, revisión, actor y
+  timestamp. Una FK compuesta asegura curso/componente; los triggers comprueban
+  que la inscripción asociada corresponda al mismo curso y participante.
+- `evaluation_results`: proyección por curso/participante. `final_hundredths`
+  queda `NULL` mientras falte cualquier componente; al completar, persiste el
+  resultado final en centésimas. La decisión explícita de incompleto=`0.00` es
+  una proyección de dominio/API, no reemplaza ese `NULL` por una nota completa.
+- `evaluation_command_receipts`: resultado JSON append-only, clave única por
+  actor/requestKey y fingerprint SHA-256 para reintento idempotente.
+
+Las cinco tablas tienen RLS habilitado y privilegios Data API revocados para
+`anon`, `authenticated` y `service_role`; las lecturas/escrituras pasan por el
+backend Drizzle con guards y revalidación transaccional. Los triggers hacen
+inmutable la identidad del esquema, exigen revisiones consecutivas, impiden
+borrar grades/receipts, comprueban esquema completo y congelan permanentemente
+los componentes al guardar la primera nota, incluso `0`. El guard de grade
+conserva identidad curso/participante/componente/inscripción, impide DELETE y
+exige revision +1. `EVALUATION_SCHEME_SAVED` conserva actor y snapshot anterior/
+nuevo; `EVALUATION_SCHEME_FROZEN` registra la primera nota; cada alta/corrección
+genera `EVALUATION_GRADE_RECORDED` con from/to y revisión. El trigger actualiza
+`evaluation_results` en cada nota y deja `final_hundredths=NULL` si faltan
+componentes. No hay FKs con `CASCADE`.
+
+El repositorio autoriza `ADMIN` activo en cualquier curso; `INSTRUCTOR` activo
+solo en su curso asignado y desde el inicio oficial. Solo estado de membresía
+`INSCRITO` permite guardar notas; la elegibilidad de asistencia no bloquea el
+grading. DTOs entregan nombre/apellido y datos académicos requeridos, no CI,
+contacto ni finanzas; el historial administrativo de correcciones es solo para
+ADMIN. La superficie HTTP/helpers y errores se describen en
+[`ARCHITECTURE.md`](ARCHITECTURE.md) y [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md).
+
 ### Participant
 
 Implementado mediante migración 0017 (release Fase 5, cloud ledger 18): persona global de administración sin cuenta Auth. CI es texto único tras trim, eliminación de whitespace y uppercase, preservando ceros iniciales, letras/sufijos; no cast numérico, validación de formato nacional, checksum ni escaneo documental. No es `InterestRegistration` ni se fusiona por email. Una persona puede tener una preinscripción activa por curso y otras en cursos distintos. CI no se expone al roster instructor.

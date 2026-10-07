@@ -41,7 +41,7 @@ Administrador:
 Instructor:
 
 - el objetivo posterior es operar únicamente sobre cursos/grupos asignados;
-- asistencia y evaluaciones requieren su módulo y autorización explícitos en fases posteriores; no se conceden por el mero rol `INSTRUCTOR` en el alcance actual.
+- asistencia y evaluación solo se habilitan por módulos y autorizaciones explícitos; el rol por sí solo no concede acceso a cursos ajenos.
 
 No confiar únicamente en ocultar botones.
 
@@ -87,9 +87,20 @@ El usuario autorizó renovar los datos sintéticos de demo de negocio, incluida 
 
 El runner usa manifiestos/contexto hash-bound y permite únicamente alta append-only; no borra ni modifica datasets preexistentes. Debe preservar Auth identities/sesiones, `users`, roles, perfiles, settings/secretos, Storage, migration ledger y todo historial financiero. No deshabilita triggers ni guardas de ledger, y nunca introduce endpoints de borrado financiero en producción. Cada destino requiere revisar el plan de solo lectura y ejecutar APPLY manual explícito; producción sigue condicionada al gate y autorización de release. Ver [`docs/FINANCIAL_DEMO.md`](FINANCIAL_DEMO.md).
 
-### Autorización de sesiones/asistencia (Fase 6 en development; release pendiente)
+### Autorización de sesiones/asistencia (Fase 6, release en producción)
 
-Las rutas y operaciones integradas limitan instructor a sus propios grupos y ADMIN a configuración/revisión/correcciones; el roster contiene solo participantes `INSCRITO` sin CI/email/finanzas. Consultas y mutaciones vuelven a comprobar ownership/rol en servidor; correcciones ADMIN quedan auditadas. Rutas no declaradas siguen fallando cerradas. `0019` no está aplicada en cloud y el release espera gate final. Véase `docs/REQUIREMENTS.md` y `docs/ATTENDANCE_CONTRACT.md`.
+Las rutas y operaciones limitan instructor a sus propios grupos y ADMIN a configuración/revisión/correcciones; el roster contiene solo participantes `INSCRITO` sin CI/email/finanzas. Consultas y mutaciones vuelven a comprobar ownership/rol en servidor; correcciones ADMIN quedan auditadas. `0018/0019` se liberaron a cloud mediante PR 211. Las restricciones correctivas C1/C2 se integraron en PR 219 y se liberaron en PR 228. Véase `docs/REQUIREMENTS.md` y `docs/ATTENDANCE_CONTRACT.md`.
+
+### Autorización y privacidad de evaluaciones (Fase 7, backend PR 230 en development)
+
+- Las rutas reservadas `/app/cursos/:courseId/evaluaciones` y `/app/mis-cursos/:courseId/evaluaciones` (con variante opcional de grupo) se incluyen en la política privada fail-closed: administración requiere `ADMIN`; la ruta instructor requiere `INSTRUCTOR`. Aún no hay página Astro/UI que exponga estas rutas.
+- Loader, HTTP helper y repositorio revalidan actor activo y permisos server-side. `ADMIN` puede operar sobre cualquier curso. `INSTRUCTOR` solo sobre su curso asignado y desde el inicio oficial; una URL/ID de curso ajeno no revela su existencia. El `groupId`, si se envía, debe pertenecer al curso.
+- Solo membresía vigente `INSCRITO` permite registrar notas; `PREINSCRITO` y `SALDOVENCIDO` quedan excluidos. La inelegibilidad calculada por asistencia no bloquea la carga de notas.
+- DTOs limitan datos de participantes a nombre/apellidos y evaluación; no incluyen CI, contacto ni datos financieros. El historial administrativo de correcciones se entrega solo a `ADMIN`.
+- Las cinco tablas de evaluación tienen RLS habilitado y grants Data API revocados a `anon`, `authenticated` y `service_role`; no hay acceso directo de browser/cliente a esas tablas. Los repositorios Drizzle aplican validaciones/ownership y escrituras transaccionales en servidor. La migración 0020 solo se validó en stacks temporales; no se aplicó al Supabase canónico ni a cloud.
+- `handleEvaluationPost` valida origen, límite de 65 536 bytes y allowlist de campos; respuestas son `private, no-store`/`nosniff`, con errores saneados. Esquema/notas usan revisión optimista e idempotencia actor+requestKey+fingerprint; los receipts son append-only. Las notas son evidencia auditable, no un permiso de modificación de identidad.
+
+El módulo backend está integrado solo en `development`; UI, gate completo y release siguen pendientes. Ver detalles de modelo/API en `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`, `docs/EVALUATIONS_CONTRACT.md` y cobertura/limitaciones en `docs/TESTING.md`.
 
 ## RUTAS
 
