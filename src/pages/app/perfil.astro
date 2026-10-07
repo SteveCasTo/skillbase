@@ -101,7 +101,23 @@ const status = Astro.url.searchParams.get("status");
 ---
 
 <PrivateLayout title="Mi perfil">
-  <header class="min-w-0">
+  <nav aria-label="Ruta de navegación" class="text-sm text-muted-foreground">
+    <ol class="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <li>
+        <a
+          href="/app"
+          class="inline-flex min-h-11 items-center hover:underline"
+        >
+          Resumen
+        </a>
+      </li>
+      <li aria-hidden="true">/</li>
+      <li aria-current="page" class="font-medium text-foreground">
+        Mi perfil
+      </li>
+    </ol>
+  </nav>
+  <header class="mt-5 min-w-0">
     <h1 class="text-3xl font-semibold tracking-tight">Mi perfil</h1>
   </header>
   <div class="mt-8 grid min-w-0 gap-6 md:grid-cols-2">
@@ -207,7 +223,7 @@ const status = Astro.url.searchParams.get("status");
     )}
     <ProfilePasswordEntry hasPassword={hasPassword} />
     <section
-      class="min-w-0 rounded-xl border bg-card p-5 sm:p-6"
+      class="flex min-w-0 flex-col rounded-xl border bg-card p-5 sm:p-6"
       aria-labelledby="google-title"
     >
       <h2 id="google-title" class="text-lg font-semibold">
@@ -220,7 +236,7 @@ const status = Astro.url.searchParams.get("status");
       </p>
       {!googleLinked && (
         <form
-          class="mt-5"
+          class="mt-5 flex justify-center"
           method="post"
           action="/auth/link-google"
           data-auth-form
@@ -229,7 +245,7 @@ const status = Astro.url.searchParams.get("status");
           <button
             class={buttonVariants({
               variant: "outline",
-              className: "min-h-11",
+              className: "min-h-11 max-w-full whitespace-normal text-center",
             })}
             type="submit"
             data-label="Asociar Google"

@@ -274,10 +274,20 @@ test("professional edit requires a valid normalized change and undo disables sav
   await expect(
     form.getByRole("button", { name: "Editar nombre", exact: true }),
   ).toBeFocused();
-  await expect(page.getByLabel("Correo electrónico")).toHaveAttribute(
-    "readonly",
-    "",
-  );
+  await expect(
+    page
+      .locator("[data-instructor-details]")
+      .getByText(AUTH_FIXTURES.instructor.email, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Correo electrónico", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Editar correo electrónico",
+      exact: true,
+    }),
+  ).toHaveCount(0);
 });
 
 test("instructor and profile layouts fill available width without horizontal overflow", async ({
