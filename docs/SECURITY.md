@@ -102,6 +102,10 @@ Las rutas y operaciones limitan instructor a sus propios grupos y ADMIN a config
 
 El backend y las páginas UI se liberaron mediante PR 235. El detalle de modelo/API y los límites de verificación cloud están en `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`, `docs/EVALUATIONS_CONTRACT.md` y `docs/TESTING.md`.
 
+### Gestión multi-ADMIN aprobada para Fase 8 (pendiente)
+
+El proyecto aprobó crear cuentas ADMIN desde servidor mediante Supabase Auth privilegiado, con permisos iguales, y un lifecycle limitado por actividad de actor/dependencias. Cuentas con historia conservan UUID y trazabilidad; el guard de lifecycle debe serializarse y no puede dejar cero ADMIN activos. La contraseña inicial nunca se persiste, registra, expone en DTO ni audita. El flujo aún no está implementado; criterios de actividad, outbox, locks y recuperación están en [`docs/PLAN.md`](PLAN.md). No asumir rol `ROOT`, auto-baja prohibida ni operación de borrado físico de la fila `users`.
+
 ## RUTAS
 
 Las rutas privadas deben validar sesión server-side.

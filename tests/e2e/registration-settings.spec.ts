@@ -89,8 +89,7 @@ test("ADMIN settings save stays in place, reports conflicts, and restores only t
     await auxiliary.fill("25,5");
     await expect(auxiliary).toHaveValue(nextAuxiliary);
     const submit = form.getByRole("button", {
-      name: "Guardar",
-      exact: true,
+      name: /^Guardar /,
     });
     await expect(submit).toBeEnabled();
     await submit.click();
@@ -108,9 +107,7 @@ test("ADMIN settings save stays in place, reports conflicts, and restores only t
     await expect(minimumForm.locator('[name="revision"]')).toHaveValue(
       await form.locator('[name="revision"]').inputValue(),
     );
-    await minimumForm
-      .getByRole("button", { name: "Guardar", exact: true })
-      .click();
+    await minimumForm.getByRole("button", { name: /^Guardar / }).click();
     await expect(
       page.getByRole("button", {
         name: "Editar pago mínimo para confirmar inscripción",
@@ -160,7 +157,7 @@ test("settings POST remains usable without JavaScript and preserves the starting
       });
       const next = (Number(await auxiliary.inputValue()) + 1) % 101;
       await auxiliary.fill(String(next));
-      await form.getByRole("button", { name: "Guardar", exact: true }).click();
+      await form.getByRole("button", { name: /^Guardar / }).click();
       await expect(page).toHaveURL(/\/app\/configuracion\?success=saved$/u);
       await expect(
         page.getByText("Configuración guardada.", { exact: true }),

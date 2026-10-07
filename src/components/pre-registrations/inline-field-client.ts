@@ -11,9 +11,31 @@ export function initializeInlineFields() {
         "input:not([type=hidden])",
       );
       const edit = root.querySelector<HTMLButtonElement>("[data-inline-edit]");
+      const save = root.querySelector<HTMLButtonElement>("[data-inline-save]");
       const cancel = root.querySelector<HTMLButtonElement>(
         "[data-inline-cancel]",
       );
+      const pendingStatus = root.querySelector<HTMLElement>(
+        "[data-inline-pending]",
+      );
+      const pending = () =>
+        Boolean(
+          form?.dataset.pending ||
+          form?.getAttribute("aria-busy") === "true" ||
+          input?.disabled,
+        );
+      const syncPending = () => {
+        if (pendingStatus)
+          pendingStatus.textContent =
+            form?.getAttribute("aria-busy") === "true" ? "Guardando…" : "";
+      };
+      if (form) {
+        const observer = new MutationObserver(syncPending);
+        observer.observe(form, {
+          attributes: true,
+          attributeFilter: ["aria-busy", "data-pending"],
+        });
+      }
       if (form && input) {
         const baseline = JSON.parse(
           form.dataset.participantBaseline ?? form.dataset.baseline ?? "{}",
@@ -49,9 +71,11 @@ export function initializeInlineFields() {
       if (editor) editor.hidden = !invalid;
       if (display) display.hidden = invalid;
       root.dataset.editing = String(invalid);
-      edit?.addEventListener("click", () => change(true));
-      cancel?.addEventListener("click", () => {
-        if (form?.dataset.pending) return;
+      edit?.addEventListener("click", () => {
+        if (!pending()) change(true);
+      });
+      const discard = () => {
+        if (pending()) return;
         if (input) {
           input.value = input.defaultValue;
           input.setAttribute("aria-invalid", "false");
@@ -65,6 +89,17 @@ export function initializeInlineFields() {
           });
         change(false);
         form?.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+      cancel?.addEventListener("click", discard);
+      editor?.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && root.dataset.editing === "true") {
+          event.preventDefault();
+          event.stopPropagation();
+          discard();
+        }
+      });
+      form?.addEventListener("submit", (event) => {
+        if (save?.disabled || pending()) event.preventDefault();
       });
       form?.addEventListener("registration:saved", () => change(false));
     });
