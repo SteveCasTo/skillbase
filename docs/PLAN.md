@@ -705,17 +705,21 @@ El source de desarrollo validado antes de integrar fue `292c5d42e2babb51a96c5580
 
 Las correcciones C1/C2/C3 quedaron liberadas mediante PR 228. Cancelación/reprogramación opera solo antes de `startsAt`, sin marcas de participantes/instructor; reemplazos futuros conservan duración e historial y no entran en conflicto. Las correcciones históricas ADMIN de evidencia siguen separadas de acciones operativas.
 
-## CONTRATO DE EVALUACIONES (Fase 7; contrato aprobado, implementación iniciada)
+## FASE 7 — EVALUACIONES Y NOTAS (backend integrado; UI incompleta)
 
-El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). La implementación de Fase 7 ya comenzó en workstreams separados de backend y UI. Aún no hay entregable de Fase 7 completado ni migración backend generada. El backend y la UI mantienen sus dueños asignados; los cambios aún no están integrados en `development`. No se debe marcar un submódulo o milestone como terminado por el inicio del trabajo.
+El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PR 230 integró a `development` el backend base: dominio, aplicación, repositorio Drizzle, loader/HTTP helpers y migración versionada 0020. Los controles de esquema/nota e idempotencia/auditoría están implementados en la capa backend. La UI sigue en progreso y no está integrada/lista; el módulo no está liberado ni la Fase 7 completa.
 
-- [x] Acordar contrato funcional y técnico antes del diseño de datos/UI.
-- [ ] Backend: modelar esquema por curso, persistencia decimal exacta, casos de uso, autorización, lock/freeze atómico desde primera nota y auditoría de correcciones conforme al contrato.
-- [ ] UI: implementar configuración de componentes/notas por el rol/ownership permitido, estados incompletos y resultado mostrado conforme a [`DESIGN.md`](DESIGN.md) y el contrato.
-- [ ] Generar/migrar schema solo después de completar el contrato de persistencia; cubrir unit/integration/E2E focales en paralelo con implementación.
-- [ ] Ejecutar gate combinado de Fase 7 al cierre; no incluye ni completa Fase 8 (cierre/planilla/reapertura) o Fase 9 (certificados).
+La migración 0020 solo se probó en stacks temporales aislados; no se aplicó al Supabase local canónico o cloud y no avanzó el ledger. El backend pasó cobertura focal (4 unit y una suite de integración HTTP de 39 assertions); el accidental full integration run y su corrección de cleanup están documentados en [`TESTING.md`](TESTING.md). No hay ejecución full de integration, UI E2E o gate completo posterior a ese fix. No se añadió seed de evaluaciones; el demo financiero existente no contiene notas y no debe presentarse como tal.
 
-## FASE 7 — EVALUACIONES Y NOTAS
+- [x] Confirmar contrato funcional/técnico antes de implementación.
+- [x] Implementar backend base de esquema, dominio, persistencia, autorización, revisión/freeze y auditoría (PR 230, `development`).
+- [x] Añadir cobertura focal y reparar el cleanup de fixtures para las nuevas tablas con el mismo `TRUNCATE ... RESTRICT` compartido (commit `649441b`); no equivale a full integration PASS.
+- [ ] Completar e integrar UI de instructor/ADMIN y flujo conectado conforme a [`DESIGN.md`](DESIGN.md) y `EVALUATIONS_CONTRACT.md`.
+- [ ] Reejecutar la suite de integración completa después del fix de cleanup y completar las pruebas focales de UI/HTTP cuando la interfaz se integre.
+- [ ] Ejecutar gate combinado de Fase 7 (unit/integration/E2E, quality/build y CI requerido) al cierre; solo entonces marcar el módulo completo.
+- [ ] Planificar y autorizar migración cloud/release después del gate; no hay aplicación 0020 en cloud registrada.
+
+Fase 7 no incluye ni completa Fase 8 (cierre/planilla/reapertura) o Fase 9 (certificados). No adelantar weighted-grade changes posteriores ni convertir el demo financiero en un seed de notas.
 
 ### Objetivos
 

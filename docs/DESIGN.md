@@ -501,7 +501,7 @@ La UI liberada conserva SSR, teclado, foco, privacidad e idempotencia conforme a
 
 ### Fase 7 — diseño de evaluaciones (implementación iniciada)
 
-El contrato funcional/técnico aprobado está en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). Los workstreams de backend y UI iniciaron; todavía no hay pantallas, esquema o migración de Fase 7 completados para describir como comportamiento existente. Mantener las decisiones de estado incompleto/nota cero y el valor final mostrado conforme al contrato, sin adelantar UI no revisada.
+El contrato funcional/técnico aprobado está en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PR 230 integró el backend, schema y migración 0020 a `development`; la migración solo fue validada en stacks temporales. El workstream UI/presentación sigue en progreso y todavía no hay una página Astro conectada integrada. Mantener las decisiones de estado incompleto/nota cero y valor final mostrado conforme al contrato, sin describir pantallas como implementadas antes de su integración/revisión.
 
 ## CONSISTENCIA
 

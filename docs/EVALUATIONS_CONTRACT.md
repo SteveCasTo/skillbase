@@ -3,9 +3,39 @@
 ## Estado y alcance
 
 Contrato funcional/técnico aprobado antes de comenzar la implementación de
-Fase 7. Este documento no acredita que existan tablas, migraciones, casos de uso,
-autorización, interfaz o pruebas de evaluación. El progreso de implementación se
-registra en [`PLAN.md`](PLAN.md).
+Fase 7. PR 230 integró el backend base en `development`: esquema/migración 0020,
+dominio, casos de uso, repositorio Drizzle y helpers server-side. La migración se
+probó solo en stacks temporales; no se aplicó al Supabase local canónico ni a
+cloud. La interfaz está en progreso y todavía no completa un flujo integrado;
+Fase 7 no está terminada ni liberada. El progreso se registra en
+[`PLAN.md`](PLAN.md), el modelo persistido en [`DATA_MODEL.md`](DATA_MODEL.md) y
+la capa de seguridad/ownership en [`SECURITY.md`](SECURITY.md).
+
+Helpers disponibles en server: `loadCourseEvaluations({actor, courseId,
+groupId?, repository?})` devuelve `{available:true,data}` o `{available:false,
+status,code,unavailableReason}`; `handleEvaluationPost({request, actor,
+repository, siteUrl, operation, courseId, groupId?})` admite `scheme`/`grade` y
+devuelve `{status,payload}`. Están disponibles para la futura UI, no equivalen a
+páginas Astro ya integradas. El alcance/rutas privadas se describen en
+`docs/ARCHITECTURE.md`.
+
+Los comandos de POST llevan `requestKey`, `courseId`, `schemeRevision` y
+`groupId` opcional; guardar nota agrega `registrationId`, `componentId`,
+`gradeRevision` y `score`, mientras guardar esquema envía la lista completa de
+componentes. El helper HTTP valida origen, body de hasta 65 536 bytes y allowlist
+de campos; curso/grupo se fijan desde el contexto de ruta. Respuestas correctas
+son `{ok:true,value,message}`; errores son `{ok:false,code,message,issues}`.
+Errores de validación: 422; autorización: 403; contexto ajeno/inexistente: 404;
+revisión, esquema congelado o conflicto de idempotencia: 409; fallo inesperado:
+503 sin detalles internos. JSON es `private, no-store` y `nosniff`.
+
+El esquema se guarda como reemplazo completo bajo `schemeRevision`; la nota lleva
+además `gradeRevision`. Una revisión obsoleta se rechaza y requiere recargar, no
+sobrescribe cambios concurrentes. Los comandos guardan receipt por actor y
+`requestKey` con fingerprint: repetir la misma operación devuelve el resultado
+registrado; reutilizar la clave con otro payload da conflicto. Los resultados
+completos se derivan tras cada nota; mientras falte alguna se conserva estado
+`PENDING`/`finalGrade:null` y decisión explícita `0.00`.
 
 Fase 7 configura componentes de evaluación por curso, registra notas y calcula
 un resultado académico final. No incluye cierre/reapertura de curso, planilla

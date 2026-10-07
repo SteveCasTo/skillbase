@@ -465,4 +465,16 @@ Los PR checks y el full master E2E cierran el gate de las correcciones para ese 
 
 #### Fase 7
 
-Los workstreams backend y UI iniciaron después del cierre de correcciones. Todavía no se generó la migración backend ni hay entregables de evaluación completos; no hay pruebas Fase 7 reportadas. El contrato aprobado y sus pendientes se mantienen en [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md) y el avance en [`PLAN.md`](PLAN.md).
+El backend base de Fase 7 se integró en development mediante PR 230. El workstream de UI/presentación continúa en progreso y aún no está integrado/listo. No equivale al cierre de Fase 7 ni hay full gate.
+
+#### Backend Fase 7 — PR 230 (evidencia focal, no full gate)
+
+- La migración 0020 genera cinco tablas y sus triggers/constraints. Se ejecutó solo en stacks Supabase de test aislados; no se aplicó al Supabase local canónico ni a cloud, y no se incrementaron sus ledgers ni se modificaron datos productivos.
+- Backend focal reportado: cuatro unit tests y una suite de integración HTTP con 39 assertions PASS.
+- Un comando accidental invocó `run-integration.ts` con `evaluation-repository.test.ts` como argumento, pero el runner ignoró ese argumento y ejecutó la carpeta completa: 118 PASS/24 FAIL. Veintitrés fallos provinieron de cleanup de fixtures que no incluía las nuevas tablas/FKs; otro caso dejó un residuo financiero de fixture. No se debe contar ese run como validación del full suite ni como defecto de la lógica de evaluación.
+- El fix test-only `649441b` añadió las cinco tablas de evaluación al allowlist compartido de fixtures, dentro del mismo `TRUNCATE ... RESTRICT`. No modificó schema, FKs ni assertions de producto. La revalidación focal posterior pasó cinco casos en cinco archivos (88 assertions) y las cuatro unitarias; lint, typecheck, formatter y `git diff --check` PASS.
+- La suite de integración completa no se volvió a ejecutar después del fix. Este resultado focal no acredita full unit/integration, UI/E2E ni gate de Fase 7. No hay seed de evaluación; `FINANCIAL_DEMO.md` no constituye fixtures de notas.
+
+El cleanup es infraestructura de tests aislados únicamente; no es un allowlist de reset/demo/producción. La migración 0020 no se aplicó a instancias persistentes.
+
+Contratos y límites efectivos en [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md); inventario schema en [`DATA_MODEL.md`](DATA_MODEL.md); progreso/remanentes en [`PLAN.md`](PLAN.md). La UI y el cierre de Fase 7 aún están pendientes.
