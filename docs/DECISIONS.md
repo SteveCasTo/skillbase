@@ -708,7 +708,7 @@ asistencia, del cierre administrativo de Fase 8 y de certificados de Fase 9.
 
 **Fecha:** 2026-10-07
 
-**Estado:** Accepted — primera revisión remota PASS; gate final reforzado pendiente
+**Estado:** Accepted — primera revisión remota PASS; última revisión detenida en provisioning APT, remediation WIP
 
 ### Contexto
 
@@ -720,7 +720,8 @@ El job `integration-e2e` secuencial del master CI `37670004492` duró 12m10s: Ch
 - Repartir E2E en dos jobs/runners GitHub concurrentes, cada uno con su propio stack Supabase/Auth/DB, servidor Astro y puerto; shard `1/2` y shard `2/2` no comparten estado.
 - Mantener `workers: 1`, `fullyParallel: false` y la política de retry existente dentro de cada shard. La paralelización ocurre entre runners, no contra una DB compartida.
 - Construir la identidad completa de tests y comprobar que los shards formen una partición disjunta/exhaustiva. Un agregador always-run debe esperar estrictamente a `quality`, integration y los dos shards E2E, fallando cerrado ante job/test fallido, omitido, cancelado, timeout o interrupción. `deploy` conserva master-only y depende de los checks requeridos.
-- La decisión está aprobada; la implementación base está en `chore/isolated-e2e-shards` (`d251335`, desde `development` `510e62d`). El primer workflow candidato pasó CI PR `37675836980`: 134 casos E2E en dos runners aislados, además de quality e integration. Después se reforzó el DAG del gate para requerir `quality`, integration y E2E, y se añadió cobertura unitaria; esa revisión actual aún requiere un nuevo CI remoto. No activarla/mergearla como aceleración comprobada hasta que la última fuente pase y se confirme el benchmark/outcomes.
+- La decisión está aprobada; la implementación base está en `chore/isolated-e2e-shards` (`d251335`, desde `development` `510e62d`; HEAD actual `2aaa213`). El primer workflow candidato pasó CI PR `37675836980`: 134 casos E2E en dos runners aislados, además de quality e integration. La revisión siguiente reforzó el DAG para requerir `quality`, integration y E2E, y añadió cobertura unitaria; el run `37678477638` se canceló durante provisioning APT del shard 2 (shard 1 ejecutó 69 tests, shard 2 cero) y el agregador falló/deploy fue omitido. La revisión actual incorpora remediation WIP y requiere CI remoto nuevo antes de merge. La validación de la revisión anterior no habilita ni prueba la actual.
+- La remediation WIP limita el aprovisionamiento Linux: pin E2E en `ubuntu-24.04`, validar el sources list, retirar el Azure HTTP mirror y conservar archive/security oficiales HTTPS; APT usa timeout de conexión/datos 30 s, retries 0 y error estricto ante índices incompletos; configuración de mirrors con límite de 1 min y `playwright install --with-deps chromium` limitado a 5 min. El job global conserva 30 min. No se añade caché de paquetes del sistema, no se omiten dependencias ni se suben retries. Los logs prueban demora de acquisition hacia Azure HTTP, no una causa DNS/socket específica. La CI Linux debe probar el fix antes de darlo por efectivo.
 
 ### Alternativas consideradas
 
@@ -734,5 +735,6 @@ El job `integration-e2e` secuencial del master CI `37670004492` duró 12m10s: Ch
 - Cada runner consume recursos Supabase/Auth/DB/Chromium de manera independiente. La estación local tiene recursos insuficientes para ejecutar ambos stacks completos junto con servicios preexistentes; por tanto la validación concurrente ocurre en GitHub, sin detener servicios ajenos.
 - La lista candidata local contiene 134 identidades (126 Chromium + 8 mobile), repartidas 69 y 65; la igualdad de lista es evidencia previa, no ejecución full de shards. Un smoke Foundation 2/2 no demuestra velocidad ni estabilidad de la suite completa.
 - En la primera comparación (una observación), el envelope E2E fue 460 s baseline vs. 387 s candidato, critical path sin espera inicial 730 vs. 426 s y consumo agregado de runners 789 vs. 931 s. Los hosts/redes/referencias no son idénticos; no demuestra mejora robusta ni “2×”. Repetir una medición comparable incluyendo stack, migraciones, fixtures/inventario, servidor, tests y cleanup antes de afirmar speedup. Baseline y límites en [`docs/TESTING.md`](TESTING.md).
+- El fallo de provisioning actual duró ~1870 s; el gate se ejecutó ~1866 s y la suma de jobs fue 3013 s. Son tiempos de un intento cancelado por APT, no un benchmark válido de shard execution.
 - El workflow agrega checks E2E a PRs de `development`, pero esa rama no tiene enforcement efectivo de branch protection para dichos estados. El operador debe verificar todos los estados requeridos antes del merge. No cambiar ni presentar este límite previo como efecto de la configuración shards.
 - El workflow conserva integridad de gates: instalación/quality no recibe secretos adicionales, integración sigue obligatoria, `deploy` sigue exclusivo de `master`, y ni la matriz ni el agregador deben permitir promover jobs omitidos como éxito.
