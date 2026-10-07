@@ -139,9 +139,9 @@ test("login and profile work without JavaScript and do not overflow on mobile", 
     page.getByRole("button", { name: "Cambiar contraseña", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("status")).toContainText(
-    "Contraseña actualizada",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Contraseña actualizada" }),
+  ).toContainText("Contraseña actualizada");
   await page.goto("/app/asistencia");
   await expect(page).toHaveURL(/\/unauthorized\?reason=forbidden$/u);
   await context.close();
