@@ -8,7 +8,11 @@ import { EvaluationHistory } from "./EvaluationHistory";
 import EvaluationBreadcrumbs from "./EvaluationBreadcrumbs.astro";
 import SchemeSummary from "./SchemeSummary.astro";
 import { EvaluationWorkspace } from "./EvaluationWorkspace";
-import { evaluationPrefix, gradeLabel } from "./presentation";
+import {
+  evaluationPrefix,
+  evaluationTypeLabels,
+  gradeLabel,
+} from "./presentation";
 import { membershipLabels } from "@/components/pre-registrations/presentation";
 import type { EvaluationRouteData } from "./route";
 
@@ -42,16 +46,16 @@ const fields = rows.length
     courseName={data?.courseName ?? "Curso"}
     {...(groupId ? { groupId, groupLabel: group?.label ?? "Grupo" } : {})}
   />
-  <header class="flex flex-col gap-3">
-    <h1 class="text-3xl font-semibold tracking-tight">
-      Evaluaciones{group ? ` · ${group.label}` : " del curso"}
-    </h1>
-    {data && (
+  <header class="flex flex-wrap items-baseline justify-between gap-2">
+    <h1 class="text-2xl font-semibold tracking-tight">Evaluaciones</h1>
+    {group && data && (
       <p class="text-sm text-muted-foreground">
-        Resultado académico provisional · Nota mínima del curso:{" "}
-        <span class="tabular-nums">
-          {gradeLabel(String(data.minimumGrade))} / 100
-        </span>
+        Grupo {group.label} · Esquema:{" "}
+        {data.scheme.modality
+          ? evaluationTypeLabels[data.scheme.modality]
+          : "Sin definir"}
+        {data.scheme.components.length > 0 &&
+          ` · ${data.scheme.components.length} ${data.scheme.components.length === 1 ? "componente" : "componentes"}`}
       </p>
     )}
   </header>
@@ -59,7 +63,7 @@ const fields = rows.length
     <CourseTabs id={courseId} active="evaluations" />
   )}
   {data ? (
-    <div class="mt-8 flex min-w-0 flex-col gap-8">
+    <div class="mt-5 flex min-w-0 flex-col gap-6">
       {success && (
         <p role="status" class="text-sm">
           {groupId ? "Nota guardada." : "Esquema guardado."}
@@ -110,17 +114,6 @@ const fields = rows.length
         <div slot="fallback" class="flex min-w-0 flex-col gap-8">
           {groupId ? (
             <>
-              <section class="flex flex-col gap-4">
-                <a
-                  href={`${prefix}/${courseId}/evaluaciones`}
-                  class="inline-flex min-h-11 items-center text-sm underline underline-offset-4"
-                >
-                  {data.scheme.frozenAt
-                    ? "Consultar esquema del curso"
-                    : "Configurar esquema del curso"}
-                </a>
-                <SchemeSummary scheme={data.scheme} />
-              </section>
               <section
                 aria-labelledby="fallback-grades-title"
                 class="flex min-w-0 flex-col gap-4"
@@ -137,24 +130,22 @@ const fields = rows.length
                     Este grupo todavía no tiene participantes para evaluar.
                   </p>
                 ) : (
-                  <ul class="flex min-w-0 flex-col gap-5">
+                  <ul class="min-w-0 divide-y rounded-xl border bg-card">
                     {data.participants.map((participant) => (
                       <li class="min-w-0">
-                        <article class="flex min-w-0 flex-col gap-5 rounded-xl border bg-card p-5">
+                        <article class="flex min-w-0 flex-col gap-3 p-4">
                           <header class="grid gap-3 lg:grid-cols-2">
                             <div>
                               <h3 class="break-words font-semibold">
                                 {participant.firstName} {participant.lastName}
                               </h3>
-                              {!participant.canGrade && (
+                              {participant.membershipStatus !== "INSCRITO" && (
                                 <p class="mt-2 text-sm text-muted-foreground">
                                   {
                                     membershipLabels[
                                       participant.membershipStatus
                                     ]
                                   }{" "}
-                                  · Solo se pueden registrar notas de
-                                  participantes inscritos.
                                 </p>
                               )}
                             </div>
@@ -230,20 +221,25 @@ const fields = rows.length
                                     aria-invalid={Boolean(
                                       attempted && issues.score,
                                     )}
-                                    aria-describedby={`${id}-help`}
+                                    aria-describedby={
+                                      attempted && message
+                                        ? `${id}-error`
+                                        : grade?.score == null
+                                          ? `${id}-help`
+                                          : undefined
+                                    }
                                   />
-                                  <p
-                                    id={`${id}-help`}
-                                    class="text-sm text-muted-foreground"
-                                  >
-                                    {grade?.score === null ||
-                                    grade?.score === undefined
-                                      ? "Pendiente. "
-                                      : ""}
-                                    0 a 100, con hasta dos decimales.
-                                  </p>
+                                  {grade?.score == null && (
+                                    <p
+                                      id={`${id}-help`}
+                                      class="text-sm text-muted-foreground"
+                                    >
+                                      Pendiente
+                                    </p>
+                                  )}
                                   {attempted && message && (
                                     <p
+                                      id={`${id}-error`}
                                       role="alert"
                                       class="text-sm text-destructive"
                                     >
@@ -292,8 +288,7 @@ const fields = rows.length
                 Componentes del curso
               </h2>
               <p class="text-sm text-muted-foreground">
-                Los pesos deben sumar exactamente 100 %. Este esquema se aplica
-                a todos los grupos y queda fijo al guardar la primera nota.
+                Los pesos deben sumar 100%. Puedes usar hasta dos decimales.
               </p>
               <form
                 method="post"
