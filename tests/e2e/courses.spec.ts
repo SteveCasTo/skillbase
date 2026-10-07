@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
@@ -1210,7 +1211,7 @@ test("instructor is denied and mutation without expected origin is rejected", as
         buffer: Buffer.from("not an image"),
       },
     },
-    headers: { Origin: "http://127.0.0.1:4321" },
+    headers: { Origin: e2eSiteUrl() },
     maxRedirects: 0,
   });
   expect(uploadResponse.status()).toBe(303);
