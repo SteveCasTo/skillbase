@@ -8,6 +8,7 @@ import { DrizzleGroupRepository } from "@/server/db/repositories/group-repositor
 import { handleAttendancePost } from "@/server/attendance/http";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { createInstructorFixture } from "../fixtures/instructors";
+import { evaluationFixtureTables } from "../fixtures/evaluation-cleanup";
 const connection = createDatabase(getTestSupabaseEnvironment().databaseUrl, {
   max: 8,
 });
@@ -30,7 +31,7 @@ beforeEach(defaults);
 afterEach(defaults);
 afterAll(async () => {
   await db.execute(
-    sql`truncate participant_attendance, instructor_attendance, session_roster, attendance_command_receipts, group_sessions, registration_ledger, registration_command_receipts, pre_registrations, participants restrict`,
+    sql`truncate ${evaluationFixtureTables}, participant_attendance, instructor_attendance, session_roster, attendance_command_receipts, group_sessions, registration_ledger, registration_command_receipts, pre_registrations, participants restrict`,
   );
   await defaults();
   await connection.close();
