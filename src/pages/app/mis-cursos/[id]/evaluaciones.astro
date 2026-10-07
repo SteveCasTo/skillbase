@@ -1,0 +1,8 @@
+---
+import EvaluationPage from "@/components/evaluations/EvaluationPage.astro";
+import { prepareEvaluationRoute } from "@/components/evaluations/route";
+const state = await prepareEvaluationRoute(Astro, true);
+if (state instanceof Response) return state;
+---
+
+<EvaluationPage {...state} />

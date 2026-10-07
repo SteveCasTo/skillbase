@@ -1,0 +1,51 @@
+---
+import type { EvaluationSchemeDto } from "@/domain/evaluations/types";
+import { evaluationTypeLabels, gradeLabel } from "./presentation";
+interface Props {
+  scheme: EvaluationSchemeDto;
+}
+const { scheme } = Astro.props;
+---
+
+<section
+  aria-labelledby="evaluation-scheme-title"
+  class="flex min-w-0 flex-col gap-4"
+>
+  <header class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 id="evaluation-scheme-title" class="text-xl font-semibold">
+      Esquema del curso
+    </h2>
+    {scheme.modality && (
+      <p class="text-sm text-muted-foreground">
+        Modalidad {evaluationTypeLabels[scheme.modality].toLowerCase()}
+      </p>
+    )}
+  </header>
+  {scheme.frozenAt && (
+    <p class="text-sm text-muted-foreground">
+      El esquema ya no puede modificarse porque se guardó la primera nota del
+      curso.
+    </p>
+  )}
+  {scheme.components.length ? (
+    <ul class="divide-y rounded-xl border bg-card px-5">
+      {scheme.components.map((component) => (
+        <li class="flex flex-wrap items-center justify-between gap-3 py-4">
+          <div class="min-w-0">
+            <h3 class="break-words font-medium">{component.name}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">
+              {evaluationTypeLabels[component.type]}
+            </p>
+          </div>
+          <p class="shrink-0 font-semibold tabular-nums">
+            {gradeLabel(component.weight)} %
+          </p>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p class="text-sm text-muted-foreground">
+      Todavía no se han definido los componentes de evaluación del curso.
+    </p>
+  )}
+</section>
