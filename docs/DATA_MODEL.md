@@ -157,16 +157,17 @@ Crear grupos genera el calendario en la transacción del alta; grupos existentes
 
 Los command receipts son append-only e idempotentes por actor+request key/fingerprint. Las mutaciones validan actor/rol/ownership en servidor, estado del grupo/sesión, revisión optimista y conflicto temporal bajo la barrera de horarios existente. Fase 6 se liberó mediante PR 211; el contrato C1/C2 de cancelación/reprogramación (antes de inicio y sin marcas) se integró en PR 219 y salió en PR 228, sin cambio de schema/migración. Pruebas y límites del release en [`ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md) y [`TESTING.md`](TESTING.md). El boceto `Session`/`Attendance`/`InstructorAttendance` inmediatamente debajo de esta sección es conceptual legado, no representa nombres de las tablas Drizzle reales.
 
-### Evaluaciones y notas (Fase 7, backend/UI PRs 230/232 en development)
+### Evaluaciones y notas (Fase 7, release PR 235)
 
 La migración versionada `0020_phase7_evaluations.sql` y el schema Drizzle definen
-cinco tablas. Después de la validación en stacks temporales, el operador aplicó
-0020 al Supabase local canónico: ledger 20→21, rerun idempotente. Se preservaron
-las 59 tablas/2 802 filas previas y las cinco tablas nuevas quedaron vacías. No
-se aplicó a cloud ni se revalidaron ledger/conteos cloud en esa operación. PR 230
-integra el modelo/backend y PR 232 la UI en `development`; el gate completo y el
-release de Fase 7 siguen pendientes. El detalle del snapshot de preservación está
-en [`TESTING.md`](TESTING.md).
+cinco tablas. PR 230 integró backend y schema, PR 232 la UI y PR 235 liberó Fase
+7 a producción. Migration 0020 se aplicó por el pipeline de release al cloud;
+una verificación read-only confirmó ledger 21 y cinco tablas nuevas vacías con
+RLS/privilegios esperados. En local canónico, el operador aplicó 0020 idempotente
+(20→21), preservando 59 tablas/2 802 filas y dejando vacías las nuevas entidades.
+La inspección cloud no incluyó comparación de hashes pre/post de todas las filas;
+no afirmar preservación cloud completa. Evidencia y límites en
+[`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 - `evaluation_schemes`: una fila por curso, con revisión, `frozen_at`, actor y
   timestamp de actualización.

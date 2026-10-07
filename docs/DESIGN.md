@@ -501,7 +501,7 @@ La UI liberada conserva SSR, teclado, foco, privacidad e idempotencia conforme a
 
 ### Fase 7 — diseño de evaluaciones (implementación iniciada)
 
-El contrato funcional/técnico aprobado está en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PR 230 integró backend/schema/migración 0020 y PR 232 las cuatro páginas y componentes UI a `development`. La UI tiene dos E2E focales previos y revisión de screenshots; el gate integrado posterior se detuvo durante setup fixture, como detalla [`TESTING.md`](TESTING.md). La migración se aplicó después al Supabase local canónico, no a cloud; siguen pendientes el gate remoto, release y cloud migration. Mantener estados incompleto/nota cero conforme al contrato, sin describir como completo el módulo antes de cerrar esas dependencias.
+El contrato funcional/técnico aprobado está en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PRs 230/232 integraron backend y las cuatro páginas de esquema/notas para ADMIN/INSTRUCTOR; PR 235 liberó Fase 7. La UI distingue estado pendiente/decisión 0.00 de una nota completa 0, conserva drafts individuales y expone el historial de correcciones ADMIN. El local QA cubrió 132 escenarios mediante corridas separadas, no una sola corrida full; el master CI sí pasó el full E2E 132/132. Migration 0020 está aplicada local/cloud, con verificación cloud de solo lectura y límites en [`DEPLOYMENT.md`](DEPLOYMENT.md). La liberación F7 no incorpora cierre/planilla de Fase 8 ni certificados de Fase 9.
 
 ## CONSISTENCIA
 

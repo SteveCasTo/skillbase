@@ -317,13 +317,13 @@ Regla aprobada para las acciones correctivas de cancelación/reprogramación: so
 
 Estado: Fase 6 se liberó mediante PR 211 y las correcciones posteriores (PRs 219–223) se liberaron a `master` mediante PR 228. La evidencia de pruebas y el límite de verificación del entorno están en [`docs/ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md) y [`docs/TESTING.md`](TESTING.md).
 
-## Evaluación y notas (Fase 7; reglas acordadas, implementación iniciada)
+## Evaluación y notas (Fase 7; implementada y liberada en producción)
 
 La definición de Fase 7 se aprobó antes de su implementación. Cada curso tiene un esquema de componentes con pesos decimales exactos cuya suma debe ser exactamente 100 %; nombres de componentes son libres y la modalidad se deriva como `THEORY`, `PRACTICAL` o mixta. Las notas admiten dos decimales dentro de 0–100. La nota final usa la precisión decimal persistida, redondea solo el resultado final a dos decimales y compara ese mismo valor mostrado con la `minimum_grade` vigente del curso (70 por defecto provisional).
 
 Una persona sin todas las notas requeridas tiene resultado incompleto/pendiente, no una exención; el cálculo incompleto se trata como 0 de forma explícita para la decisión académica, sin presentar silenciosamente una nota final aprobatoria. Al persistir la primera nota, incluso 0, quedan congelados los componentes y sus pesos; correcciones de notas son auditables. No se aprueba todavía editar componentes/pesos después de ese punto.
 
-Solo registros `INSCRITO` participan de la evaluación. Instructor solo opera cursos propios desde su inicio oficial; ADMIN puede operar para cualquier curso y conserva su regla de acceso actual incluso con rol adicional. La elegibilidad por asistencia no bloquea la calificación. Backend (PR 230) y UI (PR 232) están integrados en `development`, pero Fase 7 no está completa ni liberada; la migración 0020 se aplicó al Supabase local canónico (ledger 20→21) y no a cloud. Faltan gates de cierre. El detalle técnico, límites y casos de borde están en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). Esto no incluye cierre/reapertura de Fase 8 ni certificados de Fase 9.
+Solo registros `INSCRITO` participan de la evaluación. Instructor solo opera cursos propios desde su inicio oficial; ADMIN puede operar para cualquier curso y conserva su regla de acceso actual incluso con rol adicional. La elegibilidad por asistencia no bloquea la calificación. Backend (PR 230) y UI (PR 232) se liberaron mediante PR 235; la migración 0020 se aplicó al Supabase local canónico y cloud. Las cinco tablas F7 quedaron vacías en la verificación cloud read-only, por lo que no se atribuyen calificaciones o semillas a este release. El detalle técnico, límites y evidencia cloud están en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md), [`docs/DATA_MODEL.md`](DATA_MODEL.md) y [`docs/DEPLOYMENT.md`](DEPLOYMENT.md). El alcance no incluye cierre/reapertura de Fase 8 ni certificados de Fase 9.
 
 ## EVALUACIÓN
 

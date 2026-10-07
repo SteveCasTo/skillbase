@@ -4,21 +4,23 @@
 
 Contrato funcional/técnico aprobado antes de comenzar la implementación de
 Fase 7. PR 230 integró el backend base y PR 232 integró cuatro páginas Astro y
-componentes de esquema/notas en `development`. La migración 0020 se probó en
-stacks temporales y luego el operador la aplicó al Supabase local canónico
-(ledger 20→21, rerun idempotente); no se aplicó a cloud ni se volvió a verificar
-allí ledger/conteos. La UI está integrada en development, pero el gate remoto y
-el release de Fase 7 siguen pendientes. El progreso se registra en
+componentes de esquema/notas en `development`. PR 235 liberó backend/UI y migration
+0020 a producción. En local canónico, 0020 se aplicó con ledger 20→21 y rerun
+idempotente; cloud Management API confirmó ledger 21 y las tablas F7 vacías con
+permisos restringidos. La consulta cloud fue read-only y no comparó hashes
+pre/post de todas las filas. Fase 7 está liberada dentro de su alcance; Fase 8/9
+siguen fuera de alcance. El progreso y las limitaciones se registran en
 [`PLAN.md`](PLAN.md), el modelo persistido en [`DATA_MODEL.md`](DATA_MODEL.md) y
 la capa de seguridad/ownership en [`SECURITY.md`](SECURITY.md).
 
-Helpers disponibles en server: `loadCourseEvaluations({actor, courseId,
+Helpers server integrados y usados por la UI: `loadCourseEvaluations({actor, courseId,
 groupId?, repository?})` devuelve `{available:true,data}` o `{available:false,
 status,code,unavailableReason}`; `handleEvaluationPost({request, actor,
 repository, siteUrl, operation, courseId, groupId?})` admite `scheme`/`grade` y
 devuelve `{status,payload}`. PR 232 los conecta a las rutas Astro ADMIN e
-INSTRUCTOR descritas en [`ARCHITECTURE.md`](ARCHITECTURE.md); estas páginas no
-equivalen a un release ni a un gate de Fase 7 completado.
+INSTRUCTOR descritas en [`ARCHITECTURE.md`](ARCHITECTURE.md); PR 235 los liberó.
+La semántica de `passed` es clasificación académica de nota y no emite ni cierra
+certificados/cursos.
 
 Los comandos de POST llevan `requestKey`, `courseId`, `schemeRevision` y
 `groupId` opcional; guardar nota agrega `registrationId`, `componentId`,
