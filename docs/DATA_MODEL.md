@@ -207,6 +207,44 @@ contacto ni finanzas; el historial administrativo de correcciones es solo para
 ADMIN. La superficie HTTP/helpers y errores se describen en
 [`ARCHITECTURE.md`](ARCHITECTURE.md) y [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md).
 
+### Cierre académico por grupo (Fase 8, schema candidato 0021)
+
+La rama `feat/academic-group-closure` añade `0021_phase8_academic_group_closure.sql`
+y cuatro tablas al schema Drizzle:
+
+- `academic_group_states`: estado mutable OPEN/CLOSED, revisión y última versión
+  por grupo. Sin fila representa OPEN/revisión 0.
+- `academic_closure_versions`: snapshot JSONB inmutable por `(group_id, version)`;
+  registra course/group, `closed_at`, `actor_id`, `actor_name` capturado y el
+  `ClosureReportDto` completo (roster, notas/resultados, umbral, asistencia y
+  elegibilidad). Sus FK de grupo/curso y actor usan `RESTRICT`.
+- `academic_group_reopenings`: evento append-only con referencia a versión,
+  instante, actor UUID/name y razón obligatoria de 1–500 caracteres; unique por
+  versión reabierta.
+- `academic_closure_receipts`: resultado append-only con actor, UUID request key,
+  fingerprint SHA-256 y comando result; unique `(actor_id, request_key)`.
+
+Las tablas tienen RLS y grants Data API revocados a `PUBLIC`, `anon`,
+`authenticated` y `service_role`. Triggers bloquean UPDATE/DELETE de snapshots,
+reaperturas y receipts. Otro trigger rechaza mutaciones en `evaluation_grades`,
+`group_sessions`, `session_roster`, `participant_attendance` e
+`instructor_attendance` asociadas a grupos cerrados, incluyendo mover evidencia
+de un grupo cerrado. La capa de aplicación serializa operaciones de cierre y
+entrada de membresía mediante el advisory lock compartido y locks de filas; el
+trigger comparte el lock y sirve como defensa frente a otros repositorios
+server-side.
+
+Migración 0021 tiene timestamp `1791407807898` y SHA-256
+`9b4c19be336426441b35d0ef1b0cd68ed7d980e4481420051d56fbb24d424259`. Solo se
+aplicó en Supabase aislado de QA (ledger temporal 21→22); el canónico local y
+cloud siguen en 21. No se hizo apply persistente. El snapshot JSONB incluye CI y
+balance actuales, pero no email/teléfono. La proyección de instructor usa
+allowlist recursiva sin CI/contacto/categorías/finanzas; ADMIN conserva vista
+privada completa. Exports futuros deben usar el DTO por rol, no leer el JSONB
+directamente. El estado, loader, API-helper y límites de cierre están en
+[`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md); no existen aún
+pantallas ni exporters PDF/CSV.
+
 ### Participant
 
 Implementado mediante migración 0017 (release Fase 5, cloud ledger 18): persona global de administración sin cuenta Auth. CI es texto único tras trim, eliminación de whitespace y uppercase, preservando ceros iniciales, letras/sufijos; no cast numérico, validación de formato nacional, checksum ni escaneo documental. No es `InterestRegistration` ni se fusiona por email. Una persona puede tener una preinscripción activa por curso y otras en cursos distintos. CI no se expone al roster instructor.

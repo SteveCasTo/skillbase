@@ -102,6 +102,34 @@ Las rutas y operaciones limitan instructor a sus propios grupos y ADMIN a config
 
 El backend y las páginas UI se liberaron mediante PR 235. El detalle de modelo/API y los límites de verificación cloud están en `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`, `docs/EVALUATIONS_CONTRACT.md` y `docs/TESTING.md`.
 
+### Cierre académico por grupo (Fase 8, backend parcial no liberado)
+
+- Loader/casos de uso de cierre revalidan actor `ACTIVE`, rol y ownership en el
+  repositorio: ADMIN puede cualquier grupo; INSTRUCTOR solo grupo propio y desde
+  inicio oficial. Reabrir es ADMIN-only, con razón y auditoría transaccional.
+  No hay route Astro/policy/UI montada en este source.
+- La migración 0021 candidata habilita RLS y revoca grants Data API en estado,
+  versiones, reaperturas y receipts. Triggers hacen inmutable la historia y
+  protegen notas/sesiones/roster/asistencia con el advisory lock compartido.
+  Altas y transferencias hacia grupo cerrado se protegen server-side dentro de
+  la transacción; no se alteran las reglas de pago/refund existentes.
+- El snapshot ADMIN es privado server-side y conserva CI y evidencia financiera
+  existente, sin email/teléfono en el modelo. Las lecturas autorizadas proyectan
+  un DTO discriminado `access`; la proyección INSTRUCTOR es allowlist recursiva
+  de nombres/IDs académicos, notas y asistencia, excluyendo CI, categorías y datos
+  financieros, incluso si aparecieran nuevos campos sensibles en el snapshot.
+  Pruebas focales inspeccionan el JSON serializado y los campos futuros
+  sintéticos; el fix está en el source WIP y aún no hay ruta HTTP/página de cierre
+  integrada ni release.
+- Futuros PDF/CSV deben usar el DTO autorizado por actor/contexto a través de los
+  loaders server-side, nunca la fila snapshot JSONB directamente. No añadir
+  CI/contacto/finanzas a la salida de instructor; mantenerlo protegido por
+  servidor y Data API grants revocados.
+- Migration 0021 solo se aplicó en stacks QA temporales; no se aplicó a DB
+  canónica/cloud. Integridad/privacidad y estado parcial están en
+  [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y
+  [`DATA_MODEL.md`](DATA_MODEL.md).
+
 ### Gestión multi-ADMIN aprobada para Fase 8 (pendiente)
 
 El proyecto aprobó crear cuentas ADMIN desde servidor mediante Supabase Auth privilegiado, con permisos iguales, y un lifecycle limitado por actividad de actor/dependencias. Cuentas con historia conservan UUID y trazabilidad; el guard de lifecycle debe serializarse y no puede dejar cero ADMIN activos. La contraseña inicial nunca se persiste, registra, expone en DTO ni audita. El flujo aún no está implementado; criterios de actividad, outbox, locks y recuperación están en [`docs/PLAN.md`](PLAN.md). No asumir rol `ROOT`, auto-baja prohibida ni operación de borrado físico de la fila `users`.

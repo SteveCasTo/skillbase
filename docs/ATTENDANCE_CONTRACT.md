@@ -185,6 +185,18 @@ Las rutas están incluidas en la política privada fail-closed. ADMIN configura 
 revisa/corrige evidencia histórica, cancela y reemplaza; el instructor solo
 opera sus grupos y registra en el día civil Bolivia.
 
+## Cierre académico por grupo (Fase 8, backend parcial)
+
+El backend candidato reutiliza proyecciones de sesiones, roster y marcas para
+construir el snapshot (ver [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md)). Mientras un grupo está cerrado, los repositorios de asistencia rechazan
+escrituras de marks, roster y sesiones; la migración candidata 0021 añade trigger
+DB para defender evidencia ante otros adaptadores. Correcciones históricas y
+operativas del grupo requieren que `ADMIN` lo reabra primero con motivo y
+auditoría. Cancelar una sesión resuelve ese encuentro para el cierre: no se
+reactiva ni se inventa una marca. La elegibilidad se conserva como información
+de resultado, no bloqueo. No hay página/ruta de cierre montada y 0021 solo se
+aplicó en stacks QA aislados; canonical y cloud permanecen en ledger 21.
+
 ## Seed y validación
 
 El runner financiero admite la extensión opcional de asistencia en
