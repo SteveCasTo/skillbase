@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { AttendanceCommandResult } from "@/domain/attendance/types";
+import type { EvaluationCommandResult } from "@/domain/evaluations/types";
 import {
   check,
   boolean,
@@ -31,6 +32,144 @@ export const userStatus = pgEnum("user_status", [
   "ACTIVE",
   "DISABLED",
 ]);
+
+export const evaluationType = pgEnum("evaluation_type", [
+  "THEORY",
+  "PRACTICAL",
+]);
+export const evaluationSchemes = pgTable(
+  "evaluation_schemes",
+  {
+    courseId: uuid("course_id")
+      .primaryKey()
+      .references(() => courses.id, { onDelete: "restrict" }),
+    revision: integer("revision").notNull().default(0),
+    frozenAt: timestamp("frozen_at", { withTimezone: true, precision: 3 }),
+    updatedBy: uuid("updated_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check("evaluation_scheme_revision_check", sql`${t.revision} >= 0`),
+    index("evaluation_scheme_actor_idx").on(t.updatedBy),
+  ],
+).enableRLS();
+export const evaluationComponents = pgTable(
+  "evaluation_components",
+  {
+    id: uuid("id").primaryKey(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => evaluationSchemes.courseId, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    type: evaluationType("type").notNull(),
+    weightHundredths: integer("weight_hundredths").notNull(),
+    order: integer("sort_order").notNull(),
+  },
+  (t) => [
+    unique("evaluation_component_course_id_unique").on(t.courseId, t.id),
+    unique("evaluation_component_order_unique").on(t.courseId, t.order),
+    check(
+      "evaluation_component_weight_check",
+      sql`${t.weightHundredths} between 0 and 10000`,
+    ),
+    check(
+      "evaluation_component_name_check",
+      sql`char_length(btrim(${t.name})) between 1 and 100 and ${t.name} !~ '[[:cntrl:]]'`,
+    ),
+    check("evaluation_component_order_check", sql`${t.order} between 0 and 99`),
+  ],
+).enableRLS();
+export const evaluationGrades = pgTable(
+  "evaluation_grades",
+  {
+    courseId: uuid("course_id").notNull(),
+    componentId: uuid("component_id").notNull(),
+    participantId: uuid("participant_id")
+      .notNull()
+      .references(() => participants.id, { onDelete: "restrict" }),
+    registrationId: uuid("registration_id")
+      .notNull()
+      .references(() => preRegistrations.id, { onDelete: "restrict" }),
+    scoreHundredths: integer("score_hundredths").notNull(),
+    revision: integer("revision").notNull().default(1),
+    recordedBy: uuid("recorded_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    recordedAt: timestamp("recorded_at", {
+      withTimezone: true,
+      precision: 3,
+    }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.courseId, t.participantId, t.componentId] }),
+    foreignKey({
+      name: "evaluation_grade_component_fk",
+      columns: [t.courseId, t.componentId],
+      foreignColumns: [evaluationComponents.courseId, evaluationComponents.id],
+    }).onDelete("restrict"),
+    index("evaluation_grade_component_idx").on(t.courseId, t.componentId),
+    index("evaluation_grade_participant_idx").on(t.participantId),
+    index("evaluation_grade_registration_idx").on(t.registrationId),
+    index("evaluation_grade_actor_idx").on(t.recordedBy),
+    check(
+      "evaluation_grade_score_check",
+      sql`${t.scoreHundredths} between 0 and 10000 and ${t.revision} > 0`,
+    ),
+  ],
+).enableRLS();
+export const evaluationResults = pgTable(
+  "evaluation_results",
+  {
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => evaluationSchemes.courseId, { onDelete: "restrict" }),
+    participantId: uuid("participant_id")
+      .notNull()
+      .references(() => participants.id, { onDelete: "restrict" }),
+    finalHundredths: integer("final_hundredths"),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      precision: 3,
+    }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.courseId, t.participantId] }),
+    index("evaluation_result_participant_idx").on(t.participantId),
+    check(
+      "evaluation_result_final_check",
+      sql`${t.finalHundredths} is null or ${t.finalHundredths} between 0 and 10000`,
+    ),
+  ],
+).enableRLS();
+export const evaluationCommandReceipts = pgTable(
+  "evaluation_command_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    requestKey: uuid("request_key").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    result: jsonb("result").$type<EvaluationCommandResult>().notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("evaluation_receipts_actor_key_unique").on(
+      t.actorId,
+      t.requestKey,
+    ),
+    check(
+      "evaluation_receipt_fingerprint_check",
+      sql`${t.fingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+  ],
+).enableRLS();
 
 export const courseStatus = pgEnum("course_status", [
   "DRAFT",
