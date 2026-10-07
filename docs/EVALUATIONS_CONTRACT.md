@@ -137,8 +137,9 @@ distintos de `INSCRITO` e independencia de la elegibilidad por asistencia.
   (Fase 9).
 
 El cierre por grupo de Fase 8 recibió aprobación después del release F7. El
-backend base está implementado parcialmente en `feat/academic-group-closure`,
-sin integración/release y sin rutas, UI o exports conectados. Sus reglas,
+core backend se integró mediante PR 280, incluido su guard de escritura de
+notas. Renderers de export y seis GET adapter modules están en el worktree
+`feat/academic-closure-exports`, aún sin integrar. Sus reglas,
 helpers y estado están en [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md),
 [`REQUIREMENTS.md`](REQUIREMENTS.md) y [`PLAN.md`](PLAN.md). El cierre no cambia
 las invariantes F7: solo `INSCRITO` se califica, una nota faltante sigue
@@ -183,7 +184,10 @@ se descongelan al reabrir.
   conserva la anterior. Este alcance no exige formato institucional, firma ni
   certificado. El snapshot JSONB y su versión se implementan en la migración
   candidata 0021; 0021 solo se aplicó a stacks QA temporales, no a la base local
-  canónica ni a cloud. Las rutas/UI y exporters PDF/CSV todavía no existen.
+  canónica ni a cloud. Renderers CSV/PDF y seis route adapter files están en el
+  worktree de exports, sin integrar. No se han añadido a
+  `PRIVATE_ROUTE_POLICIES`, por lo que middleware los bloquea hasta la integración;
+  UI/descargas no están disponibles en la app.
 
 El snapshot interno `ClosureReportDto` conserva CI/balance para ADMIN y no añade
 email/teléfono. Las lecturas actuales proyectan un DTO discriminado por role:

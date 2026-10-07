@@ -2,9 +2,9 @@
 
 ## Estado y límite de release
 
-El alcance funcional de Fase 8 está aprobado. El backend base de cierre por grupo está en el worktree `feat/academic-group-closure`, basado en `development` `7807fc1`; el source aún es WIP, no está integrado ni liberado. La migración candidata es `drizzle/0021_phase8_academic_group_closure.sql`. Solo se aplicó a stacks Supabase temporales de QA (ledger temporal 21→22); no se aplicó al Supabase local canónico ni a cloud. El release `master` sigue en `91beccf8`, cloud ledger 21.
+El alcance funcional de Fase 8 está aprobado. El backend base de cierre está integrado en `development` por PR 280 (`7807fc1`); la migración candidata `drizzle/0021_phase8_academic_group_closure.sql` solo se aplicó a stacks QA temporales (ledger temporal 21→22), no al Supabase local canónico ni a cloud. Los exporters PDF/CSV y seis Astro GET adapter files están en el worktree `feat/academic-closure-exports`, base `356ec1b`; el source permanece WIP y aún no está integrado. El release `master` sigue en `91beccf8`, cloud ledger 21.
 
-Este contrato describe helpers/repositorio backend, **no una aplicación disponible al usuario**: no se montaron rutas Astro, route policies, páginas/UI ni exportadores PDF/CSV. La implementación es parcial; el milestone Fase 8 sigue abierto. El progreso y las pruebas por entrega están en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
+Los serializers/renderers y route modules existen en el source WIP, pero las rutas no se añadieron a `PRIVATE_ROUTE_POLICIES`; bajo el middleware fail-closed aún no son descargas accesibles por navegador. La UI de cierre/download corresponde a otro feature owner y tampoco está integrada. Por tanto no se considera una superficie de aplicación liberada. El milestone Fase 8 sigue parcial: falta policy/UI/revisión final/gates/release y la gestión multi-ADMIN. Estado y pruebas por stage en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 
 ## Responsabilidades y helpers actuales
 
@@ -21,8 +21,24 @@ src/domain/academic-closure
 - `loadAcademicClosure({actor, courseId, groupId, repository?})` devuelve disponibilidad más `ClosureStateDto` con estado/version, blockers, provisional u oficial e historial.
 - `loadAcademicClosureVersion({actor, courseId, groupId, version, repository?})` carga una versión histórica inmutable.
 - `handleClosurePost({request, actor, repository, siteUrl, operation, courseId, groupId})` acepta la operación de contexto `close` o `reopen`; el actor y grupo/curso vienen del servidor/ruta, no de una identidad declarada por el cliente.
+- `handleClosureDownload(context, artifact, requiredRole, repository?)` renderiza un documento a partir del `ClosureVersionDto` autorizado que obtiene `loadAcademicClosureVersion`; `artifact` se limita a `planilla.pdf`, `planilla.csv` o `informe.pdf`. No consulta el snapshot crudo ni sustituye datos históricos por valores live.
+
+Se añadieron seis Astro GET route modules bajo contextos ADMIN/INSTRUCTOR:
+`/app/cursos/:id/grupos/:groupId/cierre/:version/{planilla.pdf,planilla.csv,informe.pdf}`
+y equivalentes bajo `/app/mis-cursos/:id/grupos/:groupId/cierre/:version/`.
+Fijan role requerido y artifact. Aún no están registrados en
+`PRIVATE_ROUTE_POLICIES`; middleware fail-closed los bloquea hasta integrar
+route policy/navigation/UI del otro feature.
 
 El comando requiere `requestKey` UUID y `revision`; `reopen` requiere además `reason` (1–500 caracteres). El body admite opcionalmente `courseId`/`groupId` solo como referencias que deben coincidir con el contexto de ruta; para reabrir no se aceptan campos desconocidos. El helper valida origen y límite de 65 536 bytes. Respuestas usan `{ok:true,value,message}` o `{ok:false,code,message,issues}`, JSON `private, no-store` y `nosniff`. Mapeo: autorización 403, contexto inexistente/ajeno 404, revisión/idempotencia/estado cerrado o bloqueo 409, validación 422 y fallo inesperado 503 saneado. Esto no constituye todavía endpoint HTTP desplegado.
+
+Las descargas reciben IDs/role context desde el route adapter y sesión fresca de
+`Astro.locals`; versión debe ser entero positivo canónico. Requieren role
+`ADMIN` o `INSTRUCTOR`, y el loader revalida estado/ownership antes de render.
+401/403/404 y errores de evidencia invalidada salen con headers
+`private, no-store`/`nosniff`; el éxito usa content type PDF o `text/csv` y
+filename fijo derivado de número de versión y artefacto, nunca del nombre del
+usuario.
 
 ## Autorización y elegibilidad para cierre
 
@@ -54,7 +70,7 @@ El receipt se acota por `(actorId, requestKey)` y guarda fingerprint del comando
 
 Triggers hacen inmutables snapshots/reaperturas/receipts y rechazan insert/update/delete de grades, sesiones, roster y attendance que afecten un grupo cerrado; updates tampoco permiten mover evidencia cerrada a grupo abierto. Esta defensa complementa los guards transaccionales de los repositorios, no expone una RPC ni sustituye autorización server-side. `academic_group_states` es administrado por el repositorio autorizado.
 
-## Proyección de privacidad e integración pendiente
+## Proyección de privacidad y documentos exportados (renderers en feature worktree)
 
 El snapshot de administración queda privado en el backend e incluye los campos
 actuales del reporte, entre ellos CI y balance; el modelo no incorpora email ni
@@ -68,14 +84,39 @@ adelante. La proyección no muta el snapshot almacenado. La prueba focal recorre
 datos sintéticos que contienen también campos sensibles futuros.
 
 `handleClosurePost` devuelve únicamente resultado de estado/revisión/versión e
-ID de versión, nunca el snapshot. Cualquier futuro export PDF/CSV debe tomar un
-`AuthorizedClosureReportDto` obtenido por `loadAcademicClosure` o
-`loadAcademicClosureVersion`, respetando actor/contexto/rol; no leer la fila
-JSONB directamente para entregarla al navegador ni a un renderer sin autorizar.
+ID de versión, nunca el snapshot. Los renderers aceptan solo un
+`ClosureVersionDto` con `AuthorizedClosureReportDto` obtenido por el loader
+autorizado: no reciben un reporte JSONB raw ni valores live de umbral/settings.
+Los seis route modules implementan estos GET versionados:
 
-Siguen pendientes de integración: rutas/policies Astro, SSR/UI accesible de
-cierre/reapertura y exportadores PDF/CSV. No hay endpoint público/privado ni
-plantilla institucional montada. El lifecycle/provisionamiento multi-ADMIN está
+- ADMIN: `/app/cursos/:id/grupos/:groupId/cierre/:version/planilla.pdf`,
+  `/planilla.csv` e `/informe.pdf`.
+- INSTRUCTOR: mismos artefactos bajo
+  `/app/mis-cursos/:id/grupos/:groupId/cierre/:version/`.
+
+Cada módulo fija role requerido y artifact, pero los paths aún no están
+registrados en `PRIVATE_ROUTE_POLICIES`; middleware fail-closed los bloquea. La
+UI propietaria de cierre/descargas no está integrada.
+
+El CSV de planilla usa UTF-8 BOM, separador `;`, quoting/escaping y mitigación de
+formula injection incluyendo espacios/caracteres Unicode iniciales. Notas/pesos
+se escriben con dos decimales. La columna CI se incluye solo para ADMIN;
+INSTRUCTOR recibe nombres, componentes/notas, resultado y asistencia/elegibilidad
+sin CI/contacto/categoría/finanzas. El PDF embebe Noto Sans existente (OFL) en el
+bundle SSR; no se descarga ni almacena una fuente/archivo de la persona. PDF
+planilla e informe usan metadatos históricos; el informe añade resumen de
+resultados/asistencia. Nombre de actor, fecha, minimum grade y umbral de
+ausencias vienen del snapshot, no del perfil/curso/settings actuales. Glifos no
+soportados fallan explícitamente (`PDF_UNSUPPORTED_TEXT`/409), no se truncan ni
+sustituyen. Se reutilizan `pdf-lib`, `@pdf-lib/fontkit` y la fuente ya incluida;
+no se añadieron dependencias.
+
+Siguen pendientes: registrar las seis rutas en policy privada y comprobarlas por
+HTTP/E2E; integrar SSR/UI de cierre/reapertura y botones/descargas. El test de
+integración ejerce el handler con sesión/fixtures reales del stack aislado, no
+las rutas Astro a través del navegador. Hasta conectar policy/UI no hay una
+descarga disponible al usuario.
+El lifecycle/provisionamiento multi-ADMIN está
 aprobado pero sigue siendo paquete posterior; `closureActorDependencies` solo
 expone las nuevas referencias actor-dependent para esa futura validación. No se
 implementan certificados, firmas de certificado, QR, emisión o verificación de
