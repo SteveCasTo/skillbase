@@ -705,23 +705,24 @@ El source de desarrollo validado antes de integrar fue `292c5d42e2babb51a96c5580
 
 Las correcciones C1/C2/C3 quedaron liberadas mediante PR 228. Cancelación/reprogramación opera solo antes de `startsAt`, sin marcas de participantes/instructor; reemplazos futuros conservan duración e historial y no entran en conflicto. Las correcciones históricas ADMIN de evidencia siguen separadas de acciones operativas.
 
-## FASE 7 — EVALUACIONES Y NOTAS (backend y UI integrados en development; milestone incompleto)
+## FASE 7 — EVALUACIONES Y NOTAS (release en producción; Fase 7 cerrada)
 
-El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PR 230 integró a `development` dominio, aplicación, repositorio Drizzle, loader/HTTP helpers y migration source 0020. PR 232 integró cuatro páginas Astro (ADMIN/INSTRUCTOR por curso/grupo) y componentes de esquema/notas, historial y roster. El backend/API y la UI están integrados en desarrollo; Fase 7 no está completa ni liberada, y el full gate sigue pendiente.
+CI de master PR 235 (`37573738321`) pasó 343 unit, 139 integration y full E2E 132/132, sin flakes reportados.
 
-El operador aplicó migration 0020 al Supabase local canónico (ledger 20→21, rerun idempotente); la evidencia de preservación y conteos está en [`TESTING.md`](TESTING.md). No se aplicó a cloud ni se revalidaron independientemente ledger/conteos cloud. Tras el fix de cleanup `649441b`, full unit/integration pasó 343/139 tests (2080/1022 assertions); Drizzle check y `db:generate` no encontraron cambios de schema. El run accidental histórico 118/24 ya está supersedido por el full integration 139/139. No se añadió seed de evaluaciones; el demo financiero existente no contiene notas y no debe presentarse como tal.
+El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PR 230 integró dominio, aplicación, repositorio Drizzle, loader/HTTP helpers y migration 0020; PR 232 integró cuatro páginas Astro ADMIN/INSTRUCTOR de curso/grupo y los componentes de esquema/notas, historial y roster. PR 235 liberó Fase 7 a `master` como `4afa4858c8279282a8d26ab4adfa7769e249432d` el 2026-10-07. Fase 7 queda cerrada dentro de su alcance; Fase 8 y Fase 9 siguen pendientes.
+
+Migration 0020 se aplicó al Supabase local canónico y a cloud; los ledgers verificados quedaron en 21. La operación local preservó datos previos e idempotencia; la verificación cloud fue de solo lectura posterior y no incluyó comparación de hashes pre/post de todas las filas. El inventario cloud, la discrepancia histórica de marcas de instructor y sus límites están en [`DEPLOYMENT.md`](DEPLOYMENT.md). No se añadió seed de evaluaciones; las cinco tablas nuevas quedaron vacías y el demo financiero no contiene notas.
 
 - [x] Confirmar contrato funcional/técnico antes de implementación.
-- [x] Implementar backend base de esquema, dominio, persistencia, autorización, revisión/freeze y auditoría (PR 230, `development`).
-- [x] Añadir cobertura focal y reparar el cleanup de fixtures para las nuevas tablas con el mismo `TRUNCATE ... RESTRICT` compartido (commit `649441b`); no equivale a full integration PASS.
-- [x] Integrar UI ADMIN/INSTRUCTOR para esquema de curso, roster/notas por grupo y vistas de curso/grupo (PR 232). La UI distingue nota pendiente de cero completo, conserva drafts individuales y muestra historial/cálculo según el contrato; sus dos E2E focales pasan y se revisaron screenshots 390/768/1440 en light/dark.
-- [x] Reejecutar la suite completa de integración tras el fix de cleanup: 139 PASS/0 FAIL en stack temporal aislado.
-- [x] Corregir el setup de cursos/grupos fixture con PR 233 sin cambiar las reglas de reserva de horarios; diagnóstico y alcance en [`TESTING.md`](TESTING.md).
-- [x] Completar la validación local con evidencia combinada: 343 unit/139 integration, quality/typecheck/Drizzle/schema/build PASS y cobertura de los 132 escenarios E2E a través de corridas separadas. **No se afirma un full E2E único 132/132.**
-- [x] Aplicar 0020 al Supabase local canónico y comprobar idempotencia/preservación mediante el operador autorizado, sin seed ni reset.
-- [ ] Completar CI/release F7 a `master` y aplicar 0020 a cloud mediante el flujo autorizado; cloud y ledger/conteos no se verificaron en la operación local.
+- [x] Implementar backend base de esquema, dominio, persistencia, autorización, revisión/freeze y auditoría (PR 230).
+- [x] Reparar cleanup de fixtures para las nuevas tablas en el mismo `TRUNCATE ... RESTRICT` (649441b); mantener registro del accidental full integration run histórico 118/24.
+- [x] Integrar UI ADMIN/INSTRUCTOR en cuatro rutas de curso/grupo (PR 232): esquema, roster/notas, drafts individuales, pendiente distinto de cero completo e historial ADMIN.
+- [x] Corregir fixture E2E de curso archivado con grupos `PLANNED` mediante PR 233 sin cambiar guards o reglas de horario del producto.
+- [x] Pasar quality master CI y 343 unit/139 integration; full E2E master CI 132/132 PASS sin flakes reportados (37573738321). Ver ejecuciones focales/locales separadas en [`TESTING.md`](TESTING.md); no afirmar un único full run local 132/132.
+- [x] Aplicar migration 0020 local/canonical y cloud por el pipeline del release; validaciones locales/readonly cloud y límites de row-hash constan en `TESTING.md`/`DEPLOYMENT.md`.
+- [x] Liberar Fase 7 mediante PR 235; Vercel deployment `dpl_A9Av16T1DZvk19W1836VEuPimAGS` quedó READY para el SHA exacto de master y alias de producción.
 
-Fase 7 no incluye ni completa Fase 8 (cierre/planilla/reapertura) o Fase 9 (certificados). No adelantar weighted-grade changes posteriores ni convertir el demo financiero en un seed de notas.
+Fase 7 no incluye ni completa Fase 8 (cierre/planilla/reapertura) o Fase 9 (certificados), que no han iniciado y requieren su propio alcance/autorización. No adelantar weighted-grade changes posteriores ni convertir el demo financiero en un seed de notas.
 
 ### Objetivos
 

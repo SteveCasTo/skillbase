@@ -477,7 +477,7 @@ PR 230 integró el backend base y PR 232 integró la UI en `development`. La UI 
 
 El cleanup es infraestructura de tests aislados únicamente; no es un allowlist de reset/demo/producción. No hay seed de notas ni evaluación en el demo financiero.
 
-Contratos y límites efectivos en [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md); inventario schema en [`DATA_MODEL.md`](DATA_MODEL.md); progreso/remanentes en [`PLAN.md`](PLAN.md). La UI está integrada en development, pero el gate/cierre de Fase 7 siguen pendientes.
+Al stage de integración PR 230/232, backend/UI estaban en development sin gate Fase 7; ese snapshot se conserva como cronología. El cierre PR 235 y QA final están registrados abajo. Contrato y detalles de implementación en [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md), [`DATA_MODEL.md`](DATA_MODEL.md) y [`PLAN.md`](PLAN.md).
 
 ### QA integrada Fase 7 — bloqueo inicial y continuación completada (source `c0506fc`)
 
@@ -506,4 +506,13 @@ Después de la QA integrada, el operador aplicó `bun run db:migrate` al Supabas
 
 La comparación pre/post conservó **2802 filas en 59 tablas existentes**, incluidas filas completas/PK hashes, Auth, Storage, settings, audit payloads y receipts; también se conservaron los registros no poseídos y datos financieros/asistencia existentes: 12 cursos, 23 grupos, 16 registros, 13 movimientos, 282 sesiones (280 originales, 2 reemplazos), 3 cancelaciones, 16 marcas de participantes y 4 de instructor. Las cinco tablas F7 quedaron vacías; RLS habilitado, sin privilegios para `anon`/`authenticated`/`service_role`, y los seis trigger functions sin grants `EXECUTE` a esos roles. No hubo reset, reseed ni escrituras por API de aplicación. No se operó en cloud; no inferir ledger, conteos o tablas F7 aplicadas en producción. La aplicación no se inició ni actualizó en el worktree raíz, que permanece clean en `fb99108`; no se debe inferir ahí UI local de Fase 7. La evidencia fuente `c0506fc` está en `C:/Users/Steve/AppData/Local/Temp/opencode/phase7-local-migration-evidence/summary.json`.
 
-La migración local es un paso de infraestructura verificado, no un seed ni un release del módulo. El full gate/CI remoto F7 y la migración cloud siguen pendientes.
+Ese registro describe el estado inmediatamente después del APPLY local y antes del release PR 235; no era seed ni release del módulo. El CI/cloud posterior se registra abajo.
+
+### Cierre de release Fase 7 (PR 235; master)
+
+- CI del PR `37572831714`: full unit/integration y E2E **132/132 PASS**, sin flakes reportados. CI de `master` `37573738321`: SUCCESS con 343 unit (2080 assertions), 139 integration (1022 assertions) y full E2E **132/132 PASS**, sin flakes reportados.
+- El run de master es una única suite full; no debe confundirse con la verificación local previa, que acreditó la cobertura de 132 identidades por unión de ejecuciones separadas (25 iniciales, cuatro focales con dos solapadas y 105 restantes).
+- El fixture de PR 233 resolvió el `SCHEDULE_CONFLICT` de setup cambiando solo `tests/fixtures/attendance-flow.ts`: archiva/cancela los grupos rastreados con las APIs normales. No cambió el comportamiento de producto ni los guards de horario. La intermitencia histórica `public-interest`/submit-disabled y el guardado de grupo permanece sin causa raíz identificada; la corrida final sin flake reportado no prueba que la causa se haya eliminado.
+- La migración 0020 se aplicó al Supabase local canónico y cloud mediante el flujo de release; la operación cloud se verificó después con consultas de solo lectura, descritas en [`DEPLOYMENT.md`](DEPLOYMENT.md). No se cargó seed de notas ni se hicieron escrituras manuales de datos.
+
+Fase 7 queda liberada en `master` por PR 235. La migración/cloud y E2E de este release no equivalen a Fase 8 (cierre/planilla) ni Fase 9 (certificados), que siguen pendientes.

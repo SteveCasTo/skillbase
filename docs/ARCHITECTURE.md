@@ -218,7 +218,7 @@ La cancelación/reemplazo modifica la cronología operativa sin reescribir horas
 
 Fase 6 y su release quedaron cerrados por PR 211; las correcciones de asistencia C1/C2/C3 quedaron cerradas por PR 228. Sus pruebas/limitaciones y el límite de verificación de ledger cloud están en `docs/TESTING.md` y `docs/DEPLOYMENT.md`.
 
-### Evaluaciones y notas (Fase 7, backend/UI integrados en development)
+### Evaluaciones y notas (Fase 7, release PR 235)
 
 PR 230 integra el backend de evaluación en capas: políticas/tipos en
 `src/domain/evaluations`, casos de uso/port en `src/application/evaluations`,
@@ -234,7 +234,7 @@ reconoce destinos privados bajo `/app/cursos/:id/evaluaciones`,
 `/app/mis-cursos/:id` para Instructor. PR 232 conectó esos helpers en cuatro
 páginas Astro y en `src/components/evaluations/*`: ADMIN administra el esquema
 global/curso y califica grupos; INSTRUCTOR consulta esquema propio y califica su
-roster autorizado.
+roster autorizado. PR 235 liberó estas superficies y el backend en `master`.
 
 Las páginas usan SSR/POST como base y React para edición interactiva; conservan
 drafts de campos independientes y proyección explícita de estado incompleto.
@@ -244,14 +244,14 @@ a gate final o release de Fase 7.
 
 La migración 0020 declara cinco tablas protegidas por RLS y revoca acceso Data
 API directo; los repositorios revalidan rol/ownership/membresía dentro de
-transacciones. Tras probarse en stacks temporales, el operador la aplicó al
-Supabase local canónico (ledger 20→21, rerun idempotente); no se aplicó a cloud
-ni se verificó allí ledger/conteos. Evidencia de preservación en
+transacciones. Se aplicó en stacks temporales y al Supabase local canónico
+(ledger 20→21, idempotente), y se liberó a cloud con PR 235 (ledger 21
+confirmado mediante inspección read-only). No hubo comparación cloud de hash
+pre/post de todas las filas. Evidencia de preservación local y límites de cloud en
 `docs/TESTING.md`; detalle del modelo, autorización e idempotencia en
-`docs/DATA_MODEL.md`, `docs/SECURITY.md` y `docs/EVALUATIONS_CONTRACT.md`. El
-backend y la UI están integrados en development, pero Fase 7 aún no está
-completa ni liberada. No incluye cierre de curso/planilla de Fase 8 o certificados
-de Fase 9.
+`docs/DATA_MODEL.md`, `docs/SECURITY.md` y `docs/EVALUATIONS_CONTRACT.md`. Fase 7
+está liberada dentro de su alcance. No incluye cierre de curso/planilla de Fase 8
+o certificados de Fase 9.
 
 El POST público limita y parsea el body en el adaptador server-side, valida Origin y llama el caso de uso de interés. Un limiter persistente usa PostgreSQL y un HMAC server-only sobre `Astro.clientAddress`; no confía en forwarded headers. Sin secreto válido o dirección de cliente confiable, el flujo falla cerrado. Los defaults técnicos y requisitos de despliegue se describen en el contrato y en `docs/DEPLOYMENT.md`; no implican que los valores cloud estén configurados.
 
