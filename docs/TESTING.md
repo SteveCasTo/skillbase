@@ -469,12 +469,41 @@ PR 230 integró el backend base y PR 232 integró la UI en `development`. La UI 
 
 #### Backend Fase 7 — PR 230 (evidencia focal, no full gate)
 
-- La migración 0020 genera cinco tablas y sus triggers/constraints. Se ejecutó solo en stacks Supabase de test aislados; no se aplicó al Supabase local canónico ni a cloud, y no se incrementaron sus ledgers ni se modificaron datos productivos.
+- La migración 0020 genera cinco tablas y sus triggers/constraints. En la validación inicial de PR 230 se ejecutó solo en stacks Supabase de test aislados; la aplicación posterior al Supabase local canónico está registrada como una operación de operador abajo. No se aplicó a cloud.
 - Backend focal reportado: cuatro unit tests y una suite de integración HTTP con 39 assertions PASS.
 - Un comando accidental invocó `run-integration.ts` con `evaluation-repository.test.ts` como argumento, pero el runner ignoró ese argumento y ejecutó la carpeta completa: 118 PASS/24 FAIL. Veintitrés fallos provinieron de cleanup de fixtures que no incluía las nuevas tablas/FKs; otro caso dejó un residuo financiero de fixture. No se debe contar ese run como validación del full suite ni como defecto de la lógica de evaluación.
 - El fix test-only `649441b` añadió las cinco tablas de evaluación al allowlist compartido de fixtures, dentro del mismo `TRUNCATE ... RESTRICT`. No modificó schema, FKs ni assertions de producto. La revalidación focal posterior pasó cinco casos en cinco archivos (88 assertions) y las cuatro unitarias; lint, typecheck, formatter y `git diff --check` PASS.
-- La suite de integración completa no se volvió a ejecutar después del fix. Este resultado focal no acredita full unit/integration, UI/E2E ni gate de Fase 7. No hay seed de evaluación; `FINANCIAL_DEMO.md` no constituye fixtures de notas.
+- En la validación inicial de PR 230 no se volvió a ejecutar la suite de integración después del fix; la continuación de QA en `fb27c89` sí pasó la suite completa 139/139 (ver abajo). Los resultados focales/esta cronología no equivalen a gate de Fase 7. No hay seed de evaluación; `FINANCIAL_DEMO.md` no constituye fixtures de notas.
 
-El cleanup es infraestructura de tests aislados únicamente; no es un allowlist de reset/demo/producción. La migración 0020 no se aplicó a instancias persistentes. No hay migración cloud, seed de notas ni validación completa integrada de backend+UI a la fecha.
+El cleanup es infraestructura de tests aislados únicamente; no es un allowlist de reset/demo/producción. No hay seed de notas ni evaluación en el demo financiero.
 
 Contratos y límites efectivos en [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md); inventario schema en [`DATA_MODEL.md`](DATA_MODEL.md); progreso/remanentes en [`PLAN.md`](PLAN.md). La UI está integrada en development, pero el gate/cierre de Fase 7 siguen pendientes.
+
+### QA integrada Fase 7 — bloqueo inicial y continuación completada (source `c0506fc`)
+
+#### Intento inicial (histórico, antes del fix de fixture PR 233)
+
+La primera corrida terminó con exit code 1 a las `2026-10-07T03:59:24Z`; el estado idle se confirmó a las `04:03:23Z`, sin proceso E2E activo. Con un worker, `--retries=0` y `--max-failures=1`, Playwright seleccionó 132 casos: **25 PASS, 1 FAIL, 106 no ejecutados**.
+
+El caso fue `tests/e2e/evaluations.spec.ts:107`. Falló durante `createAttendanceFlowFixture("2020-05-04")`, antes de interactuar con la UI, con `GroupError/SCHEDULE_CONFLICT`: un curso fixture archivado aún tenía grupos `PLANNED`, que seguían reservando el horario del instructor. La ruta llegó a `DrizzleGroupRepository.assertFree`. PR 233 identificó y corrigió el lifecycle del fixture, no el flujo UI ni las reglas globales de horario.
+
+#### Continuación tras PR 233 — evidencia combinada PASS, no un full run único
+
+- PR 233 modificó solo `tests/fixtures/attendance-flow.ts`: se rastrean cursos fixture archivados y sus grupos `PLANNED` reservan horario mientras no se cancelen; el cleanup cancela únicamente los grupos rastreados usando `DrizzleGroupRepository` y sus guards normales. No cambia la regla global de horarios, comportamiento de producto, schema ni dependencias, y no cancela grupos arbitrarios/globalmente.
+- Las pruebas focales de attendance/evaluations pasaron 4/4 según la evidencia del owner; esta continuación no las repitió.
+- `coverage-ledger.json` inventarió 132 identidades E2E. La corrida inicial aportó 25 casos PASS y los focales otros 4; dos se solapan, así que la cobertura acumulada antes de la continuación fue 27. La selección restante de 105 se ejecutó y pasó **105/105**, con un worker, port `44891`, retries 0 y `max-failures=1` en 7.0 minutos.
+- En conjunto hay evidencia PASS para los **132 escenarios distintos**, pero **no** una única corrida full 132/132: el intento inicial se detuvo en el fixture fallido. Estado del continuation runner: `passed-combined-not-single-full`.
+- Quality final: format y lint PASS; build PASS (Astro 17.00 s, comando 19.764 s). Se reutiliza la validación sin cambios de aplicación/schema/dependencias: unit 343 PASS/2080 assertions, integration 139 PASS/1022 assertions, typecheck 0 errores/0 warnings/229 hints, Drizzle PASS y `db:generate` sin cambios de schema. La continuación no volvió a correr unit/integration/typecheck.
+- Esa continuación E2E y su cleanup corrieron en stacks temporales; en ese paso no hubo escrituras canonical/cloud ni aplicación persistente de 0020. Limpieza normal terminó, contenedores previos coincidieron, y el puerto E2E `44891` quedó libre. No inferir salud del root server `4321`.
+
+Artefactos QA: `C:/Users/Steve/AppData/Local/Temp/opencode/phase7-final-validation-evidence/` (`CONTINUATION-RESULT.md`, `continuation-status.json`, `coverage-ledger.json`, `continuation-remaining-e2e.log` y el historial inicial en `RESULT.md`/`status.json`). No se realizó un single full 132/132 ni se afirma OAuth real, seed de notas o release de Fase 7.
+
+La evidencia local combinada está completada con **132 escenarios cubiertos por corridas separadas**, no por una sola corrida 132/132. El full E2E local integrado no terminó verde de una vez; el conflicto de fixture se resolvió solo en tests y el conjunto restante pasó.
+
+### Aplicación local de migration 0020 (operador, 2026-10-07)
+
+Después de la QA integrada, el operador aplicó `bun run db:migrate` al Supabase local canónico `skillbase` en PostgreSQL `127.0.0.1:55322` (API `127.0.0.1:55321`): ledger **20→21**. El rerun quedó en 21 y la evidencia completa fue idéntica. Entrada 21: hash `ad01e4dea9f51c4d503eef524a458e9adffe4f90e37397c784b9ddffd25aa32b`, `created_at` `1791341690577`.
+
+La comparación pre/post conservó **2802 filas en 59 tablas existentes**, incluidas filas completas/PK hashes, Auth, Storage, settings, audit payloads y receipts; también se conservaron los registros no poseídos y datos financieros/asistencia existentes: 12 cursos, 23 grupos, 16 registros, 13 movimientos, 282 sesiones (280 originales, 2 reemplazos), 3 cancelaciones, 16 marcas de participantes y 4 de instructor. Las cinco tablas F7 quedaron vacías; RLS habilitado, sin privilegios para `anon`/`authenticated`/`service_role`, y los seis trigger functions sin grants `EXECUTE` a esos roles. No hubo reset, reseed ni escrituras por API de aplicación. No se operó en cloud; no inferir ledger, conteos o tablas F7 aplicadas en producción. La aplicación no se inició ni actualizó en el worktree raíz, que permanece clean en `fb99108`; no se debe inferir ahí UI local de Fase 7. La evidencia fuente `c0506fc` está en `C:/Users/Steve/AppData/Local/Temp/opencode/phase7-local-migration-evidence/summary.json`.
+
+La migración local es un paso de infraestructura verificado, no un seed ni un release del módulo. El full gate/CI remoto F7 y la migración cloud siguen pendientes.

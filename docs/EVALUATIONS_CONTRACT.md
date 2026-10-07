@@ -4,10 +4,11 @@
 
 Contrato funcional/técnico aprobado antes de comenzar la implementación de
 Fase 7. PR 230 integró el backend base y PR 232 integró cuatro páginas Astro y
-componentes de esquema/notas en `development`. La migración 0020 se probó solo en
-stacks temporales; no se aplicó al Supabase local canónico ni a cloud. La UI está
-integrada en desarrollo, pero el gate completo, la migración persistente y el
-release de Fase 7 siguen pendientes. El progreso se registra en
+componentes de esquema/notas en `development`. La migración 0020 se probó en
+stacks temporales y luego el operador la aplicó al Supabase local canónico
+(ledger 20→21, rerun idempotente); no se aplicó a cloud ni se volvió a verificar
+allí ledger/conteos. La UI está integrada en development, pero el gate remoto y
+el release de Fase 7 siguen pendientes. El progreso se registra en
 [`PLAN.md`](PLAN.md), el modelo persistido en [`DATA_MODEL.md`](DATA_MODEL.md) y
 la capa de seguridad/ownership en [`SECURITY.md`](SECURITY.md).
 

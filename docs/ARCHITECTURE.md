@@ -244,12 +244,14 @@ a gate final o release de Fase 7.
 
 La migración 0020 declara cinco tablas protegidas por RLS y revoca acceso Data
 API directo; los repositorios revalidan rol/ownership/membresía dentro de
-transacciones. Su validación se realizó en stacks temporales aislados, no en el
-Supabase local canónico ni en cloud. Detalle de entidades, integridad,
-autorización e idempotencia en `docs/DATA_MODEL.md`, `docs/SECURITY.md` y
-`docs/EVALUATIONS_CONTRACT.md`. El backend y la UI están integrados en
-development, pero Fase 7 aún no está completa ni liberada. No incluye cierre de
-curso/planilla de Fase 8 o certificados de Fase 9.
+transacciones. Tras probarse en stacks temporales, el operador la aplicó al
+Supabase local canónico (ledger 20→21, rerun idempotente); no se aplicó a cloud
+ni se verificó allí ledger/conteos. Evidencia de preservación en
+`docs/TESTING.md`; detalle del modelo, autorización e idempotencia en
+`docs/DATA_MODEL.md`, `docs/SECURITY.md` y `docs/EVALUATIONS_CONTRACT.md`. El
+backend y la UI están integrados en development, pero Fase 7 aún no está
+completa ni liberada. No incluye cierre de curso/planilla de Fase 8 o certificados
+de Fase 9.
 
 El POST público limita y parsea el body en el adaptador server-side, valida Origin y llama el caso de uso de interés. Un limiter persistente usa PostgreSQL y un HMAC server-only sobre `Astro.clientAddress`; no confía en forwarded headers. Sin secreto válido o dirección de cliente confiable, el flujo falla cerrado. Los defaults técnicos y requisitos de despliegue se describen en el contrato y en `docs/DEPLOYMENT.md`; no implican que los valores cloud estén configurados.
 

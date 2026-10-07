@@ -157,13 +157,16 @@ Crear grupos genera el calendario en la transacción del alta; grupos existentes
 
 Los command receipts son append-only e idempotentes por actor+request key/fingerprint. Las mutaciones validan actor/rol/ownership en servidor, estado del grupo/sesión, revisión optimista y conflicto temporal bajo la barrera de horarios existente. Fase 6 se liberó mediante PR 211; el contrato C1/C2 de cancelación/reprogramación (antes de inicio y sin marcas) se integró en PR 219 y salió en PR 228, sin cambio de schema/migración. Pruebas y límites del release en [`ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md) y [`TESTING.md`](TESTING.md). El boceto `Session`/`Attendance`/`InstructorAttendance` inmediatamente debajo de esta sección es conceptual legado, no representa nombres de las tablas Drizzle reales.
 
-### Evaluaciones y notas (Fase 7, backend PR 230 en development)
+### Evaluaciones y notas (Fase 7, backend/UI PRs 230/232 en development)
 
 La migración versionada `0020_phase7_evaluations.sql` y el schema Drizzle definen
-cinco tablas. La migración fue probada en stacks de test temporales aislados;
-no se aplicó al Supabase local canónico ni a cloud, no avanzó sus ledgers y no
-se hicieron operaciones sobre datos. PR 230 integra el modelo/backend en
-`development`; la UI y el cierre de Fase 7 siguen pendientes.
+cinco tablas. Después de la validación en stacks temporales, el operador aplicó
+0020 al Supabase local canónico: ledger 20→21, rerun idempotente. Se preservaron
+las 59 tablas/2 802 filas previas y las cinco tablas nuevas quedaron vacías. No
+se aplicó a cloud ni se revalidaron ledger/conteos cloud en esa operación. PR 230
+integra el modelo/backend y PR 232 la UI en `development`; el gate completo y el
+release de Fase 7 siguen pendientes. El detalle del snapshot de preservación está
+en [`TESTING.md`](TESTING.md).
 
 - `evaluation_schemes`: una fila por curso, con revisión, `frozen_at`, actor y
   timestamp de actualización.
