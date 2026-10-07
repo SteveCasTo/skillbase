@@ -98,6 +98,19 @@ export function assertEligibleDestination(
       { groupId: "Selecciona otro grupo con cupo." },
     );
 }
+/** Only entry into a closed academic group is prohibited. This does not change
+ * payment/cancellation deadlines or restrict transfer out of a source group. */
+export function assertAcademicRegistrationDestination(
+  closed: boolean,
+  field: "groupId" | "destinationGroupId" = "groupId",
+): void {
+  if (closed)
+    throw new RegistrationError(
+      "GROUP_CLOSED",
+      "Reabre el grupo con un motivo antes de recibir nuevas inscripciones o transferencias.",
+      { [field]: "El grupo está cerrado académicamente." },
+    );
+}
 export function assertRegistrationPayment(
   course: RegistrationCourseContext,
   price: PriceSnapshot,

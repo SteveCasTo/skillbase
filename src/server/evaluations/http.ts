@@ -50,6 +50,7 @@ export function evaluationFailure(error: unknown): {
                   "CONCURRENT_UPDATE",
                   "IDEMPOTENCY_CONFLICT",
                   "SCHEME_FROZEN",
+                  "GROUP_CLOSED",
                 ].includes(error.code)
               ? 409
               : 422,

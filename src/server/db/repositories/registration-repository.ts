@@ -18,6 +18,7 @@ import {
 import { validateParticipant } from "@/domain/pre-registrations/participant";
 import {
   assertAdditionalPayment,
+  assertAcademicRegistrationDestination,
   assertCancellation,
   assertEligibleDestination,
   assertRegistrationPayment,
@@ -47,6 +48,7 @@ import type {
 import { getDatabase } from "@/server/db/client";
 import * as schema from "@/server/db/schema";
 import { lockInstructorSchedules } from "./instructor-schedule";
+import { academicGroupClosed } from "./academic-closure-guard";
 import {
   assertFreshRevision,
   courseContext,
@@ -352,6 +354,12 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
           ...group,
           occupied: await occupiedSeats(tx, group.id),
         });
+        // Receipt replay happens before this work. New commands inspect the
+        // target under the same schedule/course/group locks as academic close,
+        // before creating a participant, registration, receipt or cash movement.
+        assertAcademicRegistrationDestination(
+          await academicGroupClosed(tx, group.id),
+        );
         const settings = await this.currentSettings(tx);
         if (settings.revision !== input.settingsRevision)
           throw new RegistrationError(
@@ -773,6 +781,10 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
           row.state,
           { ...destination, occupied: await occupiedSeats(tx, destination.id) },
           now,
+        );
+        assertAcademicRegistrationDestination(
+          await academicGroupClosed(tx, destination.id),
+          "destinationGroupId",
         );
         const [updated] = await tx
           .update(schema.preRegistrations)
