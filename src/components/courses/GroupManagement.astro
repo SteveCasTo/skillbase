@@ -191,10 +191,7 @@ const prototype: Group = {
     Todavía no hay grupos.
     {canCreate ? " Crea el primero con su horario y capacidad." : ""}
   </p>
-  <ul
-    data-groups-list
-    class="mt-4 grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-3"
-  >
+  <ul data-groups-list class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
     {[...groups, prototype].map((group, index) => {
       const published = group.publishedAt !== null;
       const intent = published
@@ -223,16 +220,6 @@ const prototype: Group = {
                 <h3 id={`group-${group.id}`} class="font-semibold">
                   Grupo {index + 1}
                 </h3>
-                <a
-                  data-group-session-link
-                  href={`/app/cursos/${course.id}/grupos/${group.id}/sesiones`}
-                  class={buttonVariants({
-                    variant: "outline",
-                    className: "min-h-11",
-                  })}
-                >
-                  Sesiones y asistencia
-                </a>
                 <span
                   data-group-inactive
                   hidden={group.status !== "CANCELLED"}
@@ -312,7 +299,7 @@ const prototype: Group = {
                 </div>
               )}
             </div>
-            <dl class="mt-4 grid min-w-0 gap-x-4 @min-[28rem]:grid-cols-2">
+            <dl class="mt-4 grid min-w-0 gap-x-4 @min-[27rem]:grid-cols-2">
               <div class="min-w-0 border-t py-2" data-group-field="schedule">
                 <dt class="text-sm text-muted-foreground">Horario</dt>
                 <dd class="mt-1 flex min-h-11 min-w-0 items-center gap-2">
@@ -403,7 +390,7 @@ const prototype: Group = {
                           type="submit"
                           aria-label={`Guardar horario del grupo ${index + 1}`}
                           title="Guardar"
-                          class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                          class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
                         >
                           <Check size={18} aria-hidden="true" />
                         </button>
@@ -518,7 +505,7 @@ const prototype: Group = {
                           type="submit"
                           aria-label={`Guardar capacidad del grupo ${index + 1}`}
                           title="Guardar"
-                          class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                          class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
                         >
                           <Check size={18} aria-hidden="true" />
                         </button>
@@ -547,6 +534,16 @@ const prototype: Group = {
                 </dd>
               </div>
             </dl>
+            <a
+              data-group-session-link
+              href={`/app/cursos/${course.id}/grupos/${group.id}/sesiones`}
+              class={buttonVariants({
+                variant: "outline",
+                className: "mt-4 min-h-11 w-full",
+              })}
+            >
+              Sesiones y asistencia
+            </a>
           </article>
         </li>
       );
@@ -669,19 +666,16 @@ const prototype: Group = {
 </dialog>
 <script src="./group-management-client.ts"></script>
 <style>
-  .group-card [data-group-session-link]::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: var(--radius-xl);
+  .group-card [data-edit-fallback]:not([open]) {
+    flex: 0 0 5.875rem;
+    width: 5.875rem;
   }
-  .group-card [data-group-session-link]:focus-visible::after {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
+  .group-card [data-edit-fallback] > summary {
+    margin-left: auto;
+    width: 2.75rem;
   }
-  .group-card :is(details, button, form) {
-    position: relative;
-    z-index: 1;
+  .group-card [data-group-form] button[aria-busy="true"] svg {
+    opacity: 0.5;
   }
   .group-management [data-edit-cancel]:not([hidden]) {
     display: inline-flex;

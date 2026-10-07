@@ -18,10 +18,8 @@ import { DrizzleCourseRepository } from "@/server/db/repositories/course-reposit
 import { DrizzleGroupRepository } from "@/server/db/repositories/group-repository";
 import { DrizzleAssignedCourseRepository } from "@/server/db/repositories/assigned-course-repository";
 import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
-import {
-  registrationFailure,
-  singleQuery,
-} from "@/server/pre-registrations/http";
+import { registrationFailure } from "@/server/pre-registrations/http";
+import { groupParticipantsQuery } from "./participants-query";
 
 /** Resolve role and group ownership before querying or rendering a private roster. */
 export async function prepareGroupParticipantsRoute(
@@ -40,6 +38,7 @@ export async function prepareGroupParticipantsRoute(
     available = false;
   let entries: readonly InstructorRosterEntryDto[] = [];
   let registrations: RegistrationPageDto | null = null;
+  let search = "";
   try {
     validateRegistrationId(courseId, "courseId");
     validateRegistrationId(groupId, "groupId");
@@ -84,13 +83,12 @@ export async function prepareGroupParticipantsRoute(
           groupId,
         );
     } else {
-      const rawPage = singleQuery(context.url.searchParams, "page") || "1";
-      if (!/^\d+$/u.test(rawPage))
-        throw new RegistrationError("VALIDATION_FAILED", "Página no válida.");
+      const filter = groupParticipantsQuery(context.url, courseId, groupId);
+      search = filter.search ?? "";
       registrations = await listRegistrations(
         createRegistrationRepository(),
         actor,
-        { courseId, groupId, page: Number(rawPage), pageSize: 30 },
+        filter,
       );
     }
     return {
@@ -104,6 +102,7 @@ export async function prepareGroupParticipantsRoute(
       available,
       entries,
       registrations,
+      search,
     };
   } catch (error) {
     const failure = registrationFailure(error);
@@ -118,6 +117,7 @@ export async function prepareGroupParticipantsRoute(
       available: false,
       entries: [],
       registrations: null,
+      search,
     };
   }
 }

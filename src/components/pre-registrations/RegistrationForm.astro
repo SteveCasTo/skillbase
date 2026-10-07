@@ -76,7 +76,7 @@ const unavailable =
   data-last-submitted={
     Object.keys(values).length ? JSON.stringify(values) : undefined
   }
-  class="flex w-full min-w-0 flex-col gap-8"
+  class="flex w-full min-w-0 flex-col gap-6"
   data-astro-reload
 >
   <input type="hidden" name="requestKey" value={requestKey} />
@@ -127,10 +127,8 @@ const unavailable =
       errors={errors}
     />
   </fieldset>
-  <fieldset class="min-w-0 border-t pt-6" disabled={unavailable}>
-    <legend class="mb-4 text-lg font-semibold">
-      Grupo y tipo de participante
-    </legend>
+  <fieldset class="min-w-0 border-t pt-4" disabled={unavailable}>
+    <legend class="text-lg font-semibold">Grupo y tipo de participante</legend>
     <div class="registration-options grid min-w-0 gap-5">
       <RegistrationSelect
         client:load
@@ -161,8 +159,8 @@ const unavailable =
       />
     </div>
   </fieldset>
-  <fieldset class="min-w-0 border-t pt-6" disabled={unavailable}>
-    <legend class="mb-4 text-lg font-semibold">Precio y primer pago</legend>
+  <fieldset class="min-w-0 border-t pt-4" disabled={unavailable}>
+    <legend class="text-lg font-semibold">Precio y primer pago</legend>
     <dl class="registration-options mb-5 grid gap-4 rounded-lg bg-secondary p-4">
       <div>
         <dt class="text-sm text-muted-foreground">Precio aplicado</dt>

@@ -272,7 +272,14 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
     <>
       <header class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <CourseBreadcrumbs current="Grupos" />
+          <CourseBreadcrumbs
+            current="Grupos"
+            parents={[
+              { label: "Resumen", href: "/app" },
+              { label: "Cursos", href: "/app/cursos" },
+              { label: course.name, href: `/app/cursos/${course.id}/editar` },
+            ]}
+          />
           <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
             Grupos
           </h1>

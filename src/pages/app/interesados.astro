@@ -2,6 +2,7 @@
 import { UsersRound } from "lucide-react";
 import type { AdminInterestSummaryDto } from "@/domain/interests/types";
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import { requireInternalUser } from "@/server/auth/context";
 import { loadAdminInterestSummary } from "@/server/interests/http";
 
@@ -18,6 +19,12 @@ try {
 ---
 
 <PrivateLayout title="Interesados">
+  <div class="mb-5">
+    <CourseBreadcrumbs
+      current="Interesados"
+      parents={[{ label: "Resumen", href: "/app" }]}
+    />
+  </div>
   <header>
     <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">
       Interesados

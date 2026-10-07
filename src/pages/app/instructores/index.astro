@@ -1,5 +1,6 @@
 ---
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import PrivateBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import { buttonVariants } from "@/components/ui/button";
 import { listInstructors } from "@/application/instructors/manage-instructors";
 import { requireInternalUser } from "@/server/auth/context";
@@ -23,6 +24,12 @@ try {
 ---
 
 <PrivateLayout title="Instructores">
+  <div class="mb-5">
+    <PrivateBreadcrumbs
+      current="Instructores"
+      parents={[{ label: "Resumen", href: "/app" }]}
+    />
+  </div>
   {Astro.url.searchParams.get("success") === "deleted" && (
     <p role="status" class="mb-6">
       Instructor eliminado.

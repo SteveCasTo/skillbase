@@ -4,6 +4,7 @@ import { BookOpen, Plus } from "lucide-react";
 import { listAdminCourses } from "@/application/courses/manage-courses";
 import type { AdminCourseDto } from "@/domain/courses/types";
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import { requireInternalUser } from "@/server/auth/context";
 import {
   COURSE_INFRASTRUCTURE_STATUS,
@@ -47,6 +48,12 @@ const levelLabel = {
 ---
 
 <PrivateLayout title="Cursos">
+  <div class="mb-5">
+    <CourseBreadcrumbs
+      current="Cursos"
+      parents={[{ label: "Resumen", href: "/app" }]}
+    />
+  </div>
   <header class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
     <div>
       <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">Cursos</h1>

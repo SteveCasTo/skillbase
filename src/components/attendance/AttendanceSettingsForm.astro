@@ -63,7 +63,11 @@ const {
       aria-describedby="attendance-limit-error attendance-limit-help"
       className="min-h-11 max-w-sm"
     />
-    <p id="attendance-limit-help" class="text-sm text-muted-foreground">
+    <p
+      slot="help"
+      id="attendance-limit-help"
+      class="text-sm text-muted-foreground"
+    >
       Al alcanzar este número se muestra una advertencia; al superarlo se pierde
       el reconocimiento.
     </p>

@@ -238,12 +238,12 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
     .filter({ has: page.getByLabel("Teléfono (opcional)", { exact: true }) });
   const phone = phoneForm.getByLabel("Teléfono (opcional)", { exact: true });
   await expect(
-    phoneForm.getByRole("button", { name: "Guardar", exact: true }),
+    phoneForm.getByRole("button", { name: /^Guardar / }),
   ).toBeDisabled();
   await phone.fill("+591 70000000");
   await phone.fill("+591 letras");
   await expect(phone).toHaveValue("+591 70000000");
-  await phoneForm.getByRole("button", { name: "Guardar", exact: true }).click();
+  await phoneForm.getByRole("button", { name: /^Guardar / }).click();
   await expect(
     page.getByRole("button", {
       name: "Editar teléfono (opcional)",
@@ -258,7 +258,7 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
   await expect(nameForm.locator('[name="revision"]')).toHaveValue(
     await phoneForm.locator('[name="revision"]').inputValue(),
   );
-  await nameForm.getByRole("button", { name: "Guardar", exact: true }).click();
+  await nameForm.getByRole("button", { name: /^Guardar / }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Sintética Registration",
   );
@@ -272,14 +272,77 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
       .getByRole("region", { name: "Historial de efectivo" })
       .textContent(),
   ).toBe(cashBefore);
-  // The independent participant page remains available.
-  await page
-    .getByRole("link", { name: "Abrir ficha del participante" })
-    .click();
+  // Global identity is edited and persisted from this registration, not a
+  // duplicate participant page. A reload verifies the actual server write.
+  const detailPath = new URL(page.url()).pathname;
   await expect(
-    page.getByRole("heading", { name: "Participante", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("link", { name: "Volver", exact: true }).click();
+    page.getByRole("link", { name: "Abrir ficha del participante" }),
+  ).toHaveCount(0);
+  await participantSection
+    .getByRole("button", { name: "Editar correo electrónico", exact: true })
+    .click();
+  const emailForm = participantSection.locator("form").filter({
+    has: page.getByLabel("Correo electrónico", { exact: true }),
+  });
+  const participantId = await emailForm
+    .locator('[name="participantId"]')
+    .inputValue();
+  const participantCi = await emailForm.locator('[name="ci"]').inputValue();
+  const updatedEmail = `updated-${crypto.randomUUID()}@test.invalid`;
+  await emailForm
+    .getByLabel("Correo electrónico", { exact: true })
+    .fill(updatedEmail);
+  const [participantResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === detailPath &&
+        new URL(response.url()).searchParams.get("operation") === "participant",
+    ),
+    emailForm
+      .getByRole("button", { name: "Guardar correo electrónico", exact: true })
+      .click(),
+  ]);
+  expect(participantResponse.status()).toBe(200);
+  expect(await participantResponse.json()).toMatchObject({
+    ok: true,
+    value: {
+      kind: "participant",
+      participant: {
+        id: participantId,
+        ci: participantCi,
+        email: updatedEmail,
+      },
+    },
+  });
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { registrationMarker?: string }).registrationMarker,
+    ),
+  ).toBe("kept");
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Sintética Registration",
+  );
+  await expect(emailForm.locator('[name="participantId"]')).toHaveValue(
+    participantId,
+  );
+  await expect(emailForm.locator('[name="ci"]')).toHaveValue(participantCi);
+  await expect(
+    emailForm.getByLabel("Correo electrónico", { exact: true }),
+  ).toHaveValue(updatedEmail);
+  await expect(phone).toHaveValue("+591 70000000");
+  expect(
+    await page
+      .getByRole("region", { name: "Resumen financiero" })
+      .textContent(),
+  ).toBe(financialBefore);
+  expect(
+    await page
+      .getByRole("region", { name: "Historial de efectivo" })
+      .textContent(),
+  ).toBe(cashBefore);
   const cancel = page.locator("#registration-cancel");
   await actions
     .getByRole("button", { name: "Cancelar preinscripción", exact: true })

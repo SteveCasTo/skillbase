@@ -224,7 +224,9 @@ export function initializeAdminInterests(): void {
             error.textContent = message;
             error.hidden = false;
           }
-          notifications.error({ id: notificationId, title: message });
+          if ((rowError && row.isConnected) || error)
+            notifications.dismiss(notificationId);
+          else notifications.error({ id: notificationId, title: message });
         } finally {
           releaseMutation();
           locks.delete(id);

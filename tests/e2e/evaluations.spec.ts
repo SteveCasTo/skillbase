@@ -82,7 +82,7 @@ async function saveGrade(page: Page, component: string, score: string) {
   const person = "Enrolled Attendance";
   await page
     .getByRole("button", {
-      name: `Editar ${component} de ${person}`,
+      name: `Editar notas de ${person}`,
       exact: true,
     })
     .click();
@@ -92,13 +92,13 @@ async function saveGrade(page: Page, component: string, score: string) {
   await input.fill(score);
   await page
     .getByRole("button", {
-      name: `Guardar ${component} de ${person}`,
+      name: `Guardar notas de ${person}`,
       exact: true,
     })
     .click();
   await expect(
     page.getByRole("button", {
-      name: `Editar ${component} de ${person}`,
+      name: `Editar notas de ${person}`,
       exact: true,
     }),
   ).toBeVisible();
@@ -126,7 +126,9 @@ test("ADMIN saves exact course-wide weights and can edit the scheme before gradi
     await page
       .getByRole("textbox", { name: "Peso (%)", exact: true })
       .fill("33,33");
-    await page.getByRole("button", { name: "Continuar", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Confirmar Teoría", exact: true })
+      .click();
     await page
       .getByRole("button", { name: "Añadir componente", exact: true })
       .click();
@@ -146,8 +148,17 @@ test("ADMIN saves exact course-wide weights and can edit the scheme before gradi
     await page
       .getByRole("textbox", { name: "Peso (%)", exact: true })
       .fill("66,67");
+    await page
+      .getByRole("button", { name: "Confirmar Práctica", exact: true })
+      .click();
     await expect(save).toBeEnabled();
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === path,
+    );
     await save.click();
+    expect((await saved).status()).toBe(200);
     await expect(
       page.getByRole("button", { name: "Editar Práctica", exact: true }),
     ).toBeVisible();
@@ -162,7 +173,16 @@ test("ADMIN saves exact course-wide weights and can edit the scheme before gradi
     await page
       .getByRole("textbox", { name: "Nombre", exact: true })
       .fill("Teoría revisada");
+    await page
+      .getByRole("button", { name: "Confirmar Teoría revisada", exact: true })
+      .click();
+    const updated = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === path,
+    );
     await save.click();
+    expect((await updated).status()).toBe(200);
     await expect(
       page.getByRole("heading", { name: "Teoría revisada", exact: true }),
     ).toBeVisible();
@@ -176,7 +196,7 @@ test("ADMIN saves exact course-wide weights and can edit the scheme before gradi
   }
 });
 
-test("INSTRUCTOR saves zero distinctly from missing, retains another draft, and corrections update weighted results and ADMIN history", async ({
+test("INSTRUCTOR saves rows atomically with pending distinct from zero, and corrections update weighted results and ADMIN history", async ({
   page,
   context,
 }) => {
@@ -188,18 +208,7 @@ test("INSTRUCTOR saves zero distinctly from missing, retains another draft, and 
     await signInFixture(context, AUTH_FIXTURES.instructor.email);
     const path = gradePath(fixture.courseId, fixture.groupId, true);
     await page.goto(path);
-    await page
-      .getByRole("button", {
-        name: "Editar Práctica de Enrolled Attendance",
-        exact: true,
-      })
-      .click();
-    const independentDraft = page.getByRole("textbox", {
-      name: /Práctica.*Enrolled Attendance/u,
-    });
-    await independentDraft.fill("100");
     await saveGrade(page, "Teoría", "0");
-    await expect(independentDraft).toHaveValue("100");
     const pending = (await read(page, path)).participants.find(
       (person) => person.registrationId === fixture.paid.id,
     )!;
@@ -209,18 +218,61 @@ test("INSTRUCTOR saves zero distinctly from missing, retains another draft, and 
       finalGrade: null,
       decisionGrade: "0.00",
     });
+    expect(pending.grades[1]?.score).toBeNull();
     await page
       .getByRole("button", {
-        name: "Guardar Práctica de Enrolled Attendance",
+        name: "Editar notas de Enrolled Attendance",
         exact: true,
       })
       .click();
+    const theory = page.getByRole("textbox", {
+      name: /Teoría.*Enrolled Attendance/u,
+    });
+    const practical = page.getByRole("textbox", {
+      name: /Práctica.*Enrolled Attendance/u,
+    });
+    const save = page.getByRole("button", {
+      name: "Guardar notas de Enrolled Attendance",
+      exact: true,
+    });
+    await expect(save).toBeDisabled();
+    await practical.fill("100");
+    await theory.fill("");
+    await expect(save).toBeDisabled();
+    await theory.fill("80");
+    const writes: unknown[] = [];
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        new URL(request.url()).pathname === path
+      )
+        writes.push(request.postDataJSON());
+    });
+    await save.click();
     await expect(
-      page.getByText("Nota final: 66,67 / 100", { exact: true }),
+      page.getByRole("button", {
+        name: "Editar notas de Enrolled Attendance",
+        exact: true,
+      }),
     ).toBeVisible();
-    await saveGrade(page, "Teoría", "80");
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toMatchObject({
+      registrationId: fixture.paid.id,
+      grades: [
+        {
+          componentId: pending.grades[0]!.componentId,
+          gradeRevision: pending.grades[0]!.revision,
+          score: "80",
+        },
+        {
+          componentId: pending.grades[1]!.componentId,
+          gradeRevision: 0,
+          score: "100",
+        },
+      ],
+    });
     await expect(
-      page.getByText("Nota final: 93,33 / 100", { exact: true }),
+      page.getByText("Nota final: 93,33", { exact: true }),
     ).toBeVisible();
     expect(
       (await read(page, path)).participants.find(
@@ -273,7 +325,7 @@ test("INSTRUCTOR saves zero distinctly from missing, retains another draft, and 
     ).toBe(true);
     await expect(
       page.getByRole("button", {
-        name: "Editar Teoría de Enrolled Attendance",
+        name: "Editar notas de Enrolled Attendance",
         exact: true,
       }),
     ).toBeVisible();
@@ -327,7 +379,7 @@ async function verifySsr(
       .getByRole("button", { name: "Guardar nota", exact: true })
       .click();
     await expect(
-      page.getByText("Nota final: 0,00 / 100", { exact: true }),
+      page.getByText("Nota final: 0,00", { exact: true }),
     ).toBeVisible();
     expect(
       (await read(page, group)).participants.find(

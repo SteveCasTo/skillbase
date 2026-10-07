@@ -106,7 +106,6 @@ describe("private route policies and caching", () => {
       "/app/instructores/nuevo",
       "/app/interesados",
       "/app/mis-cursos",
-      "/app/participantes",
       "/app/perfil",
       "/app/perfil/contrasena",
       "/app/preinscripciones",

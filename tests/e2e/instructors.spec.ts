@@ -73,7 +73,7 @@ test("ADMIN creates and edits a registered instructor with a semantic full-card 
         new URL(response.url()).pathname,
       ),
   );
-  await phoneForm.getByRole("button", { name: "Guardar", exact: true }).click();
+  await phoneForm.getByRole("button", { name: /^Guardar / }).click();
   expect((await saved).status()).toBe(200);
   await page.reload();
   await expect(

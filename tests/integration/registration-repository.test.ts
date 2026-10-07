@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, expect, test } from "bun:test";
 import { eq, sql } from "drizzle-orm";
-import { createDatabase } from "@/server/db/client";
+import { createDatabase, withRequestDatabase } from "@/server/db/client";
 import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
 import { DrizzleInterestRepository } from "@/server/db/repositories/interest-repository";
 import { DrizzleGroupRepository } from "@/server/db/repositories/group-repository";
@@ -10,8 +10,13 @@ import type { CreateRegistrationInput } from "@/domain/pre-registrations/types";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { createInstructorFixture } from "../fixtures/instructors";
 import { evaluationFixtureTables } from "../fixtures/evaluation-cleanup";
+import { lookupRegistrationPeople as lookupPeople } from "@/server/pre-registrations/loaders";
 
-const database = createDatabase(getTestSupabaseEnvironment().databaseUrl, {
+const lookupRegistrationPeople: typeof lookupPeople = (...args) =>
+  withRequestDatabase(() => lookupPeople(...args), undefined, testDatabaseUrl);
+
+const testDatabaseUrl = getTestSupabaseEnvironment().databaseUrl;
+const database = createDatabase(testDatabaseUrl, {
   max: 8,
 });
 const db = database.db;
@@ -624,7 +629,7 @@ test("participant revisions update globally without changing historical money an
   ).toEqual([updated.id]);
 });
 
-test("interest prefill is same-course editable trace only and does not mutate public interest metrics", async () => {
+test("interest conversion consumes operational demand permanently while preserving historical source and financial idempotency", async () => {
   const f = await fixture();
   const [interest] = await db
     .insert(schema.interestRegistrations)
@@ -639,17 +644,26 @@ test("interest prefill is same-course editable trace only and does not mutate pu
   const form = await repository.form(f.course.id, f.actor.id, interest!.id);
   expect(form!.sourceInterest!.firstName).toBe("Public");
   const interests = new DrizzleInterestRepository(db);
+  const other = await fixture();
+  const [independent] = await db
+    .insert(schema.interestRegistrations)
+    .values({
+      courseId: other.course.id,
+      firstName: "Public",
+      lastName: "Origin",
+      email: interest!.email,
+    })
+    .returning();
   expect(
     (await interests.course(f.course.id))!.availableForPrefillInterestIds,
   ).toContain(interest!.id);
-  const row = await repository.create(
-    {
-      ...f.input,
-      sourceInterestId: interest!.id,
-      initialPayment: { amountCents: 2001, effectiveDate: null },
-    },
-    f.actor.id,
-  );
+  const command = {
+    ...f.input,
+    sourceInterestId: interest!.id,
+    initialPayment: { amountCents: 2001, effectiveDate: null },
+  };
+  const row = await repository.create(command, f.actor.id);
+  expect(await repository.create(command, f.actor.id)).toEqual(row);
   expect(row.sourceInterestId).toBe(interest!.id);
   expect(row.participant.firstName).toBe("Synthetic");
   expect(row.paidCents).toBe(2001);
@@ -661,7 +675,49 @@ test("interest prefill is same-course editable trace only and does not mutate pu
   expect(
     availableAfterRegistration!.availableForPrefillInterestIds,
   ).not.toContain(interest!.id);
-  expect(availableAfterRegistration!.metrics.activeTotal).toBe(1);
+  expect(availableAfterRegistration!.registrations).toEqual([]);
+  expect(availableAfterRegistration!.metrics.activeTotal).toBe(0);
+  expect(
+    availableAfterRegistration!.metrics.byPreference.every(
+      (bucket) => bucket.activeCount === 0,
+    ),
+  ).toBe(true);
+  expect(
+    (await interests.summary()).find(
+      (course) => course.courseId === f.course.id,
+    )?.activeTotal,
+  ).toBe(0);
+  for (const intent of ["cancel", "reactivate"] as const) {
+    await expect(
+      interests.mutate(
+        f.course.id,
+        {
+          interestRegistrationId: interest!.id,
+          revision: interest!.updatedAt.toISOString(),
+          intent,
+        },
+        f.actor.id,
+      ),
+    ).rejects.toMatchObject({ code: "INTEREST_REGISTRATION_NOT_FOUND" });
+  }
+  const cancelled = await repository.cancel(
+    { ...mutation(row), reason: "Synthetic cancellation", refundedNow: null },
+    f.actor.id,
+  );
+  expect(cancelled.registration.state).toBe("CANCELLED");
+  expect((await interests.course(f.course.id))!.registrations).toEqual([]);
+  expect(
+    (await interests.course(f.course.id, "ACTIVE"))!.metrics.activeTotal,
+  ).toBe(0);
+  expect(
+    (await interests.course(f.course.id, "CANCELLED"))!.registrations,
+  ).toEqual([]);
+  expect(
+    (await interests.course(other.course.id))!.availableForPrefillInterestIds,
+  ).toContain(independent!.id);
+  expect((await interests.course(other.course.id))!.metrics.activeTotal).toBe(
+    1,
+  );
   await expect(
     repository.form(f.course.id, f.actor.id, interest!.id),
   ).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -683,7 +739,6 @@ test("interest prefill is same-course editable trace only and does not mutate pu
         .where(eq(schema.interestRegistrations.id, interest!.id))
     )[0],
   ).toEqual(interest!);
-  const other = await fixture();
   await expect(
     repository.form(other.course.id, other.actor.id, interest!.id),
   ).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -693,6 +748,149 @@ test("interest prefill is same-course editable trace only and does not mutate pu
       other.actor.id,
     ),
   ).rejects.toMatchObject({ code: "NOT_FOUND" });
+});
+test("interest picker offers normalized active same-course sources only, never global participants", async () => {
+  const f = await fixture();
+  const other = await fixture();
+  await repository.create(
+    {
+      ...other.input,
+      participant: {
+        ...other.input.participant,
+        firstName: "José",
+        lastName: "Muñoz",
+      },
+    },
+    other.actor.id,
+  );
+  const [available, cancelled] = await db
+    .insert(schema.interestRegistrations)
+    .values([
+      {
+        courseId: f.course.id,
+        firstName: "José",
+        lastName: "Muñoz",
+        email: "first@test.invalid",
+      },
+      {
+        courseId: f.course.id,
+        firstName: "José",
+        lastName: "Muñoz",
+        email: "cancelled@test.invalid",
+        status: "CANCELLED" as const,
+      },
+      {
+        courseId: other.course.id,
+        firstName: "José",
+        lastName: "Muñoz",
+        email: "foreign@test.invalid",
+      },
+    ])
+    .returning();
+  const actor = { ...f.actor, roles: ["ADMIN" as const] };
+  const result = await lookupRegistrationPeople(
+    actor,
+    "  JOSE\u00a0  MUNOZ ",
+    f.course.id,
+  );
+  expect(result.participants).toEqual([]);
+  expect(result.interests.map((row) => row.id)).toEqual([available!.id]);
+  expect(await lookupRegistrationPeople(actor, "Jose")).toEqual({
+    participants: [],
+    interests: [],
+  });
+  expect(
+    await lookupRegistrationPeople(actor, "Jose", crypto.randomUUID()),
+  ).toEqual({ participants: [], interests: [] });
+  await expect(
+    lookupRegistrationPeople(actor, "Jose", "invalid-course"),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  await expect(
+    repository.form(f.course.id, f.actor.id, cancelled!.id),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  await expect(
+    repository.create(
+      { ...f.input, sourceInterestId: cancelled!.id },
+      f.actor.id,
+    ),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  const created = await repository.create(
+    { ...f.input, sourceInterestId: available!.id },
+    f.actor.id,
+  );
+  expect(
+    (await lookupRegistrationPeople(actor, "Jose", f.course.id)).interests,
+  ).toEqual([]);
+  await repository.cancel(
+    { ...mutation(created), reason: "Synthetic", refundedNow: null },
+    f.actor.id,
+  );
+  expect(
+    (await lookupRegistrationPeople(actor, "Jose", f.course.id)).interests,
+  ).toEqual([]);
+  await db
+    .update(schema.users)
+    .set({ status: "DISABLED" })
+    .where(eq(schema.users.id, actor.id));
+  await expect(
+    lookupRegistrationPeople(actor, "Jose", f.course.id),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+});
+
+test("interest conversion rollback leaves source available and does not change existing CI identity or financial history", async () => {
+  const f = await fixture();
+  const other = await fixture();
+  const existing = await repository.create(other.input, other.actor.id);
+  const [interest] = await db
+    .insert(schema.interestRegistrations)
+    .values({
+      courseId: f.course.id,
+      firstName: "Public",
+      lastName: "Origin",
+      email: "rollback@test.invalid",
+    })
+    .returning();
+  const failed = {
+    ...f.input,
+    sourceInterestId: interest!.id,
+    participant: { ...other.input.participant, firstName: "Different" },
+  };
+  await expect(repository.create(failed, f.actor.id)).rejects.toMatchObject({
+    code: "PARTICIPANT_DETAILS_CONFLICT",
+  });
+  const interests = new DrizzleInterestRepository(db);
+  expect(
+    (await interests.course(f.course.id))!.availableForPrefillInterestIds,
+  ).toContain(interest!.id);
+  expect((await interests.course(f.course.id))!.metrics.activeTotal).toBe(1);
+  expect(
+    (
+      await repository.list(
+        { courseId: f.course.id, page: 1, pageSize: 20 },
+        f.actor.id,
+      )
+    ).total,
+  ).toBe(0);
+  expect(
+    await db
+      .select()
+      .from(schema.registrationCommandReceipts)
+      .where(
+        eq(schema.registrationCommandReceipts.requestKey, failed.requestKey),
+      ),
+  ).toEqual([]);
+  const created = await repository.create(
+    { ...failed, participant: other.input.participant },
+    f.actor.id,
+  );
+  expect(created.participant.id).toBe(existing.participant.id);
+  expect(
+    (await repository.detail(existing.id, other.actor.id))!.ledger,
+  ).toHaveLength(1);
+  expect(
+    (await repository.detail(created.id, f.actor.id))!.ledger,
+  ).toHaveLength(1);
+  expect((await interests.course(f.course.id))!.metrics.activeTotal).toBe(0);
 });
 test("eligibility rechecks withdrawn course, cancelled group and inactive instructor under transaction locks", async () => {
   const f = await fixture();

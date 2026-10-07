@@ -15,54 +15,86 @@ const lifecycle = editor.previous
 ---
 
 <PrivateLayout title="Editar instructor">
-  <a href="/app/instructores" class="text-sm underline underline-offset-4">
-    Instructores
-  </a>
+  <nav aria-label="Ruta de navegación" class="text-sm text-muted-foreground">
+    <ol class="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <li>
+        <a
+          href="/app"
+          class="inline-flex min-h-11 items-center hover:underline"
+        >
+          Resumen
+        </a>
+      </li>
+      <li aria-hidden="true">/</li>
+      <li>
+        <a
+          href="/app/instructores"
+          class="inline-flex min-h-11 items-center hover:underline"
+        >
+          Instructores
+        </a>
+      </li>
+      <li aria-hidden="true">/</li>
+      <li aria-current="page" class="font-medium text-foreground">
+        Editar instructor
+      </li>
+    </ol>
+  </nav>
   {lifecycle ? (
     <InstructorLifecyclePanel
       state={lifecycle}
       revision={editor.revision}
       endpoint={Astro.url.pathname}
     >
-      <h1 class="text-3xl font-semibold tracking-tight">Editar instructor</h1>
+      <h1 slot="heading" class="text-3xl font-semibold tracking-tight">
+        Editar instructor
+      </h1>
+      <div class="min-w-0 [&>[data-instructor-details]]:mt-0">
+        {editor.error && !editor.submittedField && (
+          <p role="alert" class="mt-6 text-destructive">
+            {editor.error}
+          </p>
+        )}
+        {Astro.url.searchParams.get("success") === "saved" && (
+          <p role="status" class="mt-6">
+            Instructor guardado correctamente.
+          </p>
+        )}
+        {["activate", "deactivate"].includes(
+          Astro.url.searchParams.get("success") ?? "",
+        ) && (
+          <p role="status" class="mt-6">
+            Acceso de la cuenta actualizado correctamente.
+          </p>
+        )}
+        {editor.previous && (
+          <InstructorDetails
+            values={editor.values}
+            errors={editor.errors}
+            revision={editor.revision}
+            baseline={{
+              firstName: editor.previous.firstName,
+              lastName: editor.previous.lastName,
+              email: editor.previous.email,
+              phone: editor.previous.phone ?? "",
+            }}
+            submittedField={editor.submittedField}
+            error={editor.error}
+          />
+        )}
+      </div>
     </InstructorLifecyclePanel>
   ) : (
-    <h1 class="mt-5 text-3xl font-semibold tracking-tight">
-      Editar instructor
-    </h1>
-  )}
-  {editor.error && !editor.submittedField && (
-    <p role="alert" class="mt-6 text-destructive">
-      {editor.error}
-    </p>
-  )}
-  {Astro.url.searchParams.get("success") === "saved" && (
-    <p role="status" class="mt-6">
-      Instructor guardado correctamente.
-    </p>
-  )}
-  {["activate", "deactivate"].includes(
-    Astro.url.searchParams.get("success") ?? "",
-  ) && (
-    <p role="status" class="mt-6">
-      Acceso de la cuenta actualizado correctamente.
-    </p>
-  )}
-  {editor.previous ? (
-    <InstructorDetails
-      values={editor.values}
-      errors={editor.errors}
-      revision={editor.revision}
-      baseline={{
-        firstName: editor.previous.firstName,
-        lastName: editor.previous.lastName,
-        email: editor.previous.email,
-        phone: editor.previous.phone ?? "",
-      }}
-      submittedField={editor.submittedField}
-      error={editor.error}
-    />
-  ) : (
-    <p class="mt-6">El instructor no existe.</p>
+    <>
+      <h1 class="mt-5 text-3xl font-semibold tracking-tight">
+        Editar instructor
+      </h1>
+      {editor.error && !editor.submittedField && (
+        <p role="alert" class="mt-6 text-destructive">
+          {editor.error}
+        </p>
+      )}
+      <p class="mt-6">El instructor no existe.</p>
+    </>
   )}
 </PrivateLayout>

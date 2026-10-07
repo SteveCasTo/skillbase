@@ -1,5 +1,6 @@
 ---
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import PrivateBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import RegistrationDetailPanel from "@/components/pre-registrations/RegistrationDetailPanel.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
 import { requireInternalUser } from "@/server/auth/context";
@@ -42,7 +43,11 @@ try {
     return new Response(null, { status: 405, headers: { Allow: "GET, POST" } });
   if (Astro.request.method === "POST") {
     const operation = singleQuery(Astro.url.searchParams, "operation");
-    if (!["payment", "refund", "transfer", "cancel"].includes(operation))
+    if (
+      !["payment", "refund", "transfer", "cancel", "participant"].includes(
+        operation,
+      )
+    )
       throw new RegistrationError(
         "VALIDATION_FAILED",
         "Selecciona una operación válida.",
@@ -89,54 +94,23 @@ try {
   <RegistrationDetailPanel {detail} {form} serverNow={now.toISOString()} />
 ) : (
   <PrivateLayout title="Detalle de preinscripción">
-    <nav
-      aria-label="Ruta de navegación"
-      class="flex flex-wrap items-center gap-2 text-sm"
-    >
-      <a href="/app/preinscripciones" class="underline underline-offset-4">
-        Preinscripciones
-      </a>
-      {form && (
-        <>
-          <span aria-hidden="true">/</span>
-          <a
-            href={`/app/preinscripciones?courseId=${form.course.id}`}
-            class="break-words underline underline-offset-4"
-          >
-            {form.course.name}
-          </a>
-        </>
-      )}
-      <span aria-hidden="true">/</span>
-      <span aria-current="page">Detalle</span>
-    </nav>
+    <PrivateBreadcrumbs
+      current="Detalle"
+      parents={[
+        { label: "Resumen", href: "/app" },
+        { label: "Preinscripciones", href: "/app/preinscripciones" },
+        ...(form
+          ? [
+              {
+                label: form.course.name,
+                href: `/app/preinscripciones?courseId=${form.course.id}`,
+              },
+            ]
+          : []),
+      ]}
+    />
     {detail && form ? (
       <>
-        <header class="mt-5 flex flex-wrap items-start justify-between gap-5">
-          <div>
-            <h1
-              data-registration-person-name
-              class="break-words text-3xl font-semibold tracking-tight"
-            >
-              {detail.registration.participant.firstName}{" "}
-              {detail.registration.participant.lastName}
-            </h1>
-            <p
-              data-registration-course-group
-              data-course-name={form.course.name}
-              class="mt-3 break-words text-muted-foreground"
-            >
-              {detail.registration.courseName ?? form.course.name} ·{" "}
-              {detail.registration.groupName ?? "Grupo asignado"}
-            </p>
-          </div>
-          <a
-            href={`/app/participantes/${detail.registration.participant.id}?registrationId=${id}`}
-            class="inline-flex min-h-11 items-center underline underline-offset-4"
-          >
-            Abrir ficha del participante
-          </a>
-        </header>
         {Astro.url.searchParams.has("success") && (
           <p role="status" class="mt-5 text-sm">
             Operación registrada. El estado y los importes están actualizados.

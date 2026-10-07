@@ -80,9 +80,9 @@ test("email login, keyboard password toggle, own profile and secure password cha
   await page
     .getByRole("button", { name: "Cambiar contraseña", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText(
-    "Contraseña actualizada",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Contraseña actualizada" }),
+  ).toContainText("Contraseña actualizada");
   await page
     .getByRole("button", { name: "Cerrar sesión", exact: true })
     .first()
@@ -139,9 +139,9 @@ test("login and profile work without JavaScript and do not overflow on mobile", 
     page.getByRole("button", { name: "Cambiar contraseña", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("status")).toContainText(
-    "Contraseña actualizada",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Contraseña actualizada" }),
+  ).toContainText("Contraseña actualizada");
   await page.goto("/app/asistencia");
   await expect(page).toHaveURL(/\/unauthorized\?reason=forbidden$/u);
   await context.close();
@@ -234,9 +234,8 @@ test("dedicated recovery validates inline and locks submit until a neutral pendi
     });
   });
   await submit.click();
-  await expect(
-    page.getByRole("button", { name: "Procesando…" }),
-  ).toBeDisabled();
+  await expect(submit).toBeDisabled();
+  await expect(submit).toHaveAttribute("aria-busy", "true");
   release!();
   await expect(page.locator("[data-auth-result]")).toContainText(
     "Si podemos procesar",

@@ -25,7 +25,7 @@ test("admin can inline-edit only its persisted account name", async ({
     .locator('input[name="revision"]')
     .inputValue();
   await name.fill("Ada Admin editada");
-  await form.getByRole("button", { name: "Guardar", exact: true }).click();
+  await form.getByRole("button", { name: /^Guardar / }).click();
   await expect(form.locator("[data-inline-value]")).toHaveText(
     "Ada Admin editada",
   );
@@ -40,7 +40,7 @@ test("admin can inline-edit only its persisted account name", async ({
   await form.locator('input[name="revision"]').evaluate((input, value) => {
     (input as HTMLInputElement).value = value;
   }, staleRevision);
-  await form.getByRole("button", { name: "Guardar", exact: true }).click();
+  await form.getByRole("button", { name: /^Guardar / }).click();
   await expect(form.locator("[data-form-error]")).toContainText(
     "El perfil cambió. Recarga y revisa antes de guardar.",
   );
@@ -52,7 +52,7 @@ test("admin can inline-edit only its persisted account name", async ({
     .getByRole("button", { name: "Editar nombre", exact: true })
     .click();
   await form.getByLabel("Nombre", { exact: true }).fill(original);
-  await form.getByRole("button", { name: "Guardar", exact: true }).click();
+  await form.getByRole("button", { name: /^Guardar / }).click();
   await expect(form.locator("[data-inline-value]")).toHaveText(original);
 });
 
@@ -100,7 +100,7 @@ test("own profile saves fields independently, preserves other edits and advances
       }),
     }),
   );
-  await nameForm.getByRole("button", { name: "Guardar", exact: true }).click();
+  await nameForm.getByRole("button", { name: /^Guardar / }).click();
   await expect(
     nameForm.locator('[data-field-error="firstName"]'),
   ).toBeVisible();
@@ -115,7 +115,7 @@ test("own profile saves fields independently, preserves other edits and advances
     page.locator('[data-sileo-toast][data-state="error"]'),
   ).toBeHidden();
   await page.unroute(endpoint);
-  await nameForm.getByRole("button", { name: "Guardar", exact: true }).click();
+  await nameForm.getByRole("button", { name: /^Guardar / }).click();
   await expect(
     nameForm.getByRole("button", { name: "Editar nombre", exact: true }),
   ).toBeFocused();
@@ -155,7 +155,7 @@ test("own profile saves fields independently, preserves other edits and advances
     .getByRole("button", { name: "Editar nombre", exact: true })
     .click();
   await nameForm.getByLabel("Nombre", { exact: true }).fill(originalName);
-  await nameForm.getByRole("button", { name: "Guardar", exact: true }).click();
+  await nameForm.getByRole("button", { name: /^Guardar / }).click();
   await expect(
     nameForm.getByRole("button", { name: "Editar nombre", exact: true }),
   ).toBeFocused();
@@ -176,7 +176,7 @@ test("individual profile POST works without JavaScript and preserves invalid inp
     await form
       .getByLabel("Teléfono (opcional)", { exact: true })
       .fill("+591 70000001");
-    await form.getByRole("button", { name: "Guardar", exact: true }).click();
+    await form.getByRole("button", { name: /^Guardar / }).click();
     await expect(page).toHaveURL(/\/app\/perfil\?status=profile_updated$/u);
     await expect(
       form.getByLabel("Teléfono (opcional)", { exact: true }),
@@ -191,9 +191,7 @@ test("individual profile POST works without JavaScript and preserves invalid inp
         response.request().method() === "POST" &&
         response.url().includes("edit=professional"),
     );
-    await nameForm
-      .getByRole("button", { name: "Guardar", exact: true })
-      .click();
+    await nameForm.getByRole("button", { name: /^Guardar / }).click();
     expect((await invalid).status()).toBe(422);
     await expect(nameForm.getByLabel("Nombre", { exact: true })).toHaveValue(
       " ",
@@ -259,7 +257,7 @@ test("professional edit requires a valid normalized change and undo disables sav
   await form
     .getByRole("button", { name: "Editar nombre", exact: true })
     .click();
-  const submit = form.getByRole("button", { name: "Guardar", exact: true });
+  const submit = form.getByRole("button", { name: /^Guardar / });
   const firstName = form.getByLabel("Nombre", { exact: true });
   const original = await firstName.inputValue();
   await expect(submit).toBeDisabled();
@@ -271,15 +269,25 @@ test("professional edit requires a valid normalized change and undo disables sav
   await expect(submit).toBeDisabled();
   await firstName.fill(original);
   await expect(submit).toBeDisabled();
-  await form.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await form.getByRole("button", { name: /^Cancelar edición de / }).click();
   await expect(firstName).toBeHidden();
   await expect(
     form.getByRole("button", { name: "Editar nombre", exact: true }),
   ).toBeFocused();
-  await expect(page.getByLabel("Correo electrónico")).toHaveAttribute(
-    "readonly",
-    "",
-  );
+  await expect(
+    page
+      .locator("[data-instructor-details]")
+      .getByText(AUTH_FIXTURES.instructor.email, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Correo electrónico", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Editar correo electrónico",
+      exact: true,
+    }),
+  ).toHaveCount(0);
 });
 
 test("instructor and profile layouts fill available width without horizontal overflow", async ({

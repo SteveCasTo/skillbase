@@ -123,7 +123,14 @@ const fields = [
 
 <PrivateLayout title="Nuevo formato">
   <header>
-    <CourseBreadcrumbs current="Nuevo formato" />
+    <CourseBreadcrumbs
+      current="Nuevo formato"
+      parents={[
+        { label: "Resumen", href: "/app" },
+        { label: "Cursos", href: "/app/cursos" },
+        { label: "Formatos", href: "/app/formatos" },
+      ]}
+    />
     <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
       Nuevo formato
     </h1>
@@ -204,7 +211,7 @@ const fields = [
   ></p>
   <script>
     import { navigate } from "astro:transitions/client";
-    import { notifications } from "@/lib/notifications";
+    import { notifyInlineOperation } from "@/lib/inline-operation-feedback";
     import { isUuid } from "@/domain/courses/mutation-result";
     document.addEventListener("astro:page-load", () => {
       const form = document.querySelector<HTMLFormElement>(
@@ -236,96 +243,88 @@ const fields = [
               input.removeAttribute("aria-invalid");
               input.setAttribute("aria-describedby", `${input.name}-hint`);
             });
-            void notifications
-              .promise(
-                async () => {
-                  try {
-                    const response = await fetch("/app/formatos/nuevo", {
-                      method: "POST",
-                      body: new FormData(form),
-                      headers: { Accept: "application/json" },
-                    });
-                    if (
-                      response.redirected ||
-                      !response.headers
-                        .get("content-type")
-                        ?.includes("application/json")
-                    )
-                      throw new Error(
-                        "La sesión cambió. Recarga la página e inténtalo de nuevo.",
+            void notifyInlineOperation(
+              async () => {
+                try {
+                  const response = await fetch("/app/formatos/nuevo", {
+                    method: "POST",
+                    body: new FormData(form),
+                    headers: { Accept: "application/json" },
+                  });
+                  if (
+                    response.redirected ||
+                    !response.headers
+                      .get("content-type")
+                      ?.includes("application/json")
+                  )
+                    throw new Error(
+                      "La sesión cambió. Recarga la página e inténtalo de nuevo.",
+                    );
+                  const result: unknown = await response.json();
+                  if (
+                    !response.ok &&
+                    result &&
+                    typeof result === "object" &&
+                    "errors" in result &&
+                    result.errors &&
+                    typeof result.errors === "object"
+                  ) {
+                    for (const [name, message] of Object.entries(
+                      result.errors,
+                    )) {
+                      if (typeof message !== "string") continue;
+                      const input = inputs.find((item) => item.name === name);
+                      if (!input) continue;
+                      const hint = document.createElement("p");
+                      hint.dataset.asyncError = name;
+                      hint.id = `${name}-async-error`;
+                      hint.className = "mt-1 text-sm text-destructive";
+                      hint.textContent = message;
+                      input.parentElement?.append(hint);
+                      input.setAttribute("aria-invalid", "true");
+                      input.setAttribute(
+                        "aria-describedby",
+                        `${name}-hint ${hint.id}`,
                       );
-                    const result: unknown = await response.json();
-                    if (
-                      !response.ok &&
-                      result &&
-                      typeof result === "object" &&
-                      "errors" in result &&
-                      result.errors &&
-                      typeof result.errors === "object"
-                    ) {
-                      for (const [name, message] of Object.entries(
-                        result.errors,
-                      )) {
-                        if (typeof message !== "string") continue;
-                        const input = inputs.find((item) => item.name === name);
-                        if (!input) continue;
-                        const hint = document.createElement("p");
-                        hint.dataset.asyncError = name;
-                        hint.id = `${name}-async-error`;
-                        hint.className = "mt-1 text-sm text-destructive";
-                        hint.textContent = message;
-                        input.parentElement?.append(hint);
-                        input.setAttribute("aria-invalid", "true");
-                        input.setAttribute(
-                          "aria-describedby",
-                          `${name}-hint ${hint.id}`,
-                        );
-                      }
                     }
-                    if (
-                      !response.ok ||
-                      !result ||
-                      typeof result !== "object" ||
-                      !("id" in result) ||
-                      !isUuid(result.id)
-                    )
-                      throw new Error(
-                        result &&
-                          typeof result === "object" &&
-                          "message" in result &&
-                          typeof result.message === "string"
-                          ? result.message
-                          : "No se pudo crear el formato.",
-                      );
-                    await navigate("/app/formatos");
-                  } catch (failure) {
-                    if (error) {
-                      error.textContent =
-                        failure instanceof Error
-                          ? failure.message
-                          : "No se pudo crear el formato.";
-                      error.hidden = false;
-                      error.focus();
-                    }
-                    throw failure;
-                  } finally {
-                    pending = false;
-                    button.removeAttribute("aria-busy");
-                    update();
                   }
-                },
-                {
-                  loading: { title: "Creando formato…" },
-                  success: { title: "Formato creado." },
-                  error: (failure) => ({
-                    title:
+                  if (
+                    !response.ok ||
+                    !result ||
+                    typeof result !== "object" ||
+                    !("id" in result) ||
+                    !isUuid(result.id)
+                  )
+                    throw new Error(
+                      result &&
+                        typeof result === "object" &&
+                        "message" in result &&
+                        typeof result.message === "string"
+                        ? result.message
+                        : "No se pudo crear el formato.",
+                    );
+                  await navigate("/app/formatos");
+                } catch (failure) {
+                  if (error) {
+                    error.textContent =
                       failure instanceof Error
                         ? failure.message
-                        : "No se pudo crear el formato.",
-                  }),
-                },
-              )
-              .catch(() => {});
+                        : "No se pudo crear el formato.";
+                    error.hidden = false;
+                    error.focus();
+                  }
+                  throw failure;
+                } finally {
+                  pending = false;
+                  button.removeAttribute("aria-busy");
+                  update();
+                }
+              },
+              {
+                loading: { title: "Creando formato…" },
+                success: { title: "Formato creado." },
+              },
+            ).catch(() => {});
           });
           const allowed = (kind: string, value: string) => {
             if (kind === "name")

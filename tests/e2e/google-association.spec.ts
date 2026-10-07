@@ -125,9 +125,9 @@ test("mismatched Google restores the owner; unsolicited attachment leaves passwo
   await page
     .getByRole("button", { name: "Cambiar contraseña", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText(
-    "Contraseña actualizada",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Contraseña actualizada" }),
+  ).toContainText("Contraseña actualizada");
   await expect(
     page.getByRole("button", { name: "Asociar Google" }),
   ).toBeVisible();
@@ -139,7 +139,9 @@ test("mismatched Google restores the owner; unsolicited attachment leaves passwo
   const explicitCode = await completeLinkProviderFixture(explicitRedirect, id);
   await page.goto(`/auth/callback?code=${encodeURIComponent(explicitCode)}`);
   await expect(page).toHaveURL("/app/perfil?status=linked");
-  await expect(page.getByRole("status")).toContainText("Google está asociado");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Google está asociado" }),
+  ).toContainText("Google está asociado");
   await expect(
     page.getByRole("button", { name: "Asociar Google" }),
   ).toHaveCount(0);
@@ -276,9 +278,9 @@ test("Google-only ADMIN creates a password with recent approved OAuth, then reco
   await page
     .getByRole("button", { name: "Restablecer contraseña", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText(
-    "Contraseña actualizada",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Contraseña actualizada" }),
+  ).toContainText("Contraseña actualizada");
   await page
     .getByRole("button", { name: "Cerrar sesión", exact: true })
     .first()

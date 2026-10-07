@@ -1,32 +1,37 @@
 ---
 interface Props {
   current: string;
+  parents?: readonly { label: string; href: string }[];
 }
 
-const { current } = Astro.props;
+const {
+  current,
+  parents = [
+    { label: "Resumen", href: "/app" },
+    { label: "Cursos", href: "/app/cursos" },
+  ],
+} = Astro.props;
 ---
 
 <nav aria-label="Ruta de navegación" class="text-sm text-muted-foreground">
   <ol class="flex flex-wrap items-center gap-2">
-    <li>
-      <a
-        href="/app"
-        class="rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-      >
-        Resumen
-      </a>
-    </li>
-    <li aria-hidden="true">/</li>
-    <li>
-      <a
-        href="/app/cursos"
-        class="rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-      >
-        Cursos
-      </a>
-    </li>
-    <li aria-hidden="true">/</li>
-    <li aria-current="page" class="font-medium text-foreground">
+    {parents.map((parent) => (
+      <>
+        <li class="min-w-0">
+          <a
+            href={parent.href}
+            class="inline-flex min-h-11 items-center break-words rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            {parent.label}
+          </a>
+        </li>
+        <li aria-hidden="true">/</li>
+      </>
+    ))}
+    <li
+      aria-current="page"
+      class="min-w-0 break-words font-medium text-foreground"
+    >
       {current}
     </li>
   </ol>

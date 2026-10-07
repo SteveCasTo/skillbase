@@ -1,6 +1,6 @@
 import type {
   CourseEvaluationsDto,
-  SaveEvaluationGradeInput,
+  SaveEvaluationRowInput,
   SaveEvaluationSchemeInput,
 } from "@/domain/evaluations/types";
 
@@ -18,6 +18,6 @@ export type EvaluationSaveResult =
 export type SaveScheme = (
   input: SaveEvaluationSchemeInput,
 ) => Promise<EvaluationSaveResult>;
-export type SaveGrade = (
-  input: SaveEvaluationGradeInput,
+export type SaveRow = (
+  input: SaveEvaluationRowInput,
 ) => Promise<EvaluationSaveResult>;

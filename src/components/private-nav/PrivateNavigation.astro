@@ -18,13 +18,12 @@ interface Props {
 const { mode, currentPath, isAdmin, isInstructor } = Astro.props;
 const courseActive =
   currentPath === "/app/cursos" || currentPath.startsWith("/app/cursos/");
-const formatActive = currentPath === "/app/formatos";
+const formatActive =
+  currentPath === "/app/formatos" || currentPath.startsWith("/app/formatos/");
 const interestActive =
   currentPath === "/app/interesados" ||
   currentPath.startsWith("/app/interesados/");
-const registrationActive =
-  currentPath.startsWith("/app/preinscripciones") ||
-  currentPath.startsWith("/app/participantes");
+const registrationActive = currentPath.startsWith("/app/preinscripciones");
 ---
 
 <nav

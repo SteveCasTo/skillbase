@@ -21,12 +21,6 @@ const { scheme } = Astro.props;
       </p>
     )}
   </header>
-  {scheme.frozenAt && (
-    <p class="text-sm text-muted-foreground">
-      El esquema ya no puede modificarse porque se guardó la primera nota del
-      curso.
-    </p>
-  )}
   {scheme.components.length ? (
     <ul class="divide-y rounded-xl border bg-card px-5">
       {scheme.components.map((component) => (

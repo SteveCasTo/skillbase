@@ -99,10 +99,14 @@ export function bindRegistrationMutation<T>(
     const button = form.querySelector<HTMLButtonElement>(
       'button[type="submit"], button[data-cancel-trigger]',
     );
-    const label = button?.textContent ?? "Guardar";
-    if (button) button.textContent = "Registrando…";
+    // Do not replace the button's children: inline saves contain a persistent SVG.
+    button?.setAttribute("aria-busy", "true");
+    const registering = form.hasAttribute("data-registration-form");
     const toastId = `registration-${crypto.randomUUID()}`;
-    notifications.loading({ id: toastId, title: "Registrando…" });
+    notifications.loading({
+      id: toastId,
+      title: registering ? "Registrando…" : "Guardando…",
+    });
     try {
       const result = await adapter.submit({ ...values, requestKey: key });
       if (result.ok) {
@@ -120,13 +124,14 @@ export function bindRegistrationMutation<T>(
             ? result.issues
             : { ...result.issues, form: result.message },
         );
-        if (hasFieldIssues) notifications.dismiss(toastId);
+        if (hasFieldIssues || form.querySelector("[data-inline-field]"))
+          notifications.dismiss(toastId);
         else {
           const alert = form.querySelector<HTMLElement>("[data-form-error]");
           if (alert) alert.textContent = "";
           notifications.error({
             id: toastId,
-            title: "No se pudo registrar",
+            title: registering ? "No se pudo registrar" : "No se pudo guardar",
             description: result.message,
           });
         }
@@ -136,12 +141,18 @@ export function bindRegistrationMutation<T>(
         form: "No se pudo confirmar el registro. Conservamos tus datos; reintenta para comprobar el mismo movimiento.",
       });
       const alert = form.querySelector<HTMLElement>("[data-form-error]");
-      if (alert) alert.textContent = "";
-      notifications.error({
-        id: toastId,
-        title: "Sin confirmación",
-        description: "Reintenta sin cambiar los datos.",
-      });
+      if (alert && form.querySelector("[data-inline-field]")) {
+        alert.textContent =
+          "No se pudo confirmar el guardado. Conservamos tus cambios; reintenta sin cambiar los datos.";
+        notifications.dismiss(toastId);
+      } else {
+        if (alert) alert.textContent = "";
+        notifications.error({
+          id: toastId,
+          title: "Sin confirmación",
+          description: "Reintenta sin cambiar los datos.",
+        });
+      }
     } finally {
       state.finish();
       delete form.dataset.pending;
@@ -149,7 +160,7 @@ export function bindRegistrationMutation<T>(
       controls.forEach((control, index) => {
         control.disabled = previous[index]!;
       });
-      if (button) button.textContent = label;
+      button?.removeAttribute("aria-busy");
       form.dispatchEvent(new Event("registration:updated"));
       if (form.hasAttribute("data-participant-edit"))
         document
@@ -162,6 +173,14 @@ export function bindRegistrationMutation<T>(
       );
       if (firstError) firstError.focus();
       else if (
+        form
+          .querySelector<HTMLElement>("[data-form-error]")
+          ?.textContent?.trim()
+      ) {
+        const alert = form.querySelector<HTMLElement>("[data-form-error]")!;
+        alert.tabIndex = -1;
+        alert.focus();
+      } else if (
         form.isConnected &&
         form.querySelector<HTMLElement>("[data-inline-editor][hidden]")
       )

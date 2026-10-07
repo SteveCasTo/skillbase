@@ -1,5 +1,6 @@
 ---
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import PrivateBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import RegistrationList from "@/components/pre-registrations/RegistrationList.astro";
 import RegistrationFilters from "@/components/pre-registrations/RegistrationFilters.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
@@ -109,6 +110,12 @@ next.set("page", String(filter.page + 1));
   </div>
 ) : (
   <PrivateLayout title="Preinscripciones">
+    <div class="mb-5">
+      <PrivateBreadcrumbs
+        current="Preinscripciones"
+        parents={[{ label: "Resumen", href: "/app" }]}
+      />
+    </div>
     <header class="mb-8 flex flex-wrap items-start justify-between gap-5">
       <div>
         <h1 class="text-3xl font-semibold tracking-tight">Preinscripciones</h1>
@@ -117,12 +124,6 @@ next.set("page", String(filter.page + 1));
         </p>
       </div>
       <div class="flex flex-wrap gap-3">
-        <a
-          href="/app/participantes"
-          class={buttonVariants({ variant: "outline" })}
-        >
-          Participantes
-        </a>
         <a href="/app/preinscripciones/nueva" class={buttonVariants()}>
           Registrar preinscripción
         </a>

@@ -604,6 +604,14 @@ const statusLabel = {
       >
         Reintentar acción
       </button>
+      <a
+        data-course-recover
+        hidden
+        href={`/app/cursos/${course.id}/editar`}
+        class="mt-3 inline-flex min-h-11 items-center underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+      >
+        Consultar datos actuales
+      </a>
       <div class="mt-8">
         <CourseForm
           values={values}
@@ -628,6 +636,7 @@ const statusLabel = {
       </div>
       <script>
         import { notifications } from "@/lib/notifications";
+        import { notifyInlineOperation } from "@/lib/inline-operation-feedback";
         import {
           acquireCourseMutation,
           synchronizeCourseRevision,
@@ -681,6 +690,9 @@ const statusLabel = {
           let failedIntent = "";
           const retry = document.querySelector<HTMLButtonElement>(
             "[data-editorial-retry]",
+          );
+          const recovery = document.querySelector<HTMLAnchorElement>(
+            "[data-course-recover]",
           );
           retry?.addEventListener("click", () => {
             if (!pending && failedForm) {
@@ -796,6 +808,7 @@ const statusLabel = {
               if (!release) return;
               pending = true;
               if (retry) retry.hidden = true;
+              if (recovery) recovery.hidden = true;
               button.disabled = true;
               button.setAttribute("aria-busy", "true");
               if (error) error.hidden = true;
@@ -805,113 +818,107 @@ const statusLabel = {
               const acceptedTrigger = trigger;
               restoreAfterMutation = true;
               dialog.close();
-              void notifications
-                .promise(
-                  async () => {
-                    try {
-                      const response = await fetch(mutationPath, {
-                        method: "POST",
-                        headers: { Accept: "application/json" },
-                        body: new FormData(dialogForm),
-                      });
-                      if (
-                        response.redirected ||
-                        !response.headers
-                          .get("content-type")
-                          ?.includes("application/json")
-                      )
-                        throw new Error(
-                          "La sesión cambió. Recarga la página e inténtalo de nuevo.",
-                        );
-                      const result: unknown = await response.json();
-                      if (
-                        !response.ok ||
-                        !result ||
-                        typeof result !== "object" ||
-                        !("revision" in result) ||
-                        !isEditorialResult(result, intent)
-                      )
-                        throw new Error(
-                          result &&
-                            typeof result === "object" &&
-                            "message" in result &&
-                            typeof result.message === "string"
-                            ? result.message
-                            : "No se pudo completar la acción.",
-                        );
-                      if (
-                        !("status" in result) ||
-                        typeof result.status !== "string" ||
-                        !("featured" in result) ||
-                        typeof result.featured !== "boolean"
-                      )
-                        throw new Error(
-                          "Respuesta no válida. Inténtalo nuevamente.",
-                        );
-                      renderEditorial({
-                        status: result.status,
-                        revision: result.revision,
-                        featured: result.featured,
-                      });
-                    } catch (failure) {
-                      failedForm = dialogForm;
-                      failedIntent = intent;
-                      if (retry) retry.hidden = false;
-                      dialog.close();
-                      if (error) {
-                        error.textContent =
-                          failure instanceof Error
-                            ? failure.message
-                            : "No se pudo completar la acción.";
-                        error.hidden = false;
-                        error.setAttribute("tabindex", "-1");
-                        error.focus();
-                      }
-                      throw failure;
-                    } finally {
-                      pending = false;
-                      release();
-                      if (
-                        originalEditor?.isConnected &&
-                        document.activeElement === document.body
-                      ) {
-                        const target =
-                          acceptedTrigger?.isConnected &&
-                          !acceptedTrigger.hidden &&
-                          !acceptedTrigger.disabled
-                            ? acceptedTrigger
-                            : (actions?.querySelector<HTMLButtonElement>(
-                                "[data-confirm-trigger]:not([hidden]):not(:disabled)",
-                              ) ??
-                              document.querySelector<HTMLElement>(
-                                "[data-course-status]",
-                              ));
-                        target?.focus();
-                      }
-                      button.removeAttribute("aria-busy");
-                    }
-                  },
-                  {
-                    loading: { title: "Guardando…" },
-                    success: {
-                      title:
-                        messages[
-                          intent === "publish"
-                            ? "published"
-                            : intent === "withdraw"
-                              ? "withdrawn"
-                              : "archived"
-                        ] ?? "Cambio guardado.",
-                    },
-                    error: (failure) => ({
-                      title:
+              void notifyInlineOperation(
+                async () => {
+                  try {
+                    const response = await fetch(mutationPath, {
+                      method: "POST",
+                      headers: { Accept: "application/json" },
+                      body: new FormData(dialogForm),
+                    });
+                    if (
+                      response.redirected ||
+                      !response.headers
+                        .get("content-type")
+                        ?.includes("application/json")
+                    )
+                      throw new Error(
+                        "La sesión cambió. Recarga la página e inténtalo de nuevo.",
+                      );
+                    const result: unknown = await response.json();
+                    if (response.status === 409 && recovery)
+                      recovery.hidden = false;
+                    if (
+                      !response.ok ||
+                      !result ||
+                      typeof result !== "object" ||
+                      !("revision" in result) ||
+                      !isEditorialResult(result, intent)
+                    )
+                      throw new Error(
+                        result &&
+                          typeof result === "object" &&
+                          "message" in result &&
+                          typeof result.message === "string"
+                          ? result.message
+                          : "No se pudo completar la acción.",
+                      );
+                    if (
+                      !("status" in result) ||
+                      typeof result.status !== "string" ||
+                      !("featured" in result) ||
+                      typeof result.featured !== "boolean"
+                    )
+                      throw new Error(
+                        "Respuesta no válida. Inténtalo nuevamente.",
+                      );
+                    renderEditorial({
+                      status: result.status,
+                      revision: result.revision,
+                      featured: result.featured,
+                    });
+                  } catch (failure) {
+                    failedForm = dialogForm;
+                    failedIntent = intent;
+                    if (retry) retry.hidden = recovery?.hidden === false;
+                    dialog.close();
+                    if (error) {
+                      error.textContent =
                         failure instanceof Error
                           ? failure.message
-                          : "No se pudo completar la acción.",
-                    }),
+                          : "No se pudo completar la acción.";
+                      error.hidden = false;
+                      error.setAttribute("tabindex", "-1");
+                      error.focus();
+                    }
+                    throw failure;
+                  } finally {
+                    pending = false;
+                    release();
+                    if (
+                      originalEditor?.isConnected &&
+                      document.activeElement === document.body
+                    ) {
+                      const target =
+                        acceptedTrigger?.isConnected &&
+                        !acceptedTrigger.hidden &&
+                        !acceptedTrigger.disabled
+                          ? acceptedTrigger
+                          : (actions?.querySelector<HTMLButtonElement>(
+                              "[data-confirm-trigger]:not([hidden]):not(:disabled)",
+                            ) ??
+                            document.querySelector<HTMLElement>(
+                              "[data-course-status]",
+                            ));
+                      target?.focus();
+                    }
+                    button.removeAttribute("aria-busy");
+                  }
+                },
+                {
+                  loading: { title: "Guardando…" },
+                  success: {
+                    title:
+                      messages[
+                        intent === "publish"
+                          ? "published"
+                          : intent === "withdraw"
+                            ? "withdrawn"
+                            : "archived"
+                      ] ?? "Cambio guardado.",
                   },
-                )
-                .catch(() => {});
+                },
+              ).catch(() => {});
             });
           }
           document
@@ -929,85 +936,80 @@ const statusLabel = {
                 if (!release) return;
                 pending = true;
                 if (retry) retry.hidden = true;
+                if (recovery) recovery.hidden = true;
                 if (error) error.hidden = true;
                 button.disabled = true;
-                void notifications
-                  .promise(
-                    async () => {
-                      try {
-                        const response = await fetch(mutationPath, {
-                          method: "POST",
-                          headers: { Accept: "application/json" },
-                          body: new FormData(form),
-                        });
-                        if (
-                          response.redirected ||
-                          !response.headers
-                            .get("content-type")
-                            ?.includes("application/json")
-                        )
-                          throw new Error(
-                            "La sesión cambió. Recarga la página e inténtalo de nuevo.",
-                          );
-                        const result: unknown = await response.json();
-                        if (
-                          !response.ok ||
-                          !result ||
-                          typeof result !== "object" ||
-                          !isEditorialResult(result, "feature")
-                        )
-                          throw new Error(
-                            result &&
-                              typeof result === "object" &&
-                              "message" in result &&
-                              typeof result.message === "string"
-                              ? result.message
-                              : "No se pudo completar la acción.",
-                          );
-                        if (
-                          !("status" in result) ||
-                          typeof result.status !== "string" ||
-                          !("featured" in result) ||
-                          typeof result.featured !== "boolean" ||
-                          typeof result.revision !== "string"
-                        )
-                          throw new Error(
-                            "Respuesta no válida. Inténtalo nuevamente.",
-                          );
-                        renderEditorial({
-                          status: result.status,
-                          revision: result.revision,
-                          featured: result.featured,
-                        });
-                      } catch (failure) {
-                        failedForm = form;
-                        failedIntent = "feature";
-                        if (retry) retry.hidden = false;
-                        if (error) {
-                          error.textContent =
-                            failure instanceof Error
-                              ? failure.message
-                              : "No se pudo completar la acción.";
-                          error.hidden = false;
-                        }
-                        throw failure;
-                      } finally {
-                        pending = false;
-                        release();
-                      }
-                    },
-                    {
-                      loading: { title: "Guardando…" },
-                      success: { title: "Curso seleccionado como destacado." },
-                      error: (failure) => ({
-                        title:
+                void notifyInlineOperation(
+                  async () => {
+                    try {
+                      const response = await fetch(mutationPath, {
+                        method: "POST",
+                        headers: { Accept: "application/json" },
+                        body: new FormData(form),
+                      });
+                      if (
+                        response.redirected ||
+                        !response.headers
+                          .get("content-type")
+                          ?.includes("application/json")
+                      )
+                        throw new Error(
+                          "La sesión cambió. Recarga la página e inténtalo de nuevo.",
+                        );
+                      const result: unknown = await response.json();
+                      if (response.status === 409 && recovery)
+                        recovery.hidden = false;
+                      if (
+                        !response.ok ||
+                        !result ||
+                        typeof result !== "object" ||
+                        !isEditorialResult(result, "feature")
+                      )
+                        throw new Error(
+                          result &&
+                            typeof result === "object" &&
+                            "message" in result &&
+                            typeof result.message === "string"
+                            ? result.message
+                            : "No se pudo completar la acción.",
+                        );
+                      if (
+                        !("status" in result) ||
+                        typeof result.status !== "string" ||
+                        !("featured" in result) ||
+                        typeof result.featured !== "boolean" ||
+                        typeof result.revision !== "string"
+                      )
+                        throw new Error(
+                          "Respuesta no válida. Inténtalo nuevamente.",
+                        );
+                      renderEditorial({
+                        status: result.status,
+                        revision: result.revision,
+                        featured: result.featured,
+                      });
+                    } catch (failure) {
+                      failedForm = form;
+                      failedIntent = "feature";
+                      if (retry) retry.hidden = recovery?.hidden === false;
+                      if (error) {
+                        error.textContent =
                           failure instanceof Error
                             ? failure.message
-                            : "No se pudo completar la acción.",
-                      }),
-                    },
-                  )
-                  .catch(() => {});
+                            : "No se pudo completar la acción.";
+                        error.hidden = false;
+                      }
+                      throw failure;
+                    } finally {
+                      pending = false;
+                      release();
+                    }
+                  },
+                  {
+                    loading: { title: "Guardando…" },
+                    success: { title: "Curso seleccionado como destacado." },
+                  },
+                ).catch(() => {});
               }),
             );
         });
