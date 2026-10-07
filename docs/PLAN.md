@@ -570,7 +570,7 @@ Administración transforma demanda en grupos operativos.
 
 Las correcciones y el gate completo de Fase 4 se integraron mediante PR 136. PRs 173–180 integraron schema/dominio/persistencia transaccional, settings, exportes y rutas HTTP/de roster de Fase 5 en `development`. Fase 5 se promovió a producción como `2e0eecb`; cloud quedó migrado hasta 0017 (ledger 18). El full E2E canónico reportado pasó 125/125 y quality 303 unit / 125 integration; el detalle histórico está en el cierre de producción. La integración y validación local del alcance de fase 5 no incluían asistencia/sesiones ni habilitan módulos académicos.
 
-Los cierres documentales históricos de producción (`46fa1c0`, `152f610`) son commits de documentación únicamente: no forman parte de esta rama ni deben integrarse por cherry-pick/merge. Esta nota reflejaba el límite del release de Fase 5: las correcciones existentes y Fase 6 se liberaron después mediante PR 211, con la evidencia registrada abajo. Las nuevas correcciones del bloque previo a Fase 7 siguen pendientes.
+Los cierres documentales históricos de producción (`46fa1c0`, `152f610`) son commits de documentación únicamente: no forman parte de esta rama ni deben integrarse por cherry-pick/merge. Esta nota reflejaba el límite del release de Fase 5: las correcciones existentes y Fase 6 se liberaron después mediante PR 211. Las correcciones posteriores de 219–223 están integradas en `development`; su gate completo y release siguen pendientes según el cierre actualizado abajo.
 
 #### Implementación integrada en development
 
@@ -689,20 +689,22 @@ Las pruebas focales y full citadas corresponden a sus heads, no a una única eje
 
 ## CORRECCIONES DE EXPERIENCIA ADMINISTRATIVA (planificadas antes de Fase 7)
 
-El cierre de correcciones sigue siendo el gate previo a iniciar Fase 7. PR 219 (C1/C2 backend), PR 221 (ajustes/feedback), PR 222 (perfil de instructor y nombre propio ADMIN) y PR 223 (UI C3 de grupos/participantes) están integrados en `development`, actualmente `c6f98d3c0dba721d4c0f73450b68c8c31de8be90`. PR 220 sincronizó la documentación. Estos cambios aún no se promovieron a producción: `master` sigue en el release Fase 6 anterior (`3c6ae7e2cff74faeb2f0f7de05d63b753418df4a`).
+El cierre de correcciones sigue siendo el gate previo a iniciar Fase 7. PRs 219, 221, 222 y 223 (backend, ajustes/feedback, perfiles y UI C3) están integrados en `development`; PR 220 sincronizó documentación. PRs 225/226 actualizaron únicamente expectativas E2E. El SHA actual es `292c5d42e2babb51a96c558074ef0ac0e1c2b261`; desde el source de aplicación `eacf6feeb26d67da98e46195a07d8777dd180966` no cambiaron aplicación, schema ni dependencias. Ninguno de estos cambios se promovió a producción: `master` continúa en Fase 6 (`3c6ae7e2cff74faeb2f0f7de05d63b753418df4a`), cloud ledger 20.
 
 - [x] Backend C1/C2 mediante PR 219: cancelación y reprogramación requieren `startsAt > now` y ausencia de marcas de participantes e instructor. El repositorio adquiere los locks de horario/sesión antes de volver a leer marcas y muestrear el reloj; el DTO indica explícitamente `canCancel`/`canReplace`. La familia conserva un solo encuentro activo, cronología/historial, duración y control de conflictos.
 - [x] PR 221: configuración con campos independientes y grilla responsive; edición inline de participante, reintegración y transferencia/cancelación conservando draft/revision/idempotencia; feedback sin toast duplicado ante errores de campo.
 - [x] PR 222: instructor y perfil profesional inline por campo, lifecycle con botones condicionados por cursos bloqueantes; edición del nombre propio para ADMIN puro. El alcance y límites de identidad se detallan en [`AUTHENTICATION.md`](AUTHENTICATION.md).
 - [x] Integrar la UI nueva de asistencia/grupo C3 desde `fix/course-group-attendance-ui` mediante PR 223. Incluye página dedicada de participantes/calendario y mantiene privacidad de roster. Está integrada en `development`; no está liberada a producción.
 - [x] Resolver durante PR 223 el conflicto con el componente compartido `RegistrationActionDialog`, conservando el resolver/ownership de PR 221.
-- [ ] Cerrar con un único gate combinado del milestone después de PR 223. La evidencia disponible continúa siendo focal/por heads y no equivale a full gate ni autoriza release. No debilitar pruebas, ocultar retries o reportar como flaky una reejecución con retries deshabilitados.
+- [x] Completar validación local de lint, format, typecheck, unit, integration, Drizzle check y build en el source documentado; resultados y alcance en [`TESTING.md`](TESTING.md).
+- [ ] Cerrar el gate E2E y el CI remoto requerido. El full E2E de 130 escenarios tuvo 99 PASS/31 FAIL; ejecuciones focales posteriores no equivalen a full 130/130 y un caso de guardado de grupo permanece intermitente sin causa raíz. No debilitar pruebas, ocultar retries o reportar como flaky una reejecución con retries deshabilitados.
+- [ ] Promover las correcciones a `master` solo después de un full gate aprobado y los checks CI requeridos. Hasta entonces production/cloud permanecen en release Fase 6/ledger 20.
 
 Regla backend implementada en `development` (PR 219), aún no desplegada: cancelación/reprogramación solo antes de `startsAt` y sin marcas de ningún participante ni del instructor, incluyendo la mañana del mismo día. El reemplazo es futuro, conserva duración y evita conflictos. La restricción no impide las correcciones históricas ADMIN de evidencia ya permitidas.
 
 ## CONTRATO DE EVALUACIONES (Fase 7; definición aprobada, implementación pendiente)
 
-El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). Antes de implementar, quedan confirmadas la aritmética decimal exacta, el congelamiento de componentes/pesos desde la primera nota persistida, el alcance de roles/participantes y la relación con `minimum_grade`. La implementación de Fase 7 sigue sin comenzar y está bloqueada por el gate pendiente de cierre de correcciones. No cierra grupos/cursos ni emite certificados.
+El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). Antes de implementar, quedan confirmadas la aritmética decimal exacta, el congelamiento de componentes/pesos desde la primera nota persistida, el alcance de roles/participantes y la relación con `minimum_grade`. La implementación de Fase 7 sigue sin comenzar y permanece bloqueada por el cierre de correcciones/release. No cierra grupos/cursos ni emite certificados.
 
 - [x] Acordar contrato funcional y técnico antes del diseño de datos/UI.
 - [ ] Diseñar e implementar persistencia, dominio, casos de uso, autorización, UI y auditoría conforme al contrato.
