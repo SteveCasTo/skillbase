@@ -117,9 +117,43 @@ distintos de `INSCRITO` e independencia de la elegibilidad por asistencia.
 
 ## Fuera de alcance explícito
 
-- Cerrar o reabrir cursos; planilla oficial, informe y firmas (Fase 8).
+- Informe y firmas administrativos, que requieren definición aparte.
 - Cambiar componentes/pesos tras existir la primera nota persistida.
 - Eximir evaluaciones o participantes de componentes faltantes.
 - Bloquear la calificación por asistencia.
 - Certificados, PDF, firmas de certificado, QR, verificación o revocación
   (Fase 9).
+
+El cierre de grupo/planilla de Fase 8 recibió aprobación de alcance después del
+release F7, pero aún no está implementado. Sus condiciones funcionales están en
+[`REQUIREMENTS.md`](REQUIREMENTS.md) y la secuencia en [`PLAN.md`](PLAN.md). Esta
+aprobación no cambia las invariantes de evaluación definidas arriba: solo
+`INSCRITO` se califica, una nota faltante sigue pendiente, elegibilidad de
+asistencia no bloquea la calificación y el esquema/pesos permanecen congelados
+después de la primera nota incluso si un grupo se reabre.
+
+### Límite de escritura y snapshot de cierre aprobado (pendiente de implementación)
+
+- Un guardado de una fila de calificaciones debe guardar todas las celdas
+  modificadas de esa persona atómicamente; la presentación puede permitir edición
+  independiente por componente. Una celda vacía significa pendiente, no cero ni
+  eliminación autorizada de una nota persistida.
+- El cierre requiere sesiones y asistencia resueltas y notas completas para todo
+  el roster `INSCRITO`. Cancelar una sesión resuelve esa sesión; no es necesario
+  restaurarla. No se crean marcas ocultas para completar el cierre. Las señales
+  de elegibilidad de asistencia son informativas y no constituyen gate de cierre.
+- Mientras el grupo está cerrado, el servidor debe rechazar escrituras de notas o
+  asistencia que afecten el registro oficial, incluidas operaciones alternativas
+  al editor visible. Reabrir requiere `ADMIN`, motivo obligatorio y auditoría;
+  instructor solo puede cerrar grupos con ownership vigente. Todos los ADMIN
+  tienen permisos iguales; las reglas aprobadas de creación y lifecycle se
+  registran en [`PLAN.md`](PLAN.md), no como un rol adicional en este contrato.
+- Cada cierre publica una versión inmutable con timestamp, UUID del actor y
+  nombre del actor como se mostraba en ese momento; los reportes históricos no
+  resuelven el nombre dinámicamente desde el perfil actual. La planilla puede
+  exportarse como PDF/CSV; el PDF incluye resumen de resultados, elegibilidad y
+  asistencia. Reapertura seguida de otro cierre genera una versión adicional y
+  conserva la anterior. Este alcance no exige formato institucional, firma ni
+  certificado. El diseño de persistencia del snapshot forma parte de la
+  implementación; este contrato no prescribe un esquema ni afirma que la
+  versionación ya exista.
