@@ -455,7 +455,7 @@ Los comportamientos abajo se implementaron en `8735d676fe0d96e7230b4636efa8cb510
 
 - PR 177 integró componentes reutilizables de formularios/listados/detalles de inscripción; PR 178 conectó la página de configuración global. PR 179 añadió route policy y montó `/app/preinscripciones`, nueva/detalle, `/app/participantes`/detalle, búsqueda/prellenado, operaciones de efectivo/devolución/cambio/cancelación, export y roster instructor. `PRIVATE_ROUTE_POLICIES` limita escrituras/listados financieros a ADMIN y roster al instructor asignado.
 - Los formularios muestran campos/errores pendientes según validez, feedback recuperable y valores preservados con HTML/SSR como base; con JS las mutaciones usan un adaptador `ok/value` o `ok:false/message/issues` y requestKey para idempotencia. Montos se presentan/transportan como BOB decimal y se convierten a centavos exactos server-side. Configuración responde settings o errores `code/message/fields`, incluyendo `409` revision conflict.
-- El UI integrado pasó el full canonical E2E reportado (125/125) y una revisión de 24 screenshots en 375/768/1440 px, light/dark, sin overflow. Los exportes presentan los campos actuales del backend: etiquetas curso/grupo, participante/CI, categoría, estados y cantidades del snapshot financiero. Fase 5 se liberó como `2e0eecb`; las correcciones post-release que siguen están integradas en `development` y esperan gate/release combinado.
+- El UI integrado pasó el full canonical E2E reportado (125/125) y una revisión de 24 screenshots en 375/768/1440 px, light/dark, sin overflow. Los exportes presentan los campos actuales del backend: etiquetas curso/grupo, participante/CI, categoría, estados y cantidades del snapshot financiero. Fase 5 se liberó como `2e0eecb`; las correcciones post-release siguientes se incluyeron después en PR 228/Fase 6.
 - Diseño funcional aprobado: registro directo o prellenado editable; origen del interesado de solo lectura e interno; roster instructor propio desde inicio oficial y solo nombre/apellidos; ADMIN conserva finanzas y mutaciones. Filtros/paginación con recuperación de errores, permisos server-side y cash ledger mantienen estados/foco; el total gratuito por AUXILIARY 100 % se ve como gratuidad, nunca como pago cero.
 - PR 179 integró esa UI; la rama reportó 34 pruebas dirigidas y 3 E2E (dos escenarios principales y uno temporal), además de quality PASS. No equivale a full canonical E2E ni a revisión visual/accesible final del módulo.
 
@@ -467,7 +467,7 @@ Los comportamientos abajo se implementaron en `8735d676fe0d96e7230b4636efa8cb510
 - Participantes tiene grilla responsive de hasta tres columnas. La lista muestra nombre, CI, email y estado/curso; finanzas se ven en el detalle.
 - Calendario shadcn compartido reemplaza pickers nativos. El descuento solo aparece para AUXILIARY; se quitaron banners de origen, ficha técnica global y copy redundante de servidor.
 - El actor se presenta por nombre humano. Métricas de devolución solo aparecen cuando son pertinentes. Acciones financieras usan diálogos breves, importes al centavo acotados por saldo y motivo de pago opcional; teléfono/CI mantienen validación conservadora.
-- Operaciones mantienen UUID por solicitud, estados de carga/resultado y fallback SSR sin JavaScript. Tests se acoplan a resultados observables y no a copy/CSS/orden/conteos inestables. Estas correcciones quedaron en producción con el release posterior; la siguiente pasada descrita abajo es un alcance adicional, aún pendiente.
+- Operaciones mantienen UUID por solicitud, estados de carga/resultado y fallback SSR sin JavaScript. Tests se acoplan a resultados observables y no a copy/CSS/orden/conteos inestables. Estas correcciones se incluyeron en producción mediante PR 228; el gate y la evidencia final están en [`docs/TESTING.md`](TESTING.md).
 
 ### Sesiones y asistencia (Fase 6, release de producción)
 
@@ -477,27 +477,31 @@ Los comportamientos abajo se implementaron en `8735d676fe0d96e7230b4636efa8cb510
 - El umbral N (default 3) muestra aviso al llegar a N y marca inelegibilidad al superar N; justificada cuenta como asistencia e interrumpe racha. No hay emisión/bloqueo de certificados, expulsión automática, ni acciones automáticas de cupo/devolución.
 - La UI conserva foco/teclado, estados de carga/error/éxito y fallback sin JavaScript. El release Fase 6 y el gate remoto posterior pasaron; el detalle de evidencia vigente está en [`docs/ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md).
 
-### Correcciones administrativas posteriores a Fase 6 (integradas en development; release pendiente)
+### Correcciones administrativas posteriores a Fase 6 (release PR 228)
 
-PRs 219, 221, 222 y 223 cambiaron el comportamiento en `development`; **no se han liberado a producción**. C3 quedó integrado mediante PR 223. El progreso verificable está en [`docs/PLAN.md`](PLAN.md), con evidencia de tests focales y sus límites en [`docs/TESTING.md`](TESTING.md).
+PRs 219, 221, 222 y 223 integraron las correcciones funcionales en `development`, y PR 228 las promovió a producción. PRs 225/226 actualizaron expectativas E2E; el release final y las limitaciones de evidencia están registrados en [`docs/PLAN.md`](PLAN.md) y [`docs/TESTING.md`](TESTING.md).
 
 #### Integrado en development
 
-- **Sesión C1/C2 (PR 219, backend):** cancelación/reprogramación exige `startsAt > now` y cero marcas de participantes/instructor. El backend vuelve a revisar marcas y reloj tras adquirir locks. Los DTOs incluyen `canCancel`/`canReplace`; una familia admite una sola ocurrencia activa y conserva el historial. Esto no habilita la nueva UI de C3 ni está desplegado.
+- **Sesión C1/C2 (PR 219, backend):** cancelación/reprogramación exige `startsAt > now` y cero marcas de participantes/instructor. El backend vuelve a revisar marcas y reloj tras adquirir locks. Los DTOs incluyen `canCancel`/`canReplace`; una familia admite una sola ocurrencia activa y conserva el historial. Estas reglas se liberaron mediante PR 228.
 - **Instructor/identidad (PR 222):** edición inline independiente del perfil profesional del instructor, compatible con multirol, con email readonly; acciones de lifecycle separadas y tarjetas de cursos bloqueantes. Un ADMIN puro edita únicamente su `users.name`; el email es readonly y no se inventan apellidos/teléfono/perfil profesional para ese actor. Ver el contrato de identidad en [`docs/AUTHENTICATION.md`](AUTHENTICATION.md).
 - **Configuración/participant (PR 221):** grilla de ajustes con campos independientes; edición inline de participante mantiene drafts/revisión durante las operaciones relacionadas, incluida reintegración y transferencia/cancelación.
 - **Feedback de formulario:** los errores de campo se muestran inline; se descarta el aviso loading si el resultado ya se comunica junto a campos, para evitar toast duplicado. Los fallos generales usan un solo toast. El host de notificaciones permite descartar el aviso de la operación.
 
-#### UI C3 integrada en development (PR 223; release pendiente)
+#### UI C3 integrada y liberada (PR 223; release PR 228)
 
-`fix/course-group-attendance-ui` aportó los commits `2f91395`, `a10bc7b`, `a3332c4` y `2881760`; PR 223 integró la página de participantes/calendario y sus cambios de UI a `development`. El conflicto con `RegistrationActionDialog` se resolvió durante esa integración preservando el resolver compartido de PR 221. La integración no equivale a release ni a gate combinado final.
+`fix/course-group-attendance-ui` aportó los commits `2f91395`, `a10bc7b`, `a3332c4` y `2881760`; PR 223 integró la página de participantes/calendario y sus cambios de UI a `development`. El conflicto con `RegistrationActionDialog` se resolvió durante esa integración preservando el resolver compartido de PR 221. PR 228 liberó esta UI; su evidencia final de E2E y los riesgos previos están en `docs/TESTING.md`.
 
 - La página dedicada del grupo presenta breadcrumb, participantes permitidos y para INSTRUCTOR únicamente nombres y su propia asistencia por sesión; no expone CI, contacto ni finanzas.
 - Mantener la tarjeta del grupo como destino semántico claro, sin enlaces repetidos; errores/reintentos reales sin reload incondicional; calendario con navegación a fechas pasadas, tokens y separadores solo entre elementos visibles.
 - Sesión cancelada muestra motivo y reemplazo, sin acciones operativas de asistencia. Estados alineados a la derecha y diferenciados semánticamente; acciones de roster en cabecera; diálogos «Cancelar»/«Confirmar» 50/50 y checkbox alineado.
 - No añadir edición de la asistencia de un día histórico desde ese flujo ni acción «Marcar todo» que cierre asistencia. Conservar SSR, teclado, foco, privacidad e idempotencia.
 
-La UI integrada conserva SSR, teclado, foco, privacidad e idempotencia conforme a sus pruebas focales. El gate combinado del milestone sigue pendiente; no inferir gate/release desde las corridas focales.
+La UI liberada conserva SSR, teclado, foco, privacidad e idempotencia conforme a las pruebas focales y al cierre PR 228. El test de guardado de grupo había mostrado intermitencia sin causa raíz; el full run de release pasó, pero no se atribuye una corrección de código a la intermitencia.
+
+### Fase 7 — diseño de evaluaciones (implementación iniciada)
+
+El contrato funcional/técnico aprobado está en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). Los workstreams de backend y UI iniciaron; todavía no hay pantallas, esquema o migración de Fase 7 completados para describir como comportamiento existente. Mantener las decisiones de estado incompleto/nota cero y el valor final mostrado conforme al contrato, sin adelantar UI no revisada.
 
 ## CONSISTENCIA
 
