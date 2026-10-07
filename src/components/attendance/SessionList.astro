@@ -1,6 +1,7 @@
 ---
 import type { AttendanceGroupDto } from "@/domain/attendance/types";
 import SessionCalendar from "./SessionCalendar";
+import { civilDay } from "@/domain/attendance/rules";
 import {
   dateLabel,
   timeLabel,
@@ -28,9 +29,13 @@ const { group, sessionBase, id = "attendance-sessions" } = Astro.props;
           client:load
           listId={id}
           days={group.sessions.map((session) => session.civilDate)}
+          today={civilDay(new Date())}
         />
       </div>
-      <ol id={id} class="flex min-w-0 flex-col divide-y rounded-xl border">
+      <ol
+        id={id}
+        class="session-rows flex min-w-0 flex-col overflow-hidden rounded-xl border"
+      >
         {group.sessions.map((session) => {
           const original = group.sessions.find(
             (row) => row.id === session.replacementForSessionId,
@@ -92,6 +97,9 @@ const { group, sessionBase, id = "attendance-sessions" } = Astro.props;
     )}
 </section>
 <style>
+  .session-rows > li:not([hidden]) ~ li:not([hidden]) {
+    border-top: 1px solid var(--border);
+  }
   .session-layout {
     grid-template-columns: minmax(0, 1fr);
   }

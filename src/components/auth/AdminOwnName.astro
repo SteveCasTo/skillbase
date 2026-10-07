@@ -1,0 +1,70 @@
+---
+import InlineEditField from "@/components/pre-registrations/InlineEditField.astro";
+import { Input } from "@/components/ui/input";
+import type { getAdminOwnProfile } from "@/server/auth/admin-own-profile";
+
+interface Props {
+  profile: NonNullable<Awaited<ReturnType<typeof getAdminOwnProfile>>>;
+  error?: string | null;
+  submitted?: boolean;
+}
+const { profile, error, submitted = false } = Astro.props;
+---
+
+<section class="min-w-0 md:col-span-2" aria-labelledby="personal-title">
+  <h2 id="personal-title" class="text-lg font-semibold">
+    Perfil personal
+  </h2>
+  <div data-instructor-details class="mt-5 max-w-xl">
+    <form
+      method="post"
+      action="/app/perfil?edit=name"
+      data-instructor-field
+      data-baseline={JSON.stringify({ name: profile.name })}
+      data-last-submitted={submitted ? "name" : undefined}
+      aria-label="Editar nombre"
+      class="min-w-0"
+      data-astro-reload
+    >
+      <input type="hidden" name="field" value="name" />
+      <input
+        type="hidden"
+        name="revision"
+        value={profile.updatedAt.toISOString()}
+      />
+      <InlineEditField label="Nombre" value={profile.name}>
+        <label for="admin-name" class="text-sm font-medium">
+          Nombre
+        </label>
+        <Input
+          id="admin-name"
+          name="name"
+          type="text"
+          autoComplete="name"
+          maxLength={250}
+          required
+          defaultValue={profile.name}
+          aria-invalid={Boolean(error)}
+          aria-describedby="admin-name-error"
+          className="min-h-11"
+        />
+        <p
+          id="admin-name-error"
+          data-field-error="name"
+          class="text-sm text-destructive empty:hidden"
+        >
+          {error}
+        </p>
+        <p
+          data-form-error
+          role="alert"
+          tabindex="-1"
+          class="text-sm text-destructive empty:hidden"
+        >
+          {submitted && !error ? "No pudimos guardar el nombre." : ""}
+        </p>
+      </InlineEditField>
+    </form>
+  </div>
+</section>
+<script src="../instructors/inline-profile-client.ts"></script>

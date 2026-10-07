@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
+import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { signInFixture } from "./auth-helper";
@@ -124,7 +125,7 @@ test("published course is public end-to-end and withdrawal removes every public 
       `/app/cursos/${courseId}/grupos`,
       {
         headers: {
-          Origin: "http://127.0.0.1:4321",
+          Origin: e2eSiteUrl(),
           Accept: "application/json",
         },
         form: { intent: "create", startTime: "08:00", capacity: "10" },

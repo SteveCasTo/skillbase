@@ -12,12 +12,11 @@ if (editor.response) return editor.response;
   </a>
   <h1 class="mt-5 text-3xl font-semibold tracking-tight">Crear instructor</h1>
   <p class="mt-3 text-muted-foreground">
-    Registra su perfil y una cuenta activa para consultar sus cursos asignados.
+    Registra su perfil y contraseña de acceso.
   </p>
-  {editor.error && (
-    <p role="alert" class="mt-6 text-destructive">
-      {editor.error}
-    </p>
-  )}
-  <InstructorForm values={editor.values} errors={editor.errors} />
+  <InstructorForm
+    values={editor.values}
+    errors={editor.errors}
+    error={editor.error}
+  />
 </PrivateLayout>

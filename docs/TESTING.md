@@ -441,3 +441,25 @@ PLAN verificó target/proyecto y provenance sin escrituras; el APPLY local poste
 - Revisión visual final sobre `development` `082dbbf` / app `b681a365`: seis vistas en 375 y 1440 px, light/dark, sin overflow; foco visible, diálogo cierra con Escape y devuelve foco al disparador; estado de asistencia N=3/inelegibilidad desde 4; instructor sin contactos/finanzas; sesión ajena devuelve 404; cero errores ni warnings de consola.
 - El gate local queda validado mediante esta evidencia por heads: full E2E 126/127 y escenario sin JavaScript corregido por PR 209 con ejecución focal 1/1 PASS, sin retry; unit/integration 332/137 PASS; build/Drizzle/quality PASS y typecheck 0 errores/0 warnings/204 hints. No se afirma un full E2E único 127/127. CI/release cloud/master sigue pendiente.
 - Se capturó un snapshot canónico pre-visual de 39 tablas con ledger 20. La comparación hash posterior quedó bloqueada porque Docker Desktop no estaba disponible. No se reinició Docker/Supabase ni se escribieron datos para la verificación visual; por tanto, no se afirma una comparación íntegra post-visual. Esto no invalida el snapshot de preservación del APPLY anterior, pero limita la evidencia de frescura tras la revisión visual.
+
+### QA final previo a release de correcciones (development `292c5d42`; gate incompleto)
+
+PRs 219–226 están integrados en `development`; producción no cambia. PR 225 (Google association locators) y PR 226 (origen E2E configurable) solo modificaron pruebas. Desde `eacf6feeb26d67da98e46195a07d8777dd180966` no cambiaron código de aplicación, schema ni dependencias. Los resultados se reportan por ejecución; no sumar corridas como si fueran un full run.
+
+#### Quality y unit/integration
+
+- `lint`, `format:check`, Drizzle check y build PASS. Typecheck: 0 errores, 0 warnings y 214 hints. Build completó en 27.51 s sin warnings.
+- Unit: 339 PASS (2046 assertions); integration: 138 PASS (983 assertions). Se ejecutaron en el source de aplicación `eacf6fe`; los cambios posteriores fueron solo E2E tests.
+
+#### E2E — cobertura separada, sin full 130/130
+
+- Full E2E sobre `eacf6fe` se ejecutó con `--retries=0`: **99/130 PASS, 31 FAIL**. La corrida no constituye un retry exitoso de 130/130.
+- El primer arranque E2E falló antes de los escenarios por un archivo `@supabase/ssr` ausente (`dist/module/index.js`, export configurado). Se restauró el entorno mediante `bun install --frozen-lockfile --force`; luego 3 smoke focales PASS y se inició el full run con retries deshabilitados.
+- PR 226 corrigió fixtures E2E que fijaban `http://127.0.0.1:4321` cuando `SiteUrl` usaba el puerto real `44891`; el origen de pruebas ahora deriva del servidor configurado. Es un ajuste test-only: el rechazo CSRF del servidor no cambió. La cobertura focused de origen/CSRF fue **37/38**, incluyendo 28/29 de los escenarios originales.
+- PR 225 Google association focused fue **3/3** (revalida dos expectations del full). Los dos fallos originales correspondían a expectations de test sobre visibilidad de perfil y ruta ADMIN protegida; no prueban OAuth Google real.
+- En el flujo de grupos, el submit «Guardar» quedó disabled en el full run y volvió a fallar en el focused run. Un caso nuevo en stack fresco pasó **1/1 con retries deshabilitados**, sin cambio de código ni causa raíz identificada. Se registra como intermitencia/flaky real aún sin resolver; ese pase aislado no la arregla ni oculta los fallos previos.
+- La cobertura total de escenarios fue reunida entre full y focused runs; **no** hay una corrida única full 130/130. Los runs focales separados no se proclaman como retry/flaky-pass.
+
+#### Resultado de gate/release
+
+El gate completo y los checks remotos requeridos para release a `master` permanecen pendientes. La evidencia local detallada (salidas de lint, format, typecheck, unit, integration, build y E2E) está en `C:/Users/Steve/AppData/Local/Temp/opencode/corrections-final-validation-evidence/`; `status.json` conserva SHA, comandos y exit codes. El test-only cambio de expectativa no valida Google OAuth real. No inferir salud actual de `127.0.0.1:4321` a partir de estos resultados: ese puerto fue rechazado en el entorno de validación.

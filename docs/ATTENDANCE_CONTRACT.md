@@ -13,14 +13,53 @@ La migración es `0019_phase6_attendance`, posterior a `0018_optional_payment_re
 Las seis tablas nuevas tienen RLS y grants Data API revocados. Las referencias
 están indexadas; roster y command receipts son append-only. El guard de sesión
 protege duración/revisión de formato, grupo del reemplazo y timestamps originales.
-Backend, UI y runner demo están integrados en `development` mediante PRs 201–203;
-los cambios posteriores de consistencia/pruebas están en PRs 204–205 y 207–209.
-Supabase local canónico aplicó 0018/0019 sin reset y quedó en ledger 20,
-preservando 53 tablas. Cloud/`master` permanecen en Fase 5/ledger 18; 0019
-no se ha aplicado en cloud. El E2E 126/127 y la revalidación focal 1/1 del
-locator corregido son ejecuciones separadas, no un solo full run 127/127. La
-revisión visual final y el gate local están cerrados con esa evidencia; release
-y migración cloud siguen pendientes.
+Backend, UI y runner demo se integraron inicialmente mediante PRs 201–203;
+PRs 204–205 y 207–209 cerraron consistencia y pruebas focales. Fase 6 se liberó
+después mediante PR 211 y las correcciones operativas/calendario-filtros mediante
+PRs 213, 214, 216–218. El commit de producción es
+`3c6ae7e2cff74faeb2f0f7de05d63b753418df4a`. CI remoto de release:
+`37405417986` y `37406246926`; 334 unitarias, 137 de integración y 127/127 E2E
+pasaron sin flaky tests. Evidencia del gate de PR 218: comentario 6008610515.
+
+La migración 0019 se aplicó a producción y al Supabase local sin reset; ambos
+quedaron en ledger 20 y se preservaron Auth, Storage, configuración y filas
+históricas. Producción tiene 22 grupos propios, 282 sesiones (280 originales,
+2 reemplazos), 3 cancelaciones, 16 marcas de participantes y 4 del instructor.
+El demo local contiene 12 cursos, 23 grupos, 16 registros y 13 movimientos de
+caja; los conteos de producción correspondientes son 11/22/15/12. El E2E
+histórico 126/127 y la revalidación focal 1/1 fueron ejecuciones previas
+separadas; no deben confundirse con el gate posterior 127/127 de release.
+
+Después del release, PR 219 integró C1/C2 backend; PR 223 integró la UI C3 de
+grupo/participantes a `development` hasta `c6f98d3c0dba721d4c0f73450b68c8c31de8be90`.
+El conflicto con el componente compartido `RegistrationActionDialog` se resolvió
+al preservar el resolver de PR 221. Ninguno de estos cambios posteriores está
+desplegado en producción. El gate final combinado sigue pendiente y no se
+sustituye con pruebas focales.
+
+### C1/C2 — límites backend de cancelación y reprogramación (PR 219)
+
+Cancelación y reprogramación ADMIN solo proceden mientras `startsAt > now` y no
+existe ninguna marca de participante ni del instructor, también en la mañana
+del mismo día. La comprobación server-side ocurre dentro de la transacción: se
+adquieren primero las barreras de horario/sesión, se vuelve a consultar la
+presencia de marcas y se muestrea el reloj después de esperar por los locks. Así
+se rechazan acciones con fecha/hora vencida o cambios de asistencia concurrentes.
+
+`AttendanceSessionDto` expone `canCancel` y `canReplace` explícitos; son guía de
+interfaz, no sustituyen la validación transaccional. `canReplace` además requiere
+grupo `PLANNED` y que la familia no tenga otro encuentro activo. La fecha/hora de
+reemplazo debe ser futura, mantener duración y superar la validación de conflictos
+de instructor/grupo. Una familia de original/reemplazos tiene como máximo un
+encuentro activo, mientras los cancelados y sus razones permanecen en cronología.
+El backend está en `development` por PR 219 y la página de participantes/calendario
+se integró mediante PR 223; ambos siguen fuera de producción.
+
+La limitación operativa no impide la corrección histórica ADMIN por el flujo de
+asistencia: una sesión cancelada no recibe marcas nuevas, pero evidencia ya
+existente puede revisarse/corregirse conforme al contrato histórico. La UI C3
+debe mostrar motivo y reemplazo y no presentar acciones operativas para la sesión
+cancelada.
 
 ## Casos de uso para UI y loaders
 

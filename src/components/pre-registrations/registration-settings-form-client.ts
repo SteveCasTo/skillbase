@@ -5,6 +5,7 @@ import {
 } from "./registration-settings-form-state";
 import { notifications } from "@/lib/notifications";
 import { createRequestState, requestFingerprint } from "./request-state";
+import { initializeSettingsInputs } from "./settings-input";
 
 interface SettingsResult {
   readonly minimumPaymentPercent: number;
@@ -244,11 +245,12 @@ function enhance(form: HTMLFormElement): void {
       if (message) message.textContent = "";
     }
     void (async () => {
+      const toastId = `settings-${crypto.randomUUID()}`;
       try {
         const settings = await notifications.promise(
           () => saveSettings(form, values),
           {
-            id: `settings-${crypto.randomUUID()}`,
+            id: toastId,
             loading: { title: "Guardando configuración…" },
             success: { title: "Configuración guardada." },
             error: (failure) => ({
@@ -311,9 +313,11 @@ function enhance(form: HTMLFormElement): void {
           if (input instanceof HTMLInputElement)
             input.setAttribute("aria-invalid", String(Boolean(error)));
         }
+        const hasFieldErrors = fields.some((name) => requestError.fields[name]);
+        if (hasFieldErrors) notifications.dismiss(toastId);
         if (formError) {
-          formError.textContent = requestError.message;
-          formError.removeAttribute("hidden");
+          formError.textContent = "";
+          formError.setAttribute("hidden", "");
         }
         const firstInvalid = fields
           .map((name) => form.elements.namedItem(name))
@@ -354,6 +358,7 @@ function enhance(form: HTMLFormElement): void {
 }
 
 function initialize(): void {
+  initializeSettingsInputs();
   document
     .querySelectorAll<HTMLFormElement>("[data-registration-settings-form]")
     .forEach(enhance);

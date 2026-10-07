@@ -34,10 +34,14 @@ test("rejects empty, fractional, and out-of-range field values with field-specif
     ["minimumPaymentPercent", "0"],
     ["minimumPaymentPercent", "101"],
     ["minimumPaymentPercent", "25.5"],
+    ["minimumPaymentPercent", "1e2"],
+    ["minimumPaymentPercent", "25.0"],
+    ["minimumPaymentPercent", " 25"],
     ["auxiliaryDiscountPercent", ""],
     ["auxiliaryDiscountPercent", "-1"],
     ["auxiliaryDiscountPercent", "101"],
     ["auxiliaryDiscountPercent", "50.5"],
+    ["auxiliaryDiscountPercent", "50,5"],
   ] as const) {
     const result = registrationSettingsFormState(
       { ...values, [name]: value },

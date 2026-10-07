@@ -12,6 +12,7 @@ function record(state: string, options: NotificationOptions) {
 
 // Only the real vendor export/methods used by the facade are mocked.
 const backend = {
+  dismiss: mock(() => undefined),
   success: mock((options: NotificationOptions) => record("success", options)),
   error: mock((options: NotificationOptions) => record("error", options)),
   info: mock((options: NotificationOptions) => record("info", options)),
@@ -49,7 +50,7 @@ const backend = {
   },
 } satisfies Pick<
   typeof sileo,
-  "success" | "error" | "info" | "warning" | "show" | "promise"
+  "dismiss" | "success" | "error" | "info" | "warning" | "show" | "promise"
 >;
 
 mock.module("sileo", () => ({ sileo: backend }));
@@ -57,9 +58,15 @@ const { notifications } = await import("../../src/lib/notifications");
 
 beforeEach(() => {
   calls.length = 0;
+  backend.dismiss.mockClear();
 });
 
 describe("notification operation identity", () => {
+  test("dismiss forwards the explicit notification id", () => {
+    expect(notifications.dismiss("registration-request")).toBeUndefined();
+    expect(backend.dismiss).toHaveBeenCalledWith("registration-request");
+  });
+
   test("every independent state call receives a unique explicit runtime id", () => {
     const options = {
       title: "Notice",

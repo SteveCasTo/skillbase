@@ -159,7 +159,10 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
   const actions = page.getByRole("group", {
     name: "Acciones de preinscripción",
   });
-  await actions
+  const financialActions = page.getByRole("group", {
+    name: "Acciones financieras",
+  });
+  await financialActions
     .getByRole("button", { name: "Registrar abono", exact: true })
     .click();
   await expect(payment).toHaveAttribute("data-http-bound", "true");
@@ -175,21 +178,36 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
     await page.unroute(interrupted);
   });
   await payment.getByRole("button", { name: "Registrar abono" }).click();
-  await expect(payment.locator("[data-form-error]")).toContainText(
-    "No se pudo confirmar",
-  );
+  await expect(
+    page.getByRole("button", {
+      name: /Sin confirmación.*Reintenta sin cambiar los datos/u,
+    }),
+  ).toBeVisible();
   await expect(payment.getByLabel("Importe (Bs)")).toHaveValue("0.01");
   await expect(payment.locator('[name="requestKey"]')).toHaveValue(receiptKey);
   await payment.getByRole("button", { name: "Registrar abono" }).click();
   await expect(
     page.getByRole("region", { name: "Resumen financiero" }),
   ).toContainText("Bs 74,49");
+  await expect(
+    page
+      .getByRole("region", { name: "Historial de efectivo" })
+      .getByText("Bs 0,01", { exact: true }),
+  ).toHaveCount(1);
   expect(
     await page.evaluate(
       () =>
         (window as Window & { registrationMarker?: string }).registrationMarker,
     ),
   ).toBe("kept");
+  const participantSection = page.getByRole("region", {
+    name: "Datos del participante",
+  });
+  await participantSection
+    .getByRole("button", { name: "Editar nombre", exact: true })
+    .click();
+  const firstName = participantSection.getByLabel("Nombre", { exact: true });
+  await firstName.fill("Sintética");
   const transfer = page.locator("#registration-transfer");
   await actions
     .getByRole("button", { name: "Cambiar de grupo", exact: true })
@@ -205,7 +223,13 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
     "data-http-bound",
     "true",
   );
-  await page.getByRole("link", { name: "Datos del participante" }).click();
+  await expect(firstName).toHaveValue("Sintética");
+  const financialBefore = await page
+    .getByRole("region", { name: "Resumen financiero" })
+    .textContent();
+  const cashBefore = await page
+    .getByRole("region", { name: "Historial de efectivo" })
+    .textContent();
   await page
     .getByRole("button", { name: "Editar teléfono (opcional)", exact: true })
     .click();
@@ -217,6 +241,8 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
     phoneForm.getByRole("button", { name: "Guardar", exact: true }),
   ).toBeDisabled();
   await phone.fill("+591 70000000");
+  await phone.fill("+591 letras");
+  await expect(phone).toHaveValue("+591 70000000");
   await phoneForm.getByRole("button", { name: "Guardar", exact: true }).click();
   await expect(
     page.getByRole("button", {
@@ -225,6 +251,34 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
     }),
   ).toBeFocused();
   await expect(phone).toHaveValue("+591 70000000");
+  await expect(firstName).toHaveValue("Sintética");
+  const nameForm = participantSection.locator("form").filter({
+    has: page.getByLabel("Nombre", { exact: true }),
+  });
+  await expect(nameForm.locator('[name="revision"]')).toHaveValue(
+    await phoneForm.locator('[name="revision"]').inputValue(),
+  );
+  await nameForm.getByRole("button", { name: "Guardar", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Sintética Registration",
+  );
+  expect(
+    await page
+      .getByRole("region", { name: "Resumen financiero" })
+      .textContent(),
+  ).toBe(financialBefore);
+  expect(
+    await page
+      .getByRole("region", { name: "Historial de efectivo" })
+      .textContent(),
+  ).toBe(cashBefore);
+  // The independent participant page remains available.
+  await page
+    .getByRole("link", { name: "Abrir ficha del participante" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Participante", exact: true }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Volver", exact: true }).click();
   const cancel = page.locator("#registration-cancel");
   await actions
@@ -244,7 +298,7 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
     page.getByRole("region", { name: "Resumen financiero" }),
   ).toContainText("Devolución pendiente");
   const refund = page.locator("#registration-refund");
-  await actions
+  await financialActions
     .getByRole("button", { name: "Registrar devolución", exact: true })
     .click();
   await expect(refund).toHaveAttribute("data-http-bound", "true");
@@ -282,7 +336,7 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
     .poll(() => new URL(page.url()).searchParams.get("search"))
     .toBe(personCi);
   await expect(
-    page.getByRole("link", { name: /Synthetic Registration/u }),
+    page.getByRole("link", { name: /Sintética Registration/u }),
   ).toBeVisible();
   expect(
     await page.evaluate(
@@ -343,7 +397,7 @@ test("same-course interest prefill preserves demand and instructor roster expose
       .where(eq(schema.interestRegistrations.courseId, f.id));
     expect(interests).toEqual([{ status: "ACTIVE" }]);
     await signInFixture(context, AUTH_FIXTURES.instructor.email);
-    const rosterUrl = `/app/mis-cursos/${f.id}/grupos/${f.groups[0]!.id}`;
+    const rosterUrl = `/app/mis-cursos/${f.id}/grupos/${f.groups[0]!.id}/participantes`;
     await page.goto(rosterUrl);
     await expect(
       page.getByRole("region", { name: "Participantes del grupo" }),
@@ -428,7 +482,7 @@ test("same-course interest prefill preserves demand and instructor roster expose
       admin.id,
     );
     await page.goto(
-      `/app/mis-cursos/${started!.id}/grupos/${startedGroup!.id}`,
+      `/app/mis-cursos/${started!.id}/grupos/${startedGroup!.id}/participantes`,
     );
     await expect(
       page.getByRole("region", { name: "Participantes del grupo" }),
@@ -436,7 +490,7 @@ test("same-course interest prefill preserves demand and instructor roster expose
     expect(await page.content()).not.toContain(ci);
     expect(await page.content()).not.toContain(email);
     const foreignRoster = await page.request.get(
-      `/app/mis-cursos/${foreign.id}/grupos/${foreign.groups[0]!.id}`,
+      `/app/mis-cursos/${foreign.id}/grupos/${foreign.groups[0]!.id}/participantes`,
     );
     expect(foreignRoster.status()).toBe(404);
   } finally {

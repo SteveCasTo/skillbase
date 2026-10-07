@@ -27,7 +27,22 @@ test("ADMIN creates and edits a registered instructor with a semantic full-card 
   await page.getByLabel("Apellidos").fill("Sintético");
   await page.getByLabel("Correo electrónico").fill(email);
   await page.getByLabel("Contraseña inicial", { exact: true }).fill(password);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/app/instructores/nuevo", async (route) => {
+    if (route.request().method() === "POST") await gate;
+    await route.continue();
+  });
   await page.getByRole("button", { name: "Crear instructor" }).click();
+  try {
+    await expect(
+      page.locator('[data-sileo-toast][data-state="loading"]'),
+    ).toBeVisible();
+  } finally {
+    release();
+  }
   await expect(page).toHaveURL(
     /\/app\/instructores\/[0-9a-f-]+\/editar\?success=saved$/u,
   );
@@ -35,11 +50,22 @@ test("ADMIN creates and edits a registered instructor with a semantic full-card 
     page.getByText("Instructor guardado correctamente."),
   ).toBeVisible();
   expect(await page.content()).not.toContain(password);
-  await expect(page.locator("[data-instructor-form]")).toHaveAttribute(
-    "data-bound",
-    "true",
-  );
-  await page.getByLabel("Teléfono (opcional)").fill("+591 70000000");
+  await expect(
+    page
+      .locator('[data-sileo-toast][data-state="success"]')
+      .filter({ hasText: "Instructor guardado" }),
+  ).toBeVisible();
+  const phoneForm = page.getByRole("form", {
+    name: "Editar teléfono (opcional)",
+    exact: true,
+  });
+  await expect(phoneForm).toHaveAttribute("data-bound", "true");
+  await phoneForm
+    .getByRole("button", { name: "Editar teléfono (opcional)", exact: true })
+    .click();
+  await phoneForm
+    .getByLabel("Teléfono (opcional)", { exact: true })
+    .fill("+591 70000000");
   const saved = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
@@ -47,12 +73,12 @@ test("ADMIN creates and edits a registered instructor with a semantic full-card 
         new URL(response.url()).pathname,
       ),
   );
-  await page.getByRole("button", { name: "Guardar cambios" }).click();
+  await phoneForm.getByRole("button", { name: "Guardar", exact: true }).click();
   expect((await saved).status()).toBe(200);
   await page.reload();
-  await expect(page.getByLabel("Teléfono (opcional)")).toHaveValue(
-    "+591 70000000",
-  );
+  await expect(
+    page.getByLabel("Teléfono (opcional)", { exact: true }),
+  ).toHaveValue("+591 70000000");
   await page.goto("/app/instructores");
   const card = page.getByRole("link", {
     name: `${name} Sintético ${email} Cuenta activa`,

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
 
@@ -250,7 +251,7 @@ test("inline editing swaps icons in the same row, filters input and cancels with
   await form.getByRole("button", { name: "Guardar precio estudiante" }).click();
   await expect(page.getByText("95.00 BOB")).toBeVisible();
   const stale = await page.request.post(path, {
-    headers: { Origin: "http://127.0.0.1:4321" },
+    headers: { Origin: e2eSiteUrl() },
     form: {
       intent: "revise",
       field: "studentAmount",
@@ -346,7 +347,7 @@ test("inline editing swaps icons in the same row, filters input and cancels with
     .first()
     .inputValue();
   const conflict = await page.request.post(path, {
-    headers: { Origin: "http://127.0.0.1:4321" },
+    headers: { Origin: e2eSiteUrl() },
     form: {
       intent: "rename",
       field: "name",
@@ -407,7 +408,7 @@ test("used formats toggle availability in place and disable editors while inacti
   const path = new URL(page.url()).pathname;
   const id = path.split("/").at(-1)!;
   const created = await page.request.post("/app/cursos/nuevo", {
-    headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
+    headers: { Origin: e2eSiteUrl(), Accept: "application/json" },
     form: {
       name: `Curso formato en uso ${Date.now()}`,
       requestKey: crypto.randomUUID(),

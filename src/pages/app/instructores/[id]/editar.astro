@@ -1,6 +1,6 @@
 ---
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
-import InstructorForm from "@/components/instructors/InstructorForm.astro";
+import InstructorDetails from "@/components/instructors/InstructorDetails.astro";
 import { instructorEditor } from "@/server/instructors/editor";
 import InstructorLifecyclePanel from "@/components/instructors/InstructorLifecyclePanel.astro";
 import { DrizzleInstructorLifecycleRepository } from "@/server/db/repositories/instructor-lifecycle-repository";
@@ -18,8 +18,20 @@ const lifecycle = editor.previous
   <a href="/app/instructores" class="text-sm underline underline-offset-4">
     Instructores
   </a>
-  <h1 class="mt-5 text-3xl font-semibold tracking-tight">Editar instructor</h1>
-  {editor.error && (
+  {lifecycle ? (
+    <InstructorLifecyclePanel
+      state={lifecycle}
+      revision={editor.revision}
+      endpoint={Astro.url.pathname}
+    >
+      <h1 class="text-3xl font-semibold tracking-tight">Editar instructor</h1>
+    </InstructorLifecyclePanel>
+  ) : (
+    <h1 class="mt-5 text-3xl font-semibold tracking-tight">
+      Editar instructor
+    </h1>
+  )}
+  {editor.error && !editor.submittedField && (
     <p role="alert" class="mt-6 text-destructive">
       {editor.error}
     </p>
@@ -37,7 +49,7 @@ const lifecycle = editor.previous
     </p>
   )}
   {editor.previous ? (
-    <InstructorForm
+    <InstructorDetails
       values={editor.values}
       errors={editor.errors}
       revision={editor.revision}
@@ -47,17 +59,10 @@ const lifecycle = editor.previous
         email: editor.previous.email,
         phone: editor.previous.phone ?? "",
       }}
-      editing
+      submittedField={editor.submittedField}
+      error={editor.error}
     />
   ) : (
     <p class="mt-6">El instructor no existe.</p>
-  )}
-  {lifecycle && (
-    <InstructorLifecyclePanel
-      state={lifecycle}
-      revision={editor.revision}
-      endpoint={Astro.url.pathname}
-      error={editor.error}
-    />
   )}
 </PrivateLayout>

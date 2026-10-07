@@ -4,6 +4,7 @@ import type { Group } from "@/domain/groups/types";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 import { groupEndTime } from "./group-schedule-preview";
 import { Check, CircleOff, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 
 interface Props {
   course: AdminCourseDto;
@@ -214,7 +215,7 @@ const prototype: Group = {
           data-end-time={time(group.endsAt)}
           data-status={group.status}
           hidden={group === prototype}
-          class="@container min-w-0 rounded-xl bg-card p-4 sm:p-5"
+          class="group-card @container relative isolate min-w-0 rounded-xl bg-card p-4 sm:p-5"
         >
           <article aria-labelledby={`group-${group.id}`}>
             <div class="flex items-start justify-between gap-2">
@@ -223,8 +224,12 @@ const prototype: Group = {
                   Grupo {index + 1}
                 </h3>
                 <a
+                  data-group-session-link
                   href={`/app/cursos/${course.id}/grupos/${group.id}/sesiones`}
-                  class="inline-flex min-h-11 items-center text-sm underline underline-offset-4"
+                  class={buttonVariants({
+                    variant: "outline",
+                    className: "min-h-11",
+                  })}
                 >
                   Sesiones y asistencia
                 </a>
@@ -664,6 +669,20 @@ const prototype: Group = {
 </dialog>
 <script src="./group-management-client.ts"></script>
 <style>
+  .group-card [data-group-session-link]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-xl);
+  }
+  .group-card [data-group-session-link]:focus-visible::after {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .group-card :is(details, button, form) {
+    position: relative;
+    z-index: 1;
+  }
   .group-management [data-edit-cancel]:not([hidden]) {
     display: inline-flex;
     width: 2.75rem;

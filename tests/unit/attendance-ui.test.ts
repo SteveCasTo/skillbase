@@ -15,6 +15,8 @@ import {
 import { getPrivateRoutePolicy } from "@/server/auth/route-policy";
 import type { AttendanceRepository } from "@/application/attendance/attendance-repository";
 import type { InternalUser } from "@/domain/auth/types";
+import { filterSessionRows } from "@/components/attendance/session-filter";
+import { prepareGroupParticipantsRoute } from "@/components/attendance/participants-route";
 const actor: InternalUser = {
   id: crypto.randomUUID(),
   authUserId: crypto.randomUUID(),
@@ -228,6 +230,19 @@ test("attendance pages bind role policies to declared group/session paths and pr
     getPrivateRoutePolicy(`${instructorPath}/${context.sessionId}`),
   ).toEqual({ access: "ROLES", roles: ["INSTRUCTOR"] });
   expect(getPrivateRoutePolicy(`${adminPath}/unknown`)).toBeNull();
+  expect(
+    getPrivateRoutePolicy(adminPath.replace(/sesiones$/u, "participantes")),
+  ).toEqual({ access: "ROLES", roles: ["ADMIN"] });
+  expect(
+    getPrivateRoutePolicy(
+      instructorPath.replace(/sesiones$/u, "participantes"),
+    ),
+  ).toEqual({ access: "ROLES", roles: ["INSTRUCTOR"] });
+  expect(
+    getPrivateRoutePolicy(
+      `${instructorPath.replace(/sesiones$/u, "participantes")}/${context.sessionId}`,
+    ),
+  ).toBeNull();
   expect(getPrivateRoutePolicy("/app/configuracion/asistencia")).toEqual({
     access: "ROLES",
     roles: ["ADMIN"],
@@ -246,4 +261,40 @@ test("attendance pages bind role policies to declared group/session paths and pr
   });
   expect(result.values.replacementDate).toBe("invalid");
   expect(result.payload?.ok).toBe(false);
+});
+test("calendar selection exposes only matching SSR session links and reset restores them", () => {
+  const rows = [
+    { hidden: false, dataset: { sessionDay: "2026-10-05" } },
+    { hidden: false, dataset: { sessionDay: "2026-10-06" } },
+    { hidden: false, dataset: { sessionDay: "2026-10-06" } },
+  ];
+  filterSessionRows(rows, "2026-10-06");
+  expect(
+    rows.filter((row) => !row.hidden).map((row) => row.dataset.sessionDay),
+  ).toEqual(["2026-10-06", "2026-10-06"]);
+  filterSessionRows(rows, "2026-10-05");
+  expect(rows.filter((row) => !row.hidden)).toEqual([rows[0]!]);
+  filterSessionRows(rows, "");
+  expect(rows.every((row) => !row.hidden)).toBe(true);
+});
+test("group participant pages reject the wrong role before accessing private data", async () => {
+  const adminData = await prepareGroupParticipantsRoute({
+    locals: { internalUser: { ...actor, roles: ["INSTRUCTOR"] } },
+    params: { id: context.courseId, groupId: context.groupId },
+    url: siteUrl,
+  });
+  expect(adminData.status).toBe(403);
+  expect(adminData.entries).toEqual([]);
+  expect(adminData.registrations).toBeNull();
+  const instructorData = await prepareGroupParticipantsRoute(
+    {
+      locals: { internalUser: actor },
+      params: { id: context.courseId, groupId: context.groupId },
+      url: siteUrl,
+    },
+    true,
+  );
+  expect(instructorData.status).toBe(403);
+  expect(instructorData.entries).toEqual([]);
+  expect(instructorData.registrations).toBeNull();
 });

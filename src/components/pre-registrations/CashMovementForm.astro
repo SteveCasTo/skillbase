@@ -109,7 +109,7 @@ const fields = [
     class="text-sm text-muted-foreground empty:hidden"
   ></p>
   <p role="alert" data-form-error class="text-sm text-destructive empty:hidden">
-    {message ?? errors.form}
+    {fields.some((field) => errors[field.name]) ? "" : (message ?? errors.form)}
   </p>
   {unavailable && (
     <p role="status" class="text-sm text-muted-foreground">

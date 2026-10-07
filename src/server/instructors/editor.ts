@@ -59,6 +59,7 @@ export async function instructorEditor(
     : null;
   let revision = previous?.updatedAt.toISOString() ?? "";
   let response: Response | null = null;
+  let submittedField: string | undefined;
   if (id && !previous && !loadError) context.response.status = 404;
   if (context.request.method === "POST" && !loadError && (!id || previous)) {
     try {
@@ -100,14 +101,31 @@ export async function instructorEditor(
               },
             })
           : context.redirect(destination, 303);
-        return { values, errors, error, revision, response, previous };
+        return {
+          values,
+          errors,
+          error,
+          revision,
+          response,
+          previous,
+          submittedField,
+        };
       }
-      values = Object.fromEntries(
-        ["firstName", "lastName", "email", "phone"].map((key) => [
-          key,
-          String(form.get(key) ?? ""),
-        ]),
-      );
+      const field = form.get("field");
+      if (field !== null) {
+        if (!previous || !["firstName", "lastName", "phone"].includes(field))
+          throw new InstructorError("El campo no se puede editar.");
+        submittedField = field;
+        // Merge against the fresh server profile, not client-supplied siblings.
+        values = { ...values, [field]: form.get(field) ?? "" };
+      } else {
+        values = Object.fromEntries(
+          ["firstName", "lastName", "email", "phone"].map((key) => [
+            key,
+            String(form.get(key) ?? ""),
+          ]),
+        );
+      }
       revision = form.get("revision") ?? "";
       const data = validateInstructor({
         ...values,
@@ -115,15 +133,45 @@ export async function instructorEditor(
       });
       let resultId: string;
       if (previous) {
-        resultId = (
-          await updateInstructor(
-            repository,
-            actor,
-            previous.id,
+        const updated = await updateInstructor(
+          repository,
+          actor,
+          previous.id,
+          values,
+          revision,
+        );
+        resultId = updated.id;
+        if (
+          submittedField &&
+          context.request.headers.get("accept")?.includes("application/json")
+        ) {
+          response = new Response(
+            JSON.stringify({
+              revision: updated.updatedAt.toISOString(),
+              values: {
+                firstName: updated.firstName,
+                lastName: updated.lastName,
+                email: updated.email,
+                phone: updated.phone ?? "",
+              },
+            }),
+            {
+              headers: {
+                "Content-Type": "application/json",
+                "Cache-Control": "private, no-store",
+              },
+            },
+          );
+          return {
             values,
+            errors,
+            error,
             revision,
-          )
-        ).id;
+            response,
+            previous,
+            submittedField,
+          };
+        }
       } else {
         if (!context.locals.authUser)
           throw new InstructorError("La sesión no está disponible.");
@@ -169,5 +217,13 @@ export async function instructorEditor(
         );
     }
   }
-  return { values, errors, error, revision, response, previous };
+  return {
+    values,
+    errors,
+    error,
+    revision,
+    response,
+    previous,
+    submittedField,
+  };
 }

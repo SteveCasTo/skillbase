@@ -71,7 +71,7 @@ const available = options.some((option) => !option.disabled);
   <input type="hidden" name="revision" value={registration.revision} />
   <input type="hidden" name="requestKey" value={requestKey} />
   <p role="alert" data-form-error class="text-sm text-destructive empty:hidden">
-    {errors.form}
+    {errors.destinationGroupId ? "" : errors.form}
   </p>
   {available ? (
     <>

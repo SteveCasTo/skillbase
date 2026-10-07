@@ -1,0 +1,112 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import InstructorRoster from "@/components/pre-registrations/InstructorRoster.astro";
+import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
+import AttendanceBreadcrumbs from "./AttendanceBreadcrumbs.astro";
+import { membershipLabels } from "@/components/pre-registrations/presentation";
+import { buttonVariants } from "@/components/ui/button";
+import type { prepareGroupParticipantsRoute } from "./participants-route";
+type Props = Awaited<ReturnType<typeof prepareGroupParticipantsRoute>>;
+const {
+  courseId,
+  groupId,
+  courseName,
+  groupLabel,
+  instructorRoute,
+  message,
+  available,
+  entries,
+  registrations,
+} = Astro.props;
+const pageHref = (page: number) =>
+  `${Astro.url.pathname}?${new URLSearchParams({ page: String(page) })}`;
+---
+
+<PrivateLayout title="Participantes del grupo">
+  <AttendanceBreadcrumbs
+    {courseId}
+    {groupId}
+    {courseName}
+    {groupLabel}
+    {instructorRoute}
+    current="participants"
+  />
+  <h1 class="text-3xl font-semibold tracking-tight">Participantes del grupo</h1>
+  <div class="mt-8 min-w-0">
+    {message ? (
+      <RegistrationPageError {message} retryHref={Astro.url.pathname} />
+    ) : instructorRoute ? (
+      <InstructorRoster {entries} {available} />
+    ) : (
+      registrations && (
+        <>
+          {registrations.items.length === 0 ? (
+            <p class="text-sm text-muted-foreground">
+              Este grupo todavía no tiene participantes en esta página.
+            </p>
+          ) : (
+            <ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {registrations.items.map((registration) => (
+                <li class="min-w-0">
+                  <a
+                    href={`/app/preinscripciones/${registration.id}`}
+                    class="flex h-full min-w-0 flex-col gap-2 rounded-xl border bg-card p-5 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    <h2 class="break-words font-semibold">
+                      {registration.participant.firstName}{" "}
+                      {registration.participant.lastName}
+                    </h2>
+                    <p class="break-words text-sm text-muted-foreground">
+                      CI: {registration.participant.ci}
+                    </p>
+                    <p class="break-all text-sm text-muted-foreground">
+                      {registration.participant.email}
+                    </p>
+                    <p class="text-sm">
+                      {membershipLabels[registration.membershipStatus]}
+                    </p>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {(registrations.page > 1 ||
+            registrations.page * registrations.pageSize <
+              registrations.total) && (
+            <nav
+              aria-label="Páginas de participantes"
+              class="mt-6 flex flex-wrap items-center gap-3"
+            >
+              {registrations.page > 1 && (
+                <a
+                  href={pageHref(registrations.page - 1)}
+                  class={buttonVariants({
+                    variant: "outline",
+                    className: "min-h-11",
+                  })}
+                >
+                  Anterior
+                </a>
+              )}
+              <span class="text-sm text-muted-foreground">
+                Página {registrations.page}
+              </span>
+              {registrations.page * registrations.pageSize <
+                registrations.total && (
+                <a
+                  href={pageHref(registrations.page + 1)}
+                  class={buttonVariants({
+                    variant: "outline",
+                    className: "min-h-11",
+                  })}
+                >
+                  Siguiente
+                </a>
+              )}
+            </nav>
+          )}
+        </>
+      )
+    )}
+  </div>
+</PrivateLayout>

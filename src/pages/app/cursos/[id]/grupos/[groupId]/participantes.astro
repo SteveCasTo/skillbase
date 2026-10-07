@@ -1,0 +1,14 @@
+---
+import GroupParticipantsPage from "@/components/attendance/GroupParticipantsPage.astro";
+import { prepareGroupParticipantsRoute } from "@/components/attendance/participants-route";
+if (Astro.request.method !== "GET")
+  return new Response(null, {
+    status: 405,
+    headers: { Allow: "GET", "Cache-Control": "private, no-store" },
+  });
+Astro.response.headers.set("Cache-Control", "private, no-store");
+const data = await prepareGroupParticipantsRoute(Astro);
+Astro.response.status = data.status;
+---
+
+<GroupParticipantsPage {...data} />

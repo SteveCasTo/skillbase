@@ -30,6 +30,9 @@ export interface AttendanceSessionDto {
   replacementForSessionId: string | null;
   cancellationReason: string | null;
   canRecord: boolean;
+  /** Server policy hints; commands always revalidate under lock. */
+  canCancel?: boolean;
+  canReplace?: boolean;
   instructorAttendance: AttendanceMarkDto;
 }
 export interface AttendanceParticipantDto {

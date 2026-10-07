@@ -5,6 +5,7 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
+import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import {
   INTEREST_FORMAT_FIELDS,
@@ -15,7 +16,7 @@ import { registerCourseInstructor } from "./instructor-helper";
 
 const successMessage =
   "Gracias por tu interés. Esta solicitud no reserva una plaza ni confirma una inscripción.";
-const origin = "http://127.0.0.1:4321";
+const origin = e2eSiteUrl();
 const headers = { Origin: origin, Accept: "application/json" };
 const submitName = "Dejar mis datos de interés";
 
