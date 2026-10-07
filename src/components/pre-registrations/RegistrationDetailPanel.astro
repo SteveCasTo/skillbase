@@ -11,6 +11,12 @@ import CancellationForm from "./CancellationForm.astro";
 import TransferForm from "./TransferForm.astro";
 import RegistrationActionDialog from "./RegistrationActionDialog";
 import ParticipantEditForm from "./ParticipantEditForm.astro";
+import {
+  assertCancellation,
+  assertTransfer,
+} from "@/domain/pre-registrations/policies";
+import { RegistrationError } from "@/domain/pre-registrations/errors";
+import { courseContext } from "./presentation";
 interface Props {
   detail: RegistrationDetailDto;
   form: RegistrationFormDto;
@@ -42,46 +48,121 @@ const key = (operation: RegistrationOperation) =>
   attempted(operation)
     ? values.requestKey || crypto.randomUUID()
     : crypto.randomUUID();
+let canCancel = false;
+try {
+  assertCancellation(
+    courseContext(form),
+    registration.state,
+    "VOLUNTARY",
+    new Date(serverNow),
+  );
+  canCancel = true;
+} catch (error) {
+  if (!(error instanceof RegistrationError)) throw error;
+}
+const canTransfer = form.groups.some((group) => {
+  if (group.id === registration.groupId) return false;
+  try {
+    assertTransfer(
+      courseContext(form),
+      registration.state,
+      {
+        ...group,
+        courseId: form.course.id,
+        courseTypeRevisionId: form.course.courseTypeRevisionId,
+      },
+      new Date(serverNow),
+    );
+    return true;
+  } catch (error) {
+    if (!(error instanceof RegistrationError)) throw error;
+    return false;
+  }
+});
 ---
 
-<div data-registration-panel class="mt-8 flex min-w-0 flex-col gap-8">
-  <section aria-labelledby="registration-participant-title" class="min-w-0">
-    <header class="mb-6 flex flex-wrap items-center justify-between gap-4">
-      <h2 id="registration-participant-title" class="text-xl font-semibold">
-        Datos del participante
-      </h2>
-      <div
-        role="group"
-        class="flex flex-wrap items-center gap-3"
-        aria-label="Acciones de preinscripción"
+<div data-registration-panel class="mt-6 flex min-w-0 flex-col gap-6">
+  {message &&
+    ((attempted("cancel") && !canCancel) ||
+      (attempted("transfer") && !canTransfer)) && (
+      <p role="alert" class="text-sm text-destructive">
+        {message}
+      </p>
+    )}
+  <header class="flex flex-wrap items-start justify-between gap-4">
+    <div class="min-w-0">
+      <h1
+        data-registration-person-name
+        class="break-words text-3xl font-semibold tracking-tight"
       >
-        {registration.state === "ACTIVE" && (
-          <>
-            <RegistrationActionDialog
-              client:load
-              targetId="registration-transfer-panel"
-              title="Cambiar de grupo"
-              description={form.course.name}
-              initialOpen={attempted("transfer")}
-            />
-            <RegistrationActionDialog
-              client:load
-              targetId="registration-cancel-panel"
-              title="Cancelar preinscripción"
-              description="Revisa el motivo antes de confirmar."
-              destructive
-              initialOpen={attempted("cancel")}
-            />
-          </>
-        )}
-      </div>
-    </header>
+        {registration.participant.firstName} {registration.participant.lastName}
+      </h1>
+      <p
+        data-registration-course-group
+        data-course-name={form.course.name}
+        class="mt-2 break-words text-muted-foreground"
+      >
+        {registration.courseName ?? form.course.name} ·{" "}
+        {registration.groupName ?? "Grupo asignado"}
+      </p>
+    </div>
+    <div
+      role="group"
+      class="flex flex-wrap items-center gap-3"
+      aria-label="Acciones de preinscripción"
+    >
+      {canTransfer && (
+        <RegistrationActionDialog
+          client:load
+          targetId="registration-transfer-panel"
+          title="Cambiar de grupo"
+          description={form.course.name}
+          initialOpen={attempted("transfer")}
+        />
+      )}
+      {canCancel && (
+        <RegistrationActionDialog
+          client:load
+          targetId="registration-cancel-panel"
+          title="Cancelar preinscripción"
+          description="Revisa el motivo antes de confirmar."
+          destructive
+          initialOpen={attempted("cancel")}
+        />
+      )}
+    </div>
+  </header>
+  <section aria-labelledby="registration-participant-title" class="min-w-0">
+    <h2 id="registration-participant-title" class="mb-4 text-xl font-semibold">
+      Datos del participante
+    </h2>
     <div data-registration-participant-fields>
       <ParticipantEditForm
         id="registration-participant"
-        participant={registration.participant}
-        action={`/app/participantes/${registration.participant.id}?registrationId=${registration.id}`}
-        requestKey={crypto.randomUUID()}
+        participant={{
+          ...registration.participant,
+          revision:
+            attempted("participant") && revision
+              ? revision
+              : registration.participant.revision,
+        }}
+        action={`${path}?operation=participant`}
+        requestKey={key("participant")}
+        lastSubmitted={attempted("participant") ? values : undefined}
+        {...(attempted("participant")
+          ? {
+              values: {
+                ci: values.ci ?? registration.participant.ci,
+                firstName:
+                  values.firstName ?? registration.participant.firstName,
+                lastName: values.lastName ?? registration.participant.lastName,
+                email: values.email ?? registration.participant.email,
+                phone: values.phone ?? registration.participant.phone,
+              },
+              errors,
+              ...(message ? { message } : {}),
+            }
+          : {})}
       />
     </div>
   </section>
@@ -167,7 +248,7 @@ const key = (operation: RegistrationOperation) =>
         </div>
       </section>
     )}
-    {registration.state === "ACTIVE" && (
+    {canTransfer && (
       <section class="min-w-0">
         <div
           id="registration-transfer-panel"
@@ -193,7 +274,7 @@ const key = (operation: RegistrationOperation) =>
         </div>
       </section>
     )}
-    {registration.state === "ACTIVE" && (
+    {canCancel && (
       <section class="min-w-0">
         <div
           id="registration-cancel-panel"

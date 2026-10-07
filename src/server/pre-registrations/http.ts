@@ -245,7 +245,6 @@ export async function handleRegistrationPost(input: {
   siteUrl: URL;
   operation: RegistrationOperation;
   registrationId?: string;
-  participantId?: string;
   now?: Date;
 }): Promise<{
   status: number;
@@ -341,8 +340,24 @@ export async function handleRegistrationPost(input: {
     }
     const revision = validateRegistrationRevision(values.revision);
     if (input.operation === "participant") {
+      // The contextual route resolves identity from the current registration,
+      // never from a participant selected by the browser.
+      const registrationId = validateRegistrationId(
+        input.registrationId,
+        "registrationId",
+      );
+      const detail = await getRegistrationDetail(
+        input.repository,
+        input.actor,
+        registrationId,
+      );
+      if (!detail)
+        throw new RegistrationError(
+          "NOT_FOUND",
+          "Preinscripción no encontrada.",
+        );
       const participantId = validateRegistrationId(
-        input.participantId,
+        detail.registration.participant.id,
         "participantId",
       );
       if (values.participantId !== participantId)

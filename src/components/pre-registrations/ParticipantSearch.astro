@@ -1,47 +1,44 @@
 ---
-import type { ParticipantDto } from "@/domain/pre-registrations/types";
 import type { AdminInterestRegistrationDto } from "@/domain/interests/types";
+import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { buttonVariants } from "@/components/ui/button";
 interface Props {
   id: string;
   courseId: string;
-  participants?: readonly ParticipantDto[];
   interests?: readonly AdminInterestRegistrationDto[];
   action?: string;
   query?: string;
   chooseHrefs?: Readonly<Record<string, string>>;
   targetFormId?: string;
   error?: string;
-  chooseLabel?: string;
+  selected?: boolean;
+  clearHref?: string;
 }
 const {
   id,
   courseId,
-  participants = [],
   interests = [],
   action,
   query = "",
   chooseHrefs = {},
   targetFormId,
   error,
+  selected = false,
+  clearHref,
 } = Astro.props;
-const rows = [
-  ...participants.map((person) => ({ person, kind: "participant" })),
-  ...interests
-    .filter(
-      (person) => person.courseId === courseId && person.status === "ACTIVE",
-    )
-    .map((person) => ({ person, kind: "interest" })),
-].slice(0, 30);
-const compact = Boolean(targetFormId);
+const rows = interests
+  .filter(
+    (person) => person.courseId === courseId && person.status === "ACTIVE",
+  )
+  .slice(0, 30);
 ---
 
 <section
   id={id}
   data-participant-search
   data-target-form={targetFormId}
-  aria-label="Buscar persona"
+  aria-label="Buscar interesado"
   class="flex min-w-0 flex-col gap-3"
 >
   <form
@@ -52,17 +49,45 @@ const compact = Boolean(targetFormId);
   >
     {courseId && <input type="hidden" name="courseId" value={courseId} />}
     <label for={`${id}-query`} class="text-sm font-medium">
-      {compact ? "Buscar participante o interesado" : "Nombre o CI"}
+      Buscar interesado por nombre o correo
     </label>
-    <Input
-      id={`${id}-query`}
-      name="search"
-      type="search"
-      defaultValue={query}
-      maxLength={100}
-      autoComplete="off"
-      className="min-h-11"
-    />
+    <div class="flex min-w-0 items-center gap-2">
+      <Input
+        id={`${id}-query`}
+        name="search"
+        type="search"
+        defaultValue={query}
+        maxLength={100}
+        autoComplete="off"
+        className="min-h-11 min-w-0 flex-1"
+      />
+      {targetFormId && (
+        <button
+          type="button"
+          hidden
+          data-clear-person
+          aria-label="Cambiar persona o registrar manualmente"
+          title="Cambiar persona o registrar manualmente"
+          class={buttonVariants({
+            variant: "outline",
+            size: "icon",
+            className: "size-11 shrink-0",
+          })}
+        >
+          <X aria-hidden="true" />
+        </button>
+      )}
+    </div>
+    {selected && clearHref && (
+      <noscript>
+        <a
+          href={clearHref}
+          class="inline-flex min-h-11 items-center text-sm underline underline-offset-4"
+        >
+          Cambiar persona
+        </a>
+      </noscript>
+    )}
     {action && (
       <button
         type="submit"
@@ -93,33 +118,20 @@ const compact = Boolean(targetFormId);
   </p>
   <ul
     data-search-results
-    class={
-      compact
-        ? "flex min-w-0 flex-col divide-y rounded-lg border empty:hidden"
-        : "grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3"
-    }
+    class="flex min-w-0 flex-col divide-y rounded-lg border empty:hidden"
   >
-    {rows.map(({ person, kind }) => (
+    {rows.map((person) => (
       <li class="min-w-0">
         <a
           href={chooseHrefs[person.id]}
-          data-choose-person={compact ? "" : undefined}
-          data-kind={kind}
-          data-person={compact ? JSON.stringify(person) : undefined}
-          class={
-            compact
-              ? "flex min-h-11 w-full flex-col gap-1 px-4 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
-              : "flex h-full min-w-0 flex-col gap-2 rounded-xl border p-5 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
-          }
+          data-choose-person={targetFormId ? "" : undefined}
+          data-kind="interest"
+          data-person={targetFormId ? JSON.stringify(person) : undefined}
+          class="flex min-h-11 w-full flex-col gap-1 px-4 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
         >
           <span class="break-words font-medium">
             {person.firstName} {person.lastName}
           </span>
-          {!compact && "ci" in person && (
-            <span class="break-words text-sm text-muted-foreground">
-              CI: {person.ci}
-            </span>
-          )}
           <span class="break-words text-sm text-muted-foreground">
             {person.email}
           </span>
@@ -135,18 +147,9 @@ const compact = Boolean(targetFormId);
   >
     Sin coincidencias.
   </p>
-  <p data-selected-person role="status" class="text-sm empty:hidden"></p>
-  {targetFormId && (
-    <button
-      type="button"
-      hidden
-      data-clear-person
-      class={buttonVariants({
-        variant: "outline",
-        className: "min-h-11 self-start",
-      })}
-    >
-      Registrar otra persona
-    </button>
-  )}
+  <p data-selected-person role="status" class="sr-only">
+    {selected
+      ? "Interesado seleccionado. Puedes editar sus datos o cambiar de persona."
+      : ""}
+  </p>
 </section>

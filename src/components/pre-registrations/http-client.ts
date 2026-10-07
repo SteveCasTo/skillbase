@@ -9,7 +9,6 @@ import type {
   RegistrationHttpPayload,
   RegistrationHttpValue,
 } from "@/server/pre-registrations/http";
-import type { ParticipantDto } from "@/domain/pre-registrations/types";
 import type { AdminInterestRegistrationDto } from "@/domain/interests/types";
 
 async function send(
@@ -188,14 +187,16 @@ function bindLookup() {
         "[data-participant-search]",
       );
       if (!root) return;
-      const selectPerson = (
-        person: ParticipantDto | AdminInterestRegistrationDto,
-        global: boolean,
-      ) => {
+      const selectPerson = (person: AdminInterestRegistrationDto) => {
         const form = document.getElementById(root.dataset.targetForm ?? "");
         if (!(form instanceof HTMLFormElement) || form.dataset.pending) return;
+        if (
+          person.courseId !== wrapper.dataset.lookupCourse ||
+          person.status !== "ACTIVE"
+        )
+          return;
         const fields = {
-          ci: "ci" in person ? person.ci : "",
+          ci: "",
           firstName: person.firstName,
           lastName: person.lastName,
           email: person.email,
@@ -205,17 +206,21 @@ function bindLookup() {
           const input = form.elements.namedItem(name);
           if (input instanceof HTMLInputElement) {
             input.value = value;
-            input.readOnly = global;
+            input.readOnly = false;
           }
         });
         const source = form.elements.namedItem("sourceInterestId");
-        if (source instanceof HTMLInputElement)
-          source.value = global ? "" : person.id;
+        if (source instanceof HTMLInputElement) source.value = person.id;
+        const url = new URL(location.href);
+        url.searchParams.set("sourceInterestId", person.id);
+        url.searchParams.delete("search");
+        history.replaceState(history.state, "", url);
         const selected = root.querySelector<HTMLElement>(
           "[data-selected-person]",
         );
         if (selected)
-          selected.textContent = `${person.firstName} ${person.lastName} · ${person.email}`;
+          selected.textContent =
+            "Interesado seleccionado. Puedes editar sus datos o cambiar de persona.";
         const clear = root.querySelector<HTMLButtonElement>(
           "[data-clear-person]",
         );
@@ -223,10 +228,15 @@ function bindLookup() {
         root
           .querySelector<HTMLElement>("[data-search-results]")
           ?.replaceChildren();
+        const query = root.querySelector<HTMLInputElement>(
+          'input[name="search"]',
+        );
+        if (query) {
+          query.value = "";
+          query.dispatchEvent(new Event("input", { bubbles: true }));
+        }
         form.dispatchEvent(new Event("change", { bubbles: true }));
-        const target = global
-          ? form.querySelector<HTMLElement>('[data-slot="select-trigger"]')
-          : form.elements.namedItem("ci");
+        const target = form.elements.namedItem("ci");
         if (target instanceof HTMLElement) target.focus();
       };
       root
@@ -234,11 +244,12 @@ function bindLookup() {
         .forEach((link) =>
           link.addEventListener("click", (event) => {
             event.preventDefault();
-            selectPerson(
-              JSON.parse(link.dataset.person!) as
-                ParticipantDto | AdminInterestRegistrationDto,
-              link.dataset.kind === "participant",
-            );
+            if (link.dataset.kind === "interest")
+              selectPerson(
+                JSON.parse(
+                  link.dataset.person!,
+                ) as AdminInterestRegistrationDto,
+              );
           }),
         );
       root
@@ -265,12 +276,31 @@ function bindLookup() {
             "[data-selected-person]",
           );
           if (selected) selected.textContent = "";
+          const url = new URL(location.href);
+          url.searchParams.delete("sourceInterestId");
+          url.searchParams.delete("search");
+          history.replaceState(history.state, "", url);
           if (event.currentTarget instanceof HTMLButtonElement)
             event.currentTarget.hidden = true;
+          const query = root.querySelector<HTMLInputElement>(
+            'input[name="search"]',
+          );
+          if (query) {
+            query.value = "";
+            query.dispatchEvent(new Event("input", { bubbles: true }));
+            query.focus();
+          }
           form.dispatchEvent(new Event("change", { bubbles: true }));
-          const ci = form.elements.namedItem("ci");
-          if (ci instanceof HTMLElement) ci.focus();
         });
+      const targetForm = document.getElementById(root.dataset.targetForm ?? "");
+      if (targetForm instanceof HTMLFormElement) {
+        const source = targetForm.elements.namedItem("sourceInterestId");
+        const clear = root.querySelector<HTMLButtonElement>(
+          "[data-clear-person]",
+        );
+        if (clear)
+          clear.hidden = !(source instanceof HTMLInputElement && source.value);
+      }
       bindParticipantLookup(root, {
         load: async (query, signal) => {
           const params = new URLSearchParams({ search: query });
@@ -283,7 +313,7 @@ function bindLookup() {
           if (!response.ok) throw new Error("Search failed");
           const payload = (await response.json()) as {
             ok: boolean;
-            participants: readonly ParticipantDto[];
+            participants: readonly unknown[];
             interests: readonly AdminInterestRegistrationDto[];
           };
           if (
@@ -292,17 +322,28 @@ function bindLookup() {
             !Array.isArray(payload.interests)
           )
             throw new Error("Search failed");
-          return payload;
+          // Ignore the legacy participant array even if an older response fills it.
+          return {
+            participants: [],
+            interests: payload.interests.filter(
+              (person) =>
+                person.courseId === wrapper.dataset.lookupCourse &&
+                person.status === "ACTIVE",
+            ),
+          };
         },
         onResults: (result) => {
           const list = root.querySelector<HTMLElement>("[data-search-results]");
           if (!list) return;
           list.replaceChildren();
-          const people = [
-            ...result.participants.map((person) => ({ person, global: true })),
-            ...result.interests.map((person) => ({ person, global: false })),
-          ].slice(0, 30);
-          for (const { person, global } of people) {
+          const people = result.interests
+            .filter(
+              (person) =>
+                person.courseId === wrapper.dataset.lookupCourse &&
+                person.status === "ACTIVE",
+            )
+            .slice(0, 30);
+          for (const person of people) {
             const item = document.createElement("li");
             item.className = "min-w-0";
             const title = document.createElement("p");
@@ -316,26 +357,10 @@ function bindLookup() {
             button.className =
               "flex min-h-11 w-full flex-col gap-1 px-4 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring";
             button.addEventListener("click", () => {
-              selectPerson(person, global);
+              selectPerson(person);
             });
-            if (root.dataset.targetForm) {
-              button.append(title, note);
-              item.append(button);
-            } else {
-              const link = document.createElement("a");
-              link.className =
-                "flex h-full min-w-0 flex-col gap-2 rounded-xl border p-5 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring";
-              link.href = `/app/preinscripciones?${new URLSearchParams({ search: "ci" in person ? person.ci : person.firstName })}`;
-              link.append(title);
-              if ("ci" in person) {
-                const ci = document.createElement("p");
-                ci.className = "break-words text-sm text-muted-foreground";
-                ci.textContent = `CI: ${person.ci}`;
-                link.append(ci);
-              }
-              link.append(note);
-              item.append(link);
-            }
+            button.append(title, note);
+            item.append(button);
             list.append(item);
           }
           const empty = root.querySelector<HTMLElement>("[data-search-empty]");
