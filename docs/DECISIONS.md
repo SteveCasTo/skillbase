@@ -708,7 +708,7 @@ asistencia, del cierre administrativo de Fase 8 y de certificados de Fase 9.
 
 **Fecha:** 2026-10-07
 
-**Estado:** Accepted — implementación WIP; validación concurrente remota pendiente
+**Estado:** Accepted — primera revisión remota PASS; gate final reforzado pendiente
 
 ### Contexto
 
@@ -719,8 +719,8 @@ El job `integration-e2e` secuencial del master CI `37670004492` duró 12m10s: Ch
 - Ejecutar la suite de integración una sola vez, en su stack temporal gestionado habitual.
 - Repartir E2E en dos jobs/runners GitHub concurrentes, cada uno con su propio stack Supabase/Auth/DB, servidor Astro y puerto; shard `1/2` y shard `2/2` no comparten estado.
 - Mantener `workers: 1`, `fullyParallel: false` y la política de retry existente dentro de cada shard. La paralelización ocurre entre runners, no contra una DB compartida.
-- Construir la identidad completa de tests y comprobar que los shards formen una partición disjunta/exhaustiva. Un agregador always-run debe fallar cerrado ante test o job fallido/omitido/cancelado/timeout/interrumpido; solo éxito de ambos shards satisface `integration-e2e`. `deploy` conserva los gates `quality` + agregador y el trigger exclusivo de push a `master`.
-- La decisión está aprobada; la configuración se encuentra WIP en `chore/isolated-e2e-shards` desde `development` `510e62d`. No activarla/mergearla como aceleración comprobada hasta que CI remoto ejecute ambas mitades simultáneamente, confirme outcomes exactos y registre benchmark comparable del tiempo total.
+- Construir la identidad completa de tests y comprobar que los shards formen una partición disjunta/exhaustiva. Un agregador always-run debe esperar estrictamente a `quality`, integration y los dos shards E2E, fallando cerrado ante job/test fallido, omitido, cancelado, timeout o interrupción. `deploy` conserva master-only y depende de los checks requeridos.
+- La decisión está aprobada; la implementación base está en `chore/isolated-e2e-shards` (`d251335`, desde `development` `510e62d`). El primer workflow candidato pasó CI PR `37675836980`: 134 casos E2E en dos runners aislados, además de quality e integration. Después se reforzó el DAG del gate para requerir `quality`, integration y E2E, y se añadió cobertura unitaria; esa revisión actual aún requiere un nuevo CI remoto. No activarla/mergearla como aceleración comprobada hasta que la última fuente pase y se confirme el benchmark/outcomes.
 
 ### Alternativas consideradas
 
@@ -733,5 +733,6 @@ El job `integration-e2e` secuencial del master CI `37670004492` duró 12m10s: Ch
 - El inventario necesita identidad estable y reporter/agregador que valide union, intersección y resultados; los artifacts por shard son necesarios para diagnosticar y demostrar paridad.
 - Cada runner consume recursos Supabase/Auth/DB/Chromium de manera independiente. La estación local tiene recursos insuficientes para ejecutar ambos stacks completos junto con servicios preexistentes; por tanto la validación concurrente ocurre en GitHub, sin detener servicios ajenos.
 - La lista candidata local contiene 134 identidades (126 Chromium + 8 mobile), repartidas 69 y 65; la igualdad de lista es evidencia previa, no ejecución full de shards. Un smoke Foundation 2/2 no demuestra velocidad ni estabilidad de la suite completa.
-- El baseline CI remoto se registra en [`docs/TESTING.md`](TESTING.md). No reclamar speedup hasta medir en el mismo runner/clase de entorno incluyendo stack, migraciones, fixtures/inventario, servidor, ejecución y cleanup.
+- En la primera comparación (una observación), el envelope E2E fue 460 s baseline vs. 387 s candidato, critical path sin espera inicial 730 vs. 426 s y consumo agregado de runners 789 vs. 931 s. Los hosts/redes/referencias no son idénticos; no demuestra mejora robusta ni “2×”. Repetir una medición comparable incluyendo stack, migraciones, fixtures/inventario, servidor, tests y cleanup antes de afirmar speedup. Baseline y límites en [`docs/TESTING.md`](TESTING.md).
+- El workflow agrega checks E2E a PRs de `development`, pero esa rama no tiene enforcement efectivo de branch protection para dichos estados. El operador debe verificar todos los estados requeridos antes del merge. No cambiar ni presentar este límite previo como efecto de la configuración shards.
 - El workflow conserva integridad de gates: instalación/quality no recibe secretos adicionales, integración sigue obligatoria, `deploy` sigue exclusivo de `master`, y ni la matriz ni el agregador deben permitir promover jobs omitidos como éxito.
