@@ -12,6 +12,7 @@ import {
   interestRegistrations,
   interestRegistrationRateLimits,
   users,
+  userRoles,
 } from "@/server/db/schema";
 import {
   registerInterest,
@@ -91,6 +92,7 @@ beforeEach(async () => {
     })
     .returning();
   actor = { ...user!, roles: ["ADMIN"] };
+  await db.insert(userRoles).values({ userId: actor.id, roleCode: "ADMIN" });
   course = await makeCourse();
   const [row] = await db
     .insert(groups)

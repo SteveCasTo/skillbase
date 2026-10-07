@@ -12,6 +12,8 @@ import type {
   RegisterInterestInput,
 } from "@/domain/interests/types";
 import * as schema from "@/server/db/schema";
+import { lockInstructorSchedules } from "./instructor-schedule";
+import { requireFreshRegistrationActor } from "./registration-support";
 type Database = PostgresJsDatabase<typeof schema>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 const {
@@ -222,6 +224,8 @@ export class DrizzleInterestRepository implements InterestRepository {
     actorId: string,
   ): Promise<AdminInterestPostPayload> {
     return this.db.transaction(async (tx) => {
+      await lockInstructorSchedules(tx);
+      await requireFreshRegistrationActor(tx, actorId);
       const [course] = await tx
         .select({ id: courses.id })
         .from(courses)

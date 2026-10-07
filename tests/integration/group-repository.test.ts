@@ -10,6 +10,7 @@ import {
   courses,
   groups,
   users,
+  userRoles,
 } from "@/server/db/schema";
 import { validateCourseData } from "@/domain/courses/validation";
 import {
@@ -54,6 +55,9 @@ beforeEach(async () => {
     .returning();
   if (!actor) throw new Error("No actor");
   admin = { ...actor, roles: ["ADMIN"] };
+  await database.db
+    .insert(userRoles)
+    .values({ userId: actor.id, roleCode: "ADMIN" });
   const format = await formats.create(
     `Groups ${crypto.randomUUID()}`,
     {

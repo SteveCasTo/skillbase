@@ -265,6 +265,37 @@ export const attendanceState = pgEnum("attendance_state", [
   "ABSENT",
   "EXCUSED",
 ]);
+
+export const adminAccountDeletions = pgTable(
+  "admin_account_deletions",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "restrict" }),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    authUserId: uuid("auth_user_id").notNull(),
+    requestedRevision: timestamp("requested_revision", {
+      withTimezone: true,
+      precision: 3,
+    }).notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completed_at", {
+      withTimezone: true,
+      precision: 3,
+    }),
+  },
+  (t) => [
+    index("admin_account_deletions_actor_idx").on(t.actorId),
+    check(
+      "admin_account_deletions_completion_check",
+      sql`${t.completedAt} is null or ${t.completedAt} >= ${t.requestedAt}`,
+    ),
+  ],
+).enableRLS();
 export const attendanceSettings = pgTable(
   "attendance_settings",
   {

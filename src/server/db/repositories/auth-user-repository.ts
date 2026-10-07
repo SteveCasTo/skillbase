@@ -21,6 +21,21 @@ import {
 } from "@/domain/instructors/profile";
 
 type Database = PostgresJsDatabase<typeof schema>;
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+async function lockActiveIdentity(tx: Transaction, id: string) {
+  const [actor] = await tx
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, id))
+    .for("share");
+  const roles = await tx
+    .select()
+    .from(schema.userRoles)
+    .where(eq(schema.userRoles.userId, id))
+    .for("share");
+  if (!actor || actor.status !== "ACTIVE" || !roles.length)
+    throw new AuthorizationError("FORBIDDEN", "Account is not active");
+}
 
 function isRole(value: string): value is AuthRole {
   return value === "ADMIN" || value === "INSTRUCTOR";
@@ -49,11 +64,14 @@ export class DrizzleAuthUserRepository implements AuthUserRepository {
   constructor(private readonly db: Database) {}
 
   async recordPasswordChanged(actorId: string): Promise<void> {
-    await this.db.insert(schema.auditEvents).values({
-      actorId,
-      entityType: "USER",
-      entityId: actorId,
-      action: "PASSWORD_CHANGED",
+    await this.db.transaction(async (tx) => {
+      await lockActiveIdentity(tx, actorId);
+      await tx.insert(schema.auditEvents).values({
+        actorId,
+        entityType: "USER",
+        entityId: actorId,
+        action: "PASSWORD_CHANGED",
+      });
     });
   }
 
@@ -66,11 +84,14 @@ export class DrizzleAuthUserRepository implements AuthUserRepository {
     await this.db
       .delete(schema.authGoogleLinkRequests)
       .where(lt(schema.authGoogleLinkRequests.expiresAt, now));
-    await this.db.insert(schema.authGoogleLinkRequests).values({
-      nonceHash: createHash("sha256").update(nonce).digest("hex"),
-      userId: internalUserId,
-      sessionId,
-      expiresAt: new Date(now.getTime() + 300_000),
+    await this.db.transaction(async (tx) => {
+      await lockActiveIdentity(tx, internalUserId);
+      await tx.insert(schema.authGoogleLinkRequests).values({
+        nonceHash: createHash("sha256").update(nonce).digest("hex"),
+        userId: internalUserId,
+        sessionId,
+        expiresAt: new Date(now.getTime() + 300_000),
+      });
     });
   }
 
