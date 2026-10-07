@@ -80,9 +80,9 @@ test("email login, keyboard password toggle, own profile and secure password cha
   await page
     .getByRole("button", { name: "Cambiar contraseña", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText(
-    "Contraseña actualizada",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Contraseña actualizada" }),
+  ).toContainText("Contraseña actualizada");
   await page
     .getByRole("button", { name: "Cerrar sesión", exact: true })
     .first()
