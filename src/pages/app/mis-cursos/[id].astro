@@ -5,6 +5,7 @@ import { requireInternalUser } from "@/server/auth/context";
 import { getDatabase } from "@/server/db/client";
 import { DrizzleAssignedCourseRepository } from "@/server/db/repositories/assigned-course-repository";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+import { buttonVariants } from "@/components/ui/button";
 if (Astro.request.method !== "GET")
   return new Response(null, { status: 405, headers: { Allow: "GET" } });
 let assigned: Awaited<ReturnType<typeof getAssignedCourse>> = null;
@@ -28,9 +29,17 @@ if (!assigned && !loadError) Astro.response.status = 404;
   </a>
   {assigned ? (
     <>
-      <h1 class="mt-5 text-3xl font-semibold tracking-tight">
-        {assigned.course.name}
-      </h1>
+      <header class="mt-5 flex flex-wrap items-start justify-between gap-4">
+        <h1 class="text-3xl font-semibold tracking-tight">
+          {assigned.course.name}
+        </h1>
+        <a
+          href={`/app/mis-cursos/${assigned.course.id}/evaluaciones`}
+          class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+        >
+          Esquema de evaluación
+        </a>
+      </header>
       <p class="mt-3 break-words text-muted-foreground">
         {assigned.course.description}
       </p>

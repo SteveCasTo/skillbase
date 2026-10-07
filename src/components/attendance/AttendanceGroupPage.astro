@@ -36,12 +36,20 @@ const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
   <header class="flex flex-wrap items-start justify-between gap-4">
     <h1 class="text-3xl font-semibold tracking-tight">{label}</h1>
     {group && (
-      <a
-        href={`${prefix}/${courseId}/grupos/${groupId}/participantes`}
-        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
-      >
-        Participantes del grupo
-      </a>
+      <div class="flex flex-wrap gap-3">
+        <a
+          href={`${prefix}/${courseId}/grupos/${groupId}/participantes`}
+          class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+        >
+          Participantes del grupo
+        </a>
+        <a
+          href={`${prefix}/${courseId}/grupos/${groupId}/evaluaciones`}
+          class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+        >
+          Evaluaciones
+        </a>
+      </div>
     )}
   </header>
   {group ? (
