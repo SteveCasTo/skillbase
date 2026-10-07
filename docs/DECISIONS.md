@@ -701,3 +701,37 @@ asistencia, del cierre administrativo de Fase 8 y de certificados de Fase 9.
   las tablas/permisos cloud se confirmaron mediante consulta read-only, sin hash
   pre/post completo de filas existentes. Fase 8/9 siguen siendo milestones
   separados.
+
+---
+
+## ADR-026 — E2E EN DOS SHARDS CON STACKS AISLADOS
+
+**Fecha:** 2026-10-07
+
+**Estado:** Accepted — implementación WIP; validación concurrente remota pendiente
+
+### Contexto
+
+El job `integration-e2e` secuencial del master CI `37670004492` duró 12m10s: Chromium install 2m15s, integración 2m03s y E2E 7m40s. Se quiere reducir el tiempo de feedback sin ejecutar varios procesos Playwright contra la misma base Auth/DB, lo que introduciría carreras y flakiness en fixtures/estado secuencial. El usuario aprobó evaluar dos shards y mantener intactos quality, integration, permisos, secretos, branch protections y deploy.
+
+### Decisión
+
+- Ejecutar la suite de integración una sola vez, en su stack temporal gestionado habitual.
+- Repartir E2E en dos jobs/runners GitHub concurrentes, cada uno con su propio stack Supabase/Auth/DB, servidor Astro y puerto; shard `1/2` y shard `2/2` no comparten estado.
+- Mantener `workers: 1`, `fullyParallel: false` y la política de retry existente dentro de cada shard. La paralelización ocurre entre runners, no contra una DB compartida.
+- Construir la identidad completa de tests y comprobar que los shards formen una partición disjunta/exhaustiva. Un agregador always-run debe fallar cerrado ante test o job fallido/omitido/cancelado/timeout/interrumpido; solo éxito de ambos shards satisface `integration-e2e`. `deploy` conserva los gates `quality` + agregador y el trigger exclusivo de push a `master`.
+- La decisión está aprobada; la configuración se encuentra WIP en `chore/isolated-e2e-shards` desde `development` `510e62d`. No activarla/mergearla como aceleración comprobada hasta que CI remoto ejecute ambas mitades simultáneamente, confirme outcomes exactos y registre benchmark comparable del tiempo total.
+
+### Alternativas consideradas
+
+- Mantener un solo job secuencial: menor complejidad/recursos, pero conserva el tiempo de feedback observado.
+- Aumentar `workers` o `fullyParallel` sobre un solo stack/base: rechazado por compartir estado de tests que depende de fixtures e interacciones secuenciales.
+- Duplicar integración dentro de cada shard: rechazado por repetir migraciones/costo sin aportar aislamiento E2E adicional.
+
+### Consecuencias
+
+- El inventario necesita identidad estable y reporter/agregador que valide union, intersección y resultados; los artifacts por shard son necesarios para diagnosticar y demostrar paridad.
+- Cada runner consume recursos Supabase/Auth/DB/Chromium de manera independiente. La estación local tiene recursos insuficientes para ejecutar ambos stacks completos junto con servicios preexistentes; por tanto la validación concurrente ocurre en GitHub, sin detener servicios ajenos.
+- La lista candidata local contiene 134 identidades (126 Chromium + 8 mobile), repartidas 69 y 65; la igualdad de lista es evidencia previa, no ejecución full de shards. Un smoke Foundation 2/2 no demuestra velocidad ni estabilidad de la suite completa.
+- El baseline CI remoto se registra en [`docs/TESTING.md`](TESTING.md). No reclamar speedup hasta medir en el mismo runner/clase de entorno incluyendo stack, migraciones, fixtures/inventario, servidor, ejecución y cleanup.
+- El workflow conserva integridad de gates: instalación/quality no recibe secretos adicionales, integración sigue obligatoria, `deploy` sigue exclusivo de `master`, y ni la matriz ni el agregador deben permitir promover jobs omitidos como éxito.
