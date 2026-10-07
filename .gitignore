@@ -36,6 +36,7 @@ coverage/
 playwright-report/
 test-results/
 blob-report/
+e2e-evidence/
 .playwright-cli/
 
 # Logs
