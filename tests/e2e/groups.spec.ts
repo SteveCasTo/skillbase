@@ -788,15 +788,30 @@ test("pending saves freeze only submitted inputs and validation restores field f
   await first.getByLabel("Editar horario del grupo 2").click();
   const time = first.getByLabel("Hora de inicio");
   await time.fill("10:00");
+  const scheduleConflict = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === path,
+  );
   await first.getByLabel("Guardar horario del grupo 2").click();
   await expect.poll(() => gates.length).toBe(1);
   await expect(time).toBeDisabled();
   await expect(second.getByLabel("Nueva capacidad")).toBeEnabled();
   gates[0]!.release();
+  expect((await scheduleConflict).status()).toBe(409);
   await expect(time).toHaveAttribute("aria-invalid", "true");
   await expect(time).toBeEnabled();
   await expect(time).toBeFocused();
-  await expect(page.locator("[data-group-error]")).toBeVisible();
+  await expect(time).toHaveValue("10:00");
+  const scheduleError = first.locator('[data-field-error="startTime"]');
+  await expect(scheduleError).toBeVisible();
+  await expect(scheduleError).toContainText(
+    "Otro grupo del curso ocupa ese horario.",
+  );
+  expect(await time.getAttribute("aria-describedby")).toBe(
+    await scheduleError.getAttribute("id"),
+  );
+  await expect(page.locator("[data-group-error]")).toBeHidden();
   await expect(second.getByLabel("Nueva capacidad")).toHaveValue("19");
   await first
     .getByRole("button", {
@@ -824,15 +839,38 @@ test("pending saves freeze only submitted inputs and validation restores field f
   const newCapacity = dialog.getByLabel("Capacidad");
   await newTime.fill("10:00");
   await newCapacity.fill("15");
+  const createConflict = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === path,
+  );
   await dialog.getByRole("button", { name: "Crear grupo" }).click();
   await expect.poll(() => gates.length).toBe(3);
   await expect(newTime).toBeDisabled();
   await expect(newCapacity).toBeDisabled();
   gates[2]!.release();
+  expect((await createConflict).status()).toBe(409);
   await expect(newTime).toHaveAttribute("aria-invalid", "true");
   await expect(newTime).toBeEnabled();
   await expect(newCapacity).toBeEnabled();
   await expect(newTime).toBeFocused();
   await expect(newTime).toHaveValue("10:00");
   await expect(newCapacity).toHaveValue("15");
+  const createError = dialog.locator('[data-field-error="startTime"]');
+  await expect(createError).toBeVisible();
+  await expect(createError).toContainText(
+    "Otro grupo del curso ocupa ese horario.",
+  );
+  expect(await newTime.getAttribute("aria-describedby")).toBe(
+    await createError.getAttribute("id"),
+  );
+  await expect(page.locator("[data-group-error]")).toBeHidden();
+  await page.reload();
+  await expect(page.locator("[data-group-id]")).toHaveCount(3);
+  await expect(
+    page
+      .locator("[data-group-id]")
+      .nth(1)
+      .locator('[data-group-field="schedule"] dd > span'),
+  ).toHaveText("08:00–09:30");
 });
