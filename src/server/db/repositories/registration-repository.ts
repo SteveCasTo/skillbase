@@ -273,6 +273,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
               and(
                 eq(schema.interestRegistrations.id, sourceInterestId),
                 eq(schema.interestRegistrations.courseId, courseId),
+                eq(schema.interestRegistrations.status, "ACTIVE"),
                 sql`not exists (select 1 from pre_registrations where source_interest_id = ${sourceInterestId}::uuid)`,
               ),
             )
@@ -377,6 +378,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
               and(
                 eq(schema.interestRegistrations.id, input.sourceInterestId),
                 eq(schema.interestRegistrations.courseId, course.id),
+                eq(schema.interestRegistrations.status, "ACTIVE"),
                 sql`not exists (select 1 from pre_registrations where source_interest_id = ${input.sourceInterestId}::uuid)`,
               ),
             );

@@ -1,9 +1,6 @@
 import type { InternalUser } from "@/domain/auth/types";
 import { listAdminCourses } from "@/application/courses/manage-courses";
-import {
-  getRegistrationForm,
-  findParticipants,
-} from "@/application/pre-registrations/manage-registrations";
+import { getRegistrationForm } from "@/application/pre-registrations/manage-registrations";
 import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
 import { getDatabase } from "@/server/db/client";
@@ -12,6 +9,7 @@ import { RegistrationError } from "@/domain/pre-registrations/errors";
 import type { RegistrationFormDto } from "@/domain/pre-registrations/types";
 import { hasAvailableRegistrationDestination } from "@/domain/pre-registrations/policies";
 import { filterAvailableInterestCandidates } from "./prefill-interest-candidates";
+import { requireRegistrationAdmin } from "@/application/pre-registrations/authorization";
 
 export async function loadRegistrationChoices(
   actor: InternalUser,
@@ -63,22 +61,22 @@ export async function lookupRegistrationPeople(
       "VALIDATION_FAILED",
       "Busca con 2 a 100 caracteres.",
     );
-  // Fresh repository authorization precedes reading independent public-interest data.
-  const participants = await findParticipants(
-    createRegistrationRepository(),
-    actor,
-    search,
-    30,
-  );
-  const data = courseId
-    ? await loadAdminInterestCourse(actor, courseId, "ACTIVE")
+  requireRegistrationAdmin(actor);
+  // Reauthorize against the current server identity without searching the global
+  // participant directory. Missing/invalid course never produces global results.
+  await createRegistrationRepository().settings(actor.id);
+  const form = courseId
+    ? await getRegistrationForm(createRegistrationRepository(), actor, courseId)
     : null;
-  const query = search.trim().toLocaleLowerCase("es-BO");
+  const data =
+    form && form.course.status === "PUBLISHED" && form.course.instructorActive
+      ? await loadAdminInterestCourse(actor, form.course.id, "ACTIVE")
+      : null;
   const interests = filterAvailableInterestCandidates(
     data?.registrations ?? [],
     data?.availableForPrefillInterestIds ?? [],
     courseId,
-    query,
+    search,
   );
-  return { participants, interests };
+  return { participants: [], interests };
 }
