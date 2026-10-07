@@ -50,7 +50,14 @@ export interface CourseEvaluationsDto {
   courseName: string;
   startsAt: string;
   minimumGrade: number;
-  provisional: true;
+  provisional: boolean;
+  /** Per-group official state; course-wide views may mix open and closed groups. */
+  academicGroups?: {
+    groupId: string;
+    closed: boolean;
+    version: number;
+    revision: number;
+  }[];
   groupId?: string;
   unavailableReason?: string | null;
   /** Sanitized administrative correction history, never contact or financial data. */

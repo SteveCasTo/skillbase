@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import * as s from "@/server/db/schema";
 import type { AttendanceRepository } from "@/application/attendance/attendance-repository";
 import {
@@ -32,6 +32,7 @@ import type {
   UpdateAttendanceSettingsInput,
 } from "@/domain/attendance/types";
 import { lockInstructorSchedules } from "./instructor-schedule";
+import { academicGroupClosed } from "./academic-closure-guard";
 import {
   assertSessionIntervalFree,
   eligibleSessionRegistrations,
@@ -132,8 +133,19 @@ async function context(
       "FORBIDDEN",
       "El roster se habilita desde el inicio oficial del curso.",
     );
-  await ensureGroupSessions(tx, group, now, actorId);
-  return { course, group, admin };
+  const closed = await academicGroupClosed(tx, groupId);
+  const versions = closed
+    ? await tx
+        .select()
+        .from(s.academicClosureVersions)
+        .where(eq(s.academicClosureVersions.groupId, groupId))
+        .orderBy(desc(s.academicClosureVersions.version))
+        .limit(1)
+    : [];
+  const report = versions[0]?.report;
+  if (closed && !report) throw new Error("Closure version unavailable");
+  if (!closed) await ensureGroupSessions(tx, group, now, actorId);
+  return { course, group, admin, closed, report };
 }
 async function sessionRow(
   tx: AttendanceTransaction,
@@ -264,18 +276,20 @@ async function groupDto(
   const active = rows.filter((r) => !r.cancelledAt);
   return {
     courseId: ctx.course.id,
-    courseName: ctx.course.name,
+    courseName: ctx.report?.courseName ?? ctx.course.name,
     groupId: ctx.group.id,
-    instructorName: instructor
-      ? `${instructor.firstName} ${instructor.lastName}`
-      : null,
+    instructorName: ctx.report
+      ? ctx.report.instructorName
+      : instructor
+        ? `${instructor.firstName} ${instructor.lastName}`
+        : null,
     officialEndsAt: ctx.course.endsAt.toISOString(),
     operationalEndsAt: active.length
       ? new Date(
           Math.max(...active.map((r) => r.endsAt.getTime())),
         ).toISOString()
       : null,
-    settings: await settings(tx),
+    settings: ctx.report?.attendanceSettings ?? (await settings(tx)),
     sessions: rows.map((row) => {
       const adjustable = canAdjustSession(
         row.startsAt,
@@ -291,23 +305,29 @@ async function groupDto(
       );
       return {
         ...dto,
-        canCancel: ctx.admin && !row.cancelledAt && adjustable,
+        canCancel: !ctx.closed && ctx.admin && !row.cancelledAt && adjustable,
         canReplace:
+          !ctx.closed &&
           ctx.admin &&
           ctx.group.status === "PLANNED" &&
           adjustable &&
           !hasOtherActiveEncounter(row, rows),
         canRecord:
-          dto.canRecord && (ctx.admin || ctx.group.status === "PLANNED"),
-        instructorAttendance: ctx.course.instructorId
-          ? dto.instructorAttendance
-          : {
-              status: "PENDING" as const,
-              inferred: false,
-              markedBy: null,
-              markedByName: null,
-              markedAt: null,
-            },
+          !ctx.closed &&
+          dto.canRecord &&
+          (ctx.admin || ctx.group.status === "PLANNED"),
+        instructorAttendance:
+          ctx.report?.sessions.find((s) => s.id === row.id)
+            ?.instructorAttendance ??
+          (ctx.course.instructorId
+            ? dto.instructorAttendance
+            : {
+                status: "PENDING" as const,
+                inferred: false,
+                markedBy: null,
+                markedByName: null,
+                markedAt: null,
+              }),
       };
     }),
   };
@@ -363,13 +383,10 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
         .from(s.groupSessions)
         .where(eq(s.groupSessions.groupId, groupId))
         .orderBy(asc(s.groupSessions.startsAt), asc(s.groupSessions.id));
-      const eligibility = await loadGroupEligibility(
-        tx,
-        groupId,
-        ctx.course.startsAt,
-        now,
-      );
-      for (const row of rows)
+      const eligibility = ctx.closed
+        ? []
+        : await loadGroupEligibility(tx, groupId, ctx.course.startsAt, now);
+      for (const row of ctx.closed ? [] : rows)
         await materializeSessionRoster(
           tx,
           groupId,
@@ -431,65 +448,89 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
           eq(s.groupSessions.id, s.sessionRoster.sessionId),
         )
         .where(eq(s.groupSessions.groupId, groupId));
-      const eligibleNow = await eligibleSessionRegistrations(
-        tx,
-        groupId,
-        ctx.course.startsAt,
-        selected,
-        now,
-        eligibility,
-      );
+      const eligibleNow = ctx.closed
+        ? []
+        : await eligibleSessionRegistrations(
+            tx,
+            groupId,
+            ctx.course.startsAt,
+            selected,
+            now,
+            eligibility,
+          );
       return {
         group,
         session,
         reviewCandidates:
-          ctx.admin && selected.administrativeReviewRequired
+          !ctx.closed && ctx.admin && selected.administrativeReviewRequired
             ? eligibleNow.map((e) => ({
                 registrationId: e.registration.id,
                 firstName: e.firstName,
                 lastName: e.lastName,
               }))
             : [],
-        participants: roster.map(
-          ({ registration: r, firstName, lastName }) => ({
-            registrationId: r.id,
-            firstName,
-            lastName,
-            currentlyEnrolled:
-              r.state === "ACTIVE" &&
+        participants: (ctx.report
+          ? (
+              ctx.report.sessions.find((s) => s.id === sessionId)
+                ?.participants ?? []
+            ).map((p) => ({
+              registration: { id: p.registrationId, state: "ACTIVE" as const },
+              firstName: p.firstName,
+              lastName: p.lastName,
+            }))
+          : roster
+        ).map(({ registration: r, firstName, lastName }) => ({
+          registrationId: r.id,
+          firstName,
+          lastName,
+          currentlyEnrolled: ctx.report
+            ? ctx.report.participants.some((p) => p.registrationId === r.id)
+            : r.state === "ACTIVE" &&
               eligibleNow.some((e) => e.registration.id === r.id),
-            ...attendanceSummary(
-              rows
-                .filter(
-                  (row) =>
-                    !row.cancelledAt &&
-                    membership.some(
-                      (m) =>
-                        m.sessionId === row.id && m.registrationId === r.id,
+          ...attendanceSummary(
+            ctx.report
+              ? ctx.report.sessions
+                  .filter((s) => !s.cancelledAt)
+                  .flatMap((s) =>
+                    s.participants
+                      .filter((p) => p.registrationId === r.id)
+                      .map((p) => p.attendance.status),
+                  )
+              : rows
+                  .filter(
+                    (row) =>
+                      !row.cancelledAt &&
+                      membership.some(
+                        (m) =>
+                          m.sessionId === row.id && m.registrationId === r.id,
+                      ),
+                  )
+                  .map((row) =>
+                    effectiveAttendance(
+                      marks.find(
+                        (m) =>
+                          m.sessionId === row.id && m.registrationId === r.id,
+                      )?.status ?? null,
+                      row.startsAt,
+                      row.administrativeReviewRequired,
+                      now,
                     ),
-                )
-                .map((row) =>
-                  effectiveAttendance(
-                    marks.find(
-                      (m) =>
-                        m.sessionId === row.id && m.registrationId === r.id,
-                    )?.status ?? null,
-                    row.startsAt,
-                    row.administrativeReviewRequired,
-                    now,
                   ),
-                ),
-              group.settings.consecutiveAbsenceLimit,
-            ),
-            attendance: markDto(
+            group.settings.consecutiveAbsenceLimit,
+          ),
+          attendance:
+            ctx.report?.sessions
+              .find((s) => s.id === selected.id)
+              ?.participants.find((p) => p.registrationId === r.id)
+              ?.attendance ??
+            markDto(
               marks.find(
                 (m) => m.sessionId === selected.id && m.registrationId === r.id,
               ),
               selected,
               now,
             ),
-          }),
-        ),
+        })),
       };
     });
   }
@@ -540,6 +581,11 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
         input.groupId,
         now,
       );
+      if (ctx.closed)
+        throw new AttendanceError(
+          "GROUP_CLOSED",
+          "Reabre el grupo antes de corregir asistencia.",
+        );
       return this.command(
         tx,
         actorId,
@@ -754,7 +800,19 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
     validateSessionReason(input.reason);
     return this.db.transaction(async (tx) => {
       const now = this.clock();
-      await context(tx, actorId, input.courseId, input.groupId, now, true);
+      const ctx = await context(
+        tx,
+        actorId,
+        input.courseId,
+        input.groupId,
+        now,
+        true,
+      );
+      if (ctx.closed)
+        throw new AttendanceError(
+          "GROUP_CLOSED",
+          "Reabre el grupo antes de modificar sesiones.",
+        );
       return this.command(
         tx,
         actorId,
@@ -804,6 +862,11 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
         now,
         true,
       );
+      if (ctx.closed)
+        throw new AttendanceError(
+          "GROUP_CLOSED",
+          "Reabre el grupo antes de modificar sesiones.",
+        );
       return this.command(
         tx,
         actorId,

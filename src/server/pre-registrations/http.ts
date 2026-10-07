@@ -71,6 +71,7 @@ export function registrationFailure(error: unknown): {
                 "ACTIVE_REGISTRATION_EXISTS",
                 "PARTICIPANT_DETAILS_CONFLICT",
                 "CAPACITY_EXCEEDED",
+                "GROUP_CLOSED",
               ].includes(error.code)
             ? 409
             : 422;

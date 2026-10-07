@@ -27,6 +27,7 @@ import type {
 import { membershipStatus } from "@/domain/pre-registrations/policies";
 import { lockInstructorSchedules } from "./instructor-schedule";
 import { registrationGroupName } from "./registration-support";
+import { academicGroupClosed } from "./academic-closure-guard";
 
 type Database = PostgresJsDatabase<typeof s>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -98,7 +99,7 @@ async function components(tx: Transaction, courseId: string) {
     .where(eq(s.evaluationComponents.courseId, courseId))
     .orderBy(asc(s.evaluationComponents.order));
 }
-async function roster(
+export async function loadEvaluationRoster(
   tx: Transaction,
   course: typeof s.courses.$inferSelect,
   now: Date,
@@ -111,6 +112,7 @@ async function roster(
       state: s.preRegistrations.state,
       firstName: s.participants.firstName,
       lastName: s.participants.lastName,
+      ci: s.participants.ci,
       balance: sql<string>`${s.preRegistrations.totalPriceCents} - coalesce((select sum(l.amount_cents) from public.registration_ledger l where l.registration_id = ${s.preRegistrations.id} and l.kind = 'PAYMENT' and l.recorded_at <= ${now.toISOString()}::timestamptz), 0)`,
     })
     .from(s.preRegistrations)
@@ -172,7 +174,27 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
         .from(s.groups)
         .where(eq(s.groups.courseId, courseId))
         .orderBy(asc(s.groups.startsAt), asc(s.groups.id));
-      const people = await roster(tx, ctx.course, ctx.now);
+      const people = await loadEvaluationRoster(tx, ctx.course, ctx.now);
+      const states = await tx
+        .select({ state: s.academicGroupStates })
+        .from(s.academicGroupStates)
+        .innerJoin(s.groups, eq(s.groups.id, s.academicGroupStates.groupId))
+        .where(eq(s.groups.courseId, courseId));
+      const versions = await tx
+        .select()
+        .from(s.academicClosureVersions)
+        .where(eq(s.academicClosureVersions.courseId, courseId));
+      const officialReports = states
+        .filter(({ state }) => state.closed)
+        .map(({ state }) => {
+          const version = versions.find(
+            (v) =>
+              v.groupId === state.groupId && v.version === state.lastVersion,
+          );
+          if (!version) throw new Error("Closure version unavailable");
+          return version.report;
+        });
+      const selectedReport = officialReports.find((r) => r.groupId === groupId);
       const historyRows = ctx.admin
         ? await tx
             .select({
@@ -197,12 +219,21 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
           (p.membershipStatus === "INSCRITO" ||
             grades.some((g) => g.participantId === p.participantId)),
       );
-      return {
+      const data: CourseEvaluationsDto = {
         courseId,
         courseName: ctx.course.name,
         startsAt: ctx.course.startsAt.toISOString(),
         minimumGrade: ctx.course.minimumGrade,
-        provisional: true,
+        provisional: !selectedReport,
+        academicGroups: groups.map((g) => {
+          const state = states.find((s) => s.state.groupId === g.id)?.state;
+          return {
+            groupId: g.id,
+            closed: state?.closed ?? false,
+            version: state?.lastVersion ?? 0,
+            revision: state?.revision ?? 0,
+          };
+        }),
         ...(groupId === undefined ? {} : { groupId }),
         unavailableReason: null,
         history: historyRows.flatMap((h) => {
@@ -281,6 +312,36 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
             };
           }),
       };
+      const officialParticipants = officialReports
+        .filter((r) => groupId === undefined || r.groupId === groupId)
+        .flatMap((r) =>
+          r.participants.map((p) => ({
+            participantId: p.participantId,
+            registrationId: p.registrationId,
+            groupId: p.groupId,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            membershipStatus: p.membershipStatus,
+            canGrade: false,
+            grades: p.grades.map((g) => ({
+              ...g,
+              recordedBy: ctx.admin ? g.recordedBy : null,
+            })),
+            result: p.result,
+          })),
+        );
+      data.participants = [
+        ...data.participants.filter(
+          (p) => !officialReports.some((r) => r.groupId === p.groupId),
+        ),
+        ...officialParticipants,
+      ];
+      if (selectedReport) {
+        data.courseName = selectedReport.courseName;
+        data.minimumGrade = selectedReport.minimumGrade;
+        data.scheme = selectedReport.scheme;
+      }
+      return data;
     });
   }
   private async command(
@@ -405,9 +466,9 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
       return this.command(tx, actorId, input, "ROW", input, async () => {
         assertSchemeRevision(ctx.scheme?.revision ?? 0, input.schemeRevision);
         const items = await components(tx, input.courseId);
-        const person = (await roster(tx, ctx.course, ctx.now)).find(
-          (p) => p.id === input.registrationId,
-        );
+        const person = (
+          await loadEvaluationRoster(tx, ctx.course, ctx.now)
+        ).find((p) => p.id === input.registrationId);
         if (
           !person ||
           person.membershipStatus !== "INSCRITO" ||
@@ -416,6 +477,11 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
           throw new EvaluationError(
             "NOT_ENROLLED",
             "Solo participantes inscritos pueden recibir notas.",
+          );
+        if (await academicGroupClosed(tx, person.groupId))
+          throw new EvaluationError(
+            "GROUP_CLOSED",
+            "Reabre el grupo antes de corregir notas.",
           );
         const previous = await tx
           .select()
@@ -548,9 +614,9 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
             "NOT_FOUND",
             "El componente no está disponible.",
           );
-        const person = (await roster(tx, ctx.course, ctx.now)).find(
-          (p) => p.id === input.registrationId,
-        );
+        const person = (
+          await loadEvaluationRoster(tx, ctx.course, ctx.now)
+        ).find((p) => p.id === input.registrationId);
         if (
           !person ||
           person.membershipStatus !== "INSCRITO" ||
@@ -563,6 +629,11 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
               registrationId:
                 "Selecciona una inscripción vigente del curso y grupo.",
             },
+          );
+        if (await academicGroupClosed(tx, person.groupId))
+          throw new EvaluationError(
+            "GROUP_CLOSED",
+            "Reabre el grupo antes de corregir notas.",
           );
         const [previous] = await tx
           .select()

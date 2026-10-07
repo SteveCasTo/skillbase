@@ -148,6 +148,13 @@
       "when": 1791341690577,
       "tag": "0020_phase7_evaluations",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791407807898,
+      "tag": "0021_phase8_academic_group_closure",
+      "breakpoints": true
     }
   ]
 }

@@ -738,3 +738,66 @@ El job `integration-e2e` secuencial del master CI `37670004492` duró 12m10s: Ch
 - El fallo de provisioning actual duró ~1870 s; el gate se ejecutó ~1866 s y la suma de jobs fue 3013 s. Son tiempos de un intento cancelado por APT, no un benchmark válido de shard execution.
 - El workflow agrega checks E2E a PRs de `development`, pero esa rama no tiene enforcement efectivo de branch protection para dichos estados. El operador debe verificar todos los estados requeridos antes del merge. No cambiar ni presentar este límite previo como efecto de la configuración shards.
 - El workflow conserva integridad de gates: instalación/quality no recibe secretos adicionales, integración sigue obligatoria, `deploy` sigue exclusivo de `master`, y ni la matriz ni el agregador deben permitir promover jobs omitidos como éxito.
+
+---
+
+## ADR-027 — CIERRE ACADÉMICO VERSIONADO POR GRUPO
+
+**Fecha:** 2026-10-07
+
+**Estado:** Implementado en backend de feature; integración/release pendientes
+
+### Contexto
+
+Fase 8 requiere cerrar grupos individualmente después de completar su evidencia,
+preservando el reporte oficial tal como fue emitido. Reaperturas permiten corregir
+evidencia, pero no deben sobreescribir versiones cerradas ni deshacer el freeze de
+componentes/pesos de Fase 7. El cierre debe serializarse con evaluaciones,
+asistencia y cambios de membresía.
+
+### Decisión
+
+- Separar el agregado `academic-closure` en domain/application/server repository
+  con helpers server-side; páginas/rutas/UI/export quedan fuera de este backend
+  inicial.
+- Modelar estado/revisión vigente por grupo, snapshots JSONB inmutables por
+  número de versión, eventos de reapertura enlazados a la versión y receipts
+  idempotentes por actor/requestKey/fingerprint. Capturar UUID y nombre del actor
+  al momento del cierre/reapertura.
+- Cerrar con snapshot, cambio de estado, receipt y audit en una misma transacción.
+  Reutilizar el advisory lock compartido de horarios (`20260915,3`) y locks de
+  course/group para serializar la decisión con marcas, notas, calendario y
+  entrada de membresía. Aplicar guards de repositorio y triggers DB para evitar
+  mutaciones de evidencia en grupos cerrados.
+- Reabrir solo como ADMIN con razón auditada. Instructor cierra solo grupo propio
+  y desde el inicio oficial; ADMIN puede cerrar cualquier grupo. Reabrir no
+  elimina snapshots previos ni descongela esquema/pesos de evaluación.
+- Rechazar nueva preinscripción/transferencia **hacia** grupo cerrado dentro de
+  la transacción y antes de escribir participante/registro/caja/receipt/auditoría.
+  No extender el guard a transferencia hacia fuera ni a pagos/cancelación/refund
+  preexistentes.
+
+### Alternativas consideradas
+
+- Sobrescribir el reporte al volver a cerrar; rechazado porque borraría la
+  evidencia oficial de cierres previos.
+- Permitir que UI/route esconda acciones sin guards de aplicación/repositorio/DB;
+  rechazado porque los comandos y otros adaptadores deben respetar el estado
+  cerrado.
+- Tratar cierre como estado del curso completo; rechazado a favor de estado y
+  versiones por grupo, con otros grupos del curso todavía abiertos/provisionales.
+
+### Consecuencias
+
+- La migración candidata `0021_phase8_academic_group_closure` crea cuatro tablas
+  con RLS y grants Data API revocados, referencias `RESTRICT`, trigger de historia
+  inmutable y trigger de evidencia de grupo cerrado. Solo fue aplicada en stacks
+  QA temporales; no está aplicada al Supabase local canónico ni cloud.
+- El reporte usa proyecciones existentes de evaluación/asistencia e incluye
+  elegibilidad combinada, balance informativo y datos de CI. El DTO actual no
+  redacciona CI en la variante instructor; antes de montar una ruta/UI se debe
+  corregir la proyección para cumplir la política de privacidad vigente.
+- El backend y el contrato están en
+  [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md); pruebas/QA
+  focales y límites en [`TESTING.md`](TESTING.md). El feature worktree no tiene
+  todavía ruta Astro, UI ni PDF/CSV, y no representa el milestone Fase 8 completo.

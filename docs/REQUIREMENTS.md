@@ -330,19 +330,20 @@ Solo registros `INSCRITO` participan de la evaluación. Instructor solo opera cu
 
 Corrección post-release: la UI permite editar notas por celda, pero guarda todas las calificaciones modificadas de una persona atómicamente en una transacción. Campo vacío sigue pendiente, no cero ni borrado; el fallback HTML conserva envíos individuales. PR 258 backend y PR 262 UI implementaron esta modificación; evidencia focal, sin full gate combinado, en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md) y [`docs/TESTING.md`](TESTING.md).
 
-### Alcance aprobado para Fase 8 (planificado; aún no implementado)
+### Alcance aprobado para Fase 8 (backend parcial; aún no liberada)
 
-El usuario aprobó planificar el cierre de grupo y la planilla con estas reglas. Este acuerdo no acredita implementación, migración ni release:
+El usuario aprobó cierre por grupo, snapshots e informes con estas reglas. El backend base está implementado parcialmente en `feat/academic-group-closure`, sin rutas/UI ni release; la migración 0021 solo se aplicó en stacks QA. No afirmar disponible el flujo completo:
 
-- El cierre requiere sesiones resueltas/finalizadas, asistencia resuelta y notas completas para todos los participantes `INSCRITO`. Una sesión cancelada es una resolución válida; no se exige reactivarla ni crear marcas ocultas. La elegibilidad por asistencia y el saldo financiero se presentan como información y no bloquean el cierre.
+- El cierre es por grupo y requiere sus sesiones activas finalizadas, notas completas de cada persona `INSCRITO` de ese grupo y asistencia resuelta (incluida revisión histórica). Una sesión cancelada es resolución válida; no se exige reactivarla ni crear marcas/ausencias ocultas. La elegibilidad/racha se incluye en resultado, pero no bloquea cierre. El saldo se muestra como información y no bloquea cierre.
 - El instructor solo cierra un grupo de un curso propio. `ADMIN` puede cerrar cualquier grupo y es el único rol autorizado para reabrir; la reapertura exige motivo y auditoría. Mientras esté cerrado, servidor debe rechazar toda mutación de notas o asistencia que afecte evidencia oficial. Reabrir no desbloquea componentes/pesos congelados de Fase 7.
-- Cada cierre genera una versión/snapshot inmutable con timestamp, UUID y nombre del actor en el momento del cierre; no se vuelve a resolver el nombre desde el perfil actual. Reabrir y volver a cerrar crea una versión nueva y conserva la anterior. Exportar PDF y CSV con roster, componentes/notas, resultados y elegibilidad final; PDF incluye resumen de resultados y asistencia. No se exige formato institucional ni firma. Certificados pertenecen a Fase 9.
+- Cada cierre genera una versión/snapshot inmutable con timestamp, UUID y nombre del actor en el momento del cierre; no se vuelve a resolver el nombre desde el perfil actual. Reabrir y volver a cerrar crea una versión nueva y conserva la anterior. Exportar PDF y CSV con roster, componentes/notas, resultados y elegibilidad final; PDF incluye resumen de resultados y asistencia. La proyección instructor solo incluye nombres/IDs operativos, notas y asistencia; excluye CI/contacto/categoría/finanzas aun si el snapshot o DTO futuro gana campos privados. ADMIN tiene la proyección completa. No se exige formato institucional ni firma. Certificados pertenecen a Fase 9.
+- Todo alta/preinscripción o transferencia hacia grupo cerrado se rechaza aunque la ventana F5 siga abierta. Reabrir previamente requiere ADMIN y razón. La operación fallida no deja participante, registro, movimiento, receipt ni auditoría parcial; un replay exacto de comando ya completado devuelve el resultado original. No se añade restricción a transferir fuera del grupo cerrado, pagos existentes, cancelaciones/refunds ni historial de caja; sus reglas F5 continúan vigentes.
 - En las correcciones previas, la búsqueda de conversión solo ofrece interesados `ACTIVE` del curso seleccionado, no participantes generales. La fila de interés vinculada a cualquier preinscripción queda consumida permanentemente —también si la preinscripción se cancela o se reactiva el interés— y se excluye de listas operativas, métricas y búsquedas. Se conserva la fila y el vínculo histórico; solo se consume el interés del curso elegido, no los intereses independientes de otros cursos. La búsqueda por CI/email/nombre normaliza acentos, mayúsculas y espacios; CI sigue siendo identidad única, no se fusiona por email ni nombre. Una alta manual conserva la posibilidad de usar a una persona global por CI y no duplicarla.
 - No se ofrece cancelar voluntariamente una preinscripción fuera de la ventana autorizada por el servidor; se omite el botón, sin texto de sustitución ni diálogo, y el deadline no cambia.
 - Guardar varias notas cambiadas de una fila es atómico. La UI puede editar celdas individualmente. Nota vacía es pendiente; no convierte a cero ni autoriza borrar una nota existente.
 - Las cuentas ADMIN tienen permisos iguales; no hay `ROOT` ni privilegio especial del primer usuario. ADMIN puede crear otra cuenta ADMIN en servidor y fijar la contraseña inicial usando Supabase Auth privilegiado; la contraseña no se persiste ni se registra en DTOs/logs/auditoría y el nuevo usuario cambia su propia contraseña después. El lifecycle muestra una sola acción válida: eliminar una cuenta ADMIN sin actividad de actor ni dependencias históricas; si tiene actividad, desactivar/reactivar conservando su UUID y todo el historial. No se permite que el lifecycle deje cero ADMIN activos. No se añade perfil/rol `INSTRUCTOR` ni se alteran roles existentes como efecto lateral. La política está aprobada y planificada, no implementada; límites técnicos en [`docs/PLAN.md`](PLAN.md).
 
-El alcance de Fase 8 está aprobado pero aún no implementado; el plan y los límites de validación están en [`docs/PLAN.md`](PLAN.md).
+El scope de Fase 8 está aprobado, pero solo su backend base de cierre/snapshot/guards existe en el worktree de feature. UI/routes/export PDF/CSV y lifecycle multi-ADMIN siguen pendientes; no está integrado ni desplegado. El contrato técnico está en [`docs/ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md), estado y QA en [`docs/PLAN.md`](PLAN.md) y [`docs/TESTING.md`](TESTING.md).
 
 ## EVALUACIÓN
 
@@ -440,6 +441,12 @@ Debe permitir registrar informe de finalización.
 ### RF-CLO-004
 
 Debe soportar el proceso administrativo de firmas.
+
+El alcance aprobado de planilla Fase 8 no especifica formato institucional ni
+firma, y no exige que una firma sea condición para cerrar/exportar una versión.
+`RF-CLO-004` conserva la referencia general al proceso administrativo existente;
+sus mecanismos no se han detallado ni implementado en el backend parcial de
+cierre.
 
 Referencia operativa conocida:
 

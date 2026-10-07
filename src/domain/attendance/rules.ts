@@ -7,6 +7,7 @@ export class AttendanceError extends Error {
   constructor(
     public readonly code:
       | "VALIDATION_FAILED"
+      | "GROUP_CLOSED"
       | "FORBIDDEN"
       | "NOT_FOUND"
       | "CONCURRENT_UPDATE"
