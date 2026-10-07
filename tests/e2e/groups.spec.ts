@@ -123,7 +123,7 @@ test("initially unassigned draft edits preserve one null value and keep the disa
   ).toBeDisabled();
 });
 
-test("publication without an assigned instructor shows its actual cause inline and in the toast", async ({
+test("publication without an assigned instructor shows its cause inline without a duplicate toast", async ({
   page,
   context,
 }) => {
@@ -147,9 +147,11 @@ test("publication without an assigned instructor shows its actual cause inline a
   );
   await expect(
     page
-      .locator("[data-sileo-toast]")
+      .locator('[data-sileo-toast][data-exiting="false"]')
       .filter({ hasText: "Selecciona un instructor activo registrado." }),
-  ).toBeVisible();
+  ).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator("[data-course-status]")).toHaveText("Borrador");
 });
 
 test("last planned group cannot be cancelled while published; withdrawing preserves the cancellation flow", async ({
