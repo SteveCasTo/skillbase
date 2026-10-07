@@ -1,0 +1,440 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import CourseTabs from "@/components/courses/CourseTabs.astro";
+import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { EvaluationResult } from "./EvaluationResult";
+import { EvaluationHistory } from "./EvaluationHistory";
+import EvaluationBreadcrumbs from "./EvaluationBreadcrumbs.astro";
+import SchemeSummary from "./SchemeSummary.astro";
+import { EvaluationWorkspace } from "./EvaluationWorkspace";
+import { evaluationPrefix, gradeLabel } from "./presentation";
+import { membershipLabels } from "@/components/pre-registrations/presentation";
+import type { EvaluationRouteData } from "./route";
+
+type Props = EvaluationRouteData;
+const {
+  load,
+  courseId,
+  groupId,
+  instructorRoute,
+  issues,
+  message,
+  requestKey,
+  attemptedComponents,
+  attemptedRevision,
+  attemptedGrade,
+  success,
+} = Astro.props;
+const data = load.available ? load.data : null;
+const prefix = evaluationPrefix(instructorRoute);
+const group = data?.groups.find((group) => group.id === groupId);
+const rows = attemptedComponents ?? data?.scheme.components ?? [];
+const fields = rows.length
+  ? rows
+  : [{ id: crypto.randomUUID(), name: "", type: "THEORY", weight: "" }];
+---
+
+<PrivateLayout title="Evaluaciones">
+  <EvaluationBreadcrumbs
+    {courseId}
+    {instructorRoute}
+    courseName={data?.courseName ?? "Curso"}
+    {...(groupId ? { groupId, groupLabel: group?.label ?? "Grupo" } : {})}
+  />
+  <header class="flex flex-col gap-3">
+    <h1 class="text-3xl font-semibold tracking-tight">
+      Evaluaciones{group ? ` · ${group.label}` : " del curso"}
+    </h1>
+    {data && (
+      <p class="text-sm text-muted-foreground">
+        Resultado académico provisional · Nota mínima del curso:{" "}
+        <span class="tabular-nums">
+          {gradeLabel(String(data.minimumGrade))} / 100
+        </span>
+      </p>
+    )}
+  </header>
+  {!groupId && !instructorRoute && data && (
+    <CourseTabs id={courseId} active="evaluations" />
+  )}
+  {data ? (
+    <div class="mt-8 flex min-w-0 flex-col gap-8">
+      {success && (
+        <p role="status" class="text-sm">
+          {groupId ? "Nota guardada." : "Esquema guardado."}
+        </p>
+      )}
+      {!groupId && (
+        <section
+          aria-labelledby="evaluation-groups-title"
+          class="flex flex-col gap-3"
+        >
+          <h2 id="evaluation-groups-title" class="text-xl font-semibold">
+            Evaluar por grupo
+          </h2>
+          {data.groups.length ? (
+            <ul class="flex flex-wrap gap-3">
+              {data.groups.map((group) => (
+                <li>
+                  <a
+                    href={`${prefix}/${courseId}/grupos/${group.id}/evaluaciones`}
+                    class={buttonVariants({
+                      variant: "outline",
+                      className: "min-h-11 max-w-full whitespace-normal",
+                    })}
+                  >
+                    {group.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p class="text-sm text-muted-foreground">
+              El curso todavía no tiene grupos.
+            </p>
+          )}
+        </section>
+      )}
+      <EvaluationWorkspace
+        client:only="react"
+        initialData={data}
+        {instructorRoute}
+        path={Astro.url.pathname}
+        {attemptedComponents}
+        {attemptedRevision}
+        {attemptedGrade}
+        {issues}
+        {message}
+      >
+        <div slot="fallback" class="flex min-w-0 flex-col gap-8">
+          {groupId ? (
+            <>
+              <section class="flex flex-col gap-4">
+                <a
+                  href={`${prefix}/${courseId}/evaluaciones`}
+                  class="inline-flex min-h-11 items-center text-sm underline underline-offset-4"
+                >
+                  {data.scheme.frozenAt
+                    ? "Consultar esquema del curso"
+                    : "Configurar esquema del curso"}
+                </a>
+                <SchemeSummary scheme={data.scheme} />
+              </section>
+              <section
+                aria-labelledby="fallback-grades-title"
+                class="flex min-w-0 flex-col gap-4"
+              >
+                <h2 id="fallback-grades-title" class="text-xl font-semibold">
+                  Notas de participantes
+                </h2>
+                {!data.scheme.components.length ? (
+                  <p class="text-sm text-muted-foreground">
+                    Define el esquema del curso antes de registrar notas.
+                  </p>
+                ) : !data.participants.length ? (
+                  <p class="text-sm text-muted-foreground">
+                    Este grupo todavía no tiene participantes para evaluar.
+                  </p>
+                ) : (
+                  <ul class="flex min-w-0 flex-col gap-5">
+                    {data.participants.map((participant) => (
+                      <li class="min-w-0">
+                        <article class="flex min-w-0 flex-col gap-5 rounded-xl border bg-card p-5">
+                          <header class="grid gap-3 lg:grid-cols-2">
+                            <div>
+                              <h3 class="break-words font-semibold">
+                                {participant.firstName} {participant.lastName}
+                              </h3>
+                              {!participant.canGrade && (
+                                <p class="mt-2 text-sm text-muted-foreground">
+                                  {
+                                    membershipLabels[
+                                      participant.membershipStatus
+                                    ]
+                                  }{" "}
+                                  · Solo se pueden registrar notas de
+                                  participantes inscritos.
+                                </p>
+                              )}
+                            </div>
+                            <EvaluationResult result={participant.result} />
+                          </header>
+                          <div class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                            {data.scheme.components.map((component) => {
+                              const grade = participant.grades.find(
+                                (grade) => grade.componentId === component.id,
+                              );
+                              const attempted =
+                                attemptedGrade?.registrationId ===
+                                  participant.registrationId &&
+                                attemptedGrade.componentId === component.id
+                                  ? attemptedGrade
+                                  : null;
+                              const id = `fallback-${participant.registrationId}-${component.id}`;
+                              return participant.canGrade ? (
+                                <form
+                                  method="post"
+                                  action={Astro.url.pathname}
+                                  aria-label={`${component.name} · ${participant.firstName} ${participant.lastName}`}
+                                  class="flex flex-col gap-2"
+                                >
+                                  <input
+                                    type="hidden"
+                                    name="registrationId"
+                                    value={participant.registrationId}
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name="componentId"
+                                    value={component.id}
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name="schemeRevision"
+                                    value={
+                                      attempted?.schemeRevision ??
+                                      data.scheme.revision
+                                    }
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name="gradeRevision"
+                                    value={
+                                      attempted?.gradeRevision ??
+                                      grade?.revision ??
+                                      0
+                                    }
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name="requestKey"
+                                    value={
+                                      attempted?.requestKey ??
+                                      crypto.randomUUID()
+                                    }
+                                  />
+                                  <label for={id} class="text-sm font-medium">
+                                    {component.name} · {participant.firstName}{" "}
+                                    {participant.lastName}
+                                  </label>
+                                  <input
+                                    id={id}
+                                    name="score"
+                                    inputmode="decimal"
+                                    required
+                                    value={
+                                      attempted?.score ?? grade?.score ?? ""
+                                    }
+                                    class="min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+                                    aria-invalid={Boolean(
+                                      attempted && issues.score,
+                                    )}
+                                    aria-describedby={`${id}-help`}
+                                  />
+                                  <p
+                                    id={`${id}-help`}
+                                    class="text-sm text-muted-foreground"
+                                  >
+                                    {grade?.score === null ||
+                                    grade?.score === undefined
+                                      ? "Pendiente. "
+                                      : ""}
+                                    0 a 100, con hasta dos decimales.
+                                  </p>
+                                  {attempted && message && (
+                                    <p
+                                      role="alert"
+                                      class="text-sm text-destructive"
+                                    >
+                                      {issues.score ?? message}
+                                    </p>
+                                  )}
+                                  <button
+                                    type="submit"
+                                    class={buttonVariants({
+                                      variant: "outline",
+                                      className: "min-h-11",
+                                    })}
+                                  >
+                                    Guardar nota
+                                  </button>
+                                </form>
+                              ) : (
+                                <div class="flex flex-col gap-2">
+                                  <p class="text-sm font-medium">
+                                    {component.name}
+                                  </p>
+                                  <p class="text-sm tabular-nums">
+                                    {grade?.score === null ||
+                                    grade?.score === undefined
+                                      ? "Pendiente"
+                                      : gradeLabel(grade.score)}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </article>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+              <EvaluationHistory {data} />
+            </>
+          ) : data.scheme.canEdit && !data.scheme.frozenAt ? (
+            <section
+              aria-labelledby="fallback-scheme-title"
+              class="flex min-w-0 flex-col gap-4"
+            >
+              <h2 id="fallback-scheme-title" class="text-xl font-semibold">
+                Componentes del curso
+              </h2>
+              <p class="text-sm text-muted-foreground">
+                Los pesos deben sumar exactamente 100 %. Este esquema se aplica
+                a todos los grupos y queda fijo al guardar la primera nota.
+              </p>
+              <form
+                method="post"
+                action={Astro.url.pathname}
+                class="flex min-w-0 flex-col gap-5"
+              >
+                <input
+                  type="hidden"
+                  name="schemeRevision"
+                  value={attemptedRevision ?? data.scheme.revision}
+                />
+                <input type="hidden" name="requestKey" value={requestKey} />
+                {fields.map((component, index) => (
+                  <fieldset class="grid min-w-0 gap-4 rounded-xl border bg-card p-5 sm:grid-cols-2">
+                    <legend class="px-1 text-sm font-semibold">
+                      Componente {index + 1}
+                    </legend>
+                    <input
+                      type="hidden"
+                      name={`componentId.${index}`}
+                      value={component.id}
+                    />
+                    <div class="flex min-w-0 flex-col gap-2">
+                      <label
+                        for={`name-${component.id}`}
+                        class="text-sm font-medium"
+                      >
+                        Nombre
+                      </label>
+                      <input
+                        id={`name-${component.id}`}
+                        name={`componentName.${index}`}
+                        value={component.name}
+                        maxlength={100}
+                        class="min-h-11 rounded-md border bg-background px-3 focus-visible:outline-2 focus-visible:outline-ring"
+                      />
+                      {issues[`components.${index}.name`] && (
+                        <p role="alert" class="text-sm text-destructive">
+                          {issues[`components.${index}.name`]}
+                        </p>
+                      )}
+                    </div>
+                    <div class="flex min-w-0 flex-col gap-2">
+                      <label
+                        for={`type-${component.id}`}
+                        class="text-sm font-medium"
+                      >
+                        Tipo
+                      </label>
+                      <select
+                        id={`type-${component.id}`}
+                        name={`componentType.${index}`}
+                        class="min-h-11 rounded-md border bg-background px-3 focus-visible:outline-2 focus-visible:outline-ring"
+                      >
+                        <option
+                          value="THEORY"
+                          selected={component.type === "THEORY"}
+                        >
+                          Teórica
+                        </option>
+                        <option
+                          value="PRACTICAL"
+                          selected={component.type === "PRACTICAL"}
+                        >
+                          Práctica
+                        </option>
+                      </select>
+                    </div>
+                    <div class="flex min-w-0 flex-col gap-2">
+                      <label
+                        for={`weight-${component.id}`}
+                        class="text-sm font-medium"
+                      >
+                        Peso (%)
+                      </label>
+                      <input
+                        id={`weight-${component.id}`}
+                        name={`componentWeight.${index}`}
+                        inputmode="decimal"
+                        value={component.weight}
+                        class="min-h-11 rounded-md border bg-background px-3 focus-visible:outline-2 focus-visible:outline-ring"
+                      />
+                      {issues[`components.${index}.weight`] && (
+                        <p role="alert" class="text-sm text-destructive">
+                          {issues[`components.${index}.weight`]}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="submit"
+                      name="editingAction"
+                      value={`remove:${component.id}`}
+                      class={buttonVariants({
+                        variant: "ghost",
+                        className: "min-h-11 self-end",
+                      })}
+                    >
+                      Quitar componente
+                    </button>
+                  </fieldset>
+                ))}
+                {message && (
+                  <p role="alert" class="text-sm text-destructive">
+                    {message}
+                  </p>
+                )}
+                <div class="flex flex-wrap justify-between gap-3">
+                  <button
+                    type="submit"
+                    name="editingAction"
+                    value="add"
+                    class={buttonVariants({
+                      variant: "outline",
+                      className: "min-h-11",
+                    })}
+                  >
+                    Añadir componente
+                  </button>
+                  <button
+                    type="submit"
+                    class={buttonVariants({ className: "min-h-11" })}
+                  >
+                    Guardar esquema
+                  </button>
+                </div>
+              </form>
+            </section>
+          ) : (
+            <SchemeSummary scheme={data.scheme} />
+          )}
+        </div>
+      </EvaluationWorkspace>
+    </div>
+  ) : (
+    <RegistrationPageError
+      message={
+        !load.available
+          ? load.unavailableReason
+          : "No se pudo cargar la evaluación."
+      }
+      retryHref={Astro.url.pathname}
+    />
+  )}
+</PrivateLayout>

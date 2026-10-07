@@ -147,7 +147,7 @@ La creación está disponible para cursos `DRAFT` o `PUBLISHED` con plan L–V y
 
 ### Sesiones y asistencia (Fase 6, release en producción)
 
-La migración `0019_phase6_attendance` incorpora seis tablas: `group_sessions`, `session_roster`, `participant_attendance`, `instructor_attendance`, `attendance_settings` y `attendance_command_receipts`, además del enum `attendance_state` (`PRESENT`, `ABSENT`, `EXCUSED`). Todas habilitan RLS y revocan grants de Data API. La migración 0019 se aplicó sin reset tanto en Supabase local como en producción; ambos ledgers están en 20 y se preservaron las filas históricas, Auth, Storage y settings.
+La migración `0019_phase6_attendance` incorpora seis tablas: `group_sessions`, `session_roster`, `participant_attendance`, `instructor_attendance`, `attendance_settings` y `attendance_command_receipts`, además del enum `attendance_state` (`PRESENT`, `ABSENT`, `EXCUSED`). Todas habilitan RLS y revocan grants de Data API. En el release de Fase 6/PR 211, 0019 se aplicó sin reset en Supabase local y producción, ambos ledgers quedaron en 20 y se preservaron filas históricas, Auth, Storage y settings. El release correctivo PR 228 no añadió migraciones; ledger y conteos cloud no se verificaron de nuevo de forma independiente en ese release.
 
 `group_sessions` conserva la revisión de formato, hora y duración por encuentro. La cronología original es inmutable mediante trigger; cancelación conserva fecha/actor/motivo, y un reemplazo se vincula a una sesión cancelada del mismo grupo, con idéntica duración. Una cadena mantiene como máximo un encuentro activo por familia; cancelaciones individuales liberan el intervalo y mantienen el historial. La regla de conflictos también protege grupos planificados con encuentros cancelados que todavía esperan una recuperación por desactivación de grupo. El `officialEndsAt` del curso no cambia; el fin operativo deriva del último encuentro no cancelado. No hay calendario global de feriados: ADMIN cancela/reprograma sesiones específicas y puede indicar `Feriado` como motivo.
 
@@ -155,7 +155,56 @@ Crear grupos genera el calendario en la transacción del alta; grupos existentes
 
 `participant_attendance` permite participantes `INSCRITO` elegibles para la sesión; los estados persistidos son presente/ausente/justificada. `PENDING` es una proyección, no valor almacenado. `instructor_attendance` conserva la asistencia del instructor asignado. `attendance_settings` es singleton independiente con `consecutive_absence_limit` entero positivo, default 3; no existe porcentaje mínimo ni snapshot porcentual. Se advierte al llegar a N ausencias consecutivas y `academicallyEligible` es falso si la racha máxima supera N. Justificada y presente interrumpen rachas; una marca pendiente separa la evidencia desconocida. La regla no genera certificado, no cancela inscripción/cupo ni provoca devolución.
 
-Los command receipts son append-only e idempotentes por actor+request key/fingerprint. Las mutaciones validan actor/rol/ownership en servidor, estado del grupo/sesión, revisión optimista y conflicto temporal bajo la barrera de horarios existente. Fase 6 se liberó mediante PR 211; pruebas y estado del entorno están en [`ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md). El boceto `Session`/`Attendance`/`InstructorAttendance` inmediatamente debajo de esta sección es conceptual legado, no representa nombres de las tablas Drizzle reales. El contrato correctivo aprobado para limitar cancelación/reprogramación según inicio y existencia de marcas aún no está implementado.
+Los command receipts son append-only e idempotentes por actor+request key/fingerprint. Las mutaciones validan actor/rol/ownership en servidor, estado del grupo/sesión, revisión optimista y conflicto temporal bajo la barrera de horarios existente. Fase 6 se liberó mediante PR 211; el contrato C1/C2 de cancelación/reprogramación (antes de inicio y sin marcas) se integró en PR 219 y salió en PR 228, sin cambio de schema/migración. Pruebas y límites del release en [`ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md) y [`TESTING.md`](TESTING.md). El boceto `Session`/`Attendance`/`InstructorAttendance` inmediatamente debajo de esta sección es conceptual legado, no representa nombres de las tablas Drizzle reales.
+
+### Evaluaciones y notas (Fase 7, backend/UI PRs 230/232 en development)
+
+La migración versionada `0020_phase7_evaluations.sql` y el schema Drizzle definen
+cinco tablas. Después de la validación en stacks temporales, el operador aplicó
+0020 al Supabase local canónico: ledger 20→21, rerun idempotente. Se preservaron
+las 59 tablas/2 802 filas previas y las cinco tablas nuevas quedaron vacías. No
+se aplicó a cloud ni se revalidaron ledger/conteos cloud en esa operación. PR 230
+integra el modelo/backend y PR 232 la UI en `development`; el gate completo y el
+release de Fase 7 siguen pendientes. El detalle del snapshot de preservación está
+en [`TESTING.md`](TESTING.md).
+
+- `evaluation_schemes`: una fila por curso, con revisión, `frozen_at`, actor y
+  timestamp de actualización.
+- `evaluation_components`: componentes del curso con `name`, tipo enum
+  `THEORY`/`PRACTICAL`, `weight_hundredths` entero y `sort_order`; nombre/rango/
+  orden acotados, máximo 100 componentes y pesos con suma diferida exactamente
+  10 000 (100 %).
+- `evaluation_grades`: una fila por curso/participante/componente; vincula la
+  inscripción válida y conserva nota en centésimas enteras, revisión, actor y
+  timestamp. Una FK compuesta asegura curso/componente; los triggers comprueban
+  que la inscripción asociada corresponda al mismo curso y participante.
+- `evaluation_results`: proyección por curso/participante. `final_hundredths`
+  queda `NULL` mientras falte cualquier componente; al completar, persiste el
+  resultado final en centésimas. La decisión explícita de incompleto=`0.00` es
+  una proyección de dominio/API, no reemplaza ese `NULL` por una nota completa.
+- `evaluation_command_receipts`: resultado JSON append-only, clave única por
+  actor/requestKey y fingerprint SHA-256 para reintento idempotente.
+
+Las cinco tablas tienen RLS habilitado y privilegios Data API revocados para
+`anon`, `authenticated` y `service_role`; las lecturas/escrituras pasan por el
+backend Drizzle con guards y revalidación transaccional. Los triggers hacen
+inmutable la identidad del esquema, exigen revisiones consecutivas, impiden
+borrar grades/receipts, comprueban esquema completo y congelan permanentemente
+los componentes al guardar la primera nota, incluso `0`. El guard de grade
+conserva identidad curso/participante/componente/inscripción, impide DELETE y
+exige revision +1. `EVALUATION_SCHEME_SAVED` conserva actor y snapshot anterior/
+nuevo; `EVALUATION_SCHEME_FROZEN` registra la primera nota; cada alta/corrección
+genera `EVALUATION_GRADE_RECORDED` con from/to y revisión. El trigger actualiza
+`evaluation_results` en cada nota y deja `final_hundredths=NULL` si faltan
+componentes. No hay FKs con `CASCADE`.
+
+El repositorio autoriza `ADMIN` activo en cualquier curso; `INSTRUCTOR` activo
+solo en su curso asignado y desde el inicio oficial. Solo estado de membresía
+`INSCRITO` permite guardar notas; la elegibilidad de asistencia no bloquea el
+grading. DTOs entregan nombre/apellido y datos académicos requeridos, no CI,
+contacto ni finanzas; el historial administrativo de correcciones es solo para
+ADMIN. La superficie HTTP/helpers y errores se describen en
+[`ARCHITECTURE.md`](ARCHITECTURE.md) y [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md).
 
 ### Participant
 

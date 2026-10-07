@@ -208,15 +208,50 @@ El agregado `pre-registrations` sigue los límites del monolito modular: dominio
 
 PR 178 añadió `/app/configuracion` (SSR/POST/JSON, éxito `{settings}`, error `{code,message,fields}` y conflictos de revisión `409`) con guard ADMIN; PR 179 la registró en `PRIVATE_ROUTE_POLICIES` e integró el resto de páginas/rutas ADMIN de `/app/preinscripciones`, `/app/participantes` y el roster INSTRUCTOR de `/app/mis-cursos/[id]/grupos/[groupId]`. La política es fail-closed; operaciones y repositorios vuelven a autorizar al actor activo. El roster revalida ownership/start server-side y serializa solo nombre/apellidos. En la interfaz, montos se envían como strings BOB decimales y se convierten a centavos en servidor; las mutaciones tienen respuesta discriminada de éxito/error e issues. Los generadores exportan etiquetas de curso/grupo, participante/CI, tipo, estados y montos financieros. El full canonical E2E integrado pasó 125/125; Fase 5 se liberó en producción como `2e0eecb` con cloud ledger 18. Las correcciones UX posteriores se integraron por PRs 197–199; sesiones/asistencia se implementaron después en la sección siguiente.
 
-### Sesiones y asistencia (Fase 6, integrada en development)
+### Sesiones y asistencia (Fase 6, release en producción)
 
-El módulo conserva límites del monolito: reglas en `src/domain/attendance`, casos de uso/port en `src/application/attendance`, servicio/HTTP en `src/server/attendance`, persistencia en `src/server/db/repositories/attendance-*` y schema Drizzle. La migración `0019_phase6_attendance` añade calendario, roster, marcas, configuración y receipts; migration 0018 hace opcional el motivo del movimiento de efectivo. Ambas están aplicadas al Supabase local canónico (ledger 20; se preservaron 53 tablas), pero cloud/`master` permanecen en Fase 5/ledger 18.
+El módulo conserva límites del monolito: reglas en `src/domain/attendance`, casos de uso/port en `src/application/attendance`, servicio/HTTP en `src/server/attendance`, persistencia en `src/server/db/repositories/attendance-*` y schema Drizzle. La migración `0019_phase6_attendance` añade calendario, roster, marcas, configuración y receipts; migration 0018 hace opcional el motivo del movimiento de efectivo. Ambas se aplicaron al Supabase local canónico y producción mediante el release PR 211 (ledger 20 observado en ese release). Las correcciones C1/C2/C3 se integraron después en PRs 219/223 y se liberaron mediante PR 228; no requirieron cambios de schema.
 
 PR 201 integró dominio/backend/schema; PR 202 implementó el runner de demo opcional de asistencia; PR 203 montó las rutas y UI. ADMIN configura la política y realiza correcciones; INSTRUCTOR entra solo a grupos propios y marca roster permitido durante el día civil Bolivia. `PRIVATE_ROUTE_POLICIES` aplica roles por ruta y los repositorios comprueban ownership dentro de la operación. Las páginas mantienen Astro SSR/POST, con JavaScript como mejora progresiva. No hay job de ausencias: `PENDING` y ausencias no marcadas son proyecciones calculadas desde reloj y revisión del roster.
 
 La cancelación/reemplazo modifica la cronología operativa sin reescribir horas originales ni extender las horas oficiales del formato; feriados son una razón de cancelación individual, no un subsistema de calendario global. Los seed runners viven en `scripts/`, usan context/manifiesto de provenance propios, PLAN por defecto y límites de destino explícitos; no forman parte de la aplicación ni del pipeline de despliegue. El ledger financiero y sus guards no se debilitan. Ver [`ATTENDANCE_CONTRACT.md`](ATTENDANCE_CONTRACT.md) y [`FINANCIAL_DEMO.md`](FINANCIAL_DEMO.md).
 
-La integración en `development` no significa gate combinado final ni release: no migrar cloud ni promover a `master` antes de validar el milestone completo.
+Fase 6 y su release quedaron cerrados por PR 211; las correcciones de asistencia C1/C2/C3 quedaron cerradas por PR 228. Sus pruebas/limitaciones y el límite de verificación de ledger cloud están en `docs/TESTING.md` y `docs/DEPLOYMENT.md`.
+
+### Evaluaciones y notas (Fase 7, backend/UI integrados en development)
+
+PR 230 integra el backend de evaluación en capas: políticas/tipos en
+`src/domain/evaluations`, casos de uso/port en `src/application/evaluations`,
+loader y adaptador HTTP en `src/server/evaluations`, y persistencia en
+`src/server/db/repositories/evaluation-repository.ts`. El schema se declara en
+`src/server/db/schema`; la migración versionada es
+`drizzle/0020_phase7_evaluations.sql`.
+
+El loader `loadCourseEvaluations` y `handleEvaluationPost` son helpers
+server-side para lectura y comandos `scheme`/`grade`. La policy fail-closed
+reconoce destinos privados bajo `/app/cursos/:id/evaluaciones`,
+`/app/cursos/:id/grupos/:groupId/evaluaciones` y las rutas equivalentes de
+`/app/mis-cursos/:id` para Instructor. PR 232 conectó esos helpers en cuatro
+páginas Astro y en `src/components/evaluations/*`: ADMIN administra el esquema
+global/curso y califica grupos; INSTRUCTOR consulta esquema propio y califica su
+roster autorizado.
+
+Las páginas usan SSR/POST como base y React para edición interactiva; conservan
+drafts de campos independientes y proyección explícita de estado incompleto.
+Ownership, fecha de inicio y estado `INSCRITO` se revalidan en repositorio, no
+solo en la route policy/UI. La UI está integrada en development; aún no equivale
+a gate final o release de Fase 7.
+
+La migración 0020 declara cinco tablas protegidas por RLS y revoca acceso Data
+API directo; los repositorios revalidan rol/ownership/membresía dentro de
+transacciones. Tras probarse en stacks temporales, el operador la aplicó al
+Supabase local canónico (ledger 20→21, rerun idempotente); no se aplicó a cloud
+ni se verificó allí ledger/conteos. Evidencia de preservación en
+`docs/TESTING.md`; detalle del modelo, autorización e idempotencia en
+`docs/DATA_MODEL.md`, `docs/SECURITY.md` y `docs/EVALUATIONS_CONTRACT.md`. El
+backend y la UI están integrados en development, pero Fase 7 aún no está
+completa ni liberada. No incluye cierre de curso/planilla de Fase 8 o certificados
+de Fase 9.
 
 El POST público limita y parsea el body en el adaptador server-side, valida Origin y llama el caso de uso de interés. Un limiter persistente usa PostgreSQL y un HMAC server-only sobre `Astro.clientAddress`; no confía en forwarded headers. Sin secreto válido o dirección de cliente confiable, el flujo falla cerrado. Los defaults técnicos y requisitos de despliegue se describen en el contrato y en `docs/DEPLOYMENT.md`; no implican que los valores cloud estén configurados.
 

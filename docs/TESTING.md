@@ -442,24 +442,68 @@ PLAN verificó target/proyecto y provenance sin escrituras; el APPLY local poste
 - El gate local queda validado mediante esta evidencia por heads: full E2E 126/127 y escenario sin JavaScript corregido por PR 209 con ejecución focal 1/1 PASS, sin retry; unit/integration 332/137 PASS; build/Drizzle/quality PASS y typecheck 0 errores/0 warnings/204 hints. No se afirma un full E2E único 127/127. CI/release cloud/master sigue pendiente.
 - Se capturó un snapshot canónico pre-visual de 39 tablas con ledger 20. La comparación hash posterior quedó bloqueada porque Docker Desktop no estaba disponible. No se reinició Docker/Supabase ni se escribieron datos para la verificación visual; por tanto, no se afirma una comparación íntegra post-visual. Esto no invalida el snapshot de preservación del APPLY anterior, pero limita la evidencia de frescura tras la revisión visual.
 
-### QA final previo a release de correcciones (development `292c5d42`; gate incompleto)
+### Cierre de release de correcciones PR 228 y arranque Fase 7 (2026-10-07)
 
-PRs 219–226 están integrados en `development`; producción no cambia. PR 225 (Google association locators) y PR 226 (origen E2E configurable) solo modificaron pruebas. Desde `eacf6feeb26d67da98e46195a07d8777dd180966` no cambiaron código de aplicación, schema ni dependencias. Los resultados se reportan por ejecución; no sumar corridas como si fueran un full run.
+PR 228 liberó las correcciones aprobadas a `master` como `3e6e3a45417e35d412dd8ece34dc90ecd7ccb8e0`. PRs 219–223 aportaron la funcionalidad; PR 220 sincronizó docs; PRs 225/226 fueron cambios de expectativas E2E únicamente. Producción y límites de verificación cloud se resumen en [`DEPLOYMENT.md`](DEPLOYMENT.md). Los resultados de tests se informan por ejecución y no se suman como si fueran un solo run.
 
-#### Quality y unit/integration
+#### CI y release
 
-- `lint`, `format:check`, Drizzle check y build PASS. Typecheck: 0 errores, 0 warnings y 214 hints. Build completó en 27.51 s sin warnings.
-- Unit: 339 PASS (2046 assertions); integration: 138 PASS (983 assertions). Se ejecutaron en el source de aplicación `eacf6fe`; los cambios posteriores fueron solo E2E tests.
+- CI del PR `37558507699`: quality (339 unit, 138 integration) y E2E (129 escenarios) pasaron, con un flaky reportado en `public-interest` sobre submit-disabled que pasó por retry automático.
+- Una revalidación focal del caso `public-interest` pasó 1/1 con retries deshabilitados sobre `0e9c48d`, sin cambio de código ni causa raíz identificada; el pase focal no resuelve por sí solo el flaky anterior.
+- CI del push a `master`, run `37559942423`: SUCCESS, 339 unit, 138 integration y full E2E 130/130 PASS; no se reportaron flakes en esa corrida. El resultado verde no identifica la causa del flaky anterior ni de la intermitencia local del guardado de grupo.
+- Tras checks CI verdes, el usuario autorizó explícitamente omitir la aprobación administrativa requerida para el merge. No se omitieron checks CI ni se cambiaron las protecciones del repositorio.
+- Vercel deployment `dpl_4VKVLtA5rP5YbP5y1Nymnc5TKMep` quedó `READY` para el SHA exacto de master y el alias `https://skillbase-alpha.vercel.app`. Smoke: rutas públicas y Auth respondieron 200; cuatro rutas privadas sin sesión redirigieron 303 a login.
 
-#### E2E — cobertura separada, sin full 130/130
+#### Calidad local y límites E2E previos
 
-- Full E2E sobre `eacf6fe` se ejecutó con `--retries=0`: **99/130 PASS, 31 FAIL**. La corrida no constituye un retry exitoso de 130/130.
-- El primer arranque E2E falló antes de los escenarios por un archivo `@supabase/ssr` ausente (`dist/module/index.js`, export configurado). Se restauró el entorno mediante `bun install --frozen-lockfile --force`; luego 3 smoke focales PASS y se inició el full run con retries deshabilitados.
-- PR 226 corrigió fixtures E2E que fijaban `http://127.0.0.1:4321` cuando `SiteUrl` usaba el puerto real `44891`; el origen de pruebas ahora deriva del servidor configurado. Es un ajuste test-only: el rechazo CSRF del servidor no cambió. La cobertura focused de origen/CSRF fue **37/38**, incluyendo 28/29 de los escenarios originales.
-- PR 225 Google association focused fue **3/3** (revalida dos expectations del full). Los dos fallos originales correspondían a expectations de test sobre visibilidad de perfil y ruta ADMIN protegida; no prueban OAuth Google real.
-- En el flujo de grupos, el submit «Guardar» quedó disabled en el full run y volvió a fallar en el focused run. Un caso nuevo en stack fresco pasó **1/1 con retries deshabilitados**, sin cambio de código ni causa raíz identificada. Se registra como intermitencia/flaky real aún sin resolver; ese pase aislado no la arregla ni oculta los fallos previos.
-- La cobertura total de escenarios fue reunida entre full y focused runs; **no** hay una corrida única full 130/130. Los runs focales separados no se proclaman como retry/flaky-pass.
+- `lint`, `format:check`, Drizzle check y build PASS. Typecheck: 0 errores, 0 warnings y 214 hints; build 27.51 s sin warnings. Unit: 339 PASS (2046 assertions); integration: 138 PASS (983 assertions). Unit/integration se ejecutaron en `eacf6fe`; desde ese source no cambiaron aplicación, schema o dependencias.
+- El full E2E local con `--retries=0` sobre `eacf6fe` pasó 99/130 y falló 31. El primer arranque, antes de escenarios, encontró ausente `@supabase/ssr/dist/module/index.js`; `bun install --frozen-lockfile --force` restauró el entorno y tres smoke focales pasaron antes del full run.
+- PR 226 hizo que los fixtures de origen/CSRF usen el `SiteUrl` del servidor (puerto real `44891`) en vez de fijar `4321`; no cambió el rechazo CSRF del servidor. Su focused run fue 37/38, incluyendo 28/29 escenarios originales. PR 225 focused Google association fue 3/3; sus expectations de test no constituyen OAuth real.
+- Los dos mismatches de expectativas E2E sobre visibilidad de perfil y ruta ADMIN protegida son cambios de tests, no evidencia de cambio del contrato de identidad. El submit «Guardar» de grupos falló deshabilitado en el full y focused local; un caso fresco pasó 1/1 con retries deshabilitados, sin cambio de código ni causa identificada. Mantenerlo como intermitencia sin causa raíz. La cobertura local parcial no se reporta como 130/130.
 
-#### Resultado de gate/release
+Los PR checks y el full master E2E cierran el gate de las correcciones para ese release; las corridas locales focales conservan sus límites. No se aplicó migración, reseed ni otra operación de datos para esta liberación. El ledger/conteos cloud no se verificaron de forma independiente en este release; ledger 20 es el último baseline conocido, no una comprobación nueva. La recepción de correo de prueba local no verifica recovery/cambio de contraseña ni entrega cloud; OAuth real y retención de 12 meses continúan pendientes.
 
-El gate completo y los checks remotos requeridos para release a `master` permanecen pendientes. La evidencia local detallada (salidas de lint, format, typecheck, unit, integration, build y E2E) está en `C:/Users/Steve/AppData/Local/Temp/opencode/corrections-final-validation-evidence/`; `status.json` conserva SHA, comandos y exit codes. El test-only cambio de expectativa no valida Google OAuth real. No inferir salud actual de `127.0.0.1:4321` a partir de estos resultados: ese puerto fue rechazado en el entorno de validación.
+#### Fase 7
+
+PR 230 integró el backend base y PR 232 integró la UI en `development`. La UI tiene dos E2E focales PASS; quality reportado para la rama incluyó lint/format/diff, typecheck con cero errores y build PASS. Se revisaron screenshots de 390/768/1440 px en light/dark. Esto no equivale a un full E2E ni al gate combinado de Fase 7.
+
+#### Backend Fase 7 — PR 230 (evidencia focal, no full gate)
+
+- La migración 0020 genera cinco tablas y sus triggers/constraints. En la validación inicial de PR 230 se ejecutó solo en stacks Supabase de test aislados; la aplicación posterior al Supabase local canónico está registrada como una operación de operador abajo. No se aplicó a cloud.
+- Backend focal reportado: cuatro unit tests y una suite de integración HTTP con 39 assertions PASS.
+- Un comando accidental invocó `run-integration.ts` con `evaluation-repository.test.ts` como argumento, pero el runner ignoró ese argumento y ejecutó la carpeta completa: 118 PASS/24 FAIL. Veintitrés fallos provinieron de cleanup de fixtures que no incluía las nuevas tablas/FKs; otro caso dejó un residuo financiero de fixture. No se debe contar ese run como validación del full suite ni como defecto de la lógica de evaluación.
+- El fix test-only `649441b` añadió las cinco tablas de evaluación al allowlist compartido de fixtures, dentro del mismo `TRUNCATE ... RESTRICT`. No modificó schema, FKs ni assertions de producto. La revalidación focal posterior pasó cinco casos en cinco archivos (88 assertions) y las cuatro unitarias; lint, typecheck, formatter y `git diff --check` PASS.
+- En la validación inicial de PR 230 no se volvió a ejecutar la suite de integración después del fix; la continuación de QA en `fb27c89` sí pasó la suite completa 139/139 (ver abajo). Los resultados focales/esta cronología no equivalen a gate de Fase 7. No hay seed de evaluación; `FINANCIAL_DEMO.md` no constituye fixtures de notas.
+
+El cleanup es infraestructura de tests aislados únicamente; no es un allowlist de reset/demo/producción. No hay seed de notas ni evaluación en el demo financiero.
+
+Contratos y límites efectivos en [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md); inventario schema en [`DATA_MODEL.md`](DATA_MODEL.md); progreso/remanentes en [`PLAN.md`](PLAN.md). La UI está integrada en development, pero el gate/cierre de Fase 7 siguen pendientes.
+
+### QA integrada Fase 7 — bloqueo inicial y continuación completada (source `c0506fc`)
+
+#### Intento inicial (histórico, antes del fix de fixture PR 233)
+
+La primera corrida terminó con exit code 1 a las `2026-10-07T03:59:24Z`; el estado idle se confirmó a las `04:03:23Z`, sin proceso E2E activo. Con un worker, `--retries=0` y `--max-failures=1`, Playwright seleccionó 132 casos: **25 PASS, 1 FAIL, 106 no ejecutados**.
+
+El caso fue `tests/e2e/evaluations.spec.ts:107`. Falló durante `createAttendanceFlowFixture("2020-05-04")`, antes de interactuar con la UI, con `GroupError/SCHEDULE_CONFLICT`: un curso fixture archivado aún tenía grupos `PLANNED`, que seguían reservando el horario del instructor. La ruta llegó a `DrizzleGroupRepository.assertFree`. PR 233 identificó y corrigió el lifecycle del fixture, no el flujo UI ni las reglas globales de horario.
+
+#### Continuación tras PR 233 — evidencia combinada PASS, no un full run único
+
+- PR 233 modificó solo `tests/fixtures/attendance-flow.ts`: se rastrean cursos fixture archivados y sus grupos `PLANNED` reservan horario mientras no se cancelen; el cleanup cancela únicamente los grupos rastreados usando `DrizzleGroupRepository` y sus guards normales. No cambia la regla global de horarios, comportamiento de producto, schema ni dependencias, y no cancela grupos arbitrarios/globalmente.
+- Las pruebas focales de attendance/evaluations pasaron 4/4 según la evidencia del owner; esta continuación no las repitió.
+- `coverage-ledger.json` inventarió 132 identidades E2E. La corrida inicial aportó 25 casos PASS y los focales otros 4; dos se solapan, así que la cobertura acumulada antes de la continuación fue 27. La selección restante de 105 se ejecutó y pasó **105/105**, con un worker, port `44891`, retries 0 y `max-failures=1` en 7.0 minutos.
+- En conjunto hay evidencia PASS para los **132 escenarios distintos**, pero **no** una única corrida full 132/132: el intento inicial se detuvo en el fixture fallido. Estado del continuation runner: `passed-combined-not-single-full`.
+- Quality final: format y lint PASS; build PASS (Astro 17.00 s, comando 19.764 s). Se reutiliza la validación sin cambios de aplicación/schema/dependencias: unit 343 PASS/2080 assertions, integration 139 PASS/1022 assertions, typecheck 0 errores/0 warnings/229 hints, Drizzle PASS y `db:generate` sin cambios de schema. La continuación no volvió a correr unit/integration/typecheck.
+- Esa continuación E2E y su cleanup corrieron en stacks temporales; en ese paso no hubo escrituras canonical/cloud ni aplicación persistente de 0020. Limpieza normal terminó, contenedores previos coincidieron, y el puerto E2E `44891` quedó libre. No inferir salud del root server `4321`.
+
+Artefactos QA: `C:/Users/Steve/AppData/Local/Temp/opencode/phase7-final-validation-evidence/` (`CONTINUATION-RESULT.md`, `continuation-status.json`, `coverage-ledger.json`, `continuation-remaining-e2e.log` y el historial inicial en `RESULT.md`/`status.json`). No se realizó un single full 132/132 ni se afirma OAuth real, seed de notas o release de Fase 7.
+
+La evidencia local combinada está completada con **132 escenarios cubiertos por corridas separadas**, no por una sola corrida 132/132. El full E2E local integrado no terminó verde de una vez; el conflicto de fixture se resolvió solo en tests y el conjunto restante pasó.
+
+### Aplicación local de migration 0020 (operador, 2026-10-07)
+
+Después de la QA integrada, el operador aplicó `bun run db:migrate` al Supabase local canónico `skillbase` en PostgreSQL `127.0.0.1:55322` (API `127.0.0.1:55321`): ledger **20→21**. El rerun quedó en 21 y la evidencia completa fue idéntica. Entrada 21: hash `ad01e4dea9f51c4d503eef524a458e9adffe4f90e37397c784b9ddffd25aa32b`, `created_at` `1791341690577`.
+
+La comparación pre/post conservó **2802 filas en 59 tablas existentes**, incluidas filas completas/PK hashes, Auth, Storage, settings, audit payloads y receipts; también se conservaron los registros no poseídos y datos financieros/asistencia existentes: 12 cursos, 23 grupos, 16 registros, 13 movimientos, 282 sesiones (280 originales, 2 reemplazos), 3 cancelaciones, 16 marcas de participantes y 4 de instructor. Las cinco tablas F7 quedaron vacías; RLS habilitado, sin privilegios para `anon`/`authenticated`/`service_role`, y los seis trigger functions sin grants `EXECUTE` a esos roles. No hubo reset, reseed ni escrituras por API de aplicación. No se operó en cloud; no inferir ledger, conteos o tablas F7 aplicadas en producción. La aplicación no se inició ni actualizó en el worktree raíz, que permanece clean en `fb99108`; no se debe inferir ahí UI local de Fase 7. La evidencia fuente `c0506fc` está en `C:/Users/Steve/AppData/Local/Temp/opencode/phase7-local-migration-evidence/summary.json`.
+
+La migración local es un paso de infraestructura verificado, no un seed ni un release del módulo. El full gate/CI remoto F7 y la migración cloud siguen pendientes.

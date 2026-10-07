@@ -48,6 +48,17 @@ export function getPrivateRoutePolicy(
     ] ?? null;
   if (exact) return exact;
   if (
+    /^\/app\/(?:cursos|mis-cursos)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?:\/grupos\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})?\/evaluaciones$/iu.test(
+      normalizedPath,
+    )
+  )
+    return {
+      access: "ROLES",
+      roles: normalizedPath.startsWith("/app/mis-cursos/")
+        ? ["INSTRUCTOR"]
+        : ["ADMIN"],
+    };
+  if (
     /^\/app\/(?:cursos|mis-cursos)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/grupos\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/(?:participantes|sesiones(?:\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})?)$/iu.test(
       normalizedPath,
     )

@@ -687,30 +687,41 @@ Las reglas siguientes describen el comportamiento implementado para Fase 6 y act
 
 Las pruebas focales y full citadas corresponden a sus heads, no a una única ejecución agregada. La corrida inicial 126/127 más la revalidación focal 1/1 documentan el gate local previo; el gate remoto de release posterior sí reportó 127/127 en una corrida, sin flakes. La revisión visual y el release cloud/master están cerrados para Fase 6.
 
-## CORRECCIONES DE EXPERIENCIA ADMINISTRATIVA (planificadas antes de Fase 7)
+## CIERRE DE CORRECCIONES DE EXPERIENCIA ADMINISTRATIVA (release PR 228)
 
-El cierre de correcciones sigue siendo el gate previo a iniciar Fase 7. PRs 219, 221, 222 y 223 (backend, ajustes/feedback, perfiles y UI C3) están integrados en `development`; PR 220 sincronizó documentación. PRs 225/226 actualizaron únicamente expectativas E2E. El SHA actual es `292c5d42e2babb51a96c558074ef0ac0e1c2b261`; desde el source de aplicación `eacf6feeb26d67da98e46195a07d8777dd180966` no cambiaron aplicación, schema ni dependencias. Ninguno de estos cambios se promovió a producción: `master` continúa en Fase 6 (`3c6ae7e2cff74faeb2f0f7de05d63b753418df4a`), cloud ledger 20.
+El cierre de correcciones previo a Fase 7 se completó con PR 228. PRs 219, 221–223 integraron backend, ajustes/feedback, perfiles y UI C3; PR 220 sincronizó documentación y PRs 225/226 ajustaron solo expectativas E2E. El milestone se liberó a `master` como `3e6e3a45417e35d412dd8ece34dc90ecd7ccb8e0` el 2026-10-07 02:01:05Z. En el PR hubo aprobación explícita del usuario para omitir la aprobación administrativa de merge **después** de que los checks CI requeridos pasaran; no se omitieron checks fallidos ni se cambiaron las protecciones del repositorio.
+
+El source de desarrollo validado antes de integrar fue `292c5d42e2babb51a96c558074ef0ac0e1c2b261`. Desde `eacf6feeb26d67da98e46195a07d8777dd180966` no cambiaron aplicación, schema ni dependencias; PRs 225/226 cambiaron pruebas E2E. Producción ahora corre el commit de release indicado arriba; el estado del deployment y límites de verificación de cloud están en [`DEPLOYMENT.md`](DEPLOYMENT.md). No se ejecutaron migraciones, operaciones de datos ni reseed para este release; ledger/conteos cloud no se revalidaron con PR 228. El último baseline histórico conocido era ledger 20.
 
 - [x] Backend C1/C2 mediante PR 219: cancelación y reprogramación requieren `startsAt > now` y ausencia de marcas de participantes e instructor. El repositorio adquiere los locks de horario/sesión antes de volver a leer marcas y muestrear el reloj; el DTO indica explícitamente `canCancel`/`canReplace`. La familia conserva un solo encuentro activo, cronología/historial, duración y control de conflictos.
 - [x] PR 221: configuración con campos independientes y grilla responsive; edición inline de participante, reintegración y transferencia/cancelación conservando draft/revision/idempotencia; feedback sin toast duplicado ante errores de campo.
 - [x] PR 222: instructor y perfil profesional inline por campo, lifecycle con botones condicionados por cursos bloqueantes; edición del nombre propio para ADMIN puro. El alcance y límites de identidad se detallan en [`AUTHENTICATION.md`](AUTHENTICATION.md).
-- [x] Integrar la UI nueva de asistencia/grupo C3 desde `fix/course-group-attendance-ui` mediante PR 223. Incluye página dedicada de participantes/calendario y mantiene privacidad de roster. Está integrada en `development`; no está liberada a producción.
+- [x] Integrar la UI nueva de asistencia/grupo C3 desde `fix/course-group-attendance-ui` mediante PR 223. Incluye página dedicada de participantes/calendario y mantiene privacidad de roster; PR 228 liberó las correcciones a producción.
 - [x] Resolver durante PR 223 el conflicto con el componente compartido `RegistrationActionDialog`, conservando el resolver/ownership de PR 221.
-- [x] Completar validación local de lint, format, typecheck, unit, integration, Drizzle check y build en el source documentado; resultados y alcance en [`TESTING.md`](TESTING.md).
-- [ ] Cerrar el gate E2E y el CI remoto requerido. El full E2E de 130 escenarios tuvo 99 PASS/31 FAIL; ejecuciones focales posteriores no equivalen a full 130/130 y un caso de guardado de grupo permanece intermitente sin causa raíz. No debilitar pruebas, ocultar retries o reportar como flaky una reejecución con retries deshabilitados.
-- [ ] Promover las correcciones a `master` solo después de un full gate aprobado y los checks CI requeridos. Hasta entonces production/cloud permanecen en release Fase 6/ledger 20.
+- [x] Completar lint/format/typecheck/Drizzle/build local; unit 339 y integration 138 PASS; conservar evidencia por source en [`TESTING.md`](TESTING.md).
+- [x] Integrar y promover las correcciones con PR 228 luego de CI requerido; Vercel deploy `dpl_4VKVLtA5rP5YbP5y1Nymnc5TKMep` quedó READY para el SHA exacto de release. Smoke público/Auth respondió 200 y cuatro rutas privadas sin sesión redirigieron 303 a login.
+- [x] Completar full E2E master CI 130/130 PASS sin flakes reportados (run `37559942423`). La corrida previa de PR tuvo un test flaky `public-interest` con submit disabled que pasó por retry automático; el focused posterior 1/1 sin retry no cambió código ni identificó causa raíz. La intermitencia local observada en guardado de grupo tampoco tiene causa raíz identificada; no afirmar que estos antecedentes quedaron corregidos solo por el full run verde.
+- [x] Registrar que el merge approval fue omitido explícitamente por el usuario después de CI green; no fue bypass de CI ni cambio de branch protection.
 
-Regla backend implementada en `development` (PR 219), aún no desplegada: cancelación/reprogramación solo antes de `startsAt` y sin marcas de ningún participante ni del instructor, incluyendo la mañana del mismo día. El reemplazo es futuro, conserva duración y evita conflictos. La restricción no impide las correcciones históricas ADMIN de evidencia ya permitidas.
+Las correcciones C1/C2/C3 quedaron liberadas mediante PR 228. Cancelación/reprogramación opera solo antes de `startsAt`, sin marcas de participantes/instructor; reemplazos futuros conservan duración e historial y no entran en conflicto. Las correcciones históricas ADMIN de evidencia siguen separadas de acciones operativas.
 
-## CONTRATO DE EVALUACIONES (Fase 7; definición aprobada, implementación pendiente)
+## FASE 7 — EVALUACIONES Y NOTAS (backend y UI integrados en development; milestone incompleto)
 
-El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). Antes de implementar, quedan confirmadas la aritmética decimal exacta, el congelamiento de componentes/pesos desde la primera nota persistida, el alcance de roles/participantes y la relación con `minimum_grade`. La implementación de Fase 7 sigue sin comenzar y permanece bloqueada por el cierre de correcciones/release. No cierra grupos/cursos ni emite certificados.
+El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PR 230 integró a `development` dominio, aplicación, repositorio Drizzle, loader/HTTP helpers y migration source 0020. PR 232 integró cuatro páginas Astro (ADMIN/INSTRUCTOR por curso/grupo) y componentes de esquema/notas, historial y roster. El backend/API y la UI están integrados en desarrollo; Fase 7 no está completa ni liberada, y el full gate sigue pendiente.
 
-- [x] Acordar contrato funcional y técnico antes del diseño de datos/UI.
-- [ ] Diseñar e implementar persistencia, dominio, casos de uso, autorización, UI y auditoría conforme al contrato.
-- [ ] Añadir pruebas unitarias, integración y E2E focales; completar gates local/remoto antes de declarar Fase 7 terminada.
+El operador aplicó migration 0020 al Supabase local canónico (ledger 20→21, rerun idempotente); la evidencia de preservación y conteos está en [`TESTING.md`](TESTING.md). No se aplicó a cloud ni se revalidaron independientemente ledger/conteos cloud. Tras el fix de cleanup `649441b`, full unit/integration pasó 343/139 tests (2080/1022 assertions); Drizzle check y `db:generate` no encontraron cambios de schema. El run accidental histórico 118/24 ya está supersedido por el full integration 139/139. No se añadió seed de evaluaciones; el demo financiero existente no contiene notas y no debe presentarse como tal.
 
-## FASE 7 — EVALUACIONES Y NOTAS
+- [x] Confirmar contrato funcional/técnico antes de implementación.
+- [x] Implementar backend base de esquema, dominio, persistencia, autorización, revisión/freeze y auditoría (PR 230, `development`).
+- [x] Añadir cobertura focal y reparar el cleanup de fixtures para las nuevas tablas con el mismo `TRUNCATE ... RESTRICT` compartido (commit `649441b`); no equivale a full integration PASS.
+- [x] Integrar UI ADMIN/INSTRUCTOR para esquema de curso, roster/notas por grupo y vistas de curso/grupo (PR 232). La UI distingue nota pendiente de cero completo, conserva drafts individuales y muestra historial/cálculo según el contrato; sus dos E2E focales pasan y se revisaron screenshots 390/768/1440 en light/dark.
+- [x] Reejecutar la suite completa de integración tras el fix de cleanup: 139 PASS/0 FAIL en stack temporal aislado.
+- [x] Corregir el setup de cursos/grupos fixture con PR 233 sin cambiar las reglas de reserva de horarios; diagnóstico y alcance en [`TESTING.md`](TESTING.md).
+- [x] Completar la validación local con evidencia combinada: 343 unit/139 integration, quality/typecheck/Drizzle/schema/build PASS y cobertura de los 132 escenarios E2E a través de corridas separadas. **No se afirma un full E2E único 132/132.**
+- [x] Aplicar 0020 al Supabase local canónico y comprobar idempotencia/preservación mediante el operador autorizado, sin seed ni reset.
+- [ ] Completar CI/release F7 a `master` y aplicar 0020 a cloud mediante el flujo autorizado; cloud y ledger/conteos no se verificaron en la operación local.
+
+Fase 7 no incluye ni completa Fase 8 (cierre/planilla/reapertura) o Fase 9 (certificados). No adelantar weighted-grade changes posteriores ni convertir el demo financiero en un seed de notas.
 
 ### Objetivos
 

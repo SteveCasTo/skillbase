@@ -647,7 +647,7 @@ Supabase Auth puede asociar automáticamente una identidad Google cuando el prov
 
 **Fecha:** 2026-10-06
 
-**Estado:** Accepted — definición aprobada; implementación pendiente
+**Estado:** Accepted — backend/UI integrados en development; Fase 7 y release pendientes
 
 ### Contexto
 
@@ -695,5 +695,8 @@ asistencia, del cierre administrativo de Fase 8 y de certificados de Fase 9.
 - Las correcciones de notas requieren trazabilidad; pesos y componentes no
   podrán ajustarse retrospectivamente dentro de Fase 7.
 - Contrato y casos límite detallados en
-  [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). La decisión no
-  afirma que el módulo esté implementado.
+  [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PRs 230/232
+  integraron backend/UI y migration source 0020 en `development`. 0020 se aplicó
+  idempotentemente al Supabase local canónico (ledger 20→21) y se probó en
+  stacks aislados; cloud no se ha migrado ni verificado. El gate y release de
+  Fase 7 siguen pendientes; no describir el módulo como cerrado.

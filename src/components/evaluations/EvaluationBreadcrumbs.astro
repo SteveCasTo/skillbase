@@ -1,0 +1,50 @@
+---
+import { evaluationPrefix } from "./presentation";
+interface Props {
+  courseId: string;
+  courseName: string;
+  instructorRoute: boolean;
+  groupId?: string;
+  groupLabel?: string;
+}
+const { courseId, courseName, instructorRoute, groupId, groupLabel } =
+  Astro.props;
+const prefix = evaluationPrefix(instructorRoute);
+---
+
+<nav aria-label="Ruta de navegación" class="mb-5 text-sm text-muted-foreground">
+  <ol class="flex flex-wrap items-center gap-x-2 gap-y-1">
+    <li>
+      <a
+        href={prefix}
+        class="inline-flex min-h-11 items-center underline underline-offset-4"
+      >
+        {instructorRoute ? "Mis cursos" : "Cursos"}
+      </a>
+    </li>
+    <li aria-hidden="true">/</li>
+    <li class="min-w-0">
+      <a
+        href={`${prefix}/${courseId}${instructorRoute ? "" : "/grupos"}`}
+        class="inline-flex min-h-11 items-center break-words underline underline-offset-4"
+      >
+        {courseName}
+      </a>
+    </li>
+    {groupId && (
+      <>
+        <li aria-hidden="true">/</li>
+        <li class="min-w-0">
+          <a
+            href={`${prefix}/${courseId}/grupos/${groupId}/sesiones`}
+            class="inline-flex min-h-11 items-center break-words underline underline-offset-4"
+          >
+            {groupLabel ?? "Grupo"}
+          </a>
+        </li>
+      </>
+    )}
+    <li aria-hidden="true">/</li>
+    <li aria-current="page">Evaluaciones</li>
+  </ol>
+</nav>

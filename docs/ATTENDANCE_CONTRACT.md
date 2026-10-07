@@ -21,21 +21,25 @@ PRs 213, 214, 216–218. El commit de producción es
 `37405417986` y `37406246926`; 334 unitarias, 137 de integración y 127/127 E2E
 pasaron sin flaky tests. Evidencia del gate de PR 218: comentario 6008610515.
 
-La migración 0019 se aplicó a producción y al Supabase local sin reset; ambos
-quedaron en ledger 20 y se preservaron Auth, Storage, configuración y filas
-históricas. Producción tiene 22 grupos propios, 282 sesiones (280 originales,
+En la verificación del release Fase 6/PR 211, la migración 0019 se aplicó a
+producción y al Supabase local sin reset; ambos ledgers quedaron en 20 y se
+preservaron Auth, Storage, configuración y filas históricas. El inventario
+observado entonces fue 22 grupos propios, 282 sesiones (280 originales,
 2 reemplazos), 3 cancelaciones, 16 marcas de participantes y 4 del instructor.
-El demo local contiene 12 cursos, 23 grupos, 16 registros y 13 movimientos de
-caja; los conteos de producción correspondientes son 11/22/15/12. El E2E
-histórico 126/127 y la revalidación focal 1/1 fueron ejecuciones previas
-separadas; no deben confundirse con el gate posterior 127/127 de release.
+El demo local registró 12 cursos, 23 grupos, 16 registros y 13 movimientos de
+caja; los conteos de producción de esos cuatro conjuntos entonces fueron
+11/22/15/12. PR 228 no ejecutó operaciones de datos y no revalidó ledger ni
+conteos; los números anteriores son baseline histórico, no una observación
+independiente de cloud durante ese release. El E2E histórico 126/127 y la
+revalidación focal 1/1 fueron ejecuciones previas separadas; no deben
+confundirse con el gate posterior 127/127 de release.
 
-Después del release, PR 219 integró C1/C2 backend; PR 223 integró la UI C3 de
-grupo/participantes a `development` hasta `c6f98d3c0dba721d4c0f73450b68c8c31de8be90`.
-El conflicto con el componente compartido `RegistrationActionDialog` se resolvió
-al preservar el resolver de PR 221. Ninguno de estos cambios posteriores está
-desplegado en producción. El gate final combinado sigue pendiente y no se
-sustituye con pruebas focales.
+Después del release inicial, PR 219 integró C1/C2 backend y PR 223 integró la UI
+C3 de grupo/participantes; PR 228 liberó esas correcciones a producción en
+`3e6e3a45417e35d412dd8ece34dc90ecd7ccb8e0`. El conflicto con el componente
+compartido `RegistrationActionDialog` se resolvió al preservar el resolver de PR 221. La validación de release y sus límites E2E están en [`TESTING.md`](TESTING.md)
+y [`PLAN.md`](PLAN.md). El contrato técnico que sigue describe las reglas del
+módulo, no afirma una verificación nueva del ledger o conteos cloud.
 
 ### C1/C2 — límites backend de cancelación y reprogramación (PR 219)
 
@@ -52,8 +56,9 @@ grupo `PLANNED` y que la familia no tenga otro encuentro activo. La fecha/hora d
 reemplazo debe ser futura, mantener duración y superar la validación de conflictos
 de instructor/grupo. Una familia de original/reemplazos tiene como máximo un
 encuentro activo, mientras los cancelados y sus razones permanecen en cronología.
-El backend está en `development` por PR 219 y la página de participantes/calendario
-se integró mediante PR 223; ambos siguen fuera de producción.
+El backend está en producción por PR 228; la revisión remota 130/130 está
+registrada en `docs/TESTING.md`. No se hizo una verificación independiente del
+ledger/conteos cloud en ese release.
 
 La limitación operativa no impide la corrección histórica ADMIN por el flujo de
 asistencia: una sesión cancelada no recibe marcas nuevas, pero evidencia ya

@@ -1,18 +1,23 @@
 ---
 interface Props {
   id: string;
-  active: "course" | "groups";
+  active: "course" | "groups" | "evaluations";
 }
 
 const { id, active } = Astro.props;
 const tabs = [
   { key: "course", label: "Datos del curso", href: `/app/cursos/${id}/editar` },
   { key: "groups", label: "Grupos", href: `/app/cursos/${id}/grupos` },
+  {
+    key: "evaluations",
+    label: "Evaluaciones",
+    href: `/app/cursos/${id}/evaluaciones`,
+  },
 ] as const;
 ---
 
 <nav aria-label="Secciones del curso" class="mt-7 border-b">
-  <ul class="flex gap-2 sm:gap-6">
+  <ul class="flex flex-wrap gap-2 sm:gap-6">
     {tabs.map((tab) => (
       <li>
         <a
