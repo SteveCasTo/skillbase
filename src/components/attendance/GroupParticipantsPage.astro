@@ -42,12 +42,20 @@ const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
       <p class="mt-2 text-sm text-muted-foreground">Participantes del grupo</p>
     </div>
     {!message && (
-      <a
-        href={`${prefix}/${courseId}/grupos/${groupId}/evaluaciones`}
-        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
-      >
-        Evaluaciones
-      </a>
+      <div class="flex flex-wrap gap-3">
+        <a
+          href={`${prefix}/${courseId}/grupos/${groupId}/evaluaciones`}
+          class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+        >
+          Evaluaciones
+        </a>
+        <a
+          href={`${prefix}/${courseId}/grupos/${groupId}/cierre`}
+          class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+        >
+          Cierre académico
+        </a>
+      </div>
     )}
   </header>
   <div class="mt-6 min-w-0">

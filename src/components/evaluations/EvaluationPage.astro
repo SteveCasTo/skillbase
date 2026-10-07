@@ -59,6 +59,21 @@ const fields = rows.length
       </p>
     )}
   </header>
+  {groupId && data && (
+    <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+      <p class="text-sm text-muted-foreground">
+        {data.provisional
+          ? "Resultados provisionales"
+          : `Grupo cerrado · Versión oficial ${data.academicGroups?.find((group) => group.groupId === groupId)?.version ?? ""} · Solo lectura`}
+      </p>
+      <a
+        href={`${prefix}/${courseId}/grupos/${groupId}/cierre`}
+        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+      >
+        Cierre académico
+      </a>
+    </div>
+  )}
   {!groupId && !instructorRoute && data && (
     <CourseTabs id={courseId} active="evaluations" />
   )}
