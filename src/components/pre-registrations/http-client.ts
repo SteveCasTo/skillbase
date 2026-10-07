@@ -514,12 +514,15 @@ function bindExports() {
             const inline = document.querySelector<HTMLElement>(
               "[data-registration-page-error]",
             );
-            if (inline) inline.textContent = message;
-            notifications.warning({
-              id,
-              title: "Exportación no disponible",
-              description: message,
-            });
+            if (inline) {
+              inline.textContent = message;
+              notifications.dismiss(id);
+            } else
+              notifications.warning({
+                id,
+                title: "Exportación no disponible",
+                description: message,
+              });
             return;
           }
           const filename = response.headers
@@ -539,12 +542,15 @@ function bindExports() {
           const inline = document.querySelector<HTMLElement>(
             "[data-registration-page-error]",
           );
-          if (inline) inline.textContent = message;
-          notifications.error({
-            id,
-            title: "Sin descarga",
-            description: message,
-          });
+          if (inline) {
+            inline.textContent = message;
+            notifications.dismiss(id);
+          } else
+            notifications.error({
+              id,
+              title: "Sin descarga",
+              description: message,
+            });
         } finally {
           delete link.dataset.pending;
           link.removeAttribute("aria-disabled");

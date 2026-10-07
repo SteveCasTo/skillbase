@@ -231,13 +231,7 @@ export function SchemeEditor({
                 editingBaseline.current = component ? { ...component } : null;
                 setEditing(component?.id ?? null);
               }
-              if (Object.keys(result.issues).length)
-                notifications.dismiss(notificationId);
-              else
-                notifications.error({
-                  id: notificationId,
-                  title: "No se guardó el esquema",
-                });
+              notifications.dismiss(notificationId);
               requestAnimationFrame(() =>
                 (
                   form.current?.querySelector<HTMLElement>(
@@ -251,10 +245,7 @@ export function SchemeEditor({
             setMessage(
               "No se pudo confirmar el guardado. Reintenta sin cambiar los valores para recuperar la misma operación.",
             );
-            notifications.error({
-              id: notificationId,
-              title: "No se guardó el esquema",
-            });
+            notifications.dismiss(notificationId);
           } finally {
             busy.current = false;
             setPending(false);

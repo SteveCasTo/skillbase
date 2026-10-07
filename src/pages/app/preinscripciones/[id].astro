@@ -1,5 +1,6 @@
 ---
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import PrivateBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import RegistrationDetailPanel from "@/components/pre-registrations/RegistrationDetailPanel.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
 import { requireInternalUser } from "@/server/auth/context";
@@ -93,27 +94,21 @@ try {
   <RegistrationDetailPanel {detail} {form} serverNow={now.toISOString()} />
 ) : (
   <PrivateLayout title="Detalle de preinscripción">
-    <nav
-      aria-label="Ruta de navegación"
-      class="flex flex-wrap items-center gap-2 text-sm"
-    >
-      <a href="/app/preinscripciones" class="underline underline-offset-4">
-        Preinscripciones
-      </a>
-      {form && (
-        <>
-          <span aria-hidden="true">/</span>
-          <a
-            href={`/app/preinscripciones?courseId=${form.course.id}`}
-            class="break-words underline underline-offset-4"
-          >
-            {form.course.name}
-          </a>
-        </>
-      )}
-      <span aria-hidden="true">/</span>
-      <span aria-current="page">Detalle</span>
-    </nav>
+    <PrivateBreadcrumbs
+      current="Detalle"
+      parents={[
+        { label: "Resumen", href: "/app" },
+        { label: "Preinscripciones", href: "/app/preinscripciones" },
+        ...(form
+          ? [
+              {
+                label: form.course.name,
+                href: `/app/preinscripciones?courseId=${form.course.id}`,
+              },
+            ]
+          : []),
+      ]}
+    />
     {detail && form ? (
       <>
         {Astro.url.searchParams.has("success") && (

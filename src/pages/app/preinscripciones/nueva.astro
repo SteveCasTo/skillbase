@@ -1,5 +1,6 @@
 ---
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import PrivateBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import RegistrationForm from "@/components/pre-registrations/RegistrationForm.astro";
 import ParticipantSearch from "@/components/pre-registrations/ParticipantSearch.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
@@ -94,27 +95,21 @@ const hrefs = Object.fromEntries([
 ---
 
 <PrivateLayout title="Registrar preinscripción">
-  <nav
-    aria-label="Ruta de navegación"
-    class="flex flex-wrap items-center gap-2 text-sm"
-  >
-    <a href="/app/preinscripciones" class="underline underline-offset-4">
-      Preinscripciones
-    </a>
-    {form && (
-      <>
-        <span aria-hidden="true">/</span>
-        <a
-          href={`/app/preinscripciones?courseId=${form.course.id}`}
-          class="break-words underline underline-offset-4"
-        >
-          {form.course.name}
-        </a>
-      </>
-    )}
-    <span aria-hidden="true">/</span>
-    <span aria-current="page">Nueva</span>
-  </nav>
+  <PrivateBreadcrumbs
+    current="Nueva"
+    parents={[
+      { label: "Resumen", href: "/app" },
+      { label: "Preinscripciones", href: "/app/preinscripciones" },
+      ...(form
+        ? [
+            {
+              label: form.course.name,
+              href: `/app/preinscripciones?courseId=${form.course.id}`,
+            },
+          ]
+        : []),
+    ]}
+  />
   {form && (
     <a
       href="/app/preinscripciones/nueva"

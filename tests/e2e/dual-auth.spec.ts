@@ -234,9 +234,8 @@ test("dedicated recovery validates inline and locks submit until a neutral pendi
     });
   });
   await submit.click();
-  await expect(
-    page.getByRole("button", { name: "Procesando…" }),
-  ).toBeDisabled();
+  await expect(submit).toBeDisabled();
+  await expect(submit).toHaveAttribute("aria-busy", "true");
   release!();
   await expect(page.locator("[data-auth-result]")).toContainText(
     "Si podemos procesar",

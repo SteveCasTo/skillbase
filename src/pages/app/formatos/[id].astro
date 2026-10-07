@@ -447,7 +447,7 @@ const successKey = Astro.url.searchParams.get("success");
                   <details
                     hidden={!format.active}
                     open={editing === field.key && Boolean(pageError)}
-                    class="group ml-auto shrink-0 [&:not([open])>form]:hidden open:min-w-0 open:flex-1"
+                    class="format-inline group ml-auto shrink-0 [&:not([open])>form]:hidden open:min-w-0 open:flex-1"
                   >
                     <summary
                       aria-label={`Editar ${field.label.toLowerCase()}`}
@@ -514,7 +514,7 @@ const successKey = Astro.url.searchParams.get("success");
                         type="submit"
                         aria-label={`Guardar ${field.label.toLowerCase()}`}
                         title="Guardar"
-                        class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                        class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
                       >
                         <Check size={18} aria-hidden="true" />
                       </button>
@@ -550,6 +550,8 @@ const successKey = Astro.url.searchParams.get("success");
   <script>
     import { navigate } from "astro:transitions/client";
     import { notifications } from "@/lib/notifications";
+    import { notifyInlineOperation } from "@/lib/inline-operation-feedback";
+    import { formatFieldChanged } from "@/components/courses/format-inline-state";
     import { isRevision, isUuid } from "@/domain/courses/mutation-result";
     document.addEventListener("astro:page-load", () => {
       type FormatResult = {
@@ -571,6 +573,14 @@ const successKey = Astro.url.searchParams.get("success");
         message?: string;
         errors?: Record<string, string>;
       };
+      class FormatMutationError extends Error {
+        constructor(
+          message: string,
+          readonly conflict: boolean,
+        ) {
+          super(message);
+        }
+      }
       const mutation = async (form: HTMLFormElement, field?: string) => {
         const intent = form.querySelector<HTMLInputElement>(
           'input[name="intent"]',
@@ -594,10 +604,11 @@ const successKey = Astro.url.searchParams.get("success");
           );
         const result = payload as MutationResult;
         if (!response.ok)
-          throw new Error(
+          throw new FormatMutationError(
             (field && result.errors?.[field]) ||
               result.message ||
               "No se pudo guardar el cambio. Inténtalo nuevamente.",
+            response.status === 409,
           );
         if (
           intent === "delete"
@@ -645,6 +656,30 @@ const successKey = Astro.url.searchParams.get("success");
         return result;
       };
       let pending = false;
+      const syncInlineSubmit = (form: HTMLFormElement) => {
+        const input = form.querySelector<HTMLInputElement>(
+          'input[name="value"]',
+        );
+        const field = form.querySelector<HTMLInputElement>(
+          'input[name="field"]',
+        )?.value;
+        const submit = form.querySelector<HTMLButtonElement>(
+          'button[type="submit"]',
+        );
+        if (!input || !field || !submit) return;
+        submit.disabled =
+          pending ||
+          !form.checkValidity() ||
+          !formatFieldChanged(
+            field,
+            input.value,
+            input.dataset.persistedValue ?? input.defaultValue,
+          );
+      };
+      const syncInlineSubmits = () =>
+        document
+          .querySelectorAll<HTMLFormElement>("dd details form")
+          .forEach(syncInlineSubmit);
       const mutationPath = window.location.pathname;
       const originalValue = document.querySelector<HTMLElement>(
         '[data-format-value="name"]',
@@ -740,6 +775,7 @@ const successKey = Astro.url.searchParams.get("success");
         }
         if (fallback) fallback.hidden = true;
         document.title = `${current.name} | SkillBase`;
+        syncInlineSubmits();
       };
 
       // Keep the HTML forms authoritative: filtering only assists input, never replaces server validation.
@@ -812,12 +848,19 @@ const successKey = Astro.url.searchParams.get("success");
             if (details.open) input?.focus();
           });
           cancel.addEventListener("click", () => {
+            if (pending) return;
             if (input)
               input.value = input.dataset.persistedValue ?? input.defaultValue;
+            details.querySelector(`[id^="error-"]`)?.remove();
+            input?.removeAttribute("aria-invalid");
+            input?.removeAttribute("aria-describedby");
             details.open = false;
             details.querySelector<HTMLElement>("summary")?.focus();
+            if (form) syncInlineSubmit(form);
           });
           const form = details.querySelector<HTMLFormElement>("form");
+          form?.addEventListener("input", () => syncInlineSubmit(form));
+          if (form) syncInlineSubmit(form);
           form?.addEventListener("submit", (event) => {
             event.preventDefault();
             const field = form.querySelector<HTMLInputElement>(
@@ -830,11 +873,13 @@ const successKey = Astro.url.searchParams.get("success");
               !field ||
               !input ||
               !submit ||
+              submit.disabled ||
               pending ||
               !form.reportValidity()
             )
               return;
             pending = true;
+            syncInlineSubmits();
             const wasReadOnly = input.readOnly;
             input.readOnly = true;
             const wasCancelDisabled = cancel.disabled;
@@ -846,7 +891,7 @@ const successKey = Astro.url.searchParams.get("success");
             input.removeAttribute("aria-describedby");
             void (async () => {
               try {
-                const result = await notifications.promise(
+                const result = await notifyInlineOperation(
                   () => mutation(form, field),
                   {
                     loading: { title: "Guardando…" },
@@ -856,12 +901,6 @@ const successKey = Astro.url.searchParams.get("success");
                           ? "Nombre actualizado."
                           : "Nueva revisión guardada. Los borradores usan los valores vigentes.",
                     },
-                    error: (failure) => ({
-                      title:
-                        failure instanceof Error
-                          ? failure.message
-                          : "No se pudo guardar el cambio.",
-                    }),
                   },
                 );
                 if (!result.format) {
@@ -885,18 +924,31 @@ const successKey = Astro.url.searchParams.get("success");
                 const error = document.createElement("p");
                 error.id = `error-${field}`;
                 error.className = "mt-1 text-sm text-destructive";
+                error.setAttribute("role", "alert");
                 error.textContent =
                   failure instanceof Error
                     ? failure.message
                     : "No se pudo guardar el cambio. Inténtalo nuevamente.";
                 input.parentElement?.append(error);
+                if (
+                  failure instanceof FormatMutationError &&
+                  failure.conflict
+                ) {
+                  const recovery = document.createElement("a");
+                  recovery.href = mutationPath;
+                  recovery.className =
+                    "mt-2 inline-flex min-h-11 items-center underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring";
+                  recovery.textContent = "Consultar datos actuales";
+                  error.append(document.createElement("br"), recovery);
+                }
                 input.setAttribute("aria-invalid", "true");
                 input.setAttribute("aria-describedby", error.id);
+                input.focus({ preventScroll: true });
               } finally {
                 pending = false;
                 input.readOnly = wasReadOnly;
                 cancel.disabled = wasCancelDisabled;
-                submit.disabled = false;
+                syncInlineSubmits();
                 submit.removeAttribute("aria-busy");
               }
             })();
@@ -942,6 +994,7 @@ const successKey = Astro.url.searchParams.get("success");
           );
           if (!submit || pending) return;
           pending = true;
+          syncInlineSubmits();
           if (retry) retry.hidden = true;
           dialog?.close();
           submit.disabled = true;
@@ -949,7 +1002,7 @@ const successKey = Astro.url.searchParams.get("success");
           if (error) error.hidden = true;
           void (async () => {
             try {
-              const result = await notifications.promise(() => mutation(form), {
+              const result = await notifyInlineOperation(() => mutation(form), {
                 loading: { title: "Guardando…" },
                 success: (result) => ({
                   title: result.deleted
@@ -957,12 +1010,6 @@ const successKey = Astro.url.searchParams.get("success");
                     : result.format?.active
                       ? "Formato activado."
                       : "Formato desactivado.",
-                }),
-                error: (failure) => ({
-                  title:
-                    failure instanceof Error
-                      ? failure.message
-                      : "No se pudo guardar el cambio.",
                 }),
               });
               if (result.deleted) {
@@ -990,11 +1037,24 @@ const successKey = Astro.url.searchParams.get("success");
                     ? failure.message
                     : "No se pudo guardar el cambio. Inténtalo nuevamente.";
                 error.hidden = false;
+                if (
+                  failure instanceof FormatMutationError &&
+                  failure.conflict
+                ) {
+                  const recovery = document.createElement("a");
+                  recovery.href = mutationPath;
+                  recovery.className =
+                    "mt-2 block min-h-11 underline underline-offset-4";
+                  recovery.textContent = "Consultar datos actuales";
+                  error.append(recovery);
+                  if (retry) retry.hidden = true;
+                }
               }
               dialog?.close();
               error?.focus();
             } finally {
               pending = false;
+              syncInlineSubmits();
               submit.disabled = false;
               submit.removeAttribute("aria-busy");
             }
@@ -1030,3 +1090,16 @@ const successKey = Astro.url.searchParams.get("success");
     });
   </script>
 </PrivateLayout>
+<style>
+  .format-inline:not([open]) {
+    flex: 0 0 6rem;
+    width: 6rem;
+  }
+  .format-inline > summary {
+    margin-left: auto;
+    width: 2.75rem;
+  }
+  .format-inline button[aria-busy="true"] svg {
+    opacity: 0.5;
+  }
+</style>

@@ -1,8 +1,15 @@
 ---
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import PrivateBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 ---
 
 <PrivateLayout title="Asistencia">
+  <div class="mb-5">
+    <PrivateBreadcrumbs
+      current="Asistencia"
+      parents={[{ label: "Resumen", href: "/app" }]}
+    />
+  </div>
   <header>
     <p class="text-sm font-medium text-primary">Docencia</p>
     <h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">

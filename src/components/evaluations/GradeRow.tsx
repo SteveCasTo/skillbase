@@ -114,8 +114,7 @@ export function GradeRow({
       result.code === "CONCURRENT_UPDATE" ||
         result.code === "IDEMPOTENCY_CONFLICT",
     );
-    if (Object.keys(fields).length) notifications.dismiss(id);
-    else notifications.error({ id, title: "No se guardaron las notas" });
+    notifications.dismiss(id);
     focusError();
   };
 
