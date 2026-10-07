@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
 import { registerCourseInstructor } from "./instructor-helper";
@@ -12,7 +13,7 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
   await signInFixture(context, AUTH_FIXTURES.admin.email);
   const instructor = await registerCourseInstructor(page);
   const headers = {
-    Origin: "http://127.0.0.1:4321",
+    Origin: e2eSiteUrl(),
     Accept: "application/json",
   };
   const format = await page.request.post("/app/formatos/nuevo", {
@@ -52,7 +53,7 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
   };
   await page.goto(`/app/cursos/${id}/grupos`);
   const invalidResponse = await page.request.post(`/app/cursos/${id}/grupos`, {
-    headers: { Origin: "http://127.0.0.1:4321", Accept: "text/html" },
+    headers: { Origin: e2eSiteUrl(), Accept: "text/html" },
     form: { intent: "create", startTime: "08:00", capacity: "0" },
   });
   expect(invalidResponse.status()).toBe(422);

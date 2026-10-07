@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
 import { registerCourseInstructor } from "./instructor-helper";
@@ -15,7 +16,7 @@ test("stale HTML drafts and editorial confirmations retain their rejected revisi
   const initialInstructor = await registerCourseInstructor(page);
   const peerInstructor = await registerCourseInstructor(page);
   const headers = {
-    Origin: "http://127.0.0.1:4321",
+    Origin: e2eSiteUrl(),
     Accept: "application/json",
   };
   const format = await page.request.post("/app/formatos/nuevo", {
@@ -261,7 +262,7 @@ test("new courses preserve values and can be corrected after server validation w
   const prerequisite = await page.request.post(
     new URL(page.url()).pathname.replace(/\/editar$/u, "/grupos"),
     {
-      headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
+      headers: { Origin: e2eSiteUrl(), Accept: "application/json" },
       form: { intent: "create", startTime: "08:00", capacity: "10" },
     },
   );
@@ -314,7 +315,7 @@ test("unused formats can be created, edited and deleted without JavaScript", asy
       studentAmount: "invalid",
       externalAmount: "100",
     },
-    headers: { Origin: "http://127.0.0.1:4321" },
+    headers: { Origin: e2eSiteUrl() },
   });
   expect(invalidServerResponse.status()).toBe(422);
   expect(await invalidServerResponse.text()).toContain("Revisa los campos");
@@ -333,7 +334,7 @@ test("unused formats can be created, edited and deleted without JavaScript", asy
   await expect(page.locator("[data-format-status]")).toHaveText("Activo");
   const path = new URL(page.url()).pathname;
   const deactivated = await page.request.post(path, {
-    headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
+    headers: { Origin: e2eSiteUrl(), Accept: "application/json" },
     form: {
       intent: "deactivate",
       revisionId: await page
@@ -388,7 +389,7 @@ test("used formats require confirmation to deactivate without JavaScript", async
   await page.getByRole("link", { name: new RegExp(name) }).click();
   const path = new URL(page.url()).pathname;
   const course = await page.request.post("/app/cursos/nuevo", {
-    headers: { Origin: "http://127.0.0.1:4321", Accept: "application/json" },
+    headers: { Origin: e2eSiteUrl(), Accept: "application/json" },
     form: {
       name: `Curso sin JS ${Date.now()}`,
       requestKey: crypto.randomUUID(),
@@ -445,7 +446,7 @@ test("format mutations reject stale revisions, invalid origins and non-admin use
     .locator('input[name="updatedAt"]')
     .first()
     .inputValue();
-  const headers = { Origin: "http://127.0.0.1:4321" };
+  const headers = { Origin: e2eSiteUrl() };
   const post = (form: Record<string, string>) =>
     page.request.post(path, { form, headers, maxRedirects: 0 });
   expect(
