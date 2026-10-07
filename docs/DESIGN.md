@@ -501,7 +501,7 @@ La UI liberada conserva SSR, teclado, foco, privacidad e idempotencia conforme a
 
 ### Fase 7 — diseño de evaluaciones (implementación iniciada)
 
-El contrato funcional/técnico aprobado está en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PR 230 integró el backend, schema y migración 0020 a `development`; la migración solo fue validada en stacks temporales. El workstream UI/presentación sigue en progreso y todavía no hay una página Astro conectada integrada. Mantener las decisiones de estado incompleto/nota cero y valor final mostrado conforme al contrato, sin describir pantallas como implementadas antes de su integración/revisión.
+El contrato funcional/técnico aprobado está en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PR 230 integró backend/schema/migración 0020 y PR 232 las cuatro páginas y componentes UI a `development`. La UI tiene dos E2E focales previos y revisión de screenshots; el gate integrado posterior se detuvo durante setup fixture, como detalla [`TESTING.md`](TESTING.md). La migración se aplicó después al Supabase local canónico, no a cloud; siguen pendientes el gate remoto, release y cloud migration. Mantener estados incompleto/nota cero conforme al contrato, sin describir como completo el módulo antes de cerrar esas dependencias.
 
 ## CONSISTENCIA
 
