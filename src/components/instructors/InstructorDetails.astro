@@ -91,18 +91,11 @@ const fields = [
       </InlineEditField>
     </form>
   ))}
-  <div class="min-w-0 flex flex-col gap-2">
-    <label for="email" class="text-sm text-muted-foreground">
-      Correo electrónico
-    </label>
-    <Input
-      id="email"
-      name="email"
-      type="email"
-      readOnly
-      defaultValue={baseline.email ?? ""}
-      className="min-h-11"
-    />
-  </div>
+  <dl class="flex min-w-0 flex-col gap-1">
+    <dt class="text-sm text-muted-foreground">Correo electrónico</dt>
+    <dd class="flex min-h-11 min-w-0 items-center break-all font-medium">
+      {baseline.email ?? ""}
+    </dd>
+  </dl>
 </div>
 <script src="./inline-profile-client.ts"></script>

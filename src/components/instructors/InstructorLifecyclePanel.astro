@@ -47,7 +47,7 @@ const actions = deleteReason
 <section data-instructor-lifecycle class="mt-5 flex min-w-0 flex-col gap-5">
   <header class="flex flex-wrap items-center justify-between gap-4">
     <div class="flex min-w-0 flex-wrap items-center gap-3">
-      <slot />
+      <slot name="heading" />
       <p class="text-sm text-muted-foreground">
         {state.deletionPending
           ? "Eliminación pendiente · acceso bloqueado"
@@ -95,6 +95,7 @@ const actions = deleteReason
       ))}
     </div>
   </header>
+  <slot />
   {deleteReason &&
     statusReason &&
     (!state.exclusiveInstructor || state.courses.length === 0) && (
@@ -186,7 +187,9 @@ const actions = deleteReason
         let trigger: HTMLElement | null = null;
         let pending = false;
         const controls = [
-          ...panel.querySelectorAll<HTMLButtonElement>("button"),
+          ...panel.querySelectorAll<HTMLButtonElement>(
+            "[data-lifecycle-form] button, [data-lifecycle-dialog] button",
+          ),
         ];
         const originalDisabled = new Map(
           controls.map((control) => [control, control.disabled]),
