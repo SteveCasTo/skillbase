@@ -3,9 +3,16 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 interface WorkflowJob {
+  "runs-on"?: string;
   if?: string;
   needs?: string[];
-  steps?: { run?: string; env?: Record<string, string> }[];
+  steps?: {
+    name?: string;
+    run?: string;
+    env?: Record<string, string>;
+    "timeout-minutes"?: number;
+    "continue-on-error"?: boolean;
+  }[];
 }
 
 const workflow = Bun.YAML.parse(
@@ -38,6 +45,30 @@ function runGate(quality: string, integration: string, e2e: string): number {
 }
 
 describe("required CI aggregate gate", () => {
+  test("bounds browser provisioning without skipping required system dependencies", () => {
+    const e2e = workflow.jobs.e2e!;
+    expect(e2e["runs-on"]).toBe("ubuntu-24.04");
+    const configure = e2e.steps!.findIndex(
+      (step) => step.name === "Configure bounded Ubuntu dependency downloads",
+    );
+    const install = e2e.steps!.findIndex(
+      (step) => step.run === "bunx playwright install --with-deps chromium",
+    );
+    const execute = e2e.steps!.findIndex((step) =>
+      step.run?.startsWith("bun run test:e2e "),
+    );
+    expect(configure).toBeGreaterThan(-1);
+    expect(install).toBeGreaterThan(configure);
+    expect(execute).toBeGreaterThan(install);
+    expect(e2e.steps![configure]!["timeout-minutes"]).toBe(1);
+    expect(e2e.steps![install]!["timeout-minutes"]).toBe(5);
+    expect(e2e.steps![configure]!["continue-on-error"]).not.toBe(true);
+    expect(e2e.steps![install]!["continue-on-error"]).not.toBe(true);
+    // Syntax-check the actual provisioning command; this is not a Linux/network install test.
+    expect(
+      Bun.spawnSync([bash, "-n", "-c", e2e.steps![configure]!.run!]).exitCode,
+    ).toBe(0);
+  });
   test("waits for all dependencies even when one is skipped or cancelled", () => {
     expect(aggregator.if).toBe("always()");
     expect(aggregator.needs).toEqual(["quality", "integration", "e2e"]);

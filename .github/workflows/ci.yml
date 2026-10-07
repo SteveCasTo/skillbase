@@ -44,7 +44,7 @@ jobs:
 
   e2e:
     name: e2e (${{ matrix.shard }}/2)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -63,7 +63,24 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
-      - run: bunx playwright install --with-deps chromium
+      - name: Configure bounded Ubuntu dependency downloads
+        timeout-minutes: 1
+        run: |
+          # Run 37678477638 stalled on this image's Azure APT mirror, before browser downloads.
+          # Keep the image's signed Ubuntu repositories and official HTTPS fallbacks.
+          grep -q 'mirror+file:/etc/apt/apt-mirrors.txt' /etc/apt/sources.list.d/ubuntu.sources
+          sudo sed -i '\|http://azure\.archive\.ubuntu\.com/ubuntu/|d' /etc/apt/apt-mirrors.txt
+          grep -q '^https://archive.ubuntu.com/ubuntu/' /etc/apt/apt-mirrors.txt
+          cat /etc/apt/apt-mirrors.txt
+          sudo tee /etc/apt/apt.conf.d/99skillbase-ci > /dev/null <<'EOF'
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          Acquire::Retries "0";
+          APT::Update::Error-Mode "any";
+          EOF
+      - name: Install Chromium and required system dependencies
+        timeout-minutes: 5
+        run: bunx playwright install --with-deps chromium
       - run: bun run test:e2e --shard=${{ matrix.shard }}/2
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
