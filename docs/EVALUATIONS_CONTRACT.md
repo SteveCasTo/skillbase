@@ -3,11 +3,11 @@
 ## Estado y alcance
 
 Contrato funcional/técnico aprobado antes de comenzar la implementación de
-Fase 7. PR 230 integró el backend base en `development`: esquema/migración 0020,
-dominio, casos de uso, repositorio Drizzle y helpers server-side. La migración se
-probó solo en stacks temporales; no se aplicó al Supabase local canónico ni a
-cloud. La interfaz está en progreso y todavía no completa un flujo integrado;
-Fase 7 no está terminada ni liberada. El progreso se registra en
+Fase 7. PR 230 integró el backend base y PR 232 integró cuatro páginas Astro y
+componentes de esquema/notas en `development`. La migración 0020 se probó solo en
+stacks temporales; no se aplicó al Supabase local canónico ni a cloud. La UI está
+integrada en desarrollo, pero el gate completo, la migración persistente y el
+release de Fase 7 siguen pendientes. El progreso se registra en
 [`PLAN.md`](PLAN.md), el modelo persistido en [`DATA_MODEL.md`](DATA_MODEL.md) y
 la capa de seguridad/ownership en [`SECURITY.md`](SECURITY.md).
 
@@ -15,9 +15,9 @@ Helpers disponibles en server: `loadCourseEvaluations({actor, courseId,
 groupId?, repository?})` devuelve `{available:true,data}` o `{available:false,
 status,code,unavailableReason}`; `handleEvaluationPost({request, actor,
 repository, siteUrl, operation, courseId, groupId?})` admite `scheme`/`grade` y
-devuelve `{status,payload}`. Están disponibles para la futura UI, no equivalen a
-páginas Astro ya integradas. El alcance/rutas privadas se describen en
-`docs/ARCHITECTURE.md`.
+devuelve `{status,payload}`. PR 232 los conecta a las rutas Astro ADMIN e
+INSTRUCTOR descritas en [`ARCHITECTURE.md`](ARCHITECTURE.md); estas páginas no
+equivalen a un release ni a un gate de Fase 7 completado.
 
 Los comandos de POST llevan `requestKey`, `courseId`, `schemeRevision` y
 `groupId` opcional; guardar nota agrega `registrationId`, `componentId`,
@@ -36,6 +36,13 @@ sobrescribe cambios concurrentes. Los comandos guardan receipt por actor y
 registrado; reutilizar la clave con otro payload da conflicto. Los resultados
 completos se derivan tras cada nota; mientras falte alguna se conserva estado
 `PENDING`/`finalGrade:null` y decisión explícita `0.00`.
+
+La UI integrada expone el esquema global en páginas de curso y el roster de
+calificaciones en páginas de grupo, para ADMIN y para INSTRUCTOR en sus cursos
+propios. La edición de esquema/notas es individual; el estado incompleto se
+distingue de una nota completa cero, y ADMIN puede consultar historial de
+correcciones. Mantiene valores borrador independientes y fallback SSR. La
+verificación actual de interfaz es focal, no el gate completo del módulo.
 
 Fase 7 configura componentes de evaluación por curso, registra notas y calcula
 un resultado académico final. No incluye cierre/reapertura de curso, planilla

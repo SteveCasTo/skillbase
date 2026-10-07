@@ -465,7 +465,7 @@ Los PR checks y el full master E2E cierran el gate de las correcciones para ese 
 
 #### Fase 7
 
-El backend base de Fase 7 se integró en development mediante PR 230. El workstream de UI/presentación continúa en progreso y aún no está integrado/listo. No equivale al cierre de Fase 7 ni hay full gate.
+PR 230 integró el backend base y PR 232 integró la UI en `development`. La UI tiene dos E2E focales PASS; quality reportado para la rama incluyó lint/format/diff, typecheck con cero errores y build PASS. Se revisaron screenshots de 390/768/1440 px en light/dark. Esto no equivale a un full E2E ni al gate combinado de Fase 7.
 
 #### Backend Fase 7 — PR 230 (evidencia focal, no full gate)
 
@@ -475,6 +475,6 @@ El backend base de Fase 7 se integró en development mediante PR 230. El workstr
 - El fix test-only `649441b` añadió las cinco tablas de evaluación al allowlist compartido de fixtures, dentro del mismo `TRUNCATE ... RESTRICT`. No modificó schema, FKs ni assertions de producto. La revalidación focal posterior pasó cinco casos en cinco archivos (88 assertions) y las cuatro unitarias; lint, typecheck, formatter y `git diff --check` PASS.
 - La suite de integración completa no se volvió a ejecutar después del fix. Este resultado focal no acredita full unit/integration, UI/E2E ni gate de Fase 7. No hay seed de evaluación; `FINANCIAL_DEMO.md` no constituye fixtures de notas.
 
-El cleanup es infraestructura de tests aislados únicamente; no es un allowlist de reset/demo/producción. La migración 0020 no se aplicó a instancias persistentes.
+El cleanup es infraestructura de tests aislados únicamente; no es un allowlist de reset/demo/producción. La migración 0020 no se aplicó a instancias persistentes. No hay migración cloud, seed de notas ni validación completa integrada de backend+UI a la fecha.
 
-Contratos y límites efectivos en [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md); inventario schema en [`DATA_MODEL.md`](DATA_MODEL.md); progreso/remanentes en [`PLAN.md`](PLAN.md). La UI y el cierre de Fase 7 aún están pendientes.
+Contratos y límites efectivos en [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md); inventario schema en [`DATA_MODEL.md`](DATA_MODEL.md); progreso/remanentes en [`PLAN.md`](PLAN.md). La UI está integrada en development, pero el gate/cierre de Fase 7 siguen pendientes.

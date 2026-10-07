@@ -218,7 +218,7 @@ La cancelación/reemplazo modifica la cronología operativa sin reescribir horas
 
 Fase 6 y su release quedaron cerrados por PR 211; las correcciones de asistencia C1/C2/C3 quedaron cerradas por PR 228. Sus pruebas/limitaciones y el límite de verificación de ledger cloud están en `docs/TESTING.md` y `docs/DEPLOYMENT.md`.
 
-### Evaluaciones y notas (Fase 7, backend base en development)
+### Evaluaciones y notas (Fase 7, backend/UI integrados en development)
 
 PR 230 integra el backend de evaluación en capas: políticas/tipos en
 `src/domain/evaluations`, casos de uso/port en `src/application/evaluations`,
@@ -227,20 +227,29 @@ loader y adaptador HTTP en `src/server/evaluations`, y persistencia en
 `src/server/db/schema`; la migración versionada es
 `drizzle/0020_phase7_evaluations.sql`.
 
-El loader `loadCourseEvaluations` y `handleEvaluationPost` están disponibles
-como helpers server-side para lectura y comandos `scheme`/`grade`. La policy
-fail-closed reconoce destinos privados de evaluación bajo `/app/cursos/:id`,
-`/app/mis-cursos/:id` y sus rutas de grupo; al cierre de PR 230 todavía no hay
-página Astro/UI conectada. La UI tiene un workstream separado en curso, no un
-submódulo implementado.
+El loader `loadCourseEvaluations` y `handleEvaluationPost` son helpers
+server-side para lectura y comandos `scheme`/`grade`. La policy fail-closed
+reconoce destinos privados bajo `/app/cursos/:id/evaluaciones`,
+`/app/cursos/:id/grupos/:groupId/evaluaciones` y las rutas equivalentes de
+`/app/mis-cursos/:id` para Instructor. PR 232 conectó esos helpers en cuatro
+páginas Astro y en `src/components/evaluations/*`: ADMIN administra el esquema
+global/curso y califica grupos; INSTRUCTOR consulta esquema propio y califica su
+roster autorizado.
+
+Las páginas usan SSR/POST como base y React para edición interactiva; conservan
+drafts de campos independientes y proyección explícita de estado incompleto.
+Ownership, fecha de inicio y estado `INSCRITO` se revalidan en repositorio, no
+solo en la route policy/UI. La UI está integrada en development; aún no equivale
+a gate final o release de Fase 7.
 
 La migración 0020 declara cinco tablas protegidas por RLS y revoca acceso Data
 API directo; los repositorios revalidan rol/ownership/membresía dentro de
 transacciones. Su validación se realizó en stacks temporales aislados, no en el
 Supabase local canónico ni en cloud. Detalle de entidades, integridad,
-autorización e idempotencia en `docs/DATA_MODEL.md`,
-`docs/SECURITY.md` y `docs/EVALUATIONS_CONTRACT.md`. Esto no completa Fase 7 ni
-incluye cierre de curso/planilla de Fase 8 o certificados de Fase 9.
+autorización e idempotencia en `docs/DATA_MODEL.md`, `docs/SECURITY.md` y
+`docs/EVALUATIONS_CONTRACT.md`. El backend y la UI están integrados en
+development, pero Fase 7 aún no está completa ni liberada. No incluye cierre de
+curso/planilla de Fase 8 o certificados de Fase 9.
 
 El POST público limita y parsea el body en el adaptador server-side, valida Origin y llama el caso de uso de interés. Un limiter persistente usa PostgreSQL y un HMAC server-only sobre `Astro.clientAddress`; no confía en forwarded headers. Sin secreto válido o dirección de cliente confiable, el flujo falla cerrado. Los defaults técnicos y requisitos de despliegue se describen en el contrato y en `docs/DEPLOYMENT.md`; no implican que los valores cloud estén configurados.
 

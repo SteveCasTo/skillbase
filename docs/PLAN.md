@@ -705,18 +705,18 @@ El source de desarrollo validado antes de integrar fue `292c5d42e2babb51a96c5580
 
 Las correcciones C1/C2/C3 quedaron liberadas mediante PR 228. Cancelación/reprogramación opera solo antes de `startsAt`, sin marcas de participantes/instructor; reemplazos futuros conservan duración e historial y no entran en conflicto. Las correcciones históricas ADMIN de evidencia siguen separadas de acciones operativas.
 
-## FASE 7 — EVALUACIONES Y NOTAS (backend integrado; UI incompleta)
+## FASE 7 — EVALUACIONES Y NOTAS (backend y UI integrados en development; milestone incompleto)
 
-El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PR 230 integró a `development` el backend base: dominio, aplicación, repositorio Drizzle, loader/HTTP helpers y migración versionada 0020. Los controles de esquema/nota e idempotencia/auditoría están implementados en la capa backend. La UI sigue en progreso y no está integrada/lista; el módulo no está liberado ni la Fase 7 completa.
+El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PR 230 integró a `development` dominio, aplicación, repositorio Drizzle, loader/HTTP helpers y migration source 0020. PR 232 integró cuatro páginas Astro (ADMIN/INSTRUCTOR por curso/grupo) y componentes de esquema/notas, historial y roster. El backend/API y la UI están integrados en desarrollo; Fase 7 no está completa ni liberada, y el full gate sigue pendiente.
 
-La migración 0020 solo se probó en stacks temporales aislados; no se aplicó al Supabase local canónico o cloud y no avanzó el ledger. El backend pasó cobertura focal (4 unit y una suite de integración HTTP de 39 assertions); el accidental full integration run y su corrección de cleanup están documentados en [`TESTING.md`](TESTING.md). No hay ejecución full de integration, UI E2E o gate completo posterior a ese fix. No se añadió seed de evaluaciones; el demo financiero existente no contiene notas y no debe presentarse como tal.
+La migración 0020 solo se probó en stacks temporales aislados; no se aplicó al Supabase local canónico o cloud y no avanzó sus ledgers. El backend pasó cobertura focal (4 unit y una suite de integración HTTP de 39 assertions); el accidental full integration run y su corrección de cleanup están documentados en [`TESTING.md`](TESTING.md). PR 232 añadió dos casos E2E focales para la UI, pero no un full run. La suite de integración completa no se ejecutó de nuevo tras el fix de cleanup. No se añadió seed de evaluaciones; el demo financiero existente no contiene notas y no debe presentarse como tal.
 
 - [x] Confirmar contrato funcional/técnico antes de implementación.
 - [x] Implementar backend base de esquema, dominio, persistencia, autorización, revisión/freeze y auditoría (PR 230, `development`).
 - [x] Añadir cobertura focal y reparar el cleanup de fixtures para las nuevas tablas con el mismo `TRUNCATE ... RESTRICT` compartido (commit `649441b`); no equivale a full integration PASS.
-- [ ] Completar e integrar UI de instructor/ADMIN y flujo conectado conforme a [`DESIGN.md`](DESIGN.md) y `EVALUATIONS_CONTRACT.md`.
-- [ ] Reejecutar la suite de integración completa después del fix de cleanup y completar las pruebas focales de UI/HTTP cuando la interfaz se integre.
-- [ ] Ejecutar gate combinado de Fase 7 (unit/integration/E2E, quality/build y CI requerido) al cierre; solo entonces marcar el módulo completo.
+- [x] Integrar UI ADMIN/INSTRUCTOR para esquema de curso, roster/notas por grupo y vistas de curso/grupo (PR 232). La UI distingue nota pendiente de cero completo, conserva drafts individuales y muestra historial/cálculo según el contrato; sus dos E2E focales pasan y se revisaron screenshots 390/768/1440 en light/dark.
+- [ ] Reejecutar la suite de integración completa después del fix de cleanup; las corridas previas de la carpeta completa fallaron durante cleanup de fixtures.
+- [ ] Completar el gate combinado de Fase 7 (unit/integration/E2E, quality/build y CI requerido) al cierre; solo entonces marcar el módulo completo.
 - [ ] Planificar y autorizar migración cloud/release después del gate; no hay aplicación 0020 en cloud registrada.
 
 Fase 7 no incluye ni completa Fase 8 (cierre/planilla/reapertura) o Fase 9 (certificados). No adelantar weighted-grade changes posteriores ni convertir el demo financiero en un seed de notas.
