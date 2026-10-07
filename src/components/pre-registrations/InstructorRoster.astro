@@ -1,5 +1,6 @@
 ---
 import type { InstructorRosterEntryDto } from "@/domain/pre-registrations/types";
+import { X } from "lucide-react";
 interface Props {
   entries: readonly InstructorRosterEntryDto[];
   available: boolean;
@@ -8,7 +9,6 @@ const { entries, available } = Astro.props;
 ---
 
 <section aria-label="Participantes del grupo" class="min-w-0">
-  <h2 class="mb-4 text-lg font-semibold">Participantes</h2>
   {!available ? (
     <p class="text-sm text-muted-foreground">
       Disponible desde el inicio oficial del curso.
@@ -18,12 +18,95 @@ const { entries, available } = Astro.props;
       Este grupo todavía no tiene participantes vigentes.
     </p>
   ) : (
-    <ul class="divide-y rounded-xl border px-5">
-      {entries.map((entry) => (
-        <li class="break-words py-4">
-          {entry.firstName} {entry.lastName}
-        </li>
-      ))}
-    </ul>
+    <instructor-roster-search class="block">
+      <form
+        class="mb-4 flex flex-col gap-2"
+        role="search"
+        aria-label="Buscar participantes por nombre"
+        hidden
+      >
+        <label for="instructor-roster-search" class="text-sm font-medium">
+          Buscar por nombre
+        </label>
+        <div class="relative">
+          <input
+            id="instructor-roster-search"
+            type="search"
+            autocomplete="off"
+            maxlength="200"
+            class="min-h-11 w-full rounded-lg border bg-background py-2 pl-3 pr-12 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+          />
+          <button
+            type="button"
+            hidden
+            aria-label="Limpiar búsqueda"
+            title="Limpiar búsqueda"
+            class="absolute right-0 top-0 inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+      </form>
+      <ul class="rounded-xl border px-5">
+        {entries.map((entry) => (
+          <li class="break-words py-4">
+            {entry.firstName} {entry.lastName}
+          </li>
+        ))}
+      </ul>
+      <p
+        data-roster-empty
+        hidden
+        role="status"
+        class="text-sm text-muted-foreground"
+      >
+        No se encontraron participantes. Prueba otro nombre.
+      </p>
+    </instructor-roster-search>
   )}
 </section>
+<script>
+  class InstructorRosterSearch extends HTMLElement {
+    connectedCallback() {
+      const form = this.querySelector<HTMLFormElement>("form")!;
+      const input = form.querySelector<HTMLInputElement>("input")!;
+      const clear = form.querySelector<HTMLButtonElement>("button")!;
+      const list = this.querySelector<HTMLUListElement>("ul")!;
+      const empty = this.querySelector<HTMLElement>("[data-roster-empty]")!;
+      const normalize = (value: string) =>
+        value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es");
+      const filter = () => {
+        const search = normalize(input.value.trim());
+        let count = 0;
+        list.querySelectorAll<HTMLLIElement>("li").forEach((row) => {
+          row.hidden = !normalize(row.textContent ?? "").includes(search);
+          if (!row.hidden) count++;
+        });
+        list.hidden = count === 0;
+        empty.hidden = count !== 0;
+        clear.hidden = input.value.length === 0;
+      };
+      form.hidden = false;
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        filter();
+      });
+      input.addEventListener("input", filter);
+      clear.addEventListener("click", () => {
+        input.value = "";
+        filter();
+        input.focus();
+      });
+    }
+  }
+  if (!customElements.get("instructor-roster-search"))
+    customElements.define("instructor-roster-search", InstructorRosterSearch);
+</script>
+<style>
+  input[type="search"]::-webkit-search-cancel-button {
+    appearance: none;
+  }
+  li:not([hidden]) ~ li:not([hidden]) {
+    border-top: 1px solid var(--border);
+  }
+</style>

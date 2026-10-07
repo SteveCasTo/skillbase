@@ -1,11 +1,26 @@
-/** Apply the calendar selection without removing the SSR session links. */
+import type { AttendanceSessionDto } from "@/domain/attendance/types";
+
+export type SessionStateFilter = "ALL" | AttendanceSessionDto["status"];
+
+/** Combine civil date and the authoritative DTO state; never infer completion. */
 export function filterSessionRows(
   rows: Iterable<{
     hidden: boolean | string;
-    dataset: { sessionDay?: string | undefined };
+    dataset: {
+      sessionDay?: string | undefined;
+      sessionStatus?: string | undefined;
+    };
   }>,
   selectedDay: string,
+  selectedState: SessionStateFilter = "ALL",
 ) {
-  for (const row of rows)
-    row.hidden = Boolean(selectedDay && row.dataset.sessionDay !== selectedDay);
+  let visible = 0;
+  for (const row of rows) {
+    row.hidden = Boolean(
+      (selectedDay && row.dataset.sessionDay !== selectedDay) ||
+      (selectedState !== "ALL" && row.dataset.sessionStatus !== selectedState),
+    );
+    if (!row.hidden) visible++;
+  }
+  return visible;
 }

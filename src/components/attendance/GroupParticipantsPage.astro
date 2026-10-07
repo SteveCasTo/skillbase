@@ -6,6 +6,7 @@ import AttendanceBreadcrumbs from "./AttendanceBreadcrumbs.astro";
 import { membershipLabels } from "@/components/pre-registrations/presentation";
 import { buttonVariants } from "@/components/ui/button";
 import type { prepareGroupParticipantsRoute } from "./participants-route";
+import { X } from "lucide-react";
 type Props = Awaited<ReturnType<typeof prepareGroupParticipantsRoute>>;
 const {
   courseId,
@@ -17,9 +18,10 @@ const {
   available,
   entries,
   registrations,
+  search,
 } = Astro.props;
 const pageHref = (page: number) =>
-  `${Astro.url.pathname}?${new URLSearchParams({ page: String(page) })}`;
+  `${Astro.url.pathname}?${new URLSearchParams({ ...(search ? { search } : {}), page: String(page) })}`;
 const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
 ---
 
@@ -33,9 +35,12 @@ const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
     current="participants"
   />
   <header class="flex flex-wrap items-start justify-between gap-4">
-    <h1 class="text-3xl font-semibold tracking-tight">
-      Participantes del grupo
-    </h1>
+    <div class="min-w-0">
+      <h1 class="break-words text-3xl font-semibold tracking-tight">
+        {groupLabel}
+      </h1>
+      <p class="mt-2 text-sm text-muted-foreground">Participantes del grupo</p>
+    </div>
     {!message && (
       <a
         href={`${prefix}/${courseId}/grupos/${groupId}/evaluaciones`}
@@ -45,81 +50,249 @@ const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
       </a>
     )}
   </header>
-  <div class="mt-8 min-w-0">
+  <div class="mt-6 min-w-0">
     {message ? (
       <RegistrationPageError {message} retryHref={Astro.url.pathname} />
     ) : instructorRoute ? (
       <InstructorRoster {entries} {available} />
     ) : (
       registrations && (
-        <>
-          {registrations.items.length === 0 ? (
-            <p class="text-sm text-muted-foreground">
-              Este grupo todavía no tiene participantes en esta página.
+        <group-roster-search class="block">
+          <form
+            method="get"
+            action={Astro.url.pathname}
+            class="mb-5 flex flex-col gap-2"
+            aria-label="Buscar participantes del grupo"
+          >
+            <label for="group-roster-search" class="text-sm font-medium">
+              Buscar por nombre, CI o correo
+            </label>
+            <div class="flex min-w-0 gap-2">
+              <div class="relative min-w-0 flex-1">
+                <input
+                  id="group-roster-search"
+                  name="search"
+                  type="search"
+                  value={search}
+                  maxlength="200"
+                  autocomplete="off"
+                  aria-controls="group-roster-results"
+                  class="min-h-11 w-full rounded-lg border bg-background py-2 pl-3 pr-12 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+                />
+                <button
+                  type="button"
+                  data-roster-clear
+                  hidden
+                  aria-label="Limpiar búsqueda"
+                  title="Limpiar búsqueda"
+                  class="absolute right-0 top-0 inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </div>
+              <button
+                type="submit"
+                data-roster-submit
+                class={buttonVariants({
+                  variant: "outline",
+                  className: "min-h-11",
+                })}
+              >
+                Buscar
+              </button>
+            </div>
+            <p
+              data-roster-status
+              role="status"
+              hidden
+              class="text-sm text-muted-foreground"
+            ></p>
+            <p
+              data-roster-error
+              role="alert"
+              hidden
+              class="text-sm text-destructive"
+            ></p>
+          </form>
+          <div id="group-roster-results" data-group-roster-results>
+            <p class="mb-4 text-sm text-muted-foreground" role="status">
+              {registrations.total}{" "}
+              {registrations.total === 1 ? "participante" : "participantes"}
+              {search ? " encontrados" : ""}
             </p>
-          ) : (
-            <ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {registrations.items.map((registration) => (
-                <li class="min-w-0">
+            {registrations.items.length === 0 ? (
+              <p class="text-sm text-muted-foreground">
+                {search
+                  ? "No se encontraron participantes. Prueba otro nombre, CI o correo."
+                  : "Este grupo todavía no tiene participantes en esta página."}
+              </p>
+            ) : (
+              <ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {registrations.items.map((registration) => (
+                  <li class="min-w-0">
+                    <a
+                      href={`/app/preinscripciones/${registration.id}`}
+                      class="flex h-full min-w-0 flex-col gap-2 rounded-xl border bg-card p-5 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      <h2 class="break-words font-semibold">
+                        {registration.participant.firstName}{" "}
+                        {registration.participant.lastName}
+                      </h2>
+                      <p class="break-words text-sm text-muted-foreground">
+                        CI: {registration.participant.ci}
+                      </p>
+                      <p class="break-all text-sm text-muted-foreground">
+                        {registration.participant.email}
+                      </p>
+                      {registration.membershipStatus !== "INSCRITO" && (
+                        <p class="text-sm">
+                          {membershipLabels[registration.membershipStatus]}
+                        </p>
+                      )}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {(registrations.page > 1 ||
+              registrations.page * registrations.pageSize <
+                registrations.total) && (
+              <nav
+                aria-label="Páginas de participantes"
+                class="mt-6 flex flex-wrap items-center gap-3"
+              >
+                {registrations.page > 1 && (
                   <a
-                    href={`/app/preinscripciones/${registration.id}`}
-                    class="flex h-full min-w-0 flex-col gap-2 rounded-xl border bg-card p-5 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+                    href={pageHref(registrations.page - 1)}
+                    class={buttonVariants({
+                      variant: "outline",
+                      className: "min-h-11",
+                    })}
                   >
-                    <h2 class="break-words font-semibold">
-                      {registration.participant.firstName}{" "}
-                      {registration.participant.lastName}
-                    </h2>
-                    <p class="break-words text-sm text-muted-foreground">
-                      CI: {registration.participant.ci}
-                    </p>
-                    <p class="break-all text-sm text-muted-foreground">
-                      {registration.participant.email}
-                    </p>
-                    <p class="text-sm">
-                      {membershipLabels[registration.membershipStatus]}
-                    </p>
+                    Anterior
                   </a>
-                </li>
-              ))}
-            </ul>
-          )}
-          {(registrations.page > 1 ||
-            registrations.page * registrations.pageSize <
-              registrations.total) && (
-            <nav
-              aria-label="Páginas de participantes"
-              class="mt-6 flex flex-wrap items-center gap-3"
-            >
-              {registrations.page > 1 && (
-                <a
-                  href={pageHref(registrations.page - 1)}
-                  class={buttonVariants({
-                    variant: "outline",
-                    className: "min-h-11",
-                  })}
-                >
-                  Anterior
-                </a>
-              )}
-              <span class="text-sm text-muted-foreground">
-                Página {registrations.page}
-              </span>
-              {registrations.page * registrations.pageSize <
-                registrations.total && (
-                <a
-                  href={pageHref(registrations.page + 1)}
-                  class={buttonVariants({
-                    variant: "outline",
-                    className: "min-h-11",
-                  })}
-                >
-                  Siguiente
-                </a>
-              )}
-            </nav>
-          )}
-        </>
+                )}
+                <span class="text-sm text-muted-foreground">
+                  Página {registrations.page}
+                </span>
+                {registrations.page * registrations.pageSize <
+                  registrations.total && (
+                  <a
+                    href={pageHref(registrations.page + 1)}
+                    class={buttonVariants({
+                      variant: "outline",
+                      className: "min-h-11",
+                    })}
+                  >
+                    Siguiente
+                  </a>
+                )}
+              </nav>
+            )}
+          </div>
+        </group-roster-search>
       )
     )}
   </div>
 </PrivateLayout>
+<script>
+  import { navigate } from "astro:transitions/client";
+  class GroupRosterSearch extends HTMLElement {
+    private controller?: AbortController;
+    private timer?: ReturnType<typeof setTimeout>;
+    connectedCallback() {
+      const form = this.querySelector<HTMLFormElement>("form")!;
+      const input = form.querySelector<HTMLInputElement>("input")!;
+      const clear = form.querySelector<HTMLButtonElement>(
+        "[data-roster-clear]",
+      )!;
+      const status = form.querySelector<HTMLElement>("[data-roster-status]")!;
+      const error = form.querySelector<HTMLElement>("[data-roster-error]")!;
+      const results = this.querySelector<HTMLElement>(
+        "[data-group-roster-results]",
+      )!;
+      form.querySelector<HTMLElement>("[data-roster-submit]")!.hidden = true;
+      const search = async () => {
+        clearTimeout(this.timer);
+        this.controller?.abort();
+        const controller = new AbortController();
+        this.controller = controller;
+        const url = new URL(form.action);
+        const value = input.value.trim();
+        if (value) url.searchParams.set("search", value);
+        // Every changed search starts on page one; SSR pagination retains the query.
+        clear.hidden = input.value.length === 0;
+        error.hidden = true;
+        status.textContent = "Buscando participantes…";
+        status.hidden = false;
+        results.setAttribute("aria-busy", "true");
+        try {
+          const response = await fetch(url, {
+            signal: controller.signal,
+            headers: { Accept: "text/html" },
+          });
+          if (response.redirected) {
+            await navigate(response.url);
+            return;
+          }
+          if (!response.ok)
+            throw new Error(
+              "No se pudo buscar. Reintenta con Enter o cambia la búsqueda.",
+            );
+          const html = new DOMParser().parseFromString(
+            await response.text(),
+            "text/html",
+          );
+          const next = html.querySelector("[data-group-roster-results]");
+          if (!next)
+            throw new Error(
+              "No se pudo cargar el listado. Reintenta con Enter.",
+            );
+          if (controller.signal.aborted) return;
+          results.replaceChildren(...Array.from(next.childNodes));
+          history.replaceState(history.state, "", url);
+          status.textContent = "";
+          status.hidden = true;
+        } catch (failure) {
+          if (controller.signal.aborted) return;
+          status.textContent = "";
+          status.hidden = true;
+          error.textContent =
+            failure instanceof Error
+              ? failure.message
+              : "No se pudo buscar. Reintenta con Enter.";
+          error.hidden = false;
+        } finally {
+          if (!controller.signal.aborted) results.removeAttribute("aria-busy");
+        }
+      };
+      clear.hidden = input.value.length === 0;
+      input.addEventListener("input", () => {
+        this.controller?.abort();
+        clearTimeout(this.timer);
+        clear.hidden = input.value.length === 0;
+        this.timer = setTimeout(() => void search(), 300);
+      });
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        void search();
+      });
+      clear.addEventListener("click", () => {
+        input.value = "";
+        input.focus();
+        void search();
+      });
+    }
+    disconnectedCallback() {
+      this.controller?.abort();
+      clearTimeout(this.timer);
+    }
+  }
+  if (!customElements.get("group-roster-search"))
+    customElements.define("group-roster-search", GroupRosterSearch);
+</script>
+<style>
+  input[type="search"]::-webkit-search-cancel-button {
+    appearance: none;
+  }
+</style>
