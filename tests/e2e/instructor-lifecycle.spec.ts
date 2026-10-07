@@ -140,7 +140,11 @@ test("ADMIN lifecycle preserves credentials on reactivation and denies existing 
     headers: { Origin: new URL(page.url()).origin, Accept: "application/json" },
     form: {
       intent: "deactivate",
-      revision: await blocked.locator('input[name="revision"]').inputValue(),
+      revision: await blocked
+        .locator(
+          'form[data-lifecycle-form]:has(input[name="intent"][value="deactivate"]) input[name="revision"]',
+        )
+        .inputValue(),
     },
   });
   expect(denied.status()).toBe(422);
