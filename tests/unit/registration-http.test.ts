@@ -390,8 +390,6 @@ describe("registration HTTP contracts", () => {
       "/app/preinscripciones/buscar",
       "/app/preinscripciones/exportar",
       `/app/preinscripciones/${id}`,
-      "/app/participantes",
-      `/app/participantes/${id}`,
       "/app/configuracion",
     ])
       expect(getPrivateRoutePolicy(path)).toEqual({
@@ -409,7 +407,13 @@ describe("registration HTTP contracts", () => {
     expect(navigationSkeletonVariant(`/app/preinscripciones/${id}`)).toBe(
       "detail",
     );
-    expect(navigationSkeletonVariant(`/app/participantes/${id}`)).toBe("form");
+    for (const removedPath of [
+      "/app/participantes",
+      `/app/participantes/${id}`,
+    ]) {
+      expect(getPrivateRoutePolicy(removedPath)).toBeNull();
+      expect(navigationSkeletonVariant(removedPath)).toBeNull();
+    }
     expect(
       navigationSkeletonVariant(`/app/mis-cursos/${id}/grupos/${other}`),
     ).toBe("list");

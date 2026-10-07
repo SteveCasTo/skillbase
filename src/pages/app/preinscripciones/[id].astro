@@ -42,7 +42,11 @@ try {
     return new Response(null, { status: 405, headers: { Allow: "GET, POST" } });
   if (Astro.request.method === "POST") {
     const operation = singleQuery(Astro.url.searchParams, "operation");
-    if (!["payment", "refund", "transfer", "cancel"].includes(operation))
+    if (
+      !["payment", "refund", "transfer", "cancel", "participant"].includes(
+        operation,
+      )
+    )
       throw new RegistrationError(
         "VALIDATION_FAILED",
         "Selecciona una operación válida.",
@@ -112,31 +116,6 @@ try {
     </nav>
     {detail && form ? (
       <>
-        <header class="mt-5 flex flex-wrap items-start justify-between gap-5">
-          <div>
-            <h1
-              data-registration-person-name
-              class="break-words text-3xl font-semibold tracking-tight"
-            >
-              {detail.registration.participant.firstName}{" "}
-              {detail.registration.participant.lastName}
-            </h1>
-            <p
-              data-registration-course-group
-              data-course-name={form.course.name}
-              class="mt-3 break-words text-muted-foreground"
-            >
-              {detail.registration.courseName ?? form.course.name} ·{" "}
-              {detail.registration.groupName ?? "Grupo asignado"}
-            </p>
-          </div>
-          <a
-            href={`/app/participantes/${detail.registration.participant.id}?registrationId=${id}`}
-            class="inline-flex min-h-11 items-center underline underline-offset-4"
-          >
-            Abrir ficha del participante
-          </a>
-        </header>
         {Astro.url.searchParams.has("success") && (
           <p role="status" class="mt-5 text-sm">
             Operación registrada. El estado y los importes están actualizados.

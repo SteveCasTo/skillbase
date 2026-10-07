@@ -10,12 +10,10 @@ export function navigationSkeletonVariant(path: string) {
     )
   )
     return "detail";
-  if (/^\/app\/(preinscripciones|participantes)$/.test(normalized))
-    return "list";
+  if (normalized === "/app/preinscripciones") return "list";
   if (
     normalized === "/app/preinscripciones/nueva" ||
-    normalized === "/app/configuracion" ||
-    /^\/app\/participantes\/[^/]+$/.test(normalized)
+    normalized === "/app/configuracion"
   )
     return "form";
   if (/^\/app\/preinscripciones\/[^/]+$/.test(normalized)) return "detail";

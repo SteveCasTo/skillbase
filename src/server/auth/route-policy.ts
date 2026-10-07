@@ -16,7 +16,6 @@ export const PRIVATE_ROUTE_POLICIES = {
   "/app/preinscripciones/nueva": { access: "ROLES", roles: ["ADMIN"] },
   "/app/preinscripciones/buscar": { access: "ROLES", roles: ["ADMIN"] },
   "/app/preinscripciones/exportar": { access: "ROLES", roles: ["ADMIN"] },
-  "/app/participantes": { access: "ROLES", roles: ["ADMIN"] },
   "/app/configuracion": { access: "ROLES", roles: ["ADMIN"] },
   "/app/configuracion/asistencia": { access: "ROLES", roles: ["ADMIN"] },
   "/app/perfil": { access: "ACTIVE_USER" },
@@ -70,7 +69,7 @@ export function getPrivateRoutePolicy(
         : ["ADMIN"],
     };
   if (
-    /^\/app\/(?:preinscripciones|participantes)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+    /^\/app\/preinscripciones\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
       normalizedPath,
     )
   )

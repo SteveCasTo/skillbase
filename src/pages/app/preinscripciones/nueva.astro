@@ -18,13 +18,9 @@ import {
   wantsRegistrationJson,
 } from "@/server/pre-registrations/http";
 import { getPublicAuthEnvironment } from "@/server/environment";
-import type {
-  RegistrationFormDto,
-  ParticipantDto,
-} from "@/domain/pre-registrations/types";
+import type { RegistrationFormDto } from "@/domain/pre-registrations/types";
 import type { AdminInterestRegistrationDto } from "@/domain/interests/types";
 import { RegistrationError } from "@/domain/pre-registrations/errors";
-import { validateRegistrationId } from "@/domain/pre-registrations/validation";
 void jsonResponse; // Astro checker omits imported references in returned responses.
 const actor = requireInternalUser(Astro.locals);
 Astro.response.headers.set("Cache-Control", "private, no-store");
@@ -35,9 +31,7 @@ let errors: Readonly<Record<string, string>> = {};
 let message = "";
 let form: RegistrationFormDto | null = null;
 let choices: readonly RegistrationFormDto[] = [];
-let participants: readonly ParticipantDto[] = [];
 let interests: readonly AdminInterestRegistrationDto[] = [];
-let participant: ParticipantDto | undefined;
 let courseId = "";
 let search = "";
 try {
@@ -80,21 +74,7 @@ try {
     if (!form) throw new RegistrationError("NOT_FOUND", "Curso no encontrado.");
     search = singleQuery(Astro.url.searchParams, "search");
     if (search.length >= 2)
-      ({ participants, interests } = await lookupRegistrationPeople(
-        actor,
-        search,
-        courseId,
-      ));
-    const participantId = singleQuery(Astro.url.searchParams, "participantId");
-    if (participantId) {
-      validateRegistrationId(participantId, "participantId");
-      participant = participants.find((row) => row.id === participantId);
-      if (!participant)
-        throw new RegistrationError(
-          "NOT_FOUND",
-          "Busca la ficha vigente por CI o nombre.",
-        );
-    }
+      ({ interests } = await lookupRegistrationPeople(actor, search, courseId));
   } else
     choices = (await loadRegistrationChoices(actor)).filter(
       (row) => row.course.status === "PUBLISHED" && row.course.instructorActive,
@@ -106,10 +86,6 @@ try {
 }
 const action = "/app/preinscripciones/nueva";
 const hrefs = Object.fromEntries([
-  ...participants.map((row) => [
-    row.id,
-    `${action}?${new URLSearchParams({ courseId, search, participantId: row.id })}`,
-  ]),
   ...interests.map((row) => [
     row.id,
     `${action}?${new URLSearchParams({ courseId, sourceInterestId: row.id })}`,
@@ -151,17 +127,18 @@ const hrefs = Object.fromEntries([
     Registrar preinscripción
   </h1>
   {form ? (
-    <div class="mt-8 flex min-w-0 flex-col gap-8">
+    <div class="mt-6 flex min-w-0 flex-col gap-6">
       <div data-registration-lookup data-lookup-course={courseId}>
         <ParticipantSearch
           id="registration-person-search"
           {courseId}
-          {participants}
           {interests}
           action={Astro.url.pathname}
           query={search}
           chooseHrefs={hrefs}
           targetFormId="registration-create"
+          selected={Boolean(form.sourceInterest)}
+          clearHref={`${action}?${new URLSearchParams({ courseId })}`}
         />
       </div>
       <RegistrationForm
@@ -172,7 +149,6 @@ const hrefs = Object.fromEntries([
         requestKey={values.requestKey || crypto.randomUUID()}
         {values}
         {errors}
-        {...(participant ? { participant, participantReadonly: true } : {})}
         {...(message ? { message } : {})}
       />
     </div>
