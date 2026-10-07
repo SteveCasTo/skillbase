@@ -35,6 +35,10 @@ function groupDto(row: typeof groups.$inferSelect) {
     status: row.status,
   };
 }
+// The immutable historical source link is the canonical terminal marker, including
+// CANCELLED pre-registrations. Do not duplicate it in an interest status/column.
+const unconsumedInterest = () =>
+  sql`not exists (select 1 from pre_registrations where source_interest_id = ${interests.id})`;
 const unavailable = () =>
   new InterestError(
     "INTEREST_UNAVAILABLE",
@@ -148,7 +152,11 @@ export class DrizzleInterestRepository implements InterestRepository {
       .from(courses)
       .leftJoin(
         interests,
-        and(eq(interests.courseId, courses.id), eq(interests.status, "ACTIVE")),
+        and(
+          eq(interests.courseId, courses.id),
+          eq(interests.status, "ACTIVE"),
+          unconsumedInterest(),
+        ),
       )
       .groupBy(courses.id, courses.name)
       .orderBy(asc(courses.name), asc(courses.id));
@@ -161,7 +169,7 @@ export class DrizzleInterestRepository implements InterestRepository {
       preferredGroupId: string | null;
       activeCount: number;
     }>(sql`with buckets as (select null::uuid as id union all select id from groups where course_id = ${courseId}::uuid)
-      select buckets.id as "preferredGroupId", count(i.id)::integer as "activeCount" from buckets left join interest_registrations i on i.course_id = ${courseId}::uuid and i.status = 'ACTIVE' and i.preferred_group_id is not distinct from buckets.id group by buckets.id order by buckets.id nulls first`);
+      select buckets.id as "preferredGroupId", count(i.id)::integer as "activeCount" from buckets left join interest_registrations i on i.course_id = ${courseId}::uuid and i.status = 'ACTIVE' and not exists (select 1 from pre_registrations where source_interest_id = i.id) and i.preferred_group_id is not distinct from buckets.id group by buckets.id order by buckets.id nulls first`);
     const byPreference = Array.from(result);
     return {
       courseId,
@@ -188,23 +196,10 @@ export class DrizzleInterestRepository implements InterestRepository {
           and(
             eq(interests.courseId, courseId),
             status ? eq(interests.status, status) : undefined,
+            unconsumedInterest(),
           ),
         )
         .orderBy(asc(interests.createdAt), asc(interests.id));
-      const consumedRows = await tx
-        .select({ sourceInterestId: schema.preRegistrations.sourceInterestId })
-        .from(schema.preRegistrations)
-        .where(
-          and(
-            eq(schema.preRegistrations.courseId, courseId),
-            sql`${schema.preRegistrations.sourceInterestId} is not null`,
-          ),
-        );
-      const consumedInterests = new Set(
-        consumedRows.flatMap((row) =>
-          row.sourceInterestId ? [row.sourceInterestId] : [],
-        ),
-      );
       const historical = await tx
         .select()
         .from(groups)
@@ -214,7 +209,7 @@ export class DrizzleInterestRepository implements InterestRepository {
         course,
         registrations: rows.map(dto),
         availableForPrefillInterestIds: rows
-          .filter((row) => !consumedInterests.has(row.id))
+          .filter((row) => row.status === "ACTIVE")
           .map((row) => row.id),
         metrics: await this.metrics(tx, courseId),
         groups: historical.map(groupDto),
@@ -240,6 +235,7 @@ export class DrizzleInterestRepository implements InterestRepository {
           and(
             eq(interests.id, input.interestRegistrationId),
             eq(interests.courseId, courseId),
+            unconsumedInterest(),
           ),
         )
         .for("update");
