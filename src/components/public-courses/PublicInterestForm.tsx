@@ -114,16 +114,13 @@ export default function PublicInterestForm({
   }
 
   useEffect(() => {
-    // SSR stays submittable without JS. Once enhanced, gate the real DOM before
-    // the frame that reconciles hydration/autofill and the native group selector.
+    // SSR stays submittable with native constraints until enhancement. React
+    // must own disabled: a direct DOM write can outlive an unchanged false prop
+    // when valid contact data arrives before the hydration/autofill frame.
     const form = formRef.current;
     const updateValidity = () => {
       if (form) setRequiredValid(requiredInputsValid(form));
     };
-    const button = form?.querySelector<HTMLButtonElement>(
-      'button[type="submit"]',
-    );
-    if (form && button) button.disabled = !requiredInputsValid(form);
     form?.addEventListener("input", updateValidity, true);
     form?.addEventListener("change", updateValidity, true);
     const frame = requestAnimationFrame(() => {
