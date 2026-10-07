@@ -312,9 +312,13 @@ test("inline editing swaps icons in the same row, filters input and cancels with
   await deleteButton.click();
   await dialog.getByRole("button", { name: "Sí, eliminar formato" }).click();
   await expect(dialog).toBeHidden();
-  await expect(
-    page.locator('[data-sileo-toast][data-state="loading"]'),
-  ).toBeVisible();
+  // Sileo keeps dismissed toasts in the DOM while they exit; only the live
+  // loading toast represents this delete operation.
+  const activeLoadingToast = page.locator(
+    '[data-sileo-toast][data-state="loading"][data-exiting="false"]',
+  );
+  await expect(activeLoadingToast).toHaveCount(1);
+  await expect(activeLoadingToast).toBeVisible();
   await page
     .locator("[data-dialog-form]")
     .evaluate((form) =>
