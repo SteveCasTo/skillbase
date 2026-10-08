@@ -13,10 +13,20 @@ import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { AUTH_FIXTURES } from "./auth-users";
 import { createInstructorFixture } from "./instructors";
 
+type AttendanceFixtureTestHooks = {
+  afterGroupCreated?: (
+    ownedGroupCount: number,
+    courseId: string,
+    groupId: string,
+  ) => void | Promise<void>;
+  afterDatabaseClosed?: () => void;
+};
+
 /** Trusted setup only, on the runner's verified ephemeral DB. HTTP uses real time. */
 export async function createAttendanceFlowFixture(
   startDate: string,
   withForeign = false,
+  testHooks: AttendanceFixtureTestHooks = {},
 ) {
   const database = createDatabase(getTestSupabaseEnvironment().databaseUrl);
   const db = database.db;
@@ -54,6 +64,7 @@ export async function createAttendanceFlowFixture(
       await cleanup();
     } finally {
       await database.close();
+      testHooks.afterDatabaseClosed?.();
     }
   }
   try {
@@ -111,6 +122,11 @@ export async function createAttendanceFlowFixture(
         () => createdAt,
       ).create(created!.id, startTime, 5, admin!.id);
       groupsToCancel.push({ id: group.id, updatedAt: group.updatedAt });
+      await testHooks.afterGroupCreated?.(
+        groupsToCancel.length,
+        created!.id,
+        group.id,
+      );
       return { course: created!, group };
     }
     const history = await course(teacher.id, startDate);
