@@ -129,11 +129,11 @@ El usuario autorizó renovar los datos sintéticos de demo de negocio, incluida 
 
 El runner usa manifiestos/contexto hash-bound y permite únicamente alta append-only; no borra ni modifica datasets preexistentes. Debe preservar Auth identities/sesiones, `users`, roles, perfiles, settings/secretos, Storage, migration ledger y todo historial financiero. No deshabilita triggers ni guardas de ledger, y nunca introduce endpoints de borrado financiero en producción. Cada destino requiere revisar el plan de solo lectura y ejecutar APPLY manual explícito; producción sigue condicionada al gate y autorización de release. Ver [`docs/FINANCIAL_DEMO.md`](FINANCIAL_DEMO.md).
 
-### Runner integral de demo F1–F8 (PR 288; productivo aún no ejecutado)
+### Runner integral de demo F1–F8 (PR 288; local canónico ejecutado)
 
 La autorización posterior del usuario incluye registros enteramente ficticios de notas, cierres/reaperturas y cuentas ADMIN en producción, pero **solo después del release de todas las correcciones y su CI verde**. `comprehensive-demo` es una herramienta distinta de `renew-demo` y del runner financiero; es manual, PLAN-first, con destino/proyecto explícitos, identidad/provenance propia, repetición idempotente y sin reset, `TRUNCATE`, `CASCADE`, DDL ni limpieza de filas preexistentes. Su única baja permitida es una cuenta ADMIN demo nueva, propia y sin uso, mediante el lifecycle normal; las filas históricas/tombstone/outbox se conservan. No reutilizar/rotar credenciales de Auth existentes ni enviar correo. La autorización no cubre Fase 9.
 
-La integración de QA pasó en un stack temporal independiente y preservó las filas originales del fixture. No se ha ejecutado PLAN/APPLY en el Supabase canónico local o producción. La operación productiva requiere checkout limpio del SHA liberado, aprobación `DEMO_APPROVED_RELEASE_SHA`, guards de proyecto/actor/provenance, snapshot pre/post y APPLY explícito; ver [`docs/DEMO_SEED.md`](DEMO_SEED.md). No modificar ni relajar los guards globales o el lifecycle para facilitar la demo.
+La integración QA pasó aislada. Tras el release `master` `4e067311` (CI `37828609916`, Vercel `READY`), el owner ejecutó PLAN/APPLY en local canónico desde checkout limpio y verificó 70 tablas/2,906 filas originales por hash; la repetición produjo cero cambios. Cloud no se ha ejecutado ni mutado. La vía cloud debe respetar checkout limpio, `DEMO_APPROVED_RELEASE_SHA`, guards de proyecto/actor/provenance, snapshot pre/post y APPLY explícito; existe un bloqueo operativo de acceso seguro a credenciales protegidas porque el runner integral rechaza CI. Ver [`docs/DEMO_SEED.md`](DEMO_SEED.md); no copiar secretos ni relajar guards/lifecycle.
 
 ### Autorización de sesiones/asistencia (Fase 6, release en producción)
 
@@ -264,6 +264,14 @@ No mostrar públicamente:
 La verificación pública de certificado debe limitarse a información necesaria para validar la credencial.
 
 ## CERTIFICADOS
+
+El contrato funcional y los límites de privacidad/artefactos de Fase 9 están en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). La página pública de
+verificación expone únicamente su DTO allowlist (incluido hash oficial para
+comparación local) y nunca concede acceso anónimo al PDF firmado. El PDF/Storage
+son privados; la descarga requiere autorización server-side. La comparación del
+PDF que seleccione el titular ocurre en el navegador sin enviar ni persistir el
+archivo.
 
 Cada certificado debe tener:
 

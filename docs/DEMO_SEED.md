@@ -104,7 +104,7 @@ focal también falla si no puede limpiar su proyecto propio; imprime únicamente
 el ID/ruta exactos para recuperación acotada, sin keys. Los conteos de producto
 y del caso seed se reportan por separado, no como una corrida compartida.
 
-### Producción: retenida hasta release y revisión del operador
+### Producción: operación cloud pendiente de ejecución segura
 
 Después de integrar/liberar esta herramienta y todas las correcciones, comprobar
 CI full verde y deployment READY para el SHA exacto. Preparar un checkout
@@ -130,6 +130,16 @@ Después: verificar todas las filas originales por keys/hashes, conteos nuevos y
 las pantallas/descargas bajo roles autorizados; repetir el mismo APPLY y comprobar
 cero cambios. Guardar evidencia fuera del repositorio y sin secretos. Ninguno de
 estos comandos productivos se ejecuta por esta implementación ni por sus tests.
+
+Estado operativo posterior al release: el seed local canónico ya se aplicó según
+la sección de evidencia de producción de abajo. Cloud no se ha tocado. El entorno
+protegido de GitHub contiene las credenciales necesarias, pero este runner está
+diseñado para rechazar CI y el workflow manual productivo existente no adapta
+este comando. Antes del cloud APPLY, el owner debe escoger una vía autorizada y
+auditada: adaptar un workflow manual con environment protegido, o proporcionar
+credenciales por un entorno privado del operador compatible con los guards. No
+copiar valores de secretos a Git, argumentos, documentación o logs; no usar
+Vercel ni una shell de CI que omita el guard.
 
 ## Atomicidad, reintentos y límites
 
@@ -201,26 +211,31 @@ vacío. Esto acredita QA, no una carga o verificación en producción.
 
 Evidencia privada de salida en `comprehensive-seed-*.log` bajo el directorio
 aprobado temporal de OpenCode; no contiene valores de credenciales. La validación
-remota del runner está registrada debajo; ninguna carga real en canónico o cloud
-se ha ejecutado.
+remota del runner está registrada debajo. En ese boundary previo a producción no
+se había ejecutado carga en canónico ni cloud; el estado posterior se registra
+abajo.
 
-### Estado integrado en development (PR 288; release productivo pendiente)
+### Release y ejecución canónica posterior
 
-El runner se integró en `development` mediante PR 288, junto con las correcciones
-UI de PR 289 (`development` `53f171e10c6b5ac922d9f4c5760f788b9f7bdebe`). El CI
-integrado del candidato (`37818957648`) pasó first-pass: 424 unit/2,866
-assertions, 162 integration/1,332 assertions, el caso focal del seed 1/1/890
-assertions en stack temporal independiente y E2E 140/140 (132 desktop + 8
-mobile). Formatter, lint, build y typecheck (0 errores/0 warnings/312 hints)
-PASS; sin retries, flakes ni skips reportados. El test focal preservó 416 filas
-en 70 tablas, añadió 8 cursos, 10 grupos, 26 preinscripciones/25 participantes,
-4 instructores y 5 ADMIN ficticios, además de 3 versiones de cierre, una
-reapertura y una baja ADMIN completada. La repetición del APPLY agregó cero
-cambios. Toda esta evidencia corresponde a la base temporal del test, no a datos
-canónicos o productivos.
+El runner se integró mediante PR 288; correcciones UI por PR 289. Se liberaron a
+`master` como `4e067311`; CI `37828609916` pasó first-pass con 424 unit, 162
+integration y el caso comprehensive-demo 1/1/1,140 assertions, sin fallos,
+retries ni flakes reportados. Vercel quedó `READY`. La carga de seed no es parte
+del deploy automático.
 
-La carga local canónica y la de producción siguen sin ejecutar. Para producción,
-el proceso documentado arriba exige release CI/deploy aprobado, checkout limpio
-del SHA exacto de `master`, `DEMO_APPROVED_RELEASE_SHA` revisado por el operador,
-PLAN y después APPLY explícito. No se rota ninguna credencial Auth existente ni
-se envía correo. La Fase 9 no se incluye ni se siembra.
+El owner ejecutó PLAN/APPLY en local canónico desde checkout limpio de
+`master` `4e067311`, después del gate de release. Ledger quedó en 23. La
+comparación previa/posterior conservó hashes de 2,906 filas originales en 70
+tablas; reejecutar APPLY produjo cero cambios. Se añadieron 8 cursos, 10 grupos,
+26 registros/25 participantes, 4 instructores, 5 ADMIN demo, 3 versiones de
+cierre, 1 reapertura y 1 baja ADMIN unused con outbox completado. Se preservaron
+las credenciales Auth existentes y las notas, finanzas y auditoría de usuarios
+originales; no se usaron identidades reales como fixtures.
+
+Cloud **sigue sin PLAN/APPLY ni mutaciones**. Para completarlo se requiere un
+checkout limpio del SHA exacto liberado, `DEMO_APPROVED_RELEASE_SHA`, snapshot de
+preservación, revisión del plan y aprobación del operador. Queda pendiente elegir
+el mecanismo seguro para acceder a las credenciales del environment protegido
+sin eludir el guard que prohíbe correr el comprehensive runner en CI. No se ha
+cambiado configuración de cloud, ni creado/cambiado cuentas cloud. La Fase 9 no
+se implementa ni se siembra como parte de esta carga.

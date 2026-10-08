@@ -2,9 +2,9 @@
 
 ## Estado y alcance
 
-Este documento registró los acuerdos previos para una pasada de correcciones operativas sobre la aplicación liberada en Fase 8. La implementación de correcciones y el runner de demo integral se integraron en `development` mediante PRs 289 y 288, respectivamente. El contrato describe el alcance acordado, no acredita un release a `master`: el release de todas las correcciones sigue pendiente hasta completar su flujo de promoción. La carga de demos productivos solo podrá ocurrir después de ese release y requiere seguir los guards y la operación explícita descritos en [`DEMO_SEED.md`](DEMO_SEED.md).
+Este documento registra los acuerdos para una pasada de correcciones operativas sobre la aplicación de Fase 8. La implementación UI y runner se integraron en `development` mediante PRs 289/288 y luego se liberaron a `master` como `4e067311` (CI `37828609916`, Vercel `READY`). El release no cambia el requisito de PLAN/APPLY manuales y guards descritos en [`DEMO_SEED.md`](DEMO_SEED.md): el seed local canónico ya se completó y el paso cloud sigue pendiente.
 
-Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Este contrato no la reabre. La Fase 9 no se implementa aquí; sus decisiones pendientes se enumeran al final y no se deben asumir por anticipado.
+Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Este contrato no la reabre. Fase 9 no se implementa aquí; su alcance fue aprobado posteriormente y se mantiene en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md), con implementación bloqueada hasta el paso cloud F1–F8.
 
 ## Reglas transversales de interfaz
 
@@ -70,17 +70,12 @@ El usuario autorizó explícitamente cargar datos **completamente ficticios** en
 - La QA de datos productivos solo se ejecuta **después** de que todas las correcciones estén integradas a `master` mediante el release aprobado. No sembrar Fase 9 antes de su implementación/autorización. Las cinco tablas Fase 8 estaban vacías en el snapshot de release; cualquier demo académico posterior es carga nueva autorizada, no parte del release anterior.
 - Separar evidencia de fixtures y de datos preexistentes. Antes/después registrar conteos/identificadores y preservación de filas no demo; no publicar credenciales ni información personal real.
 
-## Fase 9: decisiones futuras, no aprobadas aquí
+## Fase 9: alcance aprobado posteriormente
 
-Certificados sigue pendiente. Antes de implementar, llevar al owner preguntas, no respuestas asumidas, al menos sobre:
-
-- Tipos de certificados y qué resultado/circunstancia habilita cada tipo.
-- Firmas requeridas, autoridad que firma, en qué etapa, y si la firma es condición de emisión/publicación o un estado posterior.
-- Número institucional/serie: formato, autoridad asignadora, unicidad, momento de asignación y tratamiento de reemplazos/revocaciones.
-- Elegibilidad: qué estados/notas/asistencia se congelan y cómo aplicar políticas vigentes sin recalcular versiones históricas.
-- Fuente oficial del certificado frente a versiones de cierre: si se emite desde un snapshot/version específica de cierre, cómo se resuelve un grupo reabierto y qué ocurre con certificados anteriores.
-- Saldo financiero: si es dato informativo o condición de elegibilidad/emisión. La regla de Fase 8 de no bloquear cierre por saldo no decide por sí sola la política de certificado.
-- Datos requeridos de boleta/valorado y si pertenecen al certificado o solo al proceso administrativo.
-- Reemplazo, revocación y verificación pública: autoridad, estados, auditoría, privacidad/exposición, credential ID/QR/URL y reglas de PDF firmado/hash.
-
-Registrar las respuestas aprobadas en los documentos de requisitos/decisiones/certificados apropiados antes de implementar. Este inventario no añade requerimientos ni presume opciones.
+Al redactar este contrato de correcciones, Fase 9 seguía sin decisiones
+aprobadas. El owner aprobó después el alcance de certificados; la especificación
+vigente es [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y la decisión
+ADR-028 en [`DECISIONS.md`](DECISIONS.md). No se deben usar como pendientes las
+preguntas históricas enumeradas en esta versión del contrato. Fase 9 aún no se
+implementa; el paso cloud F1–F8 pendiente y su bloqueo operativo se registran en
+[`PLAN.md`](PLAN.md)/[`DEMO_SEED.md`](DEMO_SEED.md).

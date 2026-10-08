@@ -822,13 +822,15 @@ Instructor configura evaluación y el sistema calcula resultados finales.
 
 Fase 8 se completó y liberó mediante PR 286 a `master` `68c918119f2ec094ba7cc63b217efd2448480505`. CI `37727200394` y Vercel `READY`; las migraciones 0021/0022 avanzaron canónico/cloud a ledger 23. La comparación pre/post confirmó preservación local/cloud; las cinco tablas F8 estaban vacías en la verificación. Fase 9 no ha iniciado. Evidencia: [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md), [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md), [`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-### Correcciones UI y runner de demo integral (integrados en development; release pendiente)
+### Correcciones UI y runner de demo integral (release completado; demo cloud pendiente)
 
-El contrato aprobado está en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md). Las correcciones UI se integraron mediante PR 289 y el runner de demo integral mediante PR 288; ambos están en `development` (`53f171e`). El CI integrado del candidato pasó, pero no se ha liberado a `master`: mantener el release de todo el bloque como paso único posterior y no confundir la integración en `development` con producción. No hubo migración ni cambio de schema.
+El contrato de correcciones está en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md). Las correcciones UI y el runner se liberaron a `master` como `4e067311`; CI `37828609916` pasó first-pass (424 unit, 162 integration y comprehensive-demo focal 1/1 con 1,140 assertions, sin fallos/retries/flakes reportados) y Vercel quedó `READY`. El release no cambió el schema.
 
-El runner permite QA con datos enteramente ficticios y de forma aditiva/idempotente, preservando datos preexistentes; no tiene reset general. La carga productiva está expresamente autorizada **solo después** del release completo, con aprobación del SHA exacto y PLAN/APPLY separados, usando guards/provenance y snapshot de preservación según [`DEMO_SEED.md`](DEMO_SEED.md). No se ha ejecutado una carga nueva en el Supabase canónico o producción.
+El runner es aditivo/idempotente y sin reset general. Después del release se aplicó al entorno canónico local desde checkout limpio de `master` `4e067311`: ledger 23; 70 tablas y 2,906 filas originales preservadas por hash; el APPLY repetido agregó cero cambios. Se añadieron 8 cursos, 10 grupos, 26 registros/25 participantes, 4 instructores, 5 ADMIN demo, 3 versiones de cierre, 1 reapertura y 1 baja ADMIN unused con outbox completado. No se alteraron credenciales existentes ni datos personales/notas/asistencia/finanzas/auditoría de usuarios originales.
 
-Fase 9 continúa pendiente e independiente. Antes de iniciarla, acordar los tipos de certificado, firmas/autoridad, número institucional, elegibilidad y relación con snapshots de cierre, saldos, boleta/valorado y reemplazo/revocación/verificación pública. El contrato UI enumera estas preguntas como pendientes, no como reglas aprobadas.
+La carga en cloud todavía no se ejecutó ni cambió filas/credenciales; se preserva el requisito de autorización/checkout exacto y existe un bloqueo operativo para exponer en un proceso soportado las credenciales ya disponibles en el entorno protegido. Resolver el método seguro de ejecución (workflow manual protegido o entorno privado del operador) antes del APPLY cloud. Detalles y límites en [`DEMO_SEED.md`](DEMO_SEED.md).
+
+El alcance funcional Fase 9 fue aprobado en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y ADR-028. Sigue **sin implementación**, bloqueada hasta completar la operación cloud F1–F8; el seed no incluye certificados. Tipos, elegibilidad, acceso privado al PDF, reglas de reapertura/reemplazo y verificación ya están decididos; no requieren nuevo número institucional ni boleta/valorado/condición financiera. No modificar snapshots F8 para completar metadata F9.
 
 ### Objetivos
 
@@ -844,6 +846,11 @@ Fase 9 continúa pendiente e independiente. Antes de iniciarla, acordar los tipo
 Administración completa el cierre administrativo y académico.
 
 ## FASE 9 — CERTIFICADOS
+
+Estado: alcance aprobado; implementación bloqueada hasta completar el seed
+cloud F1–F8 y su verificación. No hay código F9 ni certificados/QR para sembrar
+en este boundary. La especificación vigente y las decisiones aprobadas están en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y ADR-028.
 
 ### Objetivos
 
