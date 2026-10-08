@@ -5,6 +5,11 @@ import { createDatabase } from "@/server/db/client";
 import * as s from "@/server/db/schema";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { runComprehensiveDemo } from "../../scripts/comprehensive-demo";
+import {
+  captureDemoSnapshot,
+  assertDemoPreservation,
+  assertDemoNoChanges,
+} from "../../scripts/comprehensive-demo-preservation";
 import { renewDemo } from "../../scripts/renew-demo";
 import { runFinancialDemo } from "../../scripts/financial-demo";
 import {
@@ -212,6 +217,16 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
     };
     expect(await runComprehensiveDemo(db, options)).toBeNull();
     expect(await snapshot()).toEqual(before);
+    const hashedOriginal = await captureDemoSnapshot(db);
+    // A mismatched reviewed plan must stop BEFORE provisioning any identity.
+    await expect(
+      runComprehensiveDemo(db, {
+        ...options,
+        apply: true,
+        expectedPlanHash: "0".repeat(64),
+      }),
+    ).rejects.toThrow("Reviewed plan changed");
+    expect(await snapshot()).toEqual(before);
     // Late graph collision is rejected before any Auth provision.
     const ci = comprehensiveDemoPlan(currentAnchor(), 3, 25).samples.find(
       (x) => x.key === "future",
@@ -276,6 +291,10 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
     );
     expect(context!.instructors).toHaveLength(4);
     const after = await snapshot();
+    const hashedAfter = await captureDemoSnapshot(db);
+    expect(() =>
+      assertDemoPreservation(hashedOriginal, hashedAfter),
+    ).not.toThrow();
     expect((await db.select().from(s.users)).map((u) => u.id).sort()).toEqual(
       accountsAfterFailure.map((u) => u.id).sort(),
     );
@@ -296,6 +315,10 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
       }),
     ).toEqual(context);
     expect(await snapshot()).toEqual(after);
+    const hashedRepeated = await captureDemoSnapshot(db);
+    expect(() =>
+      assertDemoNoChanges(hashedAfter, hashedRepeated),
+    ).not.toThrow();
     const closure = new DrizzleClosureRepository(db);
     const closed = context!.courses.closed!;
     const state = await closure.getGroup(

@@ -106,6 +106,58 @@ y del caso seed se reportan por separado, no como una corrida compartida.
 
 ### Producción: operación cloud pendiente de ejecución segura
 
+#### Canal protegido GitHub (nuevo; liberar antes de usar)
+
+`production-comprehensive-demo.yml` es exclusivamente `workflow_dispatch` en
+master y environment `production`, con permisos contents/actions read y la misma
+cola no cancelable que el operador financiero anterior (que queda intacto).
+El CI ordinario/Vercel siguen bloqueados. La excepción explícita comprueba
+evento, repositorio, ref, workflow exacto, SHA de workflow/dispatch/aprobación y
+checkout master limpio; no elimina `CI` ni abre endpoints HTTP.
+
+Inputs: `mode` (plan/apply), `approved_release_sha`, `release_ci_run_id`,
+`project_ref` y, para APPLY, `reviewed_plan_sha256`. Primero integrar a development,
+liberar a master y esperar CI completo attempt 1 verde y alias productivo READY
+para **ese nuevo SHA**, no el release anterior `4e067311`.
+
+El controlador verifica por APIs read-only master actual, run push del workflow
+CI exacto, todos sus jobs obligatorios/deploy, evidencia E2E completa sin retries
+ni flaky, y deployment actual del alias con proyecto/SHA/master/production READY.
+PLAN enumera todas las tablas public/Auth/Storage/Drizzle y obtiene solo hashes
+de PK/fila completos desde PostgreSQL. No lee/exporta valores secretos de filas.
+El hash revisable vincula plan/anchor, settings, actor, baseline, proyecto y SHA.
+APPLY exige ese hash idéntico, revalida release y baseline antes de crear cuentas,
+compara preservación original tras APPLY y repite el runner una vez exigiendo
+cero cambios completos. Cambio de fecha/settings/datos exige nuevo PLAN; actividad
+concurrente legítima puede bloquear comparación, nunca se «repara» para pasar.
+
+Solo el job protegido recibe `MIGRATION_DATABASE_URL`,
+`DEMO_SUPABASE_SERVICE_ROLE_KEY` y `VERCEL_TOKEN` existentes. Variables:
+`DEMO_ADMIN_ID`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`. Tras release, el operador
+aprovisionará `DEMO_ACCOUNT_PASSWORD` como secreto protected production desde el
+archivo privado de credenciales DEMO ya existente, sin poner su valor en comandos,
+logs, inputs ni Git. No hacerlo antes ni extraer secretos sensibles de Vercel.
+PLAN no requiere esa contraseña; solo APPLY la recibe. Las credenciales originales
+no cambian y no se envía correo. El canal protegido exige 20–128 caracteres; usar
+la contraseña criptográfica ya generada, no una contraseña débil nueva.
+
+El artifact exitoso contiene plan sintético, conteos/digests agregados y resultado,
+no passwords, tokens, URL DB, identidad real del actor ni hashes por fila Auth.
+Witnesses por fila permanecen solo en memoria. Ante fallo, el stage sanitizado
+bloquea el job; Auth puede conservar cuentas propias parciales y exige revisión
+antes de reintento. La cola serializa ambos operadores demo, **no** el deploy
+existente: el owner debe evitar despliegues durante APPLY y cualquier cambio de
+master previo a escribir se rechaza en la comprobación inmediata.
+
+Esta implementación no ejecuta el workflow ni crea secretos o datos cloud.
+Validación focal del canal protegido: 15 tests / 385 assertions de contexto,
+release/CI/deployment, aprobación de PLAN, witness e inventario workflow; caso
+real aislado 1 PASS / 894 assertions, 70 tablas / 416 filas originales preservadas
+y repetición sin cambios. Incluye rechazo de hash de plan distinto **antes** de
+aprovisionar Auth y el nuevo witness server-side. Formatter, ESLint, TypeScript y
+diff checks y build pasan. No se repitió full unit/integration/E2E; el nuevo gate remoto de
+release sigue pendiente del owner. La prueba aislada completó su limpieza normal.
+
 Después de integrar/liberar esta herramienta y todas las correcciones, comprobar
 CI full verde y deployment READY para el SHA exacto. Preparar un checkout
 **limpio de master** de ese SHA, y establecer `DEMO_APPROVED_RELEASE_SHA` a ese

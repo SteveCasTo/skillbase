@@ -1,0 +1,76 @@
+name: Protected comprehensive production demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "PLAN is read-only; APPLY requires the reviewed PLAN hash"
+        required: true
+        default: plan
+        type: choice
+        options: [plan, apply]
+      approved_release_sha:
+        description: "Exact current master SHA with first-pass full CI and READY production deployment"
+        required: true
+        type: string
+      release_ci_run_id:
+        description: "Successful attempt-1 master push CI run for that SHA"
+        required: true
+        type: string
+      reviewed_plan_sha256:
+        description: "APPLY only: reviewedPlanSha256 from the successful PLAN summary"
+        required: false
+        type: string
+      project_ref:
+        description: "Explicit production project"
+        required: true
+        default: fvzxqlezdrlzykyoevub
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: production-demo-fvzxqlezdrlzykyoevub
+  cancel-in-progress: false
+
+jobs:
+  operator:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && github.repository == 'SteveCasTo/skillbase'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: master
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Verify release, review PLAN and run explicit protected operation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          DEMO_OPERATOR_MODE: ${{ inputs.mode }}
+          DEMO_PROJECT_REF: ${{ inputs.project_ref }}
+          DEMO_APPROVED_RELEASE_SHA: ${{ inputs.approved_release_sha }}
+          DEMO_RELEASE_CI_RUN_ID: ${{ inputs.release_ci_run_id }}
+          DEMO_REVIEWED_PLAN_SHA256: ${{ inputs.reviewed_plan_sha256 }}
+          DEMO_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+          DEMO_SUPABASE_URL: https://fvzxqlezdrlzykyoevub.supabase.co
+          DEMO_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEMO_SUPABASE_SERVICE_ROLE_KEY }}
+          DEMO_ADMIN_ID: ${{ vars.DEMO_ADMIN_ID }}
+          DEMO_ACCOUNT_PASSWORD: ${{ inputs.mode == 'apply' && secrets.DEMO_ACCOUNT_PASSWORD || '' }}
+        run: bun scripts/production-comprehensive-demo.ts
+      - name: Upload successful redacted operation summary only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: comprehensive-demo-${{ inputs.mode }}-summary
+          path: ${{ runner.temp }}/comprehensive-demo-summary.json
+          if-no-files-found: error
+          retention-days: 7
