@@ -61,11 +61,11 @@ export function GradeRoster({
       aria-labelledby="grade-roster-title"
       className="flex min-w-0 flex-col gap-4"
     >
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header className="flex min-w-0 flex-col gap-3">
         <h2 id="grade-roster-title" className="text-xl font-semibold">
           Notas de participantes
         </h2>
-        <div className="flex w-full max-w-sm flex-col gap-1">
+        <div className="flex w-full min-w-0 flex-col gap-1">
           <label htmlFor="evaluation-search" className="text-sm font-medium">
             Buscar participante
           </label>

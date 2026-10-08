@@ -7,7 +7,6 @@ import { ClosureActions } from "./ClosureActions";
 import ClosureBreadcrumbs from "./ClosureBreadcrumbs.astro";
 import ClosureReport from "./ClosureReport.astro";
 import { closureDateLabel, closureBlockerLabels } from "./presentation";
-import { dateLabel } from "@/components/attendance/presentation";
 import type { ClosureRouteData } from "./route";
 type Props = ClosureRouteData;
 const {
@@ -166,22 +165,6 @@ const unavailable =
                 </li>
               ))}
             </ul>
-            {state.blockers.includes("SESSIONS_UNFINISHED") && (
-              <ul class="flex flex-col gap-1 text-sm text-muted-foreground">
-                {report.sessions
-                  .filter((session) => !session.cancelledAt)
-                  .map((session) => (
-                    <li>
-                      <a
-                        href={`${base}/sesiones/${session.id}`}
-                        class="inline-flex min-h-11 items-center underline underline-offset-4"
-                      >
-                        Sesión del {dateLabel(session.startsAt)}
-                      </a>
-                    </li>
-                  ))}
-              </ul>
-            )}
           </section>
         )}
         {selected && (
