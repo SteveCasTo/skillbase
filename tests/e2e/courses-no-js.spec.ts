@@ -102,7 +102,7 @@ test("stale HTML drafts and editorial confirmations retain their rejected revisi
         response.request().method() === "POST" &&
         new URL(response.url()).pathname === path,
     );
-    await page.getByRole("button", { name: "Confirmar publicación" }).click();
+    await page.getByRole("button", { name: "Publicar curso" }).click();
     expect((await publication).status()).toBe(409);
     const peerPage = await peer.newPage();
     await peerPage.goto(path);
@@ -269,20 +269,20 @@ test("new courses preserve values and can be corrected after server validation w
   expect(prerequisite.status()).toBe(200);
   await page.locator('[data-confirm-fallback="publish"] summary').click();
   await expect(
-    page.getByRole("button", { name: "Confirmar publicación" }),
+    page.getByRole("button", { name: "Publicar curso" }),
   ).toBeVisible();
   await page.locator('[data-confirm-fallback="publish"] summary').click();
   await expect(
-    page.getByRole("button", { name: "Confirmar publicación" }),
+    page.getByRole("button", { name: "Publicar curso" }),
   ).not.toBeVisible();
   await page.locator('[data-confirm-fallback="publish"] summary').click();
-  await page.getByRole("button", { name: "Confirmar publicación" }).click();
+  await page.getByRole("button", { name: "Publicar curso" }).click();
   await expect(page).toHaveURL(/success=published/);
   await page.locator('[data-confirm-fallback="withdraw"] summary').click();
-  await page.getByRole("button", { name: "Confirmar retiro" }).click();
+  await page.getByRole("button", { name: "Retirar curso" }).click();
   await expect(page).toHaveURL(/success=withdrawn/);
   await page.locator('[data-confirm-fallback="archive"] summary').click();
-  await page.getByRole("button", { name: "Confirmar archivo" }).click();
+  await page.getByRole("button", { name: "Archivar curso" }).click();
   await expect(page).toHaveURL(/success=archived/);
   await expect(page.getByLabel("Nombre")).toBeDisabled();
 });
@@ -359,14 +359,14 @@ test("unused formats can be created, edited and deleted without JavaScript", asy
   await page.locator("[data-action-fallback] summary").click();
   await page
     .locator("[data-action-fallback]")
-    .getByRole("link", { name: "Cancelar" })
+    .getByRole("link", { name: "Volver" })
     .click();
   await expect(page).toHaveURL(path);
   await page.locator("[data-action-fallback] summary").click();
   await expect(
-    page.getByRole("button", { name: "Sí, eliminar formato" }),
+    page.getByRole("button", { name: "Eliminar formato" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Sí, eliminar formato" }).click();
+  await page.getByRole("button", { name: "Eliminar formato" }).click();
   await expect(page).toHaveURL(/success=deleted/);
   await expect(page.getByRole("link", { name: new RegExp(name) })).toHaveCount(
     0,
@@ -411,12 +411,12 @@ test("used formats require confirmation to deactivate without JavaScript", async
   ).toHaveCount(0);
   await page.locator("[data-action-fallback] summary").click();
   await expect(
-    page.getByRole("button", { name: "Sí, desactivar formato" }),
+    page.getByRole("button", { name: "Desactivar formato" }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Cancelar" }).click();
+  await page.getByRole("link", { name: "Volver" }).click();
   await expect(page.locator("[data-format-status]")).toHaveText("Activo");
   await page.locator("[data-action-fallback] summary").click();
-  await page.getByRole("button", { name: "Sí, desactivar formato" }).click();
+  await page.getByRole("button", { name: "Desactivar formato" }).click();
   await expect(page.locator("[data-format-status]")).toHaveText("Inactivo");
   await page.getByRole("button", { name: "Activar formato" }).click();
   await expect(page.locator("[data-format-status]")).toHaveText("Activo");

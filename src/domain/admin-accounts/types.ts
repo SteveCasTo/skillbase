@@ -9,6 +9,7 @@ export interface AdminAccountDto {
   readonly exclusiveAdmin: boolean;
   readonly hasActivity: boolean;
   readonly deletionPending: boolean;
+  readonly lifecycleBlockedReason: "last-active-admin" | null;
   readonly action: AdminAccountAction | null;
 }
 export interface CreateAdminAccountInput {

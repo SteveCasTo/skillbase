@@ -19,19 +19,18 @@ async function chooseState(
   form: Locator,
   status: "Presente" | "Ausente" | "Justificada",
 ) {
-  const select = form.getByRole("combobox", { name: "Estado", exact: true });
-  await expect(select).toHaveAttribute("aria-expanded", "false");
-  await select.click();
-  await page.getByRole("option", { name: status, exact: true }).click();
-}
-async function save(page: Page, form: Locator, path: string) {
+  const path = new URL((await form.getAttribute("action")) ?? "", e2eSiteUrl())
+    .pathname;
   const revision = await form.locator('input[name="revision"]').inputValue();
   const response = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === path &&
       response.request().method() === "POST",
   );
-  await form.getByRole("button", { name: "Guardar", exact: true }).click();
+  const select = form.getByRole("combobox", { name: /^Asistencia de /u });
+  await expect(select).toHaveAttribute("aria-expanded", "false");
+  await select.click();
+  await page.getByRole("option", { name: status, exact: true }).click();
   expect((await response).status()).toBe(200);
   await expect(form.locator('input[name="revision"]')).not.toHaveValue(
     revision,
@@ -61,12 +60,23 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
       fixture.session.id,
     );
     await page.goto(path);
+    const writes: string[] = [];
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        new URL(request.url()).pathname === path
+      )
+        writes.push(request.postData() ?? "");
+    });
     const person = page.getByRole("form", {
       name: "Enrolled Attendance",
       exact: true,
     });
     await chooseState(page, person, "Presente");
-    await save(page, person, path);
+    await expect(person.getByRole("combobox")).toHaveCount(0);
+    await expect(
+      person.getByRole("button", { name: "Guardar asistencia" }),
+    ).toHaveCount(0);
     expect(
       (await detail(page, path)).participants.find(
         (person) => person.registrationId === fixture.paid.id,
@@ -76,13 +86,120 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
       inferred: false,
       markedBy: fixture.adminId,
     });
-    await chooseState(page, person, "Justificada");
-    await save(page, person, path);
+    const pencil = person.getByRole("button", {
+      name: "Editar asistencia de Enrolled Attendance",
+      exact: true,
+    });
+    await pencil.click();
+    await person
+      .getByRole("button", {
+        name: "Cancelar edición de asistencia de Enrolled Attendance",
+        exact: true,
+      })
+      .click();
+    await expect(pencil).toBeFocused();
+    expect(writes).toHaveLength(1);
+    expect(
+      (await detail(page, path)).participants.find(
+        (person) => person.registrationId === fixture.paid.id,
+      )?.attendance.status,
+    ).toBe("PRESENT");
+    await pencil.click();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(
+      `${e2eSiteUrl()}${path}?operation=record`,
+      async (route) => {
+        await gate;
+        await route.continue();
+      },
+      { times: 1 },
+    );
+    const saving = chooseState(page, person, "Justificada");
+    await expect(person).toHaveAttribute("aria-busy", "true");
+    await expect(
+      person.getByRole("combobox", {
+        name: "Asistencia de Enrolled Attendance",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await expect(
+      person.getByRole("button", {
+        name: "Cancelar edición de asistencia de Enrolled Attendance",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    release();
+    await saving;
     const corrected = (await detail(page, path)).participants.find(
       (person) => person.registrationId === fixture.paid.id,
     )!;
     expect(corrected.attendance.status).toBe("EXCUSED");
     expect(corrected.consecutiveAbsences).toBe(0);
+    // A real concurrent write invalidates the editor's revision. The failed
+    // autosave retains its draft, and an explicit refresh recovers the row.
+    const concurrent = await page.request.post(`${path}?operation=record`, {
+      headers: { Accept: "application/json", Origin: e2eSiteUrl() },
+      data: {
+        requestKey: crypto.randomUUID(),
+        revision: (await detail(page, path)).session.revision,
+        marks: [{ registrationId: fixture.paid.id, status: "PRESENT" }],
+      },
+    });
+    expect(concurrent.status()).toBe(200);
+    await pencil.click();
+    const rejectedSave = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === path,
+    );
+    await person
+      .getByRole("combobox", {
+        name: "Asistencia de Enrolled Attendance",
+        exact: true,
+      })
+      .click();
+    await page.getByRole("option", { name: "Ausente", exact: true }).click();
+    expect((await rejectedSave).status()).toBe(409);
+    await expect(person.getByRole("alert")).not.toBeEmpty();
+    await expect(
+      person.getByRole("combobox", {
+        name: "Asistencia de Enrolled Attendance",
+        exact: true,
+      }),
+    ).toContainText("Ausente");
+    await page
+      .getByRole("link", { name: "Reintentar actualización", exact: true })
+      .click();
+    await expect(
+      person.getByRole("button", { name: "Reintentar", exact: true }),
+    ).toBeEnabled();
+    await person
+      .getByRole("button", {
+        name: "Cancelar edición de asistencia de Enrolled Attendance",
+        exact: true,
+      })
+      .click();
+    await expect(
+      person
+        .locator("[data-mark-display]")
+        .getByText("Presente", { exact: true }),
+    ).toBeVisible();
+    await pencil.click();
+    await expect(
+      person.getByRole("combobox", {
+        name: "Asistencia de Enrolled Attendance",
+        exact: true,
+      }),
+    ).toContainText("Presente");
+    await person
+      .getByRole("button", {
+        name: "Cancelar edición de asistencia de Enrolled Attendance",
+        exact: true,
+      })
+      .click();
 
     const adjustablePath = route(
       "cursos",
@@ -171,13 +288,50 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     const original = page
       .getByRole("link")
       .filter({ has: page.getByText("Feriado", { exact: true }) });
+    await expect(
+      page.getByRole("radio", { name: "Próximas", exact: true }),
+    ).toBeChecked();
+    await expect(
+      page.getByRole("radio", { name: "Todas", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("radio", { name: "En curso", exact: true }),
+    ).toHaveCount(0);
+    await page.getByText("Canceladas", { exact: true }).click();
+    await expect(original).toBeVisible();
     await expect(original).toHaveAttribute("href", adjustablePath);
+    const calendarDay = page.getByRole("button", {
+      name: new RegExp(
+        new Intl.DateTimeFormat("es", {
+          dateStyle: "full",
+          timeZone: "America/La_Paz",
+        }).format(new Date(fixture.adjustable.session.startsAt)),
+        "u",
+      ),
+    });
+    await calendarDay.focus();
+    await page.keyboard.press("Enter");
+    await expect(
+      page.getByRole("radio", { name: "Todas", exact: true }),
+    ).toBeChecked();
+    await expect(original).toBeVisible();
+    await page.getByText("Próximas", { exact: true }).click();
+    await expect(
+      page.getByRole("radio", { name: "Todas", exact: true }),
+    ).toHaveCount(0);
+    await expect(original).not.toBeVisible();
     await expect(
       page
         .getByRole("link")
         .filter({ hasText: /Recuperación de/u })
         .filter({ hasText: new RegExp(fixture.replacementTime, "u") }),
     ).toHaveAttribute("href", `${listPath}/${recovered.session.id}`);
+    await calendarDay.click();
+    await page.getByText("Todas", { exact: true }).click();
+    await expect(
+      page.getByRole("radio", { name: "Todas", exact: true }),
+    ).toHaveCount(0);
+    await expect(original).toBeVisible();
   } finally {
     await fixture.close();
   }
@@ -223,7 +377,6 @@ test("INSTRUCTOR records only enrolled own participants without contacts or fina
     expect(JSON.stringify(own)).not.toContain('"balanceCents"');
     expect(JSON.stringify(own)).not.toContain('"paidCents"');
     await chooseState(page, person, "Ausente");
-    await save(page, person, path);
     const [saved] = await fixture.database.db
       .select({
         status: schema.participantAttendance.status,

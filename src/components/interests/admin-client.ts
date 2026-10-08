@@ -69,8 +69,8 @@ export function initializeAdminInterests(): void {
         if (button)
           button.textContent =
             registration.status === "ACTIVE"
-              ? "Confirmar cancelación"
-              : "Confirmar reactivación";
+              ? "Cancelar interés"
+              : "Reactivar interés";
         const copy = form.querySelector("[data-confirm-copy]");
         if (copy)
           copy.textContent =
@@ -255,6 +255,11 @@ export function initializeAdminInterests(): void {
         const cancelling = input(form, "intent").value === "cancel";
         const title = dialog?.querySelector("h2");
         const description = dialog?.querySelector("p");
+        const accept = dialog?.querySelector("[data-dialog-confirm]");
+        if (accept)
+          accept.textContent = cancelling
+            ? "Cancelar interés"
+            : "Reactivar interés";
         if (title)
           title.textContent = cancelling
             ? "Cancelar interés"

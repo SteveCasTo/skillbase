@@ -207,6 +207,9 @@ export function initializeRegistrationForms() {
       const serverNow = form.dataset.serverNow!;
       const touched = new Set<string>();
       const update = (all = false, show = true) => {
+        // Disabled controls are omitted from FormData. Do not revalidate that
+        // empty snapshot while a valid submission navigates to its detail.
+        if (form.dataset.pending) return false;
         const values = readFormValues(form);
         const cash =
           form.querySelector<HTMLFieldSetElement>("[data-cash-fields]");

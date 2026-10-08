@@ -238,10 +238,10 @@ test("fragment GET validates filters and never grants interest data to non-admin
   expect(await anonymous.text()).not.toContain("Ana Sintética");
 });
 async function confirmAction(page: Page, row: Locator, action: string) {
-  await row.getByText(action, { exact: true }).click();
+  await row.locator("summary").filter({ hasText: action }).click();
   const dialog = page.getByRole("alertdialog", { name: action });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Confirmar", exact: true }).click();
+  await dialog.getByRole("button", { name: action, exact: true }).click();
   await expect(dialog).toBeHidden();
 }
 
@@ -549,8 +549,14 @@ test("HTML fallback confirms and redirects without JS; errors stay visible", asy
     const html = await fallback.newPage();
     await html.goto(course.path);
     const row = rowFor(html);
-    await row.getByText("Cancelar interés", { exact: true }).click();
-    await row.getByRole("button", { name: "Confirmar cancelación" }).click();
+    await row
+      .locator("summary")
+      .filter({ hasText: /^Cancelar interés$/u })
+      .click();
+    await row
+      .getByRole("form")
+      .getByRole("button", { name: "Cancelar interés", exact: true })
+      .click();
     await expect(html).toHaveURL(`${course.path}?success=updated`);
     await expect(rowFor(html).locator("[data-interest-status]")).toHaveText(
       "Cancelado",

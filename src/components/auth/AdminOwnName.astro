@@ -11,11 +11,8 @@ interface Props {
 const { profile, error, submitted = false } = Astro.props;
 ---
 
-<section class="min-w-0 md:col-span-2" aria-labelledby="personal-title">
-  <h2 id="personal-title" class="text-lg font-semibold">
-    Perfil personal
-  </h2>
-  <div data-instructor-details class="mt-5 max-w-xl">
+<section class="min-w-0 md:col-span-2" aria-label="Nombre de la cuenta">
+  <div data-instructor-details class="min-w-0">
     <form
       method="post"
       action="/app/perfil?edit=name"

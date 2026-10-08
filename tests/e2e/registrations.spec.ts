@@ -146,8 +146,46 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
   await page.getByRole("option").first().click();
   await page.getByLabel("Efectivo recibido (Bs)").fill("25.50");
   await expect(create).toBeEnabled();
-  await create.click();
+  let releaseDetail!: () => void;
+  let detailRequested!: () => void;
+  const pendingDetail = new Promise<void>((resolve) => {
+    releaseDetail = resolve;
+  });
+  const detailRequest = new Promise<void>((resolve) => {
+    detailRequested = resolve;
+  });
+  await page.route("**/app/preinscripciones/*", async (route) => {
+    if (
+      route.request().method() === "GET" &&
+      /^\/app\/preinscripciones\/[0-9a-f-]+$/u.test(
+        new URL(route.request().url()).pathname,
+      )
+    ) {
+      detailRequested();
+      await pendingDetail;
+    }
+    await route.continue();
+  });
+  try {
+    await create.click();
+    await detailRequest;
+    await expect(page.locator("[data-navigation-skeleton]")).toBeVisible();
+    await expect(page.locator("[data-private-page]")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    await expect(
+      page.locator("#registration-create [data-form-error]"),
+    ).toHaveText("");
+    for (const error of await page
+      .locator("#registration-create [data-field-error]")
+      .all())
+      await expect(error).toHaveText("");
+  } finally {
+    releaseDetail();
+  }
   await expect(page).toHaveURL(/\/app\/preinscripciones\/[0-9a-f-]+$/u);
+  await page.unroute("**/app/preinscripciones/*");
   await expect(
     page.getByRole("region", { name: "Resumen financiero" }),
   ).toContainText("Bs 74,50");
@@ -210,7 +248,7 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
   await firstName.fill("Sintética");
   const transfer = page.locator("#registration-transfer");
   await actions
-    .getByRole("button", { name: "Cambiar de grupo", exact: true })
+    .getByRole("button", { name: "Cambiar grupo", exact: true })
     .click();
   await transfer.getByRole("combobox", { name: "Grupo de destino" }).click();
   await page
@@ -218,7 +256,7 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
     .filter({ hasNotText: "Selecciona" })
     .last()
     .click();
-  await transfer.getByRole("button", { name: "Cambiar de grupo" }).click();
+  await transfer.getByRole("button", { name: "Cambiar grupo" }).click();
   await expect(page.locator("#registration-transfer")).toHaveAttribute(
     "data-http-bound",
     "true",
@@ -345,17 +383,17 @@ test("ADMIN creates, edits global participant, transfers, cancels and records re
   ).toBe(cashBefore);
   const cancel = page.locator("#registration-cancel");
   await actions
-    .getByRole("button", { name: "Cancelar preinscripción", exact: true })
+    .getByRole("button", { name: "Anular inscripción", exact: true })
     .click();
   await cancel
     .getByLabel("Motivo de cancelación")
     .fill("Cancelación solicitada");
   await cancel
-    .getByRole("button", { name: "Cancelar preinscripción", exact: true })
+    .getByRole("button", { name: "Anular inscripción", exact: true })
     .click();
   await page
     .getByRole("alertdialog")
-    .getByRole("button", { name: "Confirmar cancelación" })
+    .getByRole("button", { name: "Anular inscripción" })
     .click();
   await expect(
     page.getByRole("region", { name: "Resumen financiero" }),

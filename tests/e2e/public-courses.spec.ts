@@ -133,7 +133,10 @@ test("published course is public end-to-end and withdrawal removes every public 
     );
     expect(prerequisite.status()).toBe(200);
     await page.getByRole("button", { name: "Publicar curso" }).click();
-    await page.getByRole("button", { name: "Confirmar publicación" }).click();
+    await page
+      .getByRole("dialog", { name: "Publicar curso", exact: true })
+      .getByRole("button", { name: "Publicar curso", exact: true })
+      .click();
     await expect(
       page.locator("[data-sileo-toast]").filter({ hasText: "Curso publicado" }),
     ).toContainText("Curso publicado");
@@ -297,7 +300,10 @@ test("published course is public end-to-end and withdrawal removes every public 
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     await page.goto(`/app/cursos/${courseId}/editar`);
     await page.getByRole("button", { name: "Retirar publicación" }).click();
-    await page.getByRole("button", { name: "Confirmar retiro" }).click();
+    await page
+      .getByRole("dialog", { name: "Retirar publicación", exact: true })
+      .getByRole("button", { name: "Retirar curso", exact: true })
+      .click();
     await expect(
       page
         .locator("[data-sileo-toast]")
@@ -323,7 +329,10 @@ test("published course is public end-to-end and withdrawal removes every public 
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     await page.goto(`/app/cursos/${courseId}/editar`);
     await page.getByRole("button", { name: "Archivar curso" }).click();
-    await page.getByRole("button", { name: "Confirmar archivo" }).click();
+    await page
+      .getByRole("dialog", { name: "Archivar curso", exact: true })
+      .getByRole("button", { name: "Archivar curso", exact: true })
+      .click();
     await expect(
       page.locator("[data-sileo-toast]").filter({ hasText: "Curso archivado" }),
     ).toContainText("Curso archivado");

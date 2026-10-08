@@ -277,6 +277,33 @@ test("calendar selection exposes only matching SSR session links and reset resto
   filterSessionRows(rows, "");
   expect(rows.every((row) => !row.hidden)).toBe(true);
 });
+test("calendar dates show every authoritative status on that date, and status selections clear the date", () => {
+  const rows = [
+    {
+      hidden: false,
+      dataset: { sessionDay: "2026-10-08", sessionStatus: "ONGOING" },
+    },
+    {
+      hidden: false,
+      dataset: { sessionDay: "2026-10-08", sessionStatus: "CANCELLED" },
+    },
+    {
+      hidden: false,
+      dataset: { sessionDay: "2026-10-09", sessionStatus: "UPCOMING" },
+    },
+    {
+      hidden: false,
+      dataset: { sessionDay: "2026-10-07", sessionStatus: "COMPLETED" },
+    },
+  ];
+  expect(filterSessionRows(rows, "", "UPCOMING")).toBe(1);
+  expect(rows.filter((row) => !row.hidden)).toEqual([rows[2]!]);
+  expect(filterSessionRows(rows, "2026-10-08", "ALL")).toBe(2);
+  expect(rows.filter((row) => !row.hidden)).toEqual([rows[0]!, rows[1]!]);
+  expect(filterSessionRows(rows, "", "COMPLETED")).toBe(1);
+  expect(rows.filter((row) => !row.hidden)).toEqual([rows[3]!]);
+  expect(filterSessionRows(rows, "", "ALL")).toBe(4);
+});
 test("group participant pages reject the wrong role before accessing private data", async () => {
   const adminData = await prepareGroupParticipantsRoute({
     locals: { internalUser: { ...actor, roles: ["INSTRUCTOR"] } },

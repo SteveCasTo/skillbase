@@ -1,5 +1,6 @@
 ---
 import { buttonVariants } from "@/components/ui/button";
+import { confirmationFooterClassName } from "@/components/ui/confirmation-footer";
 import {
   lifecycleBlockReason,
   type InstructorLifecycle,
@@ -80,16 +81,22 @@ const actions = deleteReason
             <p>{action.copy}</p>
             <input type="hidden" name="intent" value={action.intent} />
             <input type="hidden" name="revision" value={revision} />
-            <button
-              type="submit"
-              disabled={Boolean(action.reason)}
-              class={buttonVariants({
-                variant: action.intent === "delete" ? "destructive" : "default",
-                className: "min-h-11",
-              })}
-            >
-              Confirmar {action.label.toLowerCase()}
-            </button>
+            <div class={confirmationFooterClassName}>
+              <button
+                type="submit"
+                disabled={Boolean(action.reason)}
+                class={buttonVariants({
+                  variant:
+                    action.intent === "delete" ? "destructive" : "default",
+                  className: "min-h-11",
+                })}
+              >
+                {action.label}
+              </button>
+              <a href={endpoint} class={buttonVariants({ variant: "outline" })}>
+                Volver
+              </a>
+            </div>
           </form>
         </details>
       ))}
@@ -149,13 +156,13 @@ const actions = deleteReason
     <div class="flex flex-col gap-4">
       <h3 id="lifecycle-dialog-title" class="text-xl font-semibold"></h3>
       <p id="lifecycle-dialog-copy" class="text-sm text-muted-foreground"></p>
-      <div class="flex flex-wrap justify-end gap-3">
+      <div class={confirmationFooterClassName}>
         <button
           type="button"
           data-lifecycle-close
           class={buttonVariants({ variant: "outline", className: "min-h-11" })}
         >
-          Cancelar
+          Volver
         </button>
         <button
           type="button"
@@ -208,6 +215,8 @@ const actions = deleteReason
                 summary.textContent;
               panel.querySelector("#lifecycle-dialog-copy")!.textContent =
                 form.querySelector("p")!.textContent;
+              panel.querySelector("[data-lifecycle-accept]")!.textContent =
+                summary.textContent;
               dialog.showModal();
             });
           });
