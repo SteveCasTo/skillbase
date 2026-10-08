@@ -139,7 +139,7 @@ test("publication without an assigned instructor shows its cause inline without 
   );
   await page
     .getByRole("dialog", { name: "Publicar curso" })
-    .getByRole("button", { name: "Confirmar publicación" })
+    .getByRole("button", { name: "Publicar curso", exact: true })
     .click();
   expect((await result).status()).toBe(422);
   await expect(page.locator("[data-save-error]")).toContainText(

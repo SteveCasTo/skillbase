@@ -67,7 +67,10 @@ export async function assertE2ePortAvailable(): Promise<void> {
   });
 }
 
-export async function runWithTestStack(command: string[]): Promise<number> {
+export async function runWithTestStack(
+  command: string[],
+  options: { requireCleanup?: boolean } = {},
+): Promise<number> {
   const workdir = mkdtempSync(join(tmpdir(), "skillbase-test-"));
   const projectId = `skillbase_test_${randomBytes(8).toString("hex")}`;
   const env: NodeJS.ProcessEnv = {
@@ -102,6 +105,8 @@ export async function runWithTestStack(command: string[]): Promise<number> {
   ])
     delete env[key];
   let started = false;
+  let exitCode = 1;
+  let cleanupError: unknown;
   try {
     const ports = new Set<number>();
     while (ports.size < 9) {
@@ -203,7 +208,7 @@ export async function runWithTestStack(command: string[]): Promise<number> {
     process.once("SIGINT", signal);
     process.once("SIGTERM", signal);
     try {
-      return await child.exited;
+      exitCode = await child.exited;
     } finally {
       process.off("SIGINT", signal);
       process.off("SIGTERM", signal);
@@ -231,8 +236,13 @@ export async function runWithTestStack(command: string[]): Promise<number> {
           workdir,
           error,
         );
+        // An opt-in strict caller must not report a green gate while its owned
+        // resources remain. Preserve the exact ID/path above for scoped recovery.
+        cleanupError = error;
       }
     }
     if (stopped) rmSync(workdir, { recursive: true, force: true });
   }
+  if (options.requireCleanup && cleanupError) throw cleanupError;
+  return exitCode;
 }

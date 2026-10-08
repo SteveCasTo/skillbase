@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
@@ -147,6 +147,86 @@ test("two cross-deletes serialize and never leave zero ACTIVE ADMIN, with no spe
   );
   first = active;
   second = await fixture("Synthetic Replacement Admin");
+});
+test("list and detail project last-active lifecycle block without replacing actions", async () => {
+  const target = await fixture("Synthetic Last Admin Projection");
+  const rollback = new Error("QA rollback-only eligibility projection proof");
+  await expect(
+    db.db.transaction(async (tx) => {
+      // Other integration files also create ADMIN fixtures in this shared,
+      // runner-owned stack. Keep exactly two known admins for the eligibility
+      // assertion, then one; rollback restores every unrelated fixture.
+      await tx.execute(sql`select pg_advisory_xact_lock(20261007, 8)`);
+      const activeAdmins = await tx
+        .select({ id: s.users.id })
+        .from(s.users)
+        .innerJoin(s.userRoles, eq(s.userRoles.userId, s.users.id))
+        .where(
+          and(eq(s.users.status, "ACTIVE"), eq(s.userRoles.roleCode, "ADMIN")),
+        );
+      const otherIds = [
+        ...new Set(
+          activeAdmins
+            .map((admin) => admin.id)
+            .filter((id) => id !== target.id && id !== first.id),
+        ),
+      ];
+      if (otherIds.length)
+        await tx
+          .update(s.users)
+          .set({ status: "DISABLED" })
+          .where(inArray(s.users.id, otherIds));
+
+      const activeCount = async () => {
+        const [row] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(s.users)
+          .innerJoin(s.userRoles, eq(s.userRoles.userId, s.users.id))
+          .where(
+            and(
+              eq(s.users.status, "ACTIVE"),
+              eq(s.userRoles.roleCode, "ADMIN"),
+            ),
+          );
+        return row?.count ?? 0;
+      };
+      expect(await activeCount()).toBe(2);
+      const scoped = new DrizzleAdminAccountRepository(tx);
+      expect(await scoped.get(target.id, target.id)).toMatchObject({
+        action: "delete",
+        lifecycleBlockedReason: null,
+      });
+
+      await tx
+        .update(s.users)
+        .set({ status: "DISABLED" })
+        .where(eq(s.users.id, first.id));
+      expect(await activeCount()).toBe(1);
+      const listed = (await scoped.list(target.id)).find(
+        (account) => account.id === target.id,
+      );
+      expect(listed).toMatchObject({
+        action: "delete",
+        lifecycleBlockedReason: "last-active-admin",
+      });
+      expect(await scoped.get(target.id, target.id)).toMatchObject({
+        action: "delete",
+        lifecycleBlockedReason: "last-active-admin",
+      });
+
+      await tx.insert(s.auditEvents).values({
+        actorId: target.id,
+        entityType: "USER",
+        entityId: target.id,
+        action: "QA_SYNTHETIC_ADMIN_ACTIVITY",
+      });
+      expect(await scoped.get(target.id, target.id)).toMatchObject({
+        action: "deactivate",
+        lifecycleBlockedReason: "last-active-admin",
+      });
+      throw rollback;
+    }),
+  ).rejects.toBe(rollback);
 });
 test("schema RLS, all Data API grants revoked, restrictive evidence, QA ledger23", async () => {
   const rows = await db.db.execute<{ rls: boolean; grants: boolean }>(

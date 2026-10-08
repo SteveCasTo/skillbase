@@ -1015,7 +1015,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   );
   await page
     .getByRole("dialog", { name: "Publicar curso" })
-    .getByRole("button", { name: "Confirmar publicación" })
+    .getByRole("button", { name: "Publicar curso" })
     .click();
   const publicationResult = await publishAfterSave;
   expect(publicationResult.status()).toBe(200);
@@ -1034,14 +1034,14 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await page.getByRole("button", { name: "Retirar publicación" }).click();
   await page
     .getByRole("dialog", { name: "Retirar publicación" })
-    .getByRole("button", { name: "Confirmar retiro" })
+    .getByRole("button", { name: "Retirar curso" })
     .click();
   await expect(page.locator("[data-course-status]")).toHaveText("Borrador");
   expect(saveAndPublishGets).toBe(0);
   page.off("request", countRefresh);
   await page.getByRole("button", { name: "Publicar curso" }).click();
   const dialog = page.getByRole("dialog", { name: "Publicar curso" });
-  await expect(dialog.getByRole("button", { name: "Cancelar" })).toBeFocused();
+  await expect(dialog.getByRole("button", { name: "Volver" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
   await expect(
@@ -1065,7 +1065,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     },
   );
   expect(publishedElsewhere.status()).toBe(200);
-  await dialog.getByRole("button", { name: "Confirmar publicación" }).click();
+  await dialog.getByRole("button", { name: "Publicar curso" }).click();
   await expect(
     page.locator("[data-save-error]").filter({ hasText: /El curso cambió/ }),
   ).toBeVisible();
@@ -1125,7 +1125,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     await route.fulfill({ response });
   });
   await page.getByRole("button", { name: "Publicar curso" }).click();
-  await dialog.getByRole("button", { name: "Confirmar publicación" }).click();
+  await dialog.getByRole("button", { name: "Publicar curso" }).click();
   await expect(dialog).toBeHidden();
   await page.getByLabel("Descripción").fill("Cambio durante publicación");
   await expect(save).toBeDisabled();
@@ -1183,7 +1183,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await page.getByRole("button", { name: "Retirar publicación" }).click();
   await page
     .getByRole("dialog", { name: "Retirar publicación" })
-    .getByRole("button", { name: "Confirmar retiro" })
+    .getByRole("button", { name: "Retirar curso" })
     .click();
   await expect(
     page
@@ -1193,7 +1193,7 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await page.getByRole("button", { name: "Archivar curso" }).click();
   await page
     .getByRole("dialog", { name: "Archivar curso" })
-    .getByRole("button", { name: "Confirmar archivo" })
+    .getByRole("button", { name: "Archivar curso" })
     .click();
   await expect(
     page.locator("[data-sileo-toast]").filter({ hasText: "Curso archivado" }),

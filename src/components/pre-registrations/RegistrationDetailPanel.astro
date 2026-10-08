@@ -115,19 +115,21 @@ const canTransfer = form.groups.some((group) => {
         <RegistrationActionDialog
           client:load
           targetId="registration-transfer-panel"
-          title="Cambiar de grupo"
+          title="Cambiar grupo"
           description={form.course.name}
           initialOpen={attempted("transfer")}
+          formFooter
         />
       )}
       {canCancel && (
         <RegistrationActionDialog
           client:load
           targetId="registration-cancel-panel"
-          title="Cancelar preinscripción"
+          title="Anular inscripción"
           description="Revisa el motivo antes de confirmar."
           destructive
           initialOpen={attempted("cancel")}
+          formFooter
         />
       )}
     </div>
@@ -178,6 +180,7 @@ const canTransfer = form.groups.some((group) => {
         title="Registrar abono"
         description="Registra el efectivo recibido."
         initialOpen={attempted("payment")}
+        formFooter
       />
     )}
     {registration.state === "CANCELLED" && registration.refundDueCents > 0 && (
@@ -187,6 +190,7 @@ const canTransfer = form.groups.some((group) => {
         title="Registrar devolución"
         description="Registra el efectivo entregado."
         initialOpen={attempted("refund")}
+        formFooter
       />
     )}
   </div>

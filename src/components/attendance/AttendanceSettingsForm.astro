@@ -60,17 +60,9 @@ const {
         values.consecutiveAbsenceLimit ?? settings.consecutiveAbsenceLimit
       }
       aria-invalid={Boolean(errors.consecutiveAbsenceLimit)}
-      aria-describedby="attendance-limit-error attendance-limit-help"
+      aria-describedby="attendance-limit-error"
       className="min-h-11 max-w-sm"
     />
-    <p
-      slot="help"
-      id="attendance-limit-help"
-      class="text-sm text-muted-foreground"
-    >
-      Al alcanzar este número se muestra una advertencia; al superarlo se pierde
-      el reconocimiento.
-    </p>
     <p
       id="attendance-limit-error"
       data-field-error="consecutiveAbsenceLimit"

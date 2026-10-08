@@ -132,9 +132,9 @@ Para disponibilidad se consideran grupos `PLANNED` del instructor entre cursos �
 
 La migración `0016_instructor_lifecycle_outbox` añade `instructor_account_deletions`: registro de eliminación pendiente/completada con instructor, actor, `auth_user_id` y tiempos de solicitud/fin; FK `RESTRICT` a users/actor, índice por actor, RLS habilitado y grants Data API revocados. El repositorio conserva una fila tombstone mínima tras quitar perfil/rol para respetar referencias de auditoría, y mantiene el estado bloqueado para reintentar la etapa Auth externa si falla. Solo permite eliminación cuando no existe historia/dependencia y el usuario tiene rol exclusivo `INSTRUCTOR`; perfiles con historia conservan identidad. La migración se integró en `development` mediante PR 134 y se aplicó localmente sin reset (ledger 16→17); el release posterior de Fase 5 lleva cloud a ledger 18. La fuente final validada en PR 136 pasó integration 98 y E2E 120/120.
 
-#### Lifecycle de cuentas ADMIN (schema candidato 0022; backend PR 283)
+#### Lifecycle de cuentas ADMIN (schema 0022, release PR 286)
 
-La migración candidata `0022_phase8_admin_accounts` añade
+La migración `0022_phase8_admin_accounts` añade
 `admin_account_deletions` mediante `drizzle/0022_phase8_admin_accounts.sql`.
 Registra por `user_id` la intención de
 baja, `actor_id`, UUID Auth objetivo, revisión observada, timestamps de solicitud
@@ -145,11 +145,13 @@ a un instante válido. La fila `users` permanece como tombstone para preservar
 referencias actor/dependencia.
 
 La migración tiene timestamp `1791414145526` y SHA-256
-`c9792638377a89d162c64c951596b680c39c4f4017589f61a72844e85f55b856`. Se aplicó
-solo en el stack aislado de QA del feature, avanzando su ledger de 22 a 23; no se
-aplicó al Supabase local canónico ni cloud, que permanecen en ledger 21. La
-implementación del repositorio/actividad está en development por PR 283. La UI
-no añade campos de datos a `users`; contrato en
+`c9792638377a89d162c64c951596b680c39c4f4017589f61a72844e85f55b856`. PR 286 la
+aplicó por el pipeline normal al Supabase local canónico y cloud, llevando ambos
+ledgers a 23; los stacks temporales QA también se usaron en etapas previas. La
+verificación de release confirmó la tabla nueva vacía, políticas RLS/grants y
+trigger protegidos. La comparación completa preservó 2,843 filas/64 tablas en
+local y 876 filas/66 tablas en cloud. El modelo `users` no añade
+campos para la UI; contrato en
 [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
 
 ### Group
@@ -227,7 +229,7 @@ contacto ni finanzas; el historial administrativo de correcciones es solo para
 ADMIN. La superficie HTTP/helpers y errores se describen en
 [`ARCHITECTURE.md`](ARCHITECTURE.md) y [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md).
 
-### Cierre académico por grupo (Fase 8, schema integrado en development)
+### Cierre académico por grupo (Fase 8, schema released por PR 286)
 
 PR 280 integra `0021_phase8_academic_group_closure.sql` y cuatro tablas al
 schema Drizzle:
@@ -255,18 +257,19 @@ trigger comparte el lock y sirve como defensa frente a otros repositorios
 server-side.
 
 Migración 0021 tiene timestamp `1791407807898` y SHA-256
-`9b4c19be336426441b35d0ef1b0cd68ed7d980e4481420051d56fbb24d424259`. Solo se
-aplicó en Supabase aislado de QA (ledger temporal 21→22); el canónico local y
-cloud siguen en 21, sin apply persistente. El snapshot JSONB incluye CI y
+`9b4c19be336426441b35d0ef1b0cd68ed7d980e4481420051d56fbb24d424259`. PR 286 la
+aplicó por el pipeline normal a Supabase canónico local y cloud; ambos avanzaron
+21→23 con 0022 y preservaron todas las filas preexistentes en la comparación
+completa de release. Las cinco tablas nuevas permanecieron vacías en la
+verificación. El snapshot JSONB incluye CI y
 balance actuales, pero no email/teléfono. La proyección de instructor usa
 allowlist recursiva sin CI/contacto/categorías/finanzas; ADMIN conserva vista
-privada completa. Exports futuros deben usar el DTO por rol, no leer el JSONB
-directamente. PRs 281/282/284/285 integraron exporters, UI/policies de cierre,
-validación focal de downloads y administración multi-ADMIN al árbol de
-development; ver el contrato y evidencia/límites en
+privada completa. Los exporters implementados por PR 281 consumen el DTO
+autorizado por rol, no leen JSONB directamente. PRs 281–285 integraron exports,
+UI/policies de cierre, pruebas live focales y lifecycle/UI multi-ADMIN a
+development; PR 286 liberó el schema a producción. Ver contrato/evidencia en
 [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y
-[`TESTING.md`](TESTING.md). Ledger canónico/cloud continúa en 21 hasta el release
-autorizado.
+[`TESTING.md`](TESTING.md). Ledger canónico local/cloud tras PR 286 es 23.
 
 ### Participant
 

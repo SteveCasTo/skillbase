@@ -71,56 +71,58 @@ const { values, issues, error } = Astro.props;
       </div>
     ))}
   </fieldset>
-  <fieldset class="flex min-w-0 flex-col gap-2">
+  <fieldset class="grid min-w-0 gap-5 sm:grid-cols-2">
     <legend class="mb-3 text-lg font-semibold">Acceso inicial</legend>
-    <label for="password" class="text-sm font-medium">
-      Contraseña inicial
-    </label>
-    <div
-      class="flex max-w-xl items-center gap-2"
-      data-invalid={Boolean(issues.password)}
-    >
-      <Input
-        id="password"
-        name="password"
-        type="password"
-        autoComplete="new-password"
-        required
-        minLength={12}
-        maxLength={128}
-        aria-invalid={Boolean(issues.password)}
-        aria-describedby="password-help password-error"
-        className="min-h-11"
-      />
-      <button
-        hidden
-        type="button"
-        data-password-toggle
-        aria-controls="password"
-        aria-label="Mostrar contraseña inicial"
-        aria-pressed="false"
-        class={buttonVariants({
-          variant: "outline",
-          size: "icon",
-          className: "min-h-11 min-w-11 shrink-0",
-        })}
+    <div class="flex min-w-0 flex-col gap-2">
+      <label for="password" class="text-sm font-medium">
+        Contraseña inicial
+      </label>
+      <div
+        class="flex min-w-0 items-center gap-2"
+        data-invalid={Boolean(issues.password)}
       >
-        <Eye data-password-show aria-hidden="true" />
-        <span data-password-hide hidden>
-          <EyeOff aria-hidden="true" />
-        </span>
-      </button>
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          required
+          minLength={12}
+          maxLength={128}
+          aria-invalid={Boolean(issues.password)}
+          aria-describedby="password-help password-error"
+          className="min-h-11"
+        />
+        <button
+          hidden
+          type="button"
+          data-password-toggle
+          aria-controls="password"
+          aria-label="Mostrar contraseña inicial"
+          aria-pressed="false"
+          class={buttonVariants({
+            variant: "outline",
+            size: "icon",
+            className: "min-h-11 min-w-11 shrink-0",
+          })}
+        >
+          <Eye data-password-show aria-hidden="true" />
+          <span data-password-hide hidden>
+            <EyeOff aria-hidden="true" />
+          </span>
+        </button>
+      </div>
+      <p
+        id="password-error"
+        data-field-error="password"
+        class="text-sm text-destructive empty:hidden"
+      >
+        {issues.password}
+      </p>
+      <p id="password-help" class="text-sm text-muted-foreground">
+        Usa entre 12 y 128 caracteres.
+      </p>
     </div>
-    <p
-      id="password-error"
-      data-field-error="password"
-      class="text-sm text-destructive empty:hidden"
-    >
-      {issues.password}
-    </p>
-    <p id="password-help" class="text-sm text-muted-foreground">
-      Usa entre 12 y 128 caracteres.
-    </p>
   </fieldset>
   <button
     type="submit"

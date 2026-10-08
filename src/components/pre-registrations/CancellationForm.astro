@@ -6,6 +6,8 @@ import type {
 import { assertCancellation } from "@/domain/pre-registrations/policies";
 import { Input } from "@/components/ui/input";
 import CancellationConfirmation from "./CancellationConfirmation";
+import { confirmationFooterClassName } from "@/components/ui/confirmation-footer";
+import { buttonVariants } from "@/components/ui/button";
 import { courseContext, formatMoney } from "./presentation";
 interface Props {
   id: string;
@@ -47,7 +49,7 @@ const description =
 ---
 
 <section class="min-w-0">
-  <h2 class="mb-4 text-lg font-semibold">Cancelar preinscripción</h2>
+  <h2 class="mb-4 text-lg font-semibold">Anular inscripción</h2>
   {unavailable ? (
     <div>
       <p role="status" class="text-sm text-muted-foreground">
@@ -108,11 +110,22 @@ const description =
           {errors.reason}
         </p>
       </div>
-      <CancellationConfirmation
-        client:load
-        formId={id}
-        description={description}
-      />
+      <div class={confirmationFooterClassName}>
+        <span data-dialog-cancel>
+          <a
+            data-dialog-cancel-fallback
+            href={`/app/preinscripciones/${registration.id}`}
+            class={buttonVariants({ variant: "outline", className: "w-full" })}
+          >
+            Volver
+          </a>
+        </span>
+        <CancellationConfirmation
+          client:load
+          formId={id}
+          description={description}
+        />
+      </div>
     </form>
   )}
 </section>

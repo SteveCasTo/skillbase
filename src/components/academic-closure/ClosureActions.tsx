@@ -1,6 +1,7 @@
 import { useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { navigate } from "astro:transitions/client";
 import { Button } from "@/components/ui/button";
+import { confirmationFooterClassName } from "@/components/ui/confirmation-footer";
 import {
   Dialog,
   DialogContent,
@@ -107,26 +108,30 @@ export function ClosureActions({
           {error}
         </p>
       )}
-      <div className="grid grid-cols-2 gap-2">
+      <div className={confirmationFooterClassName}>
         {enhanced ? (
           <Button
             type="button"
             variant="outline"
-            className="min-h-11"
+            className="min-h-11 w-full min-w-0 whitespace-normal"
             disabled={pending}
             onClick={() => setOpen(false)}
           >
-            Cancelar
+            Volver
           </Button>
         ) : (
           <a
             href={path}
             className="inline-flex min-h-11 items-center justify-center underline underline-offset-4"
           >
-            Cancelar
+            Volver
           </a>
         )}
-        <Button type="submit" className="min-h-11" disabled={pending}>
+        <Button
+          type="submit"
+          className="min-h-11 w-full min-w-0 whitespace-normal"
+          disabled={pending}
+        >
           {pending ? "Confirmando…" : "Confirmar cierre"}
         </Button>
       </div>
@@ -234,7 +239,7 @@ export function ClosureActions({
             asistencia y altas en este grupo. No archiva el curso.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="block">{closeForm}</DialogFooter>
+        <DialogFooter layout="content">{closeForm}</DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -24,7 +24,7 @@ export default function SessionCalendar({ listId, days, today }: Props) {
     () => false,
   );
   const [day, setDay] = useState<string>("");
-  const [state, setState] = useState<SessionStateFilter>("ALL");
+  const [state, setState] = useState<SessionStateFilter>("UPCOMING");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [month, setMonth] = useState(() => civilDate(days[0] ?? today)!);
   const dateTrigger = useRef<HTMLButtonElement>(null);
@@ -54,6 +54,21 @@ export default function SessionCalendar({ listId, days, today }: Props) {
       if (empty) empty.hidden = true;
     };
   }, [enhanced, listId]);
+  useEffect(() => {
+    if (!enhanced) return;
+    const list = document.getElementById(listId);
+    if (!list) return;
+    const visible = filterSessionRows(
+      list.querySelectorAll<HTMLElement>("[data-session-day]"),
+      day,
+      state,
+    );
+    list.hidden = visible === 0;
+    const empty = list.parentElement?.querySelector<HTMLElement>(
+      "[data-session-empty]",
+    );
+    if (empty) empty.hidden = visible !== 0;
+  }, [day, state, enhanced, listId]);
   const filter = (next: string, nextState = state) => {
     setDay(next);
     setState(nextState);
@@ -102,7 +117,7 @@ export default function SessionCalendar({ listId, days, today }: Props) {
               past: "[&_button:not([data-selected-single=true])]:bg-muted [&_button:not([data-selected-single=true])]:text-muted-foreground",
             }}
             onSelect={(date) => {
-              filter(date ? keyOf(date) : "");
+              filter(date ? keyOf(date) : "", "ALL");
               if (!desktop) {
                 setCalendarOpen(false);
                 dateTrigger.current?.focus({ preventScroll: true });
@@ -112,16 +127,6 @@ export default function SessionCalendar({ listId, days, today }: Props) {
           />
         </div>
       )}
-      {day && (
-        <Button
-          type="button"
-          variant="outline"
-          className="min-h-11 w-full"
-          onClick={() => filter("")}
-        >
-          Ver todas las sesiones
-        </Button>
-      )}
       <fieldset className="min-w-0">
         <legend className="mb-2 text-sm font-medium">
           Estado de la sesión
@@ -129,9 +134,8 @@ export default function SessionCalendar({ listId, days, today }: Props) {
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
           {(
             [
-              ["ALL", "Todas"],
+              ...(day ? [["ALL", "Todas"] as const] : []),
               ["UPCOMING", "Próximas"],
-              ["ONGOING", "En curso"],
               ["COMPLETED", "Finalizadas"],
               ["CANCELLED", "Canceladas"],
             ] as const
@@ -145,7 +149,8 @@ export default function SessionCalendar({ listId, days, today }: Props) {
                 name={`${listId}-state`}
                 value={value}
                 checked={state === value}
-                onChange={() => filter(day, value)}
+                readOnly
+                onClick={() => filter("", value)}
                 aria-controls={listId}
                 className="peer sr-only"
               />
