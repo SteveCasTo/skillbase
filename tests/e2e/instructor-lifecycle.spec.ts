@@ -42,7 +42,7 @@ test("instructor lifecycle confirmation and mutations remain available without J
       .click();
     await panel
       .getByRole("button", {
-        name: "Confirmar eliminar instructor",
+        name: "Eliminar instructor",
         exact: true,
       })
       .click();
