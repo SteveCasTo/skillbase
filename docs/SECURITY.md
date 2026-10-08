@@ -68,7 +68,7 @@ No confiar únicamente en ocultar botones.
 - Las pruebas locales del feature branch no son verificación de entrega real. Configurar y verificar SMTP/recovery es trabajo aprobado pendiente; Google OAuth real continúa pendiente de forma independiente.
 - Fase 5 trata CI, email y roster como datos personales. No exponer CI públicamente; exportación CSV/PDF es solo ADMIN, debe neutralizar fórmula CSV y no constituye recibo/boleta. No hay pasarela de cobro ni upload de comprobantes.
 
-### Lifecycle y UI de cuentas ADMIN (feature, no integrado)
+### Lifecycle y UI de cuentas ADMIN (backend PR 283; UI feature)
 
 - `/app/administradores`, `/nuevo` y el detalle UUID están registrados como
   rutas privadas exclusivas ADMIN. Navigation solo expone el enlace a usuarios
@@ -89,9 +89,24 @@ No confiar únicamente en ocultar botones.
   rol exclusivo, revisión y guard global de último ADMIN bajo locks. Mantiene al
   menos un ADMIN activo; puede permitirse auto-desactivación/baja si queda otro
   ADMIN activo. En auto-baja exitosa la sesión se dirige a login.
-- Las rutas y UI ADMIN son feature WIP, aún no integradas ni release. La migration
-  0022 se probó en QA aislado, no en Supabase canónico/cloud. Contrato en
-  [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
+- El backend PR 283 revalida ADMIN activo en loader, caso de uso y transacción;
+  actor, target y rol vienen de sesión/ruta server-side. UI `/app/administradores`
+  lista/nuevo/detalle está en feature branch y no se ha integrado. Sus policies
+  son ADMIN-only; la autorización de servidor sigue siendo obligatoria.
+- POST valida Origin, limita el body a 8192 bytes, rechaza campos extra y devuelve
+  `private, no-store`/`nosniff`. Contraseña solo se transmite al Admin API
+  server-side, no se persiste/retorna/audita. Compensación de alta solo puede
+  borrar el UUID Auth recién creado; si también falla, una identidad huérfana
+  puede requerir reconciliación operativa (no hay reconciliador automático
+  documentado).
+- Baja Auth ocurre fuera de transacción PostgreSQL: primero guarda intención y
+  bloquea el usuario. Falla queda DISABLED/pending; solo `user_not_found` explícito
+  significa identidad ya ausente. Tombstone, UUID y evidencia se preservan. Uso
+  propio/dependencia solo ofrece desactivar/reactivar; locks y actor-revalidation
+  mantienen al menos un ADMIN ACTIVE. No hay prohibición global de auto-baja si
+  otra cuenta ADMIN queda activa; no se gestionan roles multirol/perfil instructor.
+- Migration 0022 mantiene RLS/grants revocados y trigger de intención inmutable;
+  se aplicó solo en QA, no canónico/cloud. Contrato: [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
 
 #### Seguridad de preinscripciones (rutas integradas; full-suite local PASS)
 
@@ -127,12 +142,14 @@ Las rutas y operaciones limitan instructor a sus propios grupos y ADMIN a config
 
 El backend y las páginas UI se liberaron mediante PR 235. El detalle de modelo/API y los límites de verificación cloud están en `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`, `docs/EVALUATIONS_CONTRACT.md` y `docs/TESTING.md`.
 
-### Cierre académico por grupo (Fase 8, backend parcial no liberado)
+### Cierre académico por grupo (Fase 8, integrado; no release)
 
 - Loader/casos de uso de cierre revalidan actor `ACTIVE`, rol y ownership en el
   repositorio: ADMIN puede cualquier grupo; INSTRUCTOR solo grupo propio y desde
   inicio oficial. Reabrir es ADMIN-only, con razón y auditoría transaccional.
-  No hay route Astro/policy/UI montada en este source.
+  Las páginas SSR/JSON de workspace/history y policy fail-closed se integraron
+  por PR 282; los GET export adapters por PR 281. Role policy está acotada por
+  contexto y loaders revalidan ownership.
 - La migración 0021 candidata habilita RLS y revoca grants Data API en estado,
   versiones, reaperturas y receipts. Triggers hacen inmutable la historia y
   protegen notas/sesiones/roster/asistencia con el advisory lock compartido.
@@ -143,21 +160,32 @@ El backend y las páginas UI se liberaron mediante PR 235. El detalle de modelo/
   un DTO discriminado `access`; la proyección INSTRUCTOR es allowlist recursiva
   de nombres/IDs académicos, notas y asistencia, excluyendo CI, categorías y datos
   financieros, incluso si aparecieran nuevos campos sensibles en el snapshot.
-  Pruebas focales inspeccionan el JSON serializado y los campos futuros
-  sintéticos; el fix está en el source WIP y aún no hay ruta HTTP/página de cierre
-  integrada ni release.
-- Futuros PDF/CSV deben usar el DTO autorizado por actor/contexto a través de los
-  loaders server-side, nunca la fila snapshot JSONB directamente. No añadir
-  CI/contacto/finanzas a la salida de instructor; mantenerlo protegido por
-  servidor y Data API grants revocados.
+  Pruebas focales inspeccionan JSON serializado y campos futuros sintéticos. La
+  policy de UI comprueba patrones acotados y role prefix; el backend revalida actor,
+  ownership y estado.
+- Los renderers PDF/CSV y seis GET adapters están presentes en el árbol combinado
+  actual. Los adapters usan el DTO autorizado de la versión histórica obtenida por
+  loaders server-side, nunca el snapshot JSONB crudo. La policy permite solo las
+  rutas de artefacto acotadas bajo ADMIN/instructor y el middleware falla cerrado
+  para otras rutas. La proyección INSTRUCTOR sigue excluyendo CI/contacto/finanzas;
+  El owner reportó verificación focal live de los seis GET/download paths en QA;
+  esto no equivale a release ni full gate F8.
 - Migration 0021 solo se aplicó en stacks QA temporales; no se aplicó a DB
   canónica/cloud. Integridad/privacidad y estado parcial están en
   [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y
   [`DATA_MODEL.md`](DATA_MODEL.md).
 
-### Gestión multi-ADMIN aprobada para Fase 8 (pendiente)
+### Gestión multi-ADMIN (backend PR 283; UI feature)
 
-El proyecto aprobó crear cuentas ADMIN desde servidor mediante Supabase Auth privilegiado, con permisos iguales, y un lifecycle limitado por actividad de actor/dependencias. Cuentas con historia conservan UUID y trazabilidad; el guard de lifecycle debe serializarse y no puede dejar cero ADMIN activos. La contraseña inicial nunca se persiste, registra, expone en DTO ni audita. El flujo aún no está implementado; criterios de actividad, outbox, locks y recuperación están en [`docs/PLAN.md`](PLAN.md). No asumir rol `ROOT`, auto-baja prohibida ni operación de borrado físico de la fila `users`.
+El backend de cuentas ADMIN se integró por PR 283. La UI SSR y navegación están
+en `feat/admin-account-interface`, aún no integradas ni disponibles en release.
+El servidor revalida actor ADMIN y acción/target vigentes; permisos son iguales,
+sin `ROOT`. La contraseña inicial solo pasa por Auth Admin API y nunca se
+persiste, registra ni retorna. Lifecycle conserva UUID/tombstone e historial,
+usa una intención durable para baja Auth fuera de la transacción, y serializa
+actividad/último ADMIN. El código permite auto-baja si queda otro ADMIN activo;
+no añadir una prohibición general. Migration 0022 solo se aplicó a QA, no a
+canónico/cloud. Detalle en [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
 
 ## RUTAS
 

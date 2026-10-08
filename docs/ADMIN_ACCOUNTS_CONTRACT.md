@@ -1,17 +1,20 @@
 # Contrato de cuentas ADMIN (Fase 8)
 
-Este contrato reúne el backend de aprovisionamiento/lifecycle y la interfaz
-implementada en `feat/admin-account-interface` (base `4bed53b`). Son cambios en
-feature, aún no integrados a `development` ni liberados. El plan y evidencia
-focal están en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
+Este contrato reúne el backend de aprovisionamiento/lifecycle integrado por PR
+283 y la interfaz implementada en `feat/admin-account-interface` (base
+`4bed53b`), aún no integrada a `development` ni liberada. Migración 0022 se probó
+solo en QA. Plan y evidencia focal en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 
 ## Reglas de cuenta
 
 - Todas las cuentas ADMIN tienen permisos iguales; no existe `ROOT` ni
   privilegio especial de la primera cuenta.
 - ADMIN activo crea una cuenta con nombre, correo y contraseña inicial vía
-  Supabase Auth Admin API server-side. Se crea identidad confirmada y usuario
-  interno ACTIVE con rol exclusivo ADMIN. El secreto no se almacena ni aparece
+  Supabase Auth Admin API server-side. El correo se normaliza y la contraseña
+  sigue la política Auth existente (12–128 caracteres). Se crea identidad
+  confirmada y usuario interno ACTIVE, proveedor EMAIL y rol exclusivo ADMIN;
+  se audita con UUID real del actor. El actor se revalida antes/después de Auth
+  y dentro de la escritura DB. El secreto no se almacena ni aparece
   en DTO, respuesta o auditoría; no se exige cambiar la contraseña en el primer
   login. El flujo normal de cambio de contraseña sigue disponible.
 - El nombre se puede editar en cuentas ADMIN exclusivas con revisión optimista;
@@ -29,13 +32,28 @@ focal están en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
   pending; el reintento apunta a la misma identidad. La actividad incluye uso
   como actor o dependencia histórica; ser target de una acción de otro actor o
   un login aislado no basta.
+- Si Auth falla al completar una baja, la cuenta queda DISABLED/pending; el
+  reintento solo acepta `user_not_found` explícito como identidad ya ausente.
+  Otros 404/errores de proveedor no se consideran éxito ni se recrea la identidad.
 - Renombrar un actor no reescribe evidencia histórica: el cierre conserva el
   UUID y el nombre capturado al emitir cada snapshot, de acuerdo con el contrato
   de cierre académico.
 
-La implementación del backend, DTO, catálogo de actividad, límites de
-compensación y migration 0022 se detallan en el código de `src/domain/admin-accounts`,
-`src/application/admin-accounts` y `src/server/admin-accounts`.
+El DTO expone UUID, nombre, email, estado, revision, exclusividad ADMIN,
+actividad, eliminación pendiente y la única acción válida. No cuenta como uso
+ser actor solo el hecho de figurar como target de una creación ajena; login
+aislado tampoco cuenta, aunque dependencias persistidas de actor sí retienen.
+Autorización fresca del actor/ownership y el guard global de lifecycle viven en
+el repositorio. Auth ocurre fuera de la transacción DB. La compensación de
+creación se limita al UUID recién creado; si falla también la compensación puede
+quedar identidad Auth huérfana sin reconciliador automático documentado.
+
+La migration candidata `0022_phase8_admin_accounts` crea
+`admin_account_deletions`, intención durable con FK restrictivas, RLS, grants
+Data API revocados y trigger de evidencia inmutable. Se probó en QA aislado,
+ledger 22→23; no se aplicó a canónico/cloud (ledger 21). El código vive en
+`src/domain/admin-accounts`, `src/application/admin-accounts` y
+`src/server/admin-accounts`.
 
 ## Páginas y autorización
 
@@ -69,10 +87,14 @@ desde datos enviados por el navegador.
 
 ## Estado y verificación
 
-Este feature tiene 32 unit tests y dos E2E de cuentas (2/2 first-pass sin
-retries), además de lint/format/typecheck/build PASS reportados. Los checks y la
-prueba real de E2E usan stack temporal aislado, no acreditan release ni el gate
-integrado de Fase 8. Hubo intentos QA previos focales con errores de expectativas
-o locators; se conservan como historial, no como suites exitosas. La navegación,
-policy y páginas ADMIN están implementadas en esta rama, pero no integradas en
-`development`.
+Los helpers `loadAdminAccounts`/`loadAdminAccount` y `handleAdminAccountPost`
+delegan a repositorio/casos de uso. POST valida Origin, allowlist y body de 8192
+bytes; respuestas son `private, no-store`/`nosniff`. Actor/target vienen del
+contexto de sesión y ruta, nunca de body. Las acciones son `create`, `name`,
+`delete`, `deactivate`, `activate`, `retry-delete`.
+
+La UI de feature tiene 32 tests unitarios y dos E2E (2/2 first-pass sin retries),
+además de checks lint/format/typecheck/build reportados PASS. QA E2E usó stack
+temporal aislado. Se reportaron intentos focales previos con expectations/locators
+fallidos; no se cuentan como suite exitosa. UI/policy ADMIN permanece feature,
+sin integración a development ni release. El backend PR 283 está en development.

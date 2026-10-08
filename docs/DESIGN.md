@@ -597,7 +597,7 @@ El ajuste compacto/responsive del panel y formulario de interesados quedó integ
 
 ## Correcciones administrativas aprobadas (implementadas en fuente; gate final pendiente)
 
-Los ajustes siguientes se implementaron en las ramas integradas PRs 258–264 y en el head de feedback/navegación `d057d2d`. Las verificaciones fueron focales por stage y no constituyen el gate combinado; los límites están en [`TESTING.md`](TESTING.md). Core/UI de cierre y exports tienen implementación descrita en `PLAN.md`; la UI de gestión multi-ADMIN está en el feature actual y aún no está integrada a `development`.
+Los ajustes siguientes se implementaron en las ramas integradas PRs 258–264 y en el head de feedback/navegación `d057d2d`. Las verificaciones fueron focales por stage y no constituyen el gate combinado; límites en [`TESTING.md`](TESTING.md). Core/UI de cierre y exports se integraron por PRs 280–282. La UI multi-ADMIN está implementada en `feat/admin-account-interface`, pendiente de integración.
 
 - **Edición inline compartida:** lápiz/guardar/cancelar por atributo, posición y tamaño estables; comunicar dirty/validación y mantener controles/iconos accesibles. Loading no debe sustituir el layout ni destruir el SVG/estado del control. Mostrar errores persistentes junto al campo y conflictos accionables; Sileo solo para feedback transitorio no duplicado.
 - **Instructor y perfil:** nombre como texto y correo de solo lectura sin decoración de input editable. El listado de cursos presenta datos personales primero y una explicación/bloqueo debajo junto a los cursos pertinentes. Centrar la tarjeta global del perfil y alinear Google en una fila propia.
@@ -609,6 +609,24 @@ Los ajustes siguientes se implementaron en las ramas integradas PRs 258–264 y 
 La revisión manual prevista cubre desktop/mobile, tabla y lista, light/dark, teclado, errores y loading mediante Playwright CLI. No reemplaza pruebas de reglas de negocio ni justifica tests E2E acoplados a CSS o copy.
 
 En las verificaciones focales de estos cambios se usaron páginas/DTOs y respuestas sintéticas interceptadas cuando se indica en [`TESTING.md`](TESTING.md); no equivalen a una auditoría completa de rutas privadas, persistencia/Auth ni al gate de release.
+
+## Cierre académico de grupo (Fase 8, UI integrada)
+
+`feat/academic-closure-interface` implementa SSR para el workspace de cierre por
+grupo y el detalle de versiones históricas para ADMIN e INSTRUCTOR. El workspace
+distingue resultado provisional y versión oficial; lista blockers con links a
+evaluaciones/sesiones, conserva breadcrumbs de curso/grupo y presenta actor y
+timestamp congelados del snapshot. Cerrar requiere confirmación accesible breve
+(Escape/retorno de foco); reabrir solo ADMIN y motivo obligatorio con error
+inline. En estado cerrado, notas/asistencia se presentan readonly. SSR/POST y
+fallback HTML sin JS conservan requestKey/revision y drafts al resolver errores
+409/422; la UI no sustituye guards server-side.
+
+Los links por versión consumen adapters PDF/CSV en el mismo árbol de PRs 281/282.
+El owner reportó verificación focal de los seis GET/download paths en QA; no
+equivale a full release/gate F8. UI reportó 21 unit/137 assertions y 3 E2E
+first-pass, además de revisión manual de 12 capturas responsive/light-dark; ver
+[`TESTING.md`](TESTING.md).
 
 ## Cuentas de administradores (UI Fase 8, feature no integrado)
 
@@ -629,4 +647,5 @@ pending, drafts no secretos y recarga son contextuales; al auto-desactivar o
 eliminar, el servidor termina la sesión redirigiendo a login. Tarjetas y
 acciones evitan overflow por emails/nombres largos. Pruebas UI focales y límites
 de responsive/teclado están en [`TESTING.md`](TESTING.md). La sección aún no está
-integrada en `development` ni liberada.
+integrada en `development` ni liberada. El backend está en development por PR
+283; la presentación ADMIN no.

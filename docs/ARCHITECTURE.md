@@ -271,29 +271,33 @@ El agregado nuevo mantiene las capas del monolito: reglas/tipos en
 `src/server/academic-closure`, persistencia en
 `src/server/db/repositories/academic-closure-*` y schema/migración Drizzle.
 `loadAcademicClosure`, `loadAcademicClosureVersion` y `handleClosurePost` son
-helpers server-side reutilizados por las páginas SSR de workspace/historial
-integradas por PR 282. PR 281 añade renderers y seis GET download adapters; la
-route policy registra workspace, versión y documento con roles acotados por
-contexto, y el loader revalida ownership. No se dispone de evidencia live-browser
-de descarga en esta documentación. El cierre transaccional reutiliza advisory
-locks, bloquea curso/grupo y serializa estado, snapshot, receipt y auditoría con
-escrituras de notas, asistencia, calendario y membresía destino. Los guards se
-comparten entre repositorios; 0021 añade trigger DB para evidencia cerrada.
-Contrato y límites en
-[`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md).
+helpers server-side reutilizados por las páginas SSR workspace/historial
+integradas por PR 282. PR 281 añadió renderers PDF/CSV y seis GET adapters sobre
+`loadAcademicClosureVersion`. La policy registra patrones acotados workspace,
+versión y documentos: ADMIN opera en `/app/cursos`, INSTRUCTOR en `/app/mis-cursos`
+con ownership revalidado por loaders. Evitar wildcards amplios. El cierre
+transaccional bloquea curso/grupo y serializa estado, snapshot, receipt y auditoría
+con escrituras de notas, asistencia, calendario y membresía destino; 0021 añade
+trigger DB para evidencia cerrada. El owner reportó una verificación focal live
+de los seis GET/download paths en QA; esto no equivale al gate/release F8.
+Contrato y límites en [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md).
 
-### Cuentas ADMIN (Fase 8, feature UI/backend)
+### Cuentas ADMIN (backend PR 283; UI en feature)
 
-El backend vive en reglas/DTO `src/domain/admin-accounts`, casos de uso
-`src/application/admin-accounts`, helpers HTTP/loader/Auth gateway en
-`src/server/admin-accounts` y repositorio Drizzle. Esta interfaz agrega páginas
-Astro en `/app/administradores`, `/nuevo` y `/:id`, componentes SSR en
-`src/components/admin-accounts` y acceso client enhancement pequeño; los POST
-delegan siempre al helper/caso de uso server-side, sin reglas de negocio en UI.
-El route policy fija explícitamente ADMIN para list/create y UUID detail; la
-navegación añade el acceso a todos los usuarios ADMIN. El middleware mantiene
-fallo cerrado para el resto. No existe rol ROOT ni interfaz que altere roles o
-perfiles profesionales. Esta UI/feature aún no se integra a development. Ver
+El backend sigue capas: reglas/DTO en `src/domain/admin-accounts`, casos de uso
+`src/application/admin-accounts`, helpers HTTP/loaders/Auth gateway en
+`src/server/admin-accounts` y repositorio Drizzle. PR 283 integró el backend a
+development. Migration 0022 añade la intención durable/inmutable de baja; tablas
+`users`/`user_roles` se reutilizan. Auth queda fuera de la transacción PostgreSQL;
+el repositorio revalida actor, revisión y actividad/dependencias bajo locks,
+incluido el guard global del último ADMIN.
+
+La interfaz aún no integrada en `feat/admin-account-interface` agrega SSR en
+`/app/administradores`, `/nuevo` y `/:id`, componentes en
+`src/components/admin-accounts` y mejoras progresivas de cliente. POST y lectura
+delegan a helpers/casos server-side, sin lógica de negocio en UI. Route policy
+registra ADMIN para lista/creación/UUID detail y navegación para cualquier ADMIN;
+no hay ROOT ni interfaz de promoción/edición de perfiles. Ver
 [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
 
 El POST público limita y parsea el body en el adaptador server-side, valida Origin y llama el caso de uso de interés. Un limiter persistente usa PostgreSQL y un HMAC server-only sobre `Astro.clientAddress`; no confía en forwarded headers. Sin secreto válido o dirección de cliente confiable, el flujo falla cerrado. Los defaults técnicos y requisitos de despliegue se describen en el contrato y en `docs/DEPLOYMENT.md`; no implican que los valores cloud estén configurados.

@@ -132,17 +132,24 @@ Para disponibilidad se consideran grupos `PLANNED` del instructor entre cursos �
 
 La migración `0016_instructor_lifecycle_outbox` añade `instructor_account_deletions`: registro de eliminación pendiente/completada con instructor, actor, `auth_user_id` y tiempos de solicitud/fin; FK `RESTRICT` a users/actor, índice por actor, RLS habilitado y grants Data API revocados. El repositorio conserva una fila tombstone mínima tras quitar perfil/rol para respetar referencias de auditoría, y mantiene el estado bloqueado para reintentar la etapa Auth externa si falla. Solo permite eliminación cuando no existe historia/dependencia y el usuario tiene rol exclusivo `INSTRUCTOR`; perfiles con historia conservan identidad. La migración se integró en `development` mediante PR 134 y se aplicó localmente sin reset (ledger 16→17); el release posterior de Fase 5 lleva cloud a ledger 18. La fuente final validada en PR 136 pasó integration 98 y E2E 120/120.
 
-#### Lifecycle de cuentas ADMIN (0022, feature no integrado)
+#### Lifecycle de cuentas ADMIN (schema candidato 0022; backend PR 283)
 
-La migración candidata `0022_phase8_admin_accounts` crea
-`admin_account_deletions`, con intención de baja durable: `user_id`, `actor_id`,
-UUID Auth objetivo, revisión de solicitud y tiempos de creación/completado. FK a
-usuario y actor son `RESTRICT`; tabla con RLS, grants Data API revocados y trigger
-que conserva inmutable la evidencia, permitiendo solo completar una intención
-pendiente. La cuenta `users` se conserva como tombstone para referencias de actor
-e historial. La migración se aplicó solo al QA temporal del feature (ledger
-22→23); el Supabase local canónico y cloud permanecen en ledger 21. La interfaz
-no añade campos al modelo `users`; detalles operativos y autorización están en
+La migración candidata `0022_phase8_admin_accounts` añade
+`admin_account_deletions` mediante `drizzle/0022_phase8_admin_accounts.sql`.
+Registra por `user_id` la intención de
+baja, `actor_id`, UUID Auth objetivo, revisión observada, timestamps de solicitud
+y finalización. Las FK a usuario/actor son `RESTRICT`; RLS está habilitado, los
+grants Data API se revocan incluyendo `service_role`, y un trigger impide borrar
+la evidencia o modificar sus campos; solo permite pasar `completed_at` de NULL
+a un instante válido. La fila `users` permanece como tombstone para preservar
+referencias actor/dependencia.
+
+La migración tiene timestamp `1791414145526` y SHA-256
+`c9792638377a89d162c64c951596b680c39c4f4017589f61a72844e85f55b856`. Se aplicó
+solo en el stack aislado de QA del feature, avanzando su ledger de 22 a 23; no se
+aplicó al Supabase local canónico ni cloud, que permanecen en ledger 21. La
+implementación del repositorio/actividad está en development por PR 283. La UI
+no añade campos de datos a `users`; contrato en
 [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
 
 ### Group

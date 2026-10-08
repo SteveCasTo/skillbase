@@ -364,6 +364,19 @@ En ese estado pre-release, producción seguía en Fase 7 `master` `4afa485`, Ver
 
 La nota intermedia de workflow pendiente arriba quedó supersedida cuando PR 279 se integró a `development`. El CI final `37684331005` pasó con 376 unit/2266 assertions, 142 integration/1077 assertions y 134/134 E2E (69+65), first-pass tras remediar provisioning APT. El shard fijo a Ubuntu 24.04 y sus timeouts/fuentes HTTPS quedaron verificados en ambos runners; no se cambia `master`/deploy por un chore separado.
 
-El core de cierre está integrado por PR 280, export adapters por PR 281 y UI workspace/history por PR 282. Las migraciones candidatas 0021/0022 se probaron solo en stacks QA aislados (ledger 21→22→23); el Supabase local canónico y cloud permanecen en ledger 21. UI y backend de cuentas ADMIN están en `feat/admin-account-interface`, aún sin integrar ni desplegar; no hay rutas ADMIN en development. La verificación live de descargas PDF/CSV por browser no se afirma aquí. Producción sigue en PR 278 (`master` `91beccf8`, Vercel `READY`); no se afirma cierre F8 ni lifecycle ADMIN disponible allí.
+El core cierre (PR 280), export adapters (PR 281) y UI workspace/history/policy
+(PR 282) están integrados en `development`. El backend multi-ADMIN se integró por
+PR 283; la UI de cuentas sigue en `feat/admin-account-interface` y no está
+integrada ni desplegada. El CI de PR 283 pasó run `37717389828`: 400 unit/2530
+assertions, 160 integration/1314 assertions y 137 E2E (72+65), first-pass sin
+flakies, skips ni retries reportados.
+
+Las migraciones candidatas 0021/0022 se aplicaron solo a QA aislado (ledger
+temporal 21→22→23); Supabase canónico y cloud permanecen en ledger 21. El owner
+reportó verificación focal live de los seis endpoints de descarga en QA; esto no
+equivale a release ni full gate F8. Producción sigue en PR 278 (`master`
+`91beccf8`, Vercel `READY`); no afirmar UI ADMIN ni lifecycle F8 disponible allí.
 
 **Actualización del gate shards:** el status «requiere nuevo run» del registro previo quedó supersedido por PR 279/run `37684331005`, que pasó los dos shards y el agregador estricto tras la remediación APT. PR 279 se integró a `development`; no movió producción ni el ledger cloud.
+
+Los adapters de export se integraron por PR 281 y la UI/policy de cierre por PR 282. La verificación focal reportada de descarga no implica disponibilidad en producción ni reemplaza el gate/release F8. Cloud/canónico permanecen en ledger 21.
