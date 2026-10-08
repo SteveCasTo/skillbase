@@ -11,6 +11,7 @@ import {
   courseTypes,
   courses,
   users,
+  userRoles,
 } from "@/server/db/schema";
 import { validateCourseData } from "@/domain/courses/validation";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
@@ -77,10 +78,18 @@ beforeEach(async () => {
   instructorId = (await createInstructorFixture(database.db)).id;
   const [actor] = await database.db
     .insert(users)
-    .values({ email: "course.actor@repository.test", name: "Course Actor" })
+    .values({
+      email: "course.actor@repository.test",
+      name: "Course Actor",
+      status: "ACTIVE",
+      authUserId: crypto.randomUUID(),
+    })
     .returning();
   if (!actor) throw new Error("Missing actor");
   actorId = actor.id;
+  await database.db
+    .insert(userRoles)
+    .values({ userId: actorId, roleCode: "ADMIN" });
   formatId = (
     await formats.create(
       "30 horas",
@@ -156,9 +165,14 @@ describe("course format persistence", () => {
       .values({
         email: "other.course.actor@repository.test",
         name: "Other actor",
+        status: "ACTIVE",
+        authUserId: crypto.randomUUID(),
       })
       .returning();
     if (!other) throw new Error("Missing actor");
+    await database.db
+      .insert(userRoles)
+      .values({ userId: other.id, roleCode: "ADMIN" });
     const independent = await repository.create(input(), other.id, request);
     expect(independent.id).not.toBe(first.id);
     expect("createFingerprint" in first).toBe(false);

@@ -32,6 +32,7 @@ import {
 
 type Database = PostgresJsDatabase<typeof schema>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+import { requireFreshRegistrationActor } from "./registration-support";
 type Row = typeof schema.courses.$inferSelect;
 type Revision = typeof schema.courseTypeRevisions.$inferSelect;
 
@@ -298,6 +299,8 @@ export class DrizzleCourseRepository implements CourseRepository {
   ): Promise<AdminCourseDto & { creationRevision?: Date }> {
     return persistence("create", () =>
       this.db.transaction(async (tx) => {
+        await lockInstructorSchedules(tx);
+        await requireFreshRegistrationActor(tx, actorId);
         await lockInstructorSchedules(tx, undefined, input.instructorId);
         await assertActiveInstructor(tx, input.instructorId);
         if (request) {
@@ -393,6 +396,8 @@ export class DrizzleCourseRepository implements CourseRepository {
   ): Promise<AdminCourseDto> {
     return persistence("update", () =>
       this.db.transaction(async (tx) => {
+        await lockInstructorSchedules(tx);
+        await requireFreshRegistrationActor(tx, actorId);
         await lockInstructorSchedules(tx, id, input.instructorId);
         const [previous] = await tx
           .select()
@@ -546,6 +551,8 @@ export class DrizzleCourseRepository implements CourseRepository {
   ): Promise<AdminCourseDto> {
     return persistence("transition", () =>
       this.db.transaction(async (tx) => {
+        await lockInstructorSchedules(tx);
+        await requireFreshRegistrationActor(tx, actorId);
         await lockInstructorSchedules(tx, id);
         const [previous] = await tx
           .select()
@@ -663,6 +670,7 @@ export class DrizzleCourseRepository implements CourseRepository {
       this.db.transaction(async (tx) => {
         // Serialize competing selections; the partial unique index also protects direct writes.
         await lockInstructorSchedules(tx, id);
+        await requireFreshRegistrationActor(tx, actorId);
         await tx.execute(sql`select pg_advisory_xact_lock(20260915, 2)`);
         const [target] = await tx
           .select()

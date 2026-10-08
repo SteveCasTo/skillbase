@@ -9,6 +9,7 @@ import {
 import { InstructorError } from "@/domain/instructors/profile";
 import * as schema from "@/server/db/schema";
 import { lockInstructorSchedules } from "./instructor-schedule";
+import { requireFreshRegistrationActor } from "./registration-support";
 
 type Database = PostgresJsDatabase<typeof schema>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -97,6 +98,7 @@ export class DrizzleInstructorLifecycleRepository implements InstructorLifecycle
 
   private async lock(tx: Transaction, id: string, actorId: string) {
     await lockInstructorSchedules(tx, undefined, id);
+    await requireFreshRegistrationActor(tx, actorId);
     const [actor] = await tx
       .select({ id: schema.users.id })
       .from(schema.users)
