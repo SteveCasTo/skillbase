@@ -104,351 +104,493 @@ async function fillPerson(page: Page) {
     .fill(`registration-${crypto.randomUUID()}@test.invalid`);
   return ci;
 }
-test("ADMIN creates, edits global participant, transfers, cancels and records real cash without reload", async ({
-  page,
-  context,
-}, testInfo) => {
-  const f = await fixture(page, context);
-  await page.goto(`/app/preinscripciones/nueva?courseId=${f.id}`);
-  await expect(page.locator("#registration-create")).toHaveAttribute(
-    "data-http-bound",
-    "true",
-  );
-  const create = page.getByRole("button", {
-    name: "Registrar preinscripción",
-    exact: true,
+// Preserve first-attempt evidence for this scenario without tracing other cases.
+// Trace is worker-scoped in Playwright; describe-level test.use is unsupported.
+const registrationTest = test.extend({
+  trace: "retain-on-failure",
+});
+registrationTest.describe(() => {
+  const diagnostics = new WeakMap<Page, Record<string, unknown>[]>();
+  const safeUrl = (raw: string) => {
+    try {
+      const url = new URL(raw);
+      return `${url.origin}${url.pathname}`;
+    } catch {
+      return "[unavailable URL]";
+    }
+  };
+  // Classify free-form messages rather than attaching possible input/secrets.
+  const category = (message: string) =>
+    /hydrat/iu.test(message)
+      ? "hydration"
+      : /dynamically imported module|module script|importing a module/iu.test(
+            message,
+          )
+        ? "module-load"
+        : /net::ERR_|Failed to fetch/iu.test(message)
+          ? "network"
+          : "other";
+  registrationTest.beforeEach(async ({ page }) => {
+    const started = Date.now();
+    const events: Record<string, unknown>[] = [];
+    diagnostics.set(page, events);
+    const record = (event: Record<string, unknown>) => {
+      if (events.length === 50) events.shift();
+      events.push({ elapsedMs: Date.now() - started, ...event });
+    };
+    page.on("console", (message) => {
+      if (!["error", "warning"].includes(message.type())) return;
+      const location = message.location();
+      record({
+        kind: "console",
+        type: message.type(),
+        category: category(message.text()),
+        url: safeUrl(location.url),
+        line: location.lineNumber,
+        column: location.columnNumber,
+      });
+    });
+    page.on("pageerror", (error) =>
+      record({
+        kind: "pageerror",
+        name: /^(?:Error|[A-Za-z]{1,30}Error)$/u.test(error.name)
+          ? error.name
+          : "Error",
+        category: category(error.message),
+      }),
+    );
+    page.on("requestfailed", (request) =>
+      record({
+        kind: "requestfailed",
+        url: safeUrl(request.url()),
+        resourceType: request.resourceType(),
+        networkError: request
+          .failure()
+          ?.errorText.match(/net::ERR_[A-Z_]+/u)?.[0],
+      }),
+    );
+    page.on("response", (response) => {
+      if (
+        response.status() < 400 ||
+        response.request().resourceType() !== "script"
+      )
+        return;
+      record({
+        kind: "module-http-error",
+        url: safeUrl(response.url()),
+        status: response.status(),
+      });
+    });
   });
-  await expect(create).toBeDisabled();
-  for (const theme of ["light", "dark"]) {
-    await page.setViewportSize({ width: 1280, height: 900 });
-    const dark = await page
-      .locator("html")
-      .evaluate((element) => element.classList.contains("dark"));
-    if (dark !== (theme === "dark"))
-      await page
-        .getByRole("button", { name: /Cambiar a modo/ })
-        .filter({ visible: true })
+  registrationTest.afterEach(async ({ page }, testInfo) => {
+    const events = diagnostics.get(page) ?? [];
+    diagnostics.delete(page);
+    if (testInfo.status === testInfo.expectedStatus) return;
+    let islands: unknown = { unavailable: true };
+    try {
+      islands = await page.locator("astro-island").evaluateAll((elements) =>
+        elements
+          .filter((island) =>
+            island
+              .getAttribute("component-url")
+              ?.includes("RegistrationActionDialog"),
+          )
+          .slice(0, 10)
+          .map((island) => ({
+            client: island.getAttribute("client"),
+            ssr: island.hasAttribute("ssr"),
+            parentSsr: Boolean(
+              island.parentElement?.closest("astro-island[ssr]"),
+            ),
+            triggerTag: island.querySelector("[data-operation-trigger]")
+              ?.tagName,
+            target: island
+              .querySelector("[data-operation-trigger]")
+              ?.getAttribute("data-operation-trigger"),
+          })),
+      );
+    } catch {
+      // A closed/crashed page must not replace the original failure.
+    }
+    await testInfo.attach("registration-hydration-diagnostics", {
+      body: JSON.stringify({ events, islands }),
+      contentType: "application/json",
+    });
+  });
+  registrationTest(
+    "ADMIN creates, edits global participant, transfers, cancels and records real cash without reload",
+    async ({ page, context }, testInfo) => {
+      const f = await fixture(page, context);
+      await page.goto(`/app/preinscripciones/nueva?courseId=${f.id}`);
+      await expect(page.locator("#registration-create")).toHaveAttribute(
+        "data-http-bound",
+        "true",
+      );
+      const create = page.getByRole("button", {
+        name: "Registrar preinscripción",
+        exact: true,
+      });
+      await expect(create).toBeDisabled();
+      for (const theme of ["light", "dark"]) {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        const dark = await page
+          .locator("html")
+          .evaluate((element) => element.classList.contains("dark"));
+        if (dark !== (theme === "dark"))
+          await page
+            .getByRole("button", { name: /Cambiar a modo/ })
+            .filter({ visible: true })
+            .click();
+        for (const width of [320, 768, 1280]) {
+          await page.setViewportSize({ width, height: 900 });
+          expect(
+            await page.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth,
+            ),
+          ).toBe(true);
+          await page.screenshot({
+            path: testInfo.outputPath(
+              `registration-form-${theme}-${width}.png`,
+            ),
+          });
+        }
+      }
+      const personCi = await fillPerson(page);
+      await page.getByRole("combobox", { name: "Grupo", exact: true }).click();
+      await page.getByRole("option").first().click();
+      await page.getByLabel("Efectivo recibido (Bs)").fill("25.50");
+      await expect(create).toBeEnabled();
+      let releaseDetail!: () => void;
+      let detailRequested!: () => void;
+      const pendingDetail = new Promise<void>((resolve) => {
+        releaseDetail = resolve;
+      });
+      const detailRequest = new Promise<void>((resolve) => {
+        detailRequested = resolve;
+      });
+      await page.route("**/app/preinscripciones/*", async (route) => {
+        if (
+          route.request().method() === "GET" &&
+          /^\/app\/preinscripciones\/[0-9a-f-]+$/u.test(
+            new URL(route.request().url()).pathname,
+          )
+        ) {
+          detailRequested();
+          await pendingDetail;
+        }
+        await route.continue();
+      });
+      try {
+        await create.click();
+        await detailRequest;
+        await expect(page.locator("[data-navigation-skeleton]")).toBeVisible();
+        await expect(page.locator("[data-private-page]")).toHaveAttribute(
+          "aria-hidden",
+          "true",
+        );
+        await expect(
+          page.locator("#registration-create [data-form-error]"),
+        ).toHaveText("");
+        for (const error of await page
+          .locator("#registration-create [data-field-error]")
+          .all())
+          await expect(error).toHaveText("");
+      } finally {
+        releaseDetail();
+      }
+      await expect(page).toHaveURL(/\/app\/preinscripciones\/[0-9a-f-]+$/u);
+      await page.unroute("**/app/preinscripciones/*");
+      await expect(
+        page.getByRole("region", { name: "Resumen financiero" }),
+      ).toContainText("Bs 74,50");
+      await page.evaluate(() => {
+        (
+          window as Window & { registrationMarker?: string }
+        ).registrationMarker = "kept";
+      });
+      const payment = page.locator("#registration-payment");
+      const actions = page.getByRole("group", {
+        name: "Acciones de preinscripción",
+      });
+      const financialActions = page.getByRole("group", {
+        name: "Acciones financieras",
+      });
+      await financialActions
+        .getByRole("button", { name: "Registrar abono", exact: true })
         .click();
-    for (const width of [320, 768, 1280]) {
-      await page.setViewportSize({ width, height: 900 });
+      await expect(payment).toHaveAttribute("data-http-bound", "true");
+      await payment.getByLabel("Importe (Bs)").fill("0.01");
+      await payment
+        .getByLabel("Motivo (opcional)", { exact: true })
+        .fill("Segundo pago real");
+      const receiptKey = await payment
+        .locator('[name="requestKey"]')
+        .inputValue();
+      const interrupted = "**/app/preinscripciones/*?operation=payment";
+      await page.route(interrupted, async (route) => {
+        expect((await route.fetch()).status()).toBe(200);
+        await route.abort("failed");
+        await page.unroute(interrupted);
+      });
+      await payment.getByRole("button", { name: "Registrar abono" }).click();
+      await expect(
+        page.getByRole("button", {
+          name: /Sin confirmación.*Reintenta sin cambiar los datos/u,
+        }),
+      ).toBeVisible();
+      await expect(payment.getByLabel("Importe (Bs)")).toHaveValue("0.01");
+      await expect(payment.locator('[name="requestKey"]')).toHaveValue(
+        receiptKey,
+      );
+      await payment.getByRole("button", { name: "Registrar abono" }).click();
+      await expect(
+        page.getByRole("region", { name: "Resumen financiero" }),
+      ).toContainText("Bs 74,49");
+      await expect(
+        page
+          .getByRole("region", { name: "Historial de efectivo" })
+          .getByText("Bs 0,01", { exact: true }),
+      ).toHaveCount(1);
       expect(
         await page.evaluate(
-          () => document.documentElement.scrollWidth <= innerWidth,
+          () =>
+            (window as Window & { registrationMarker?: string })
+              .registrationMarker,
         ),
-      ).toBe(true);
-      await page.screenshot({
-        path: testInfo.outputPath(`registration-form-${theme}-${width}.png`),
+      ).toBe("kept");
+      const participantSection = page.getByRole("region", {
+        name: "Datos del participante",
       });
-    }
-  }
-  const personCi = await fillPerson(page);
-  await page.getByRole("combobox", { name: "Grupo", exact: true }).click();
-  await page.getByRole("option").first().click();
-  await page.getByLabel("Efectivo recibido (Bs)").fill("25.50");
-  await expect(create).toBeEnabled();
-  let releaseDetail!: () => void;
-  let detailRequested!: () => void;
-  const pendingDetail = new Promise<void>((resolve) => {
-    releaseDetail = resolve;
-  });
-  const detailRequest = new Promise<void>((resolve) => {
-    detailRequested = resolve;
-  });
-  await page.route("**/app/preinscripciones/*", async (route) => {
-    if (
-      route.request().method() === "GET" &&
-      /^\/app\/preinscripciones\/[0-9a-f-]+$/u.test(
-        new URL(route.request().url()).pathname,
-      )
-    ) {
-      detailRequested();
-      await pendingDetail;
-    }
-    await route.continue();
-  });
-  try {
-    await create.click();
-    await detailRequest;
-    await expect(page.locator("[data-navigation-skeleton]")).toBeVisible();
-    await expect(page.locator("[data-private-page]")).toHaveAttribute(
-      "aria-hidden",
-      "true",
-    );
-    await expect(
-      page.locator("#registration-create [data-form-error]"),
-    ).toHaveText("");
-    for (const error of await page
-      .locator("#registration-create [data-field-error]")
-      .all())
-      await expect(error).toHaveText("");
-  } finally {
-    releaseDetail();
-  }
-  await expect(page).toHaveURL(/\/app\/preinscripciones\/[0-9a-f-]+$/u);
-  await page.unroute("**/app/preinscripciones/*");
-  await expect(
-    page.getByRole("region", { name: "Resumen financiero" }),
-  ).toContainText("Bs 74,50");
-  await page.evaluate(() => {
-    (window as Window & { registrationMarker?: string }).registrationMarker =
-      "kept";
-  });
-  const payment = page.locator("#registration-payment");
-  const actions = page.getByRole("group", {
-    name: "Acciones de preinscripción",
-  });
-  const financialActions = page.getByRole("group", {
-    name: "Acciones financieras",
-  });
-  await financialActions
-    .getByRole("button", { name: "Registrar abono", exact: true })
-    .click();
-  await expect(payment).toHaveAttribute("data-http-bound", "true");
-  await payment.getByLabel("Importe (Bs)").fill("0.01");
-  await payment
-    .getByLabel("Motivo (opcional)", { exact: true })
-    .fill("Segundo pago real");
-  const receiptKey = await payment.locator('[name="requestKey"]').inputValue();
-  const interrupted = "**/app/preinscripciones/*?operation=payment";
-  await page.route(interrupted, async (route) => {
-    expect((await route.fetch()).status()).toBe(200);
-    await route.abort("failed");
-    await page.unroute(interrupted);
-  });
-  await payment.getByRole("button", { name: "Registrar abono" }).click();
-  await expect(
-    page.getByRole("button", {
-      name: /Sin confirmación.*Reintenta sin cambiar los datos/u,
-    }),
-  ).toBeVisible();
-  await expect(payment.getByLabel("Importe (Bs)")).toHaveValue("0.01");
-  await expect(payment.locator('[name="requestKey"]')).toHaveValue(receiptKey);
-  await payment.getByRole("button", { name: "Registrar abono" }).click();
-  await expect(
-    page.getByRole("region", { name: "Resumen financiero" }),
-  ).toContainText("Bs 74,49");
-  await expect(
-    page
-      .getByRole("region", { name: "Historial de efectivo" })
-      .getByText("Bs 0,01", { exact: true }),
-  ).toHaveCount(1);
-  expect(
-    await page.evaluate(
-      () =>
-        (window as Window & { registrationMarker?: string }).registrationMarker,
-    ),
-  ).toBe("kept");
-  const participantSection = page.getByRole("region", {
-    name: "Datos del participante",
-  });
-  await participantSection
-    .getByRole("button", { name: "Editar nombre", exact: true })
-    .click();
-  const firstName = participantSection.getByLabel("Nombre", { exact: true });
-  await firstName.fill("Sintética");
-  const transfer = page.locator("#registration-transfer");
-  await actions
-    .getByRole("button", { name: "Cambiar grupo", exact: true })
-    .click();
-  await transfer.getByRole("combobox", { name: "Grupo de destino" }).click();
-  await page
-    .getByRole("option")
-    .filter({ hasNotText: "Selecciona" })
-    .last()
-    .click();
-  await transfer.getByRole("button", { name: "Cambiar grupo" }).click();
-  await expect(page.locator("#registration-transfer")).toHaveAttribute(
-    "data-http-bound",
-    "true",
-  );
-  await expect(firstName).toHaveValue("Sintética");
-  const financialBefore = await page
-    .getByRole("region", { name: "Resumen financiero" })
-    .textContent();
-  const cashBefore = await page
-    .getByRole("region", { name: "Historial de efectivo" })
-    .textContent();
-  await page
-    .getByRole("button", { name: "Editar teléfono (opcional)", exact: true })
-    .click();
-  const phoneForm = page
-    .locator("form")
-    .filter({ has: page.getByLabel("Teléfono (opcional)", { exact: true }) });
-  const phone = phoneForm.getByLabel("Teléfono (opcional)", { exact: true });
-  await expect(
-    phoneForm.getByRole("button", { name: /^Guardar / }),
-  ).toBeDisabled();
-  await phone.fill("+591 70000000");
-  await phone.fill("+591 letras");
-  await expect(phone).toHaveValue("+591 70000000");
-  await phoneForm.getByRole("button", { name: /^Guardar / }).click();
-  await expect(
-    page.getByRole("button", {
-      name: "Editar teléfono (opcional)",
-      exact: true,
-    }),
-  ).toBeFocused();
-  await expect(phone).toHaveValue("+591 70000000");
-  await expect(firstName).toHaveValue("Sintética");
-  const nameForm = participantSection.locator("form").filter({
-    has: page.getByLabel("Nombre", { exact: true }),
-  });
-  await expect(nameForm.locator('[name="revision"]')).toHaveValue(
-    await phoneForm.locator('[name="revision"]').inputValue(),
-  );
-  await nameForm.getByRole("button", { name: /^Guardar / }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Sintética Registration",
-  );
-  expect(
-    await page
-      .getByRole("region", { name: "Resumen financiero" })
-      .textContent(),
-  ).toBe(financialBefore);
-  expect(
-    await page
-      .getByRole("region", { name: "Historial de efectivo" })
-      .textContent(),
-  ).toBe(cashBefore);
-  // Global identity is edited and persisted from this registration, not a
-  // duplicate participant page. A reload verifies the actual server write.
-  const detailPath = new URL(page.url()).pathname;
-  await expect(
-    page.getByRole("link", { name: "Abrir ficha del participante" }),
-  ).toHaveCount(0);
-  await participantSection
-    .getByRole("button", { name: "Editar correo electrónico", exact: true })
-    .click();
-  const emailForm = participantSection.locator("form").filter({
-    has: page.getByLabel("Correo electrónico", { exact: true }),
-  });
-  const participantId = await emailForm
-    .locator('[name="participantId"]')
-    .inputValue();
-  const participantCi = await emailForm.locator('[name="ci"]').inputValue();
-  const updatedEmail = `updated-${crypto.randomUUID()}@test.invalid`;
-  await emailForm
-    .getByLabel("Correo electrónico", { exact: true })
-    .fill(updatedEmail);
-  const [participantResponse] = await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.request().method() === "POST" &&
-        new URL(response.url()).pathname === detailPath &&
-        new URL(response.url()).searchParams.get("operation") === "participant",
-    ),
-    emailForm
-      .getByRole("button", { name: "Guardar correo electrónico", exact: true })
-      .click(),
-  ]);
-  expect(participantResponse.status()).toBe(200);
-  expect(await participantResponse.json()).toMatchObject({
-    ok: true,
-    value: {
-      kind: "participant",
-      participant: {
-        id: participantId,
-        ci: participantCi,
-        email: updatedEmail,
-      },
+      await participantSection
+        .getByRole("button", { name: "Editar nombre", exact: true })
+        .click();
+      const firstName = participantSection.getByLabel("Nombre", {
+        exact: true,
+      });
+      await firstName.fill("Sintética");
+      const transfer = page.locator("#registration-transfer");
+      await actions
+        .getByRole("button", { name: "Cambiar grupo", exact: true })
+        .click();
+      await transfer
+        .getByRole("combobox", { name: "Grupo de destino" })
+        .click();
+      await page
+        .getByRole("option")
+        .filter({ hasNotText: "Selecciona" })
+        .last()
+        .click();
+      await transfer.getByRole("button", { name: "Cambiar grupo" }).click();
+      await expect(page.locator("#registration-transfer")).toHaveAttribute(
+        "data-http-bound",
+        "true",
+      );
+      await expect(firstName).toHaveValue("Sintética");
+      const financialBefore = await page
+        .getByRole("region", { name: "Resumen financiero" })
+        .textContent();
+      const cashBefore = await page
+        .getByRole("region", { name: "Historial de efectivo" })
+        .textContent();
+      await page
+        .getByRole("button", {
+          name: "Editar teléfono (opcional)",
+          exact: true,
+        })
+        .click();
+      const phoneForm = page.locator("form").filter({
+        has: page.getByLabel("Teléfono (opcional)", { exact: true }),
+      });
+      const phone = phoneForm.getByLabel("Teléfono (opcional)", {
+        exact: true,
+      });
+      await expect(
+        phoneForm.getByRole("button", { name: /^Guardar / }),
+      ).toBeDisabled();
+      await phone.fill("+591 70000000");
+      await phone.fill("+591 letras");
+      await expect(phone).toHaveValue("+591 70000000");
+      await phoneForm.getByRole("button", { name: /^Guardar / }).click();
+      await expect(
+        page.getByRole("button", {
+          name: "Editar teléfono (opcional)",
+          exact: true,
+        }),
+      ).toBeFocused();
+      await expect(phone).toHaveValue("+591 70000000");
+      await expect(firstName).toHaveValue("Sintética");
+      const nameForm = participantSection.locator("form").filter({
+        has: page.getByLabel("Nombre", { exact: true }),
+      });
+      await expect(nameForm.locator('[name="revision"]')).toHaveValue(
+        await phoneForm.locator('[name="revision"]').inputValue(),
+      );
+      await nameForm.getByRole("button", { name: /^Guardar / }).click();
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+        "Sintética Registration",
+      );
+      expect(
+        await page
+          .getByRole("region", { name: "Resumen financiero" })
+          .textContent(),
+      ).toBe(financialBefore);
+      expect(
+        await page
+          .getByRole("region", { name: "Historial de efectivo" })
+          .textContent(),
+      ).toBe(cashBefore);
+      // Global identity is edited and persisted from this registration, not a
+      // duplicate participant page. A reload verifies the actual server write.
+      const detailPath = new URL(page.url()).pathname;
+      await expect(
+        page.getByRole("link", { name: "Abrir ficha del participante" }),
+      ).toHaveCount(0);
+      await participantSection
+        .getByRole("button", { name: "Editar correo electrónico", exact: true })
+        .click();
+      const emailForm = participantSection.locator("form").filter({
+        has: page.getByLabel("Correo electrónico", { exact: true }),
+      });
+      const participantId = await emailForm
+        .locator('[name="participantId"]')
+        .inputValue();
+      const participantCi = await emailForm.locator('[name="ci"]').inputValue();
+      const updatedEmail = `updated-${crypto.randomUUID()}@test.invalid`;
+      await emailForm
+        .getByLabel("Correo electrónico", { exact: true })
+        .fill(updatedEmail);
+      const [participantResponse] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.request().method() === "POST" &&
+            new URL(response.url()).pathname === detailPath &&
+            new URL(response.url()).searchParams.get("operation") ===
+              "participant",
+        ),
+        emailForm
+          .getByRole("button", {
+            name: "Guardar correo electrónico",
+            exact: true,
+          })
+          .click(),
+      ]);
+      expect(participantResponse.status()).toBe(200);
+      expect(await participantResponse.json()).toMatchObject({
+        ok: true,
+        value: {
+          kind: "participant",
+          participant: {
+            id: participantId,
+            ci: participantCi,
+            email: updatedEmail,
+          },
+        },
+      });
+      expect(
+        await page.evaluate(
+          () =>
+            (window as Window & { registrationMarker?: string })
+              .registrationMarker,
+        ),
+      ).toBe("kept");
+      await page.reload();
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+        "Sintética Registration",
+      );
+      await expect(emailForm.locator('[name="participantId"]')).toHaveValue(
+        participantId,
+      );
+      await expect(emailForm.locator('[name="ci"]')).toHaveValue(participantCi);
+      await expect(
+        emailForm.getByLabel("Correo electrónico", { exact: true }),
+      ).toHaveValue(updatedEmail);
+      await expect(phone).toHaveValue("+591 70000000");
+      expect(
+        await page
+          .getByRole("region", { name: "Resumen financiero" })
+          .textContent(),
+      ).toBe(financialBefore);
+      expect(
+        await page
+          .getByRole("region", { name: "Historial de efectivo" })
+          .textContent(),
+      ).toBe(cashBefore);
+      const cancel = page.locator("#registration-cancel");
+      await actions
+        .getByRole("button", { name: "Anular inscripción", exact: true })
+        .click();
+      await cancel
+        .getByLabel("Motivo de cancelación")
+        .fill("Cancelación solicitada");
+      await cancel
+        .getByRole("button", { name: "Anular inscripción", exact: true })
+        .click();
+      await page
+        .getByRole("alertdialog")
+        .getByRole("button", { name: "Anular inscripción" })
+        .click();
+      await expect(
+        page.getByRole("region", { name: "Resumen financiero" }),
+      ).toContainText("Devolución pendiente");
+      const refund = page.locator("#registration-refund");
+      await financialActions
+        .getByRole("button", { name: "Registrar devolución", exact: true })
+        .click();
+      await expect(refund).toHaveAttribute("data-http-bound", "true");
+      await refund.getByLabel("Importe (Bs)").fill("25.51");
+      await refund
+        .getByLabel("Motivo", { exact: true })
+        .fill("Efectivo entregado");
+      await refund
+        .getByRole("button", { name: "Registrar devolución" })
+        .click();
+      await expect(
+        page.getByRole("region", { name: "Resumen financiero" }),
+      ).toContainText("Devuelto");
+      await expect(
+        page
+          .getByRole("region", { name: "Historial de efectivo" })
+          .getByText("Pago recibido", { exact: true }),
+      ).toHaveCount(2);
+      await expect(
+        page
+          .getByRole("region", { name: "Historial de efectivo" })
+          .getByText("Devolución registrada", { exact: true }),
+      ).toHaveCount(1);
+      for (const width of [320, 768, 1280]) {
+        await page.setViewportSize({ width, height: 900 });
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        ).toBe(true);
+      }
+      await page.goto(`/app/preinscripciones?courseId=${f.id}`);
+      await page.evaluate(() => {
+        (
+          window as Window & { registrationMarker?: string }
+        ).registrationMarker = "list-kept";
+      });
+      await page.getByLabel("Nombre o CI").fill(personCi);
+      await expect
+        .poll(() => new URL(page.url()).searchParams.get("search"))
+        .toBe(personCi);
+      await expect(
+        page.getByRole("link", { name: /Sintética Registration/u }),
+      ).toBeVisible();
+      expect(
+        await page.evaluate(
+          () =>
+            (window as Window & { registrationMarker?: string })
+              .registrationMarker,
+        ),
+      ).toBe("list-kept");
+      const downloaded = page.waitForEvent("download");
+      await page.getByRole("link", { name: "CSV", exact: true }).click();
+      expect((await downloaded).suggestedFilename()).toMatch(
+        /^preinscripciones-[\d-]+\.csv$/u,
+      );
     },
-  });
-  expect(
-    await page.evaluate(
-      () =>
-        (window as Window & { registrationMarker?: string }).registrationMarker,
-    ),
-  ).toBe("kept");
-  await page.reload();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Sintética Registration",
-  );
-  await expect(emailForm.locator('[name="participantId"]')).toHaveValue(
-    participantId,
-  );
-  await expect(emailForm.locator('[name="ci"]')).toHaveValue(participantCi);
-  await expect(
-    emailForm.getByLabel("Correo electrónico", { exact: true }),
-  ).toHaveValue(updatedEmail);
-  await expect(phone).toHaveValue("+591 70000000");
-  expect(
-    await page
-      .getByRole("region", { name: "Resumen financiero" })
-      .textContent(),
-  ).toBe(financialBefore);
-  expect(
-    await page
-      .getByRole("region", { name: "Historial de efectivo" })
-      .textContent(),
-  ).toBe(cashBefore);
-  const cancel = page.locator("#registration-cancel");
-  await actions
-    .getByRole("button", { name: "Anular inscripción", exact: true })
-    .click();
-  await cancel
-    .getByLabel("Motivo de cancelación")
-    .fill("Cancelación solicitada");
-  await cancel
-    .getByRole("button", { name: "Anular inscripción", exact: true })
-    .click();
-  await page
-    .getByRole("alertdialog")
-    .getByRole("button", { name: "Anular inscripción" })
-    .click();
-  await expect(
-    page.getByRole("region", { name: "Resumen financiero" }),
-  ).toContainText("Devolución pendiente");
-  const refund = page.locator("#registration-refund");
-  await financialActions
-    .getByRole("button", { name: "Registrar devolución", exact: true })
-    .click();
-  await expect(refund).toHaveAttribute("data-http-bound", "true");
-  await refund.getByLabel("Importe (Bs)").fill("25.51");
-  await refund.getByLabel("Motivo", { exact: true }).fill("Efectivo entregado");
-  await refund.getByRole("button", { name: "Registrar devolución" }).click();
-  await expect(
-    page.getByRole("region", { name: "Resumen financiero" }),
-  ).toContainText("Devuelto");
-  await expect(
-    page
-      .getByRole("region", { name: "Historial de efectivo" })
-      .getByText("Pago recibido", { exact: true }),
-  ).toHaveCount(2);
-  await expect(
-    page
-      .getByRole("region", { name: "Historial de efectivo" })
-      .getByText("Devolución registrada", { exact: true }),
-  ).toHaveCount(1);
-  for (const width of [320, 768, 1280]) {
-    await page.setViewportSize({ width, height: 900 });
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
-  }
-  await page.goto(`/app/preinscripciones?courseId=${f.id}`);
-  await page.evaluate(() => {
-    (window as Window & { registrationMarker?: string }).registrationMarker =
-      "list-kept";
-  });
-  await page.getByLabel("Nombre o CI").fill(personCi);
-  await expect
-    .poll(() => new URL(page.url()).searchParams.get("search"))
-    .toBe(personCi);
-  await expect(
-    page.getByRole("link", { name: /Sintética Registration/u }),
-  ).toBeVisible();
-  expect(
-    await page.evaluate(
-      () =>
-        (window as Window & { registrationMarker?: string }).registrationMarker,
-    ),
-  ).toBe("list-kept");
-  const downloaded = page.waitForEvent("download");
-  await page.getByRole("link", { name: "CSV", exact: true }).click();
-  expect((await downloaded).suggestedFilename()).toMatch(
-    /^preinscripciones-[\d-]+\.csv$/u,
   );
 });
 test("same-course interest prefill preserves demand and instructor roster exposes names only from official start", async ({

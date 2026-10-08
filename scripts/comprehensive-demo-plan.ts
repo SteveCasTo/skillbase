@@ -61,7 +61,11 @@ export function assertComprehensiveTarget(
 
 export function parseComprehensiveArgs(args: readonly string[]) {
   const values = new Map<string, string>();
-  const switches = new Set(["--apply", "--allow-production"]);
+  const switches = new Set([
+    "--apply",
+    "--allow-production",
+    "--protected-manual",
+  ]);
   const allowed = new Set([...switches, "--target", "--project", "--anchor"]);
   for (let i = 0; i < args.length; i++) {
     const key = args[i]!;
@@ -79,6 +83,7 @@ export function parseComprehensiveArgs(args: readonly string[]) {
     project: values.get("--project")!,
     apply: values.has("--apply"),
     allowProduction: values.has("--allow-production"),
+    protectedManual: values.has("--protected-manual"),
     anchorDay: values.get("--anchor"),
   };
 }
