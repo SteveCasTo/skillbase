@@ -1,0 +1,83 @@
+---
+import { Input } from "@/components/ui/input";
+import type { AdminAccountDto } from "@/domain/admin-accounts/types";
+import { adminAccountStatus } from "./presentation";
+interface Props {
+  accounts: readonly AdminAccountDto[];
+}
+const { accounts } = Astro.props;
+---
+
+<section
+  class="mt-8 flex min-w-0 flex-col gap-5"
+  data-admin-account-list
+  aria-label="Cuentas de administradores"
+>
+  <div class="hidden max-w-xl flex-col gap-2" data-admin-search-control>
+    <label for="admin-search" class="text-sm font-medium">
+      Buscar por nombre o correo
+    </label>
+    <Input
+      id="admin-search"
+      type="search"
+      autoComplete="off"
+      className="min-h-11"
+    />
+  </div>
+  <p data-admin-search-count role="status" class="sr-only"></p>
+  <ul class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    {accounts.map((account) => (
+      <li
+        class="min-w-0"
+        data-admin-card
+        data-search={`${account.name} ${account.email}`}
+      >
+        <a
+          href={`/app/administradores/${account.id}`}
+          class="flex h-full min-w-0 flex-col gap-3 rounded-xl border bg-card p-6 text-card-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <h2 class="break-words text-xl font-semibold">{account.name}</h2>
+          <p class="break-all text-sm text-muted-foreground">{account.email}</p>
+          <p class="text-sm">{adminAccountStatus(account)}</p>
+        </a>
+      </li>
+    ))}
+  </ul>
+  <p data-admin-no-results hidden class="text-muted-foreground">
+    No hay cuentas que coincidan. Prueba otro nombre o correo.
+  </p>
+</section>
+<script>
+  function initialize() {
+    document
+      .querySelectorAll<HTMLElement>("[data-admin-account-list]")
+      .forEach((list) => {
+        if (list.dataset.bound) return;
+        list.dataset.bound = "true";
+        list
+          .querySelector<HTMLElement>("[data-admin-search-control]")
+          ?.classList.replace("hidden", "flex");
+        const input = list.querySelector<HTMLInputElement>("input")!;
+        const cards = [
+          ...list.querySelectorAll<HTMLElement>("[data-admin-card]"),
+        ];
+        input.addEventListener("input", () => {
+          const term = input.value.trim().toLocaleLowerCase("es");
+          let count = 0;
+          cards.forEach((card) => {
+            card.hidden = !card.dataset.search
+              ?.toLocaleLowerCase("es")
+              .includes(term);
+            if (!card.hidden) count++;
+          });
+          list.querySelector<HTMLElement>("[data-admin-no-results]")!.hidden =
+            count !== 0;
+          list.querySelector<HTMLElement>(
+            "[data-admin-search-count]",
+          )!.textContent = `${count} cuentas encontradas.`;
+        });
+      });
+  }
+  initialize();
+  document.addEventListener("astro:page-load", initialize);
+</script>

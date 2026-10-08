@@ -22,6 +22,8 @@ export const PRIVATE_ROUTE_POLICIES = {
   "/app/perfil/contrasena": { access: "ACTIVE_USER" },
   "/app/instructores": { access: "ROLES", roles: ["ADMIN"] },
   "/app/instructores/nuevo": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/administradores": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/administradores/nuevo": { access: "ROLES", roles: ["ADMIN"] },
   "/app/mis-cursos": { access: "ROLES", roles: ["INSTRUCTOR"] },
 } as const satisfies Readonly<Record<string, PrivateRoutePolicy>>;
 
@@ -54,6 +56,12 @@ export function getPrivateRoutePolicy(
       normalizedPath as keyof typeof PRIVATE_ROUTE_POLICIES
     ] ?? null;
   if (exact) return exact;
+  if (
+    /^\/app\/administradores\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(
+      normalizedPath,
+    )
+  )
+    return { access: "ROLES", roles: ["ADMIN"] };
   if (
     CLOSURE_WORKSPACE_PATH.test(normalizedPath) ||
     CLOSURE_VERSION_PATH.test(normalizedPath) ||

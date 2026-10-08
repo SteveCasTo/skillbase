@@ -169,20 +169,22 @@ La migración aditiva 0014 vincula el perfil profesional con el ID interno estab
 
 El full E2E Auth PR 118 pasó 104/104 y PR 120 había pasado 107/107 antes de cambios posteriores. Tras restaurar la dependencia opcional Astro Sharp con `bun install --frozen-lockfile`, la fuente final pasó full E2E 107/107 en `127.0.0.1:4321`; el smoke público/privado pasó y el release CI/deploy de PR 126 se completó. Google OAuth real y SMTP/recovery no estaban probados en ese release histórico. El estado operacional vigente de SMTP (configuración cloud/local y receipt local confirmada, límites de recovery/cloud pendientes) está arriba y en `docs/DEPLOYMENT.md`.
 
-### Gestión multi-ADMIN aprobada para Fase 8 (backend en feature branch)
+### Gestión multi-ADMIN aprobada para Fase 8 (backend integrado; UI feature)
 
-La implementación `feat/admin-account-management` (commit `4bed53b`, aún no
-integrada) añade helpers server-side para aprovisionamiento y lifecycle ADMIN;
-no hay página/ruta montada ni cambio de Auth disponible en la aplicación
-integrada. Las cuentas tienen iguales permisos, sin `ROOT` ni privilegio del
-primero. Un ADMIN activo crea otra cuenta confirmada con contraseña inicial vía
-Supabase Auth privilegiado; el secreto no se guarda ni se expone y el flujo no
-fuerza cambio al primer login. El nombre se puede editar con revisión; correo es
-readonly. Lifecycle ofrece una única acción: eliminar si no existe actividad de
-actor/dependencia, o desactivar/reactivar conservando identidad e historial si
-existe uso. La baja Auth es externa a la transacción DB, con intención durable,
-reintento acotado y tombstone; un guard serializa cambios para mantener al menos
-un ADMIN activo. No se permite gestión incidental de roles/perfil profesional.
-Contrato detallado: [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
-La aplicación de 0022 se limita a QA aislado; no migrar el estado de Auth/modelo
-de producción por inferencia desde este feature.
+El backend de aprovisionamiento y lifecycle ADMIN se integró a `development` por
+PR 283. Las páginas/UI siguen en `feat/admin-account-interface`, sin merge ni
+disponibilidad en producción. ADMIN activo crea otra identidad confirmada con
+contraseña inicial vía Supabase Auth Admin API server-side; la credencial no se
+persiste, registra ni retorna y no se fuerza cambio en primer login. Permisos
+ADMIN son iguales, sin rol ROOT ni privilegio del primero.
+
+En la UI feature, `/app/administradores`, `/app/administradores/nuevo` y detalle
+UUID son rutas privadas ADMIN. Listado/búsqueda, alta y edición de nombre usan
+helpers/loaders server-side; correo es readonly. El backend calcula una acción:
+eliminar solo cuenta sin actividad propia/dependencia, o desactivar/reactivar
+conservando UUID/historial; baja pendiente se reintenta sobre la misma identidad.
+El guard serial mantiene al menos un ADMIN activo, sin prohibición general de
+auto-baja cuando queda otro ADMIN. Auth ocurre fuera de la transacción DB y la
+compensación de alta solo apunta al UUID recién creado. Migración 0022 se aplicó
+solo en QA; no usar este feature para inferir estado Auth/migraciones en
+producción. Contrato en [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).

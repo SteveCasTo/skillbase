@@ -1,0 +1,134 @@
+---
+import { buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Eye, EyeOff } from "lucide-react";
+interface Props {
+  values: Readonly<Record<string, string>>;
+  issues: Readonly<Record<string, string>>;
+  error: string | null;
+}
+const { values, issues, error } = Astro.props;
+---
+
+<form
+  method="post"
+  class="mt-8 flex min-w-0 flex-col gap-6"
+  data-admin-create
+  data-astro-reload
+>
+  <p
+    role="alert"
+    tabindex="-1"
+    data-form-error
+    class="text-sm text-destructive empty:hidden"
+  >
+    {Object.keys(issues).length ? "" : error}
+  </p>
+  <fieldset class="grid min-w-0 gap-5 sm:grid-cols-2">
+    <legend class="mb-5 text-lg font-semibold">Datos del administrador</legend>
+    {[
+      {
+        key: "name",
+        label: "Nombre",
+        type: "text",
+        max: 250,
+        autocomplete: "name",
+      },
+      {
+        key: "email",
+        label: "Correo electrónico",
+        type: "email",
+        max: 254,
+        autocomplete: "email",
+      },
+    ].map((field) => (
+      <div
+        class="flex min-w-0 flex-col gap-2"
+        data-invalid={Boolean(issues[field.key])}
+      >
+        <label for={field.key} class="text-sm font-medium">
+          {field.label}
+        </label>
+        <Input
+          id={field.key}
+          name={field.key}
+          type={field.type}
+          autoComplete={field.autocomplete}
+          maxLength={field.max}
+          required
+          defaultValue={values[field.key] ?? ""}
+          aria-invalid={Boolean(issues[field.key])}
+          aria-describedby={`${field.key}-error`}
+          className="min-h-11"
+        />
+        <p
+          id={`${field.key}-error`}
+          data-field-error={field.key}
+          class="text-sm text-destructive empty:hidden"
+        >
+          {issues[field.key]}
+        </p>
+      </div>
+    ))}
+  </fieldset>
+  <fieldset class="flex min-w-0 flex-col gap-2">
+    <legend class="mb-3 text-lg font-semibold">Acceso inicial</legend>
+    <label for="password" class="text-sm font-medium">
+      Contraseña inicial
+    </label>
+    <div
+      class="flex max-w-xl items-center gap-2"
+      data-invalid={Boolean(issues.password)}
+    >
+      <Input
+        id="password"
+        name="password"
+        type="password"
+        autoComplete="new-password"
+        required
+        minLength={12}
+        maxLength={128}
+        aria-invalid={Boolean(issues.password)}
+        aria-describedby="password-help password-error"
+        className="min-h-11"
+      />
+      <button
+        hidden
+        type="button"
+        data-password-toggle
+        aria-controls="password"
+        aria-label="Mostrar contraseña inicial"
+        aria-pressed="false"
+        class={buttonVariants({
+          variant: "outline",
+          size: "icon",
+          className: "min-h-11 min-w-11 shrink-0",
+        })}
+      >
+        <Eye data-password-show aria-hidden="true" />
+        <span data-password-hide hidden>
+          <EyeOff aria-hidden="true" />
+        </span>
+      </button>
+    </div>
+    <p
+      id="password-error"
+      data-field-error="password"
+      class="text-sm text-destructive empty:hidden"
+    >
+      {issues.password}
+    </p>
+    <p id="password-help" class="text-sm text-muted-foreground">
+      Usa entre 12 y 128 caracteres.
+    </p>
+  </fieldset>
+  <button
+    type="submit"
+    class={buttonVariants({
+      className: "min-h-11 w-full sm:w-auto sm:self-start",
+    })}
+  >
+    Crear administrador
+  </button>
+</form>
+<script src="./create-client.ts"></script>

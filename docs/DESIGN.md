@@ -597,7 +597,7 @@ El ajuste compacto/responsive del panel y formulario de interesados quedó integ
 
 ## Correcciones administrativas aprobadas (implementadas en fuente; gate final pendiente)
 
-Los ajustes siguientes se implementaron en las ramas integradas PRs 258–264 y en el head de feedback/navegación `d057d2d`. Las verificaciones fueron focales por stage y no constituyen el gate combinado; los límites están en [`TESTING.md`](TESTING.md). El backend de cierre/snapshot se integró por PR 280; la UI de cierre está implementada en un feature worktree separado, exports PDF/CSV en otro. Multi-ADMIN y las integraciones Fase 8 restantes siguen pendientes.
+Los ajustes siguientes se implementaron en las ramas integradas PRs 258–264 y en el head de feedback/navegación `d057d2d`. Las verificaciones fueron focales por stage y no constituyen el gate combinado; límites en [`TESTING.md`](TESTING.md). Core/UI de cierre y exports se integraron por PRs 280–282. La UI multi-ADMIN está implementada en `feat/admin-account-interface`, pendiente de integración.
 
 - **Edición inline compartida:** lápiz/guardar/cancelar por atributo, posición y tamaño estables; comunicar dirty/validación y mantener controles/iconos accesibles. Loading no debe sustituir el layout ni destruir el SVG/estado del control. Mostrar errores persistentes junto al campo y conflictos accionables; Sileo solo para feedback transitorio no duplicado.
 - **Instructor y perfil:** nombre como texto y correo de solo lectura sin decoración de input editable. El listado de cursos presenta datos personales primero y una explicación/bloqueo debajo junto a los cursos pertinentes. Centrar la tarjeta global del perfil y alinear Google en una fila propia.
@@ -610,7 +610,7 @@ La revisión manual prevista cubre desktop/mobile, tabla y lista, light/dark, te
 
 En las verificaciones focales de estos cambios se usaron páginas/DTOs y respuestas sintéticas interceptadas cuando se indica en [`TESTING.md`](TESTING.md); no equivalen a una auditoría completa de rutas privadas, persistencia/Auth ni al gate de release.
 
-## Cierre académico de grupo (Fase 8, UI implementada en feature branch)
+## Cierre académico de grupo (Fase 8, UI integrada)
 
 `feat/academic-closure-interface` implementa SSR para el workspace de cierre por
 grupo y el detalle de versiones históricas para ADMIN e INSTRUCTOR. El workspace
@@ -622,12 +622,30 @@ inline. En estado cerrado, notas/asistencia se presentan readonly. SSR/POST y
 fallback HTML sin JS conservan requestKey/revision y drafts al resolver errores
 409/422; la UI no sustituye guards server-side.
 
-Se muestran links por versión a planilla PDF/CSV e informe PDF, pero sus route
-adapters pertenecen a `feat/academic-closure-exports` y aún no están integrados
-con este branch. No afirmar que las descargas funcionan desde la app.
+Los links por versión consumen adapters PDF/CSV en el mismo árbol de PRs 281/282.
+El owner reportó verificación focal de los seis GET/download paths en QA; no
+equivale a full release/gate F8. UI reportó 21 unit/137 assertions y 3 E2E
+first-pass, además de revisión manual de 12 capturas responsive/light-dark; ver
+[`TESTING.md`](TESTING.md).
 
-QA visual Playwright en stack aislado: 12 capturas desktop/tablet/mobile a
-390/768/1440 px, light/dark, sin overflow; seis componentes, nombres largos,
-teclado, Escape/foco, pendientes, dirty/409/422 y reload/hidratación. UI branch
-reporta 21 unit/137 assertions y 3 E2E first-pass, incluido fallback sin JS.
-Esto no es el gate F8 completo y no cubre descargas PDF/CSV; ver [`TESTING.md`](TESTING.md).
+## Cuentas de administradores (UI Fase 8, feature no integrado)
+
+La feature `feat/admin-account-interface` agrega la sección «Administradores»
+visible a cualquier cuenta ADMIN, sin jerarquía ROOT. La lista SSR usa tarjetas
+responsive en grid y búsqueda por nombre/correo con estado accesible sin
+resultados. La pantalla de alta separa los datos del administrador del acceso
+inicial; el toggle de visibilidad de password es progresivo y nunca vuelve a
+renderizar el valor. Nombre/email tienen validación contextual y la contraseña
+respeta el rango 12–128 establecido por backend.
+
+En el detalle, nombre solo es editable por control inline compartido y email se
+muestra como texto readonly. La acción lifecycle singular se deriva del DTO
+autorizado: eliminar, desactivar/reactivar o reintentar eliminación pendiente;
+no hay selector de acción/rol. La confirmación tiene fallback HTML sin JS y,
+con React, mantiene foco inicial/cancelación y retorno de foco. Los errores,
+pending, drafts no secretos y recarga son contextuales; al auto-desactivar o
+eliminar, el servidor termina la sesión redirigiendo a login. Tarjetas y
+acciones evitan overflow por emails/nombres largos. Pruebas UI focales y límites
+de responsive/teclado están en [`TESTING.md`](TESTING.md). La sección aún no está
+integrada en `development` ni liberada. El backend está en development por PR
+283; la presentación ADMIN no.

@@ -95,6 +95,8 @@ describe("private route policies and caching", () => {
   test("declares every current route and denies unknown future routes", () => {
     expect(Object.keys(PRIVATE_ROUTE_POLICIES).sort()).toEqual([
       "/app",
+      "/app/administradores",
+      "/app/administradores/nuevo",
       "/app/configuracion",
       "/app/configuracion/asistencia",
       "/app/cursos",

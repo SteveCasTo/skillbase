@@ -1,74 +1,100 @@
 # Contrato de cuentas ADMIN (Fase 8)
 
-Este contrato describe el backend de gestión multi-ADMIN implementado en
-`feat/admin-account-management` (commit `4bed53b`, base `356ec1b`). Es código de
-feature aún no integrado; no existen páginas Astro ni rutas montadas para este
-flujo. El avance de Fase 8 y su evidencia están en [`PLAN.md`](PLAN.md) y
-[`TESTING.md`](TESTING.md).
+Este contrato reúne el backend de aprovisionamiento/lifecycle integrado por PR
+283 y la interfaz implementada en `feat/admin-account-interface` (base
+`4bed53b`), aún no integrada a `development` ni liberada. Migración 0022 se probó
+solo en QA. Plan y evidencia focal en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 
 ## Reglas de cuenta
 
-- Todas las cuentas ADMIN tienen permisos iguales. No hay `ROOT` ni privilegio
-  especial para la primera cuenta.
-- ADMIN activo puede aprovisionar otra cuenta con nombre, correo y contraseña
-  inicial. El correo se normaliza y la contraseña cumple la regla Auth existente
-  (12–128 caracteres). Supabase Auth crea una identidad confirmada usando el
-  gateway privilegiado server-side; luego se guarda el usuario interno ACTIVE,
-  proveedor primario EMAIL, rol único ADMIN y evento de auditoría con UUID real
-  del actor. No se crea perfil profesional de instructor.
-- El actor ADMIN se revalida antes y después de la llamada Auth y dentro de la
-  escritura PostgreSQL. Si falla la persistencia interna, la compensación solo
-  puede eliminar el UUID Auth recién creado por esa operación; nunca una
-  identidad preexistente. Auth y PostgreSQL no comparten transacción. Si también
-  falla la compensación, puede quedar una identidad Auth huérfana; no hay
-  reconciliador automático documentado en este feature.
-- La contraseña no se persiste ni se incluye en DTO, evento o respuesta. No se
-  registra en logs. La cuenta usa el flujo existente de cambio de contraseña;
-  este backend no impone un cambio obligatorio al primer login.
-- El correo es de solo lectura después del aprovisionamiento. Para ADMIN
-  exclusivo se permite editar el nombre con revisión optimista y evento
-  `USER_PROFILE_UPDATED`. No se agrega edición de correo, campos profesionales
-  ni perfil/rol INSTRUCTOR.
+- Todas las cuentas ADMIN tienen permisos iguales; no existe `ROOT` ni
+  privilegio especial de la primera cuenta.
+- ADMIN activo crea una cuenta con nombre, correo y contraseña inicial vía
+  Supabase Auth Admin API server-side. El correo se normaliza y la contraseña
+  sigue la política Auth existente (12–128 caracteres). Se crea identidad
+  confirmada y usuario interno ACTIVE, proveedor EMAIL y rol exclusivo ADMIN;
+  se audita con UUID real del actor. El actor se revalida antes/después de Auth
+  y dentro de la escritura DB. El secreto no se almacena ni aparece
+  en DTO, respuesta o auditoría; no se exige cambiar la contraseña en el primer
+  login. El flujo normal de cambio de contraseña sigue disponible.
+- El nombre se puede editar en cuentas ADMIN exclusivas con revisión optimista;
+  el correo se muestra como texto readonly. No se agregan campos profesionales
+  ni rol/perfil INSTRUCTOR.
+- Las acciones visibles provienen del DTO calculado por backend: eliminar
+  cuenta sin actividad de actor ni dependencia; desactivar/reactivar cuando sí
+  existe actividad; o reintentar una eliminación pendiente. No hay regla
+  especial de primer administrador. El backend serializa cambios y conserva al
+  menos un ADMIN activo, incluyendo auto-desactivación/baja solo cuando otro
+  ADMIN permanece activo.
+- La eliminación de una cuenta no usada deshabilita primero el acceso, usa una
+  intención durable para Auth fuera de la transacción y conserva UUID, actor,
+  historial/auditoría y tombstone. Si Auth falla, la cuenta queda bloqueada y
+  pending; el reintento apunta a la misma identidad. La actividad incluye uso
+  como actor o dependencia histórica; ser target de una acción de otro actor o
+  un login aislado no basta.
+- Si Auth falla al completar una baja, la cuenta queda DISABLED/pending; el
+  reintento solo acepta `user_not_found` explícito como identidad ya ausente.
+  Otros 404/errores de proveedor no se consideran éxito ni se recrea la identidad.
+- Renombrar un actor no reescribe evidencia histórica: el cierre conserva el
+  UUID y el nombre capturado al emitir cada snapshot, de acuerdo con el contrato
+  de cierre académico.
 
-## Acciones y retención
+El DTO expone UUID, nombre, email, estado, revision, exclusividad ADMIN,
+actividad, eliminación pendiente y la única acción válida. No cuenta como uso
+ser actor solo el hecho de figurar como target de una creación ajena; login
+aislado tampoco cuenta, aunque dependencias persistidas de actor sí retienen.
+Autorización fresca del actor/ownership y el guard global de lifecycle viven en
+el repositorio. Auth ocurre fuera de la transacción DB. La compensación de
+creación se limita al UUID recién creado; si falla también la compensación puede
+quedar identidad Auth huérfana sin reconciliador automático documentado.
 
-El DTO de cuenta incluye UUID, nombre, correo, estado, revisión,
-`exclusiveAdmin`, `hasActivity`, `deletionPending` y una única acción aplicable.
-Una cuenta ADMIN multirol o en estado INVITED no recibe acción de lifecycle en
-este módulo.
+La migration candidata `0022_phase8_admin_accounts` crea
+`admin_account_deletions`, intención durable con FK restrictivas, RLS, grants
+Data API revocados y trigger de evidencia inmutable. Se probó en QA aislado,
+ledger 22→23; no se aplicó a canónico/cloud (ledger 21). El código vive en
+`src/domain/admin-accounts`, `src/application/admin-accounts` y
+`src/server/admin-accounts`.
 
-- Sin actividad propia de actor ni dependencias históricas: `delete`. La baja
-  elimina la identidad Auth fuera de la transacción y después retira roles,
-  sustituye nombre/correo por valores tombstone y limpia la identidad Google
-  aprobada. Conserva `users.id`, `users.auth_user_id`, la fila de intención y la
-  auditoría para preservar referencias restrictivas.
-- Con actividad/dependencias: solo `deactivate` si ACTIVE o `activate` si
-  DISABLED. Se conservan UUID, credenciales y registros históricos.
-- Si Auth falla durante una eliminación, la cuenta permanece DISABLED y con
-  eliminación pendiente; `retry-delete` reintenta el mismo UUID. Solo el error
-  explícito `user_not_found` se interpreta como identidad ya ausente; otros 404
-  o errores de proveedor no se tratan como éxito.
-- La señal de uso consulta eventos donde el usuario fue actor y referencias
-  actor/dependencia en cursos/asignaciones, settings, preinscripciones, ledger y
-  receipts, asistencia, evaluaciones, lifecycles y cierres. Ser el target de la
-  creación hecha por otro actor no basta. Login aislado no se cuenta como uso;
-  solicitudes persistidas de asociación Google sí cuentan como dependencia.
-- Se permite baja propia únicamente si aplica la regla de cuenta sin uso y hay
-  otro ADMIN activo. Un guard global serializa operaciones y mantiene al menos
-  un ADMIN activo; se revalidan actor, estado y revisión bajo locks. Las
-  dependencias de negocio que registran actividad se coordinan con la barrera de
-  actor para evitar que una cuenta se elimine mientras se registra uso.
+## Páginas y autorización
 
-## Adaptadores actuales
+La UI incluye tres páginas SSR:
 
-`loadAdminAccounts` y `loadAdminAccount` son loaders server-side protegidos por
-rol ADMIN; el repositorio vuelve a comprobar actor activo y rol. `handleAdminAccountPost`
-acepta actor interno autenticado por servidor, operación y target de la ruta; no
-lee actor/rol/target del body. Valida Origin, allowlist exacta de campos y body
-de hasta 8192 bytes, y devuelve `private, no-store`/`nosniff`. Las operaciones
-son `create`, `name`, `delete`, `deactivate`, `activate` y `retry-delete`.
-Los errores de concurrencia/último ADMIN/uso/rol exponen estados de conflicto;
-fallas Auth o eliminación pendiente no se confirman como éxito.
+- `/app/administradores`: lista tarjetas ADMIN y permite buscar nombre/correo;
+- `/app/administradores/nuevo`: alta de nombre, email y contraseña inicial;
+- `/app/administradores/:id`: detalle con edición del nombre y acción de
+  lifecycle aplicable.
 
-Estos helpers no implican que exista una URL HTTP pública, UI o policy registrada.
-La integración de presentación y pruebas de rutas queda pendiente.
+Las tres rutas son privadas y están registradas explícitamente para `ADMIN`;
+los detalles aceptan UUID estructural específico. La navegación muestra
+«Administradores» a todo usuario con rol ADMIN. No existe excepción ROOT ni
+ocultamiento de las cuentas creadas por otro ADMIN. El servidor vuelve a validar
+actor activo/rol, revision y acción actual; target y actor nunca se autorizan
+desde datos enviados por el navegador.
+
+## Comportamiento de interfaz
+
+- Formularios SSR conservan fallback HTML. La mejora progresiva valida
+  campos/dirty, mantiene errores inline y no devuelve el password al navegador.
+- El detalle usa la acción/estado del DTO. El ciclo de confirmación es accesible
+  por teclado, devuelve foco al control y ofrece error/pending/reload. Si la
+  acción propia desactiva o elimina al actor, la respuesta dirige a login; no
+  se afirma una prohibición general de auto-baja si existe otro ADMIN activo.
+- Las tarjetas fluyen en grid responsive, permiten nombres/emails largos y
+  búsqueda cliente accesible; las acciones de lifecycle son discretas y
+  confirmadas, no una edición de roles.
+- Error de concurrencia, 403, 409/422 o Auth pendiente no simula éxito ni borra
+  el draft no secreto. Se revalida/relee estado desde el servidor.
+
+## Estado y verificación
+
+Los helpers `loadAdminAccounts`/`loadAdminAccount` y `handleAdminAccountPost`
+delegan a repositorio/casos de uso. POST valida Origin, allowlist y body de 8192
+bytes; respuestas son `private, no-store`/`nosniff`. Actor/target vienen del
+contexto de sesión y ruta, nunca de body. Las acciones son `create`, `name`,
+`delete`, `deactivate`, `activate`, `retry-delete`.
+
+La UI de feature tiene 32 tests unitarios y dos E2E (2/2 first-pass sin retries),
+además de checks lint/format/typecheck/build reportados PASS. QA E2E usó stack
+temporal aislado. Se reportaron intentos focales previos con expectations/locators
+fallidos; no se cuentan como suite exitosa. UI/policy ADMIN permanece feature,
+sin integración a development ni release. El backend PR 283 está en development.
