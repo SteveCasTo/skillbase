@@ -364,7 +364,15 @@ En ese estado pre-release, producción seguía en Fase 7 `master` `4afa485`, Ver
 
 La nota intermedia de workflow pendiente arriba quedó supersedida cuando PR 279 se integró a `development`. El CI final `37684331005` pasó con 376 unit/2266 assertions, 142 integration/1077 assertions y 134/134 E2E (69+65), first-pass tras remediar provisioning APT. El shard fijo a Ubuntu 24.04 y sus timeouts/fuentes HTTPS quedaron verificados en ambos runners; no se cambia `master`/deploy por un chore separado.
 
-El core backend F8 está integrado en development por PR 280. Migration 0021 se probó solo en QA (ledger temporal 21→22); Supabase canónico y cloud permanecen en ledger 21. Los export adapters se integraron a development por PR 281, pero la UI/policy de cierre permanece en feature worktree y aún no se ha verificado un árbol combinado con descarga de navegador. El backend de cuentas ADMIN y migration candidata 0022 están en `feat/admin-account-management` sin integrar; 0022 se aplicó solo a un stack QA (ledger 22→23). Producción sigue en PR 278 (`master` `91beccf8`, Vercel `READY`); no afirmar cierre, descargas o lifecycle ADMIN Fase 8 disponibles allí.
+El core backend F8 está integrado por PR 280 y los adapters PDF/CSV por PR 281;
+la UI SSR de cierre y su route policy se integraron en el árbol actual del feature.
+Sin embargo, no hay aquí evidencia de descarga live por navegador ni release F8.
+La migration candidata 0021 se aplicó solo en QA (ledger temporal 21→22), y
+0022 solo en QA de cuentas ADMIN (ledger 22→23); el Supabase canónico y cloud
+permanecen en ledger 21. El backend ADMIN está integrado en este árbol, pero no
+tiene páginas/rutas/policy de aplicación. Producción sigue en PR 278 (`master`
+`91beccf8`, Vercel `READY`); no afirmar snapshots, descargas ni lifecycle
+multi-ADMIN Fase 8 disponibles allí.
 
 **Actualización del gate shards:** el status «requiere nuevo run» del registro previo quedó supersedido por PR 279/run `37684331005`, que pasó los dos shards y el agregador estricto tras la remediación APT. PR 279 se integró a `development`; no movió producción ni el ledger cloud.
 

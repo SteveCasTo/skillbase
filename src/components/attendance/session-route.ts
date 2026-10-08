@@ -7,6 +7,7 @@ import { getAttendanceRepository } from "@/server/attendance/service";
 import { civilDay } from "@/domain/attendance/rules";
 import { loadAttendanceSessionPage } from "./page-load";
 import { attendanceGroupLabel } from "./group-label";
+import { loadAcademicClosure } from "@/server/academic-closure/loaders";
 export interface AttendanceSessionPageProps {
   detail: AttendanceSessionDetailDto | null;
   path: string;
@@ -19,6 +20,7 @@ export interface AttendanceSessionPageProps {
   errors: Readonly<Record<string, string>>;
   message: string;
   failedOperation: AttendanceOperation | undefined;
+  closedVersion?: number;
 }
 export async function prepareAttendanceSessionRoute(context: {
   request: Request;
@@ -97,6 +99,13 @@ export async function prepareAttendanceSessionRoute(context: {
   let groupLabel = "Grupo";
   let detail = result.detail,
     status = result.status;
+  const closure = detail
+    ? await loadAcademicClosure({ actor, courseId, groupId })
+    : null;
+  const closedVersion =
+    closure?.available && closure.data.status === "CLOSED"
+      ? closure.data.official?.version
+      : undefined;
   let failure =
     result.payload && !result.payload.ok ? result.payload : undefined;
   try {
@@ -136,6 +145,7 @@ export async function prepareAttendanceSessionRoute(context: {
       errors: failure?.issues ?? {},
       message: failure?.message ?? "",
       failedOperation: result.operation,
+      ...(closedVersion === undefined ? {} : { closedVersion }),
     },
   };
 }

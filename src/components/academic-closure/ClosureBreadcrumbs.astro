@@ -1,0 +1,61 @@
+---
+interface Props {
+  base: string;
+  courseId: string;
+  courseName: string;
+  groupName: string;
+  instructorRoute: boolean;
+  version?: number;
+}
+const { base, courseId, courseName, groupName, instructorRoute, version } =
+  Astro.props;
+const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
+---
+
+<nav aria-label="Ruta de navegación" class="mb-5 text-sm text-muted-foreground">
+  <ol class="flex flex-wrap items-center gap-x-2 gap-y-1">
+    <li>
+      <a
+        href={prefix}
+        class="inline-flex min-h-11 items-center underline underline-offset-4"
+      >
+        {instructorRoute ? "Mis cursos" : "Cursos"}
+      </a>
+    </li>
+    <li aria-hidden="true">/</li>
+    <li class="min-w-0">
+      <a
+        href={`${prefix}/${courseId}${instructorRoute ? "" : "/grupos"}`}
+        class="inline-flex min-h-11 items-center break-words underline underline-offset-4"
+      >
+        {courseName}
+      </a>
+    </li>
+    <li aria-hidden="true">/</li>
+    <li class="min-w-0">
+      <a
+        href={`${base}/participantes`}
+        class="inline-flex min-h-11 items-center break-words underline underline-offset-4"
+      >
+        Grupo {groupName}
+      </a>
+    </li>
+    <li aria-hidden="true">/</li>
+    {version ? (
+      <>
+        <li>
+          <a
+            href={`${base}/cierre`}
+            class="inline-flex min-h-11 items-center underline underline-offset-4"
+          >
+            Cierre académico
+          </a>
+        </li>
+        <li aria-hidden="true">/</li>
+        <li aria-current="page">Versión {version}</li>
+      </>
+    ) : (
+      <li aria-current="page">Cierre académico</li>
+    )}
+  </ol>
+</nav>

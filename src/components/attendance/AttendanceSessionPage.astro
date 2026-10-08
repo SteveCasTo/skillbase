@@ -17,11 +17,18 @@ const {
   errors,
   message,
   failedOperation,
+  closedVersion,
 } = Astro.props;
 ---
 
 {fragment && detail ? (
-  <AttendanceSessionPanel {detail} {path} {isAdmin} {correction} />
+  <AttendanceSessionPanel
+    {detail}
+    {path}
+    {isAdmin}
+    {correction}
+    {closedVersion}
+  />
 ) : (
   <PrivateLayout title="Asistencia de sesión">
     <AttendanceBreadcrumbs
@@ -48,6 +55,7 @@ const {
         {errors}
         {message}
         {failedOperation}
+        {closedVersion}
       />
     ) : (
       <>

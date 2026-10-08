@@ -2,9 +2,9 @@
 
 ## Estado y límite de release
 
-El alcance funcional de Fase 8 está aprobado. El backend base de cierre está integrado en `development` por PR 280 (`7807fc1`); la migración candidata `drizzle/0021_phase8_academic_group_closure.sql` solo se aplicó a stacks QA temporales (ledger temporal 21→22), no al Supabase local canónico ni a cloud. Los exporters PDF/CSV y seis Astro GET adapter files están en el worktree `feat/academic-closure-exports`, base `356ec1b`; el source permanece WIP y aún no está integrado. El release `master` sigue en `91beccf8`, cloud ledger 21.
+El alcance funcional de Fase 8 está aprobado. El backend base de cierre está integrado en `development` por PR 280 (`7807fc1`). UI SSR y policy están en `feat/academic-closure-interface`; los renderers PDF/CSV y seis Astro GET adapters de `feat/academic-closure-exports` están incorporados en el árbol combinado actual, aún no integrado en development. La migración candidata `drizzle/0021_phase8_academic_group_closure.sql` solo se aplicó a stacks QA temporales (ledger temporal 21→22), no al Supabase local canónico ni a cloud. El release `master` sigue en `91beccf8`, cloud ledger 21.
 
-Los serializers/renderers y route modules existen en el source WIP, pero las rutas no se añadieron a `PRIVATE_ROUTE_POLICIES`; bajo el middleware fail-closed aún no son descargas accesibles por navegador. La UI de cierre/download corresponde a otro feature owner y tampoco está integrada. Por tanto no se considera una superficie de aplicación liberada. El milestone Fase 8 sigue parcial: falta policy/UI/revisión final/gates/release y la gestión multi-ADMIN. Estado y pruebas por stage en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
+Los helpers, la interfaz SSR y los seis GET adapters PDF/CSV están presentes en el árbol combinado de `feat/academic-closure-interface` con `feat/academic-closure-exports`; aún no están integrados en `development` ni liberados. El route policy de UI incluye patrones acotados para workspace, historial y los tres artefactos bajo ambos contextos, con ADMIN para `/app/cursos` e INSTRUCTOR para `/app/mis-cursos`; el loader vuelve a validar actor/ownership. La UI enlaza a los adapters integrados en este árbol. La descarga desde navegador aún no se ha verificado, y Fase 8 sigue parcial: falta gate/revisión/release y lifecycle multi-ADMIN. El progreso por etapa está en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 
 ## Responsabilidades y helpers actuales
 
@@ -26,9 +26,20 @@ src/domain/academic-closure
 Se añadieron seis Astro GET route modules bajo contextos ADMIN/INSTRUCTOR:
 `/app/cursos/:id/grupos/:groupId/cierre/:version/{planilla.pdf,planilla.csv,informe.pdf}`
 y equivalentes bajo `/app/mis-cursos/:id/grupos/:groupId/cierre/:version/`.
-Fijan role requerido y artifact. Aún no están registrados en
-`PRIVATE_ROUTE_POLICIES`; middleware fail-closed los bloquea hasta integrar
-route policy/navigation/UI del otro feature.
+Fijan role requerido y artifact. En el árbol combinado actual, las rutas están
+registradas en `PRIVATE_ROUTE_POLICIES` con patrones acotados; el middleware
+sigue fail-closed para rutas privadas no declaradas y el loader revalida contexto
+y ownership. La descarga real por navegador permanece sin verificar.
+
+La UI/adapter SSR se encuentra en `feat/academic-closure-interface`. Sus rutas
+son `/app/cursos/:id/grupos/:groupId/cierre` y `/:version`, con equivalentes
+`/app/mis-cursos/:id/grupos/:groupId/cierre` y `/:version`. El route policy
+fail-closed acotado incluye workspace, historial y los paths `planilla.pdf`,
+`planilla.csv` e `informe.pdf`: ADMIN para cursos e INSTRUCTOR para Mis cursos;
+el loader revalida ownership. Los seis route modules de export están incorporados
+al árbol combinado actual y los enlaces SSR apuntan a ellos. Su descarga HTTP o
+browser real aún no se ha verificado; esto no equivale a gate completo ni a
+disponibilidad en development o producción.
 
 El comando requiere `requestKey` UUID y `revision`; `reopen` requiere además `reason` (1–500 caracteres). El body admite opcionalmente `courseId`/`groupId` solo como referencias que deben coincidir con el contexto de ruta; para reabrir no se aceptan campos desconocidos. El helper valida origen y límite de 65 536 bytes. Respuestas usan `{ok:true,value,message}` o `{ok:false,code,message,issues}`, JSON `private, no-store` y `nosniff`. Mapeo: autorización 403, contexto inexistente/ajeno 404, revisión/idempotencia/estado cerrado o bloqueo 409, validación 422 y fallo inesperado 503 saneado. Esto no constituye todavía endpoint HTTP desplegado.
 
@@ -94,9 +105,10 @@ Los seis route modules implementan estos GET versionados:
 - INSTRUCTOR: mismos artefactos bajo
   `/app/mis-cursos/:id/grupos/:groupId/cierre/:version/`.
 
-Cada módulo fija role requerido y artifact, pero los paths aún no están
-registrados en `PRIVATE_ROUTE_POLICIES`; middleware fail-closed los bloquea. La
-UI propietaria de cierre/descargas no está integrada.
+Cada módulo fija role requerido y artifact. Los paths están registrados en
+`PRIVATE_ROUTE_POLICIES` del árbol combinado actual con patrones acotados por
+contexto; la route policy más el loader revalidan rol y ownership. La descarga por
+navegador aún no se verificó y el árbol no está integrado a development.
 
 El CSV de planilla usa UTF-8 BOM, separador `;`, quoting/escaping y mitigación de
 formula injection incluyendo espacios/caracteres Unicode iniciales. Notas/pesos
@@ -111,11 +123,11 @@ soportados fallan explícitamente (`PDF_UNSUPPORTED_TEXT`/409), no se truncan ni
 sustituyen. Se reutilizan `pdf-lib`, `@pdf-lib/fontkit` y la fuente ya incluida;
 no se añadieron dependencias.
 
-Siguen pendientes: registrar las seis rutas en policy privada y comprobarlas por
-HTTP/E2E; integrar SSR/UI de cierre/reapertura y botones/descargas. El test de
-integración ejerce el handler con sesión/fixtures reales del stack aislado, no
-las rutas Astro a través del navegador. Hasta conectar policy/UI no hay una
-descarga disponible al usuario.
+Sigue pendiente comprobar las seis rutas y las descargas por HTTP/E2E de navegador.
+El test de integración ejerce el handler con sesión/fixtures reales del stack
+aislado, no las rutas Astro a través del navegador. Por ello, la presencia de UI,
+policy y adapters en este feature no se documenta como descarga verificada ni
+como disponibilidad en development/producción.
 El lifecycle/provisionamiento multi-ADMIN está
 aprobado pero sigue siendo paquete posterior; `closureActorDependencies` solo
 expone las nuevas referencias actor-dependent para esa futura validación. No se

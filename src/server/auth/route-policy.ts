@@ -34,6 +34,14 @@ const FORMAT_DETAIL_PATH =
 const INTEREST_DETAIL_PATH =
   /^\/app\/interesados\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const CLOSURE_CONTEXT = String.raw`\/app\/(cursos|mis-cursos)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/grupos\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/cierre`;
+const CLOSURE_WORKSPACE_PATH = new RegExp(`^${CLOSURE_CONTEXT}$`, "iu");
+const CLOSURE_VERSION_PATH = new RegExp(`^${CLOSURE_CONTEXT}/[1-9]\\d*$`, "iu");
+const CLOSURE_DOCUMENT_PATH = new RegExp(
+  `^${CLOSURE_CONTEXT}/[1-9]\\d*/(?:planilla\\.pdf|planilla\\.csv|informe\\.pdf)$`,
+  "iu",
+);
+
 export function getPrivateRoutePolicy(
   pathname: string,
 ): PrivateRoutePolicy | null {
@@ -46,6 +54,17 @@ export function getPrivateRoutePolicy(
       normalizedPath as keyof typeof PRIVATE_ROUTE_POLICIES
     ] ?? null;
   if (exact) return exact;
+  if (
+    CLOSURE_WORKSPACE_PATH.test(normalizedPath) ||
+    CLOSURE_VERSION_PATH.test(normalizedPath) ||
+    CLOSURE_DOCUMENT_PATH.test(normalizedPath)
+  )
+    return {
+      access: "ROLES",
+      roles: normalizedPath.startsWith("/app/mis-cursos/")
+        ? ["INSTRUCTOR"]
+        : ["ADMIN"],
+    };
   if (
     /^\/app\/(?:cursos|mis-cursos)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?:\/grupos\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})?\/evaluaciones$/iu.test(
       normalizedPath,
