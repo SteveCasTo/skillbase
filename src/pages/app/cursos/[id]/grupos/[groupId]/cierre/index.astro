@@ -1,0 +1,8 @@
+---
+import ClosurePage from "@/components/academic-closure/ClosurePage.astro";
+import { prepareClosureRoute } from "@/components/academic-closure/route";
+const state = await prepareClosureRoute(Astro, false);
+if (state instanceof Response) return state;
+---
+
+<ClosurePage {...state} />

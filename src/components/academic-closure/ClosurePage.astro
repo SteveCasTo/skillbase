@@ -1,0 +1,268 @@
+---
+import "sileo/styles.css";
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { ClosureActions } from "./ClosureActions";
+import ClosureBreadcrumbs from "./ClosureBreadcrumbs.astro";
+import ClosureReport from "./ClosureReport.astro";
+import { closureDateLabel, closureBlockerLabels } from "./presentation";
+import { dateLabel } from "@/components/attendance/presentation";
+import type { ClosureRouteData } from "./route";
+type Props = ClosureRouteData;
+const {
+  load,
+  historical,
+  courseId,
+  groupId,
+  instructorRoute,
+  version,
+  requestKey,
+  attemptedRevision,
+  reason,
+  issues,
+  message,
+  success,
+  operation,
+} = Astro.props;
+const state = load.available ? load.data : null;
+const selected = historical?.available
+  ? historical.data
+  : version
+    ? null
+    : state?.official;
+const report = selected?.report ?? (version ? null : state?.provisional);
+const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
+const base = `${prefix}/${courseId}/grupos/${groupId}`;
+const unavailable =
+  historical && !historical.available
+    ? historical.unavailableReason
+    : !load.available
+      ? load.unavailableReason
+      : "No se pudo cargar el reporte.";
+---
+
+<PrivateLayout
+  title={version ? `Cierre académico · Versión ${version}` : "Cierre académico"}
+>
+  <ClosureBreadcrumbs
+    {base}
+    {courseId}
+    {instructorRoute}
+    courseName={report?.courseName ?? "Curso"}
+    groupName={report?.groupName ?? "Grupo"}
+    {...(version ? { version } : {})}
+  />
+  <header class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-semibold tracking-tight">
+      {version ? `Versión ${version}` : "Cierre académico"}
+    </h1>
+    {report && !version && (
+      <a
+        href={`${base}/evaluaciones`}
+        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+      >
+        Evaluaciones
+      </a>
+    )}
+  </header>
+  {report && state ? (
+    <div class="mt-5 flex min-w-0 flex-col gap-8">
+      <section
+        aria-labelledby="closure-state"
+        class="flex flex-col gap-4 border-b pb-5"
+      >
+        <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+          <div class="min-w-0">
+            <h2
+              id="closure-state"
+              tabindex="-1"
+              class="text-lg font-semibold focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              {selected
+                ? `Versión oficial ${selected.version}${version && state.official?.version !== version ? " · Histórica" : ""}`
+                : "Grupo abierto · Resultado provisional"}
+            </h2>
+            {selected ? (
+              <p class="mt-2 break-words text-sm text-muted-foreground">
+                Cerrado por {selected.actorName} ·{" "}
+                <time datetime={selected.closedAt}>
+                  {closureDateLabel(selected.closedAt)}
+                </time>{" "}
+                (Bolivia)
+              </p>
+            ) : (
+              <p class="mt-2 text-sm text-muted-foreground">
+                {state.blockers.length
+                  ? "Completa los pendientes antes de cerrar el grupo."
+                  : "El grupo está listo para cerrar."}
+              </p>
+            )}
+            {!version && state.status === "CLOSED" && (
+              <p class="mt-2 text-sm text-muted-foreground">
+                Notas y asistencia de solo lectura.
+              </p>
+            )}
+          </div>
+          {!version && (
+            <ClosureActions
+              client:load
+              path={`${base}/cierre`}
+              revision={attemptedRevision ?? String(state.revision)}
+              {requestKey}
+              canClose={state.canClose}
+              canReopen={state.canReopen && report.access === "ADMIN"}
+              initialReason={reason}
+              reasonError={issues.reason}
+            />
+          )}
+        </div>
+        <p
+          id="closure-error"
+          tabindex="-1"
+          role="alert"
+          class="text-sm text-destructive empty:hidden"
+        >
+          {issues.reason ? "" : message}
+        </p>
+        <span
+          data-closure-outcome={success ? "success" : "error"}
+          data-message={
+            operation === "close" ? "Grupo cerrado." : "Grupo reabierto."
+          }
+          hidden
+        ></span>
+        {success && (
+          <noscript>
+            <p role="status">
+              {operation === "close" ? "Grupo cerrado." : "Grupo reabierto."}
+            </p>
+          </noscript>
+        )}
+        {!version && state.status === "OPEN" && state.blockers.length > 0 && (
+          <section
+            aria-labelledby="closure-blockers-title"
+            class="flex flex-col gap-2"
+          >
+            <h3 id="closure-blockers-title" class="font-medium">
+              Pendientes para cerrar
+            </h3>
+            <ul class="flex flex-col gap-1 text-sm">
+              {state.blockers.map((blocker) => (
+                <li>
+                  <a
+                    href={`${base}/${blocker === "GRADES_PENDING" ? "evaluaciones" : "sesiones"}`}
+                    class="inline-flex min-h-11 items-center underline underline-offset-4"
+                  >
+                    {closureBlockerLabels[blocker]}
+                  </a>
+                  {blocker === "ATTENDANCE_PENDING" &&
+                    report.access === "INSTRUCTOR" && (
+                      <span class="text-muted-foreground">
+                        {" "}
+                        · La revisión histórica corresponde a administración.
+                      </span>
+                    )}
+                </li>
+              ))}
+            </ul>
+            {state.blockers.includes("SESSIONS_UNFINISHED") && (
+              <ul class="flex flex-col gap-1 text-sm text-muted-foreground">
+                {report.sessions
+                  .filter((session) => !session.cancelledAt)
+                  .map((session) => (
+                    <li>
+                      <a
+                        href={`${base}/sesiones/${session.id}`}
+                        class="inline-flex min-h-11 items-center underline underline-offset-4"
+                      >
+                        Sesión del {dateLabel(session.startsAt)}
+                      </a>
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </section>
+        )}
+        {selected && (
+          <nav
+            aria-label={`Documentos de la versión ${selected.version}`}
+            class="flex flex-wrap gap-2"
+          >
+            {[
+              ["planilla.pdf", "Planilla PDF"],
+              ["planilla.csv", "Planilla CSV"],
+              ["informe.pdf", "Informe PDF"],
+            ].map(([suffix, label]) => (
+              <a
+                href={`${base}/cierre/${selected.version}/${suffix}`}
+                data-astro-reload
+                class={buttonVariants({
+                  variant: "outline",
+                  className: "min-h-11",
+                })}
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
+        )}
+      </section>
+      <ClosureReport {report} />
+      {!version && (
+        <section
+          aria-labelledby="closure-history-title"
+          class="flex flex-col gap-4"
+        >
+          <h2 id="closure-history-title" class="text-xl font-semibold">
+            Historial de cierres
+          </h2>
+          {!state.history.length ? (
+            <p class="text-sm text-muted-foreground">
+              Todavía no hay versiones oficiales.
+            </p>
+          ) : (
+            <ol class="flex flex-col divide-y">
+              {state.history.map((entry) => (
+                <li class="flex flex-col gap-2 py-4">
+                  <a
+                    href={`${base}/cierre/${entry.version}`}
+                    class="inline-flex min-h-11 items-center self-start font-medium underline underline-offset-4"
+                  >
+                    Versión {entry.version}
+                    {state.official?.version === entry.version
+                      ? " · Vigente"
+                      : ""}
+                  </a>
+                  <p class="break-words text-sm text-muted-foreground">
+                    {entry.actorName} ·{" "}
+                    <time datetime={entry.closedAt}>
+                      {closureDateLabel(entry.closedAt)}
+                    </time>
+                  </p>
+                  {state.reopenings
+                    .filter((reopening) => reopening.version === entry.version)
+                    .map((reopening) => (
+                      <p class="break-words text-sm">
+                        Reabierto por {reopening.actorName} ·{" "}
+                        <time datetime={reopening.reopenedAt}>
+                          {closureDateLabel(reopening.reopenedAt)}
+                        </time>
+                        <br />
+                        {reopening.reason}
+                      </p>
+                    ))}
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
+    </div>
+  ) : (
+    <RegistrationPageError
+      message={unavailable}
+      retryHref={Astro.url.pathname}
+    />
+  )}
+</PrivateLayout>

@@ -52,6 +52,12 @@ const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
         >
           Evaluaciones
         </a>
+        <a
+          href={`${prefix}/${courseId}/grupos/${groupId}/cierre`}
+          class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+        >
+          Cierre académico
+        </a>
       </div>
     )}
   </header>
