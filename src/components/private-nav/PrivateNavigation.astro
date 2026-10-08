@@ -35,6 +35,21 @@ const registrationActive = currentPath.startsWith("/app/preinscripciones");
       <li>
         <a
           class="private-nav-link"
+          href="/app/administradores"
+          title="Administradores"
+          aria-current={
+            currentPath.startsWith("/app/administradores") ? "page" : undefined
+          }
+        >
+          <UsersRound size={19} aria-hidden="true" />
+          <span class="private-label">Administradores</span>
+        </a>
+      </li>
+    )}
+    {isAdmin && (
+      <li>
+        <a
+          class="private-nav-link"
           href="/app/instructores"
           title="Instructores"
           aria-current={
