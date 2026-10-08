@@ -549,8 +549,14 @@ test("HTML fallback confirms and redirects without JS; errors stay visible", asy
     const html = await fallback.newPage();
     await html.goto(course.path);
     const row = rowFor(html);
-    await row.getByText("Cancelar interés", { exact: true }).click();
-    await row.getByRole("button", { name: "Cancelar interés" }).click();
+    await row
+      .locator("summary")
+      .filter({ hasText: /^Cancelar interés$/u })
+      .click();
+    await row
+      .getByRole("form")
+      .getByRole("button", { name: "Cancelar interés", exact: true })
+      .click();
     await expect(html).toHaveURL(`${course.path}?success=updated`);
     await expect(rowFor(html).locator("[data-interest-status]")).toHaveText(
       "Cancelado",
