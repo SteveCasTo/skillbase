@@ -31,6 +31,11 @@ export async function hasAdminActorActivity(
     or exists(select 1 from ${s.adminAccountDeletions} where ${eq(s.adminAccountDeletions.actorId, id)})
     or exists(select 1 from ${s.authGoogleLinkRequests} where ${eq(s.authGoogleLinkRequests.userId, id)})
     or exists(select 1 from ${s.instructorProfiles} where ${eq(s.instructorProfiles.id, id)})
+    or exists(select 1 from ${s.certificates} where ${eq(s.certificates.createdBy, id)} or ${eq(s.certificates.instructorId, id)})
+    or exists(select 1 from ${s.certificateEvents} where ${eq(s.certificateEvents.actorId, id)})
+    or exists(select 1 from ${s.certificateReceipts} where ${eq(s.certificateReceipts.actorId, id)})
+    or exists(select 1 from ${s.certificateSettings} where ${eq(s.certificateSettings.updatedBy, id)})
+    or exists(select 1 from ${s.certificateArtifacts} where ${eq(s.certificateArtifacts.actorId, id)})
   `,
     })
     .from(s.users)
