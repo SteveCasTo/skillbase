@@ -5,6 +5,7 @@ import type {
 } from "@/domain/pre-registrations/types";
 import { assertTransfer } from "@/domain/pre-registrations/policies";
 import { buttonVariants } from "@/components/ui/button";
+import { confirmationFooterClassName } from "@/components/ui/confirmation-footer";
 import RegistrationSelect from "./RegistrationSelect";
 import { courseContext, formatDate } from "./presentation";
 interface Props {
@@ -66,7 +67,7 @@ const available = options.some((option) => !option.disabled);
   }
   data-astro-reload
 >
-  <h2 class="text-lg font-semibold">Cambiar de grupo</h2>
+  <h2 class="text-lg font-semibold">Cambiar grupo</h2>
   <input type="hidden" name="registrationId" value={registration.id} />
   <input type="hidden" name="revision" value={registration.revision} />
   <input type="hidden" name="requestKey" value={requestKey} />
@@ -84,14 +85,25 @@ const available = options.some((option) => !option.disabled);
         options={options}
         error={errors.destinationGroupId}
       />
-      <button
-        type="submit"
-        class={buttonVariants({
-          className: "min-h-11 w-full sm:w-auto sm:self-start",
-        })}
-      >
-        Cambiar de grupo
-      </button>
+      <div class={confirmationFooterClassName}>
+        <span data-dialog-cancel>
+          <a
+            data-dialog-cancel-fallback
+            href={`/app/preinscripciones/${registration.id}`}
+            class={buttonVariants({ variant: "outline", className: "w-full" })}
+          >
+            Volver
+          </a>
+        </span>
+        <button
+          type="submit"
+          class={buttonVariants({
+            className: "w-full",
+          })}
+        >
+          Cambiar grupo
+        </button>
+      </div>
     </>
   ) : (
     <p role="status" class="text-sm text-muted-foreground">

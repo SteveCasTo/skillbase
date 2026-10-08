@@ -145,13 +145,18 @@ async function command(
 async function prepare(
   page: Page,
   fixture: Awaited<ReturnType<typeof createAttendanceFlowFixture>>,
+  count = 6,
 ) {
   const base = basePath(fixture.historyCourseId, fixture.historyGroupId);
-  const components = Array.from({ length: 6 }, (_, index) => ({
+  const hundredths = Math.floor(10_000 / count);
+  const components = Array.from({ length: count }, (_, index) => ({
     id: crypto.randomUUID(),
     name: `Componente ${index + 1}: análisis y aplicación de conocimientos`,
     type: index % 2 ? "PRACTICAL" : "THEORY",
-    weight: index === 5 ? "16.65" : "16.67",
+    weight: (
+      (index === count - 1 ? 10_000 - hundredths * (count - 1) : hundredths) /
+      100
+    ).toFixed(2),
   }));
   const scheme = await page.request.post(
     `/app/cursos/${fixture.historyCourseId}/evaluaciones`,
@@ -357,7 +362,7 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
   const adminPath = `${basePath(fixture.historyCourseId, fixture.historyGroupId)}/cierre`;
   try {
     await exportParticipant(fixture);
-    const prepared = await prepare(admin, fixture);
+    const prepared = await prepare(admin, fixture, 8);
     const adminReport = (await read(admin, adminPath)).provisional!;
     expect(adminReport.access).toBe("ADMIN");
     const sensitive =
@@ -366,6 +371,24 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
     const path = `${basePath(fixture.historyCourseId, fixture.historyGroupId, true)}/cierre`;
     await page.goto(path);
     await expect(page.getByText(sensitive, { exact: false })).toHaveCount(0);
+    const card = page.getByRole("button", {
+      name: "Ver resultados de =María Ñúñez Álvarez",
+      exact: true,
+    });
+    await expect(card).toContainText("8/8 componentes calificados");
+    await card.focus();
+    await page.keyboard.press("Enter");
+    const detail = page.getByRole("dialog", {
+      name: "=María Ñúñez Álvarez",
+      exact: true,
+    });
+    await expect(detail).toBeVisible();
+    await expect(
+      detail.getByText(prepared.components[7]!.name, { exact: false }),
+    ).toBeVisible();
+    await expect(detail.getByRole("textbox")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(card).toBeFocused();
     await page
       .getByRole("button", { name: "Cerrar grupo", exact: true })
       .click();

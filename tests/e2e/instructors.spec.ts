@@ -20,7 +20,7 @@ test("ADMIN creates and edits a registered instructor with a semantic full-card 
     "data-bound",
     "true",
   );
-  const name = `Instructor ${randomUUID()}`;
+  const name = `Íñstructor ${randomUUID()}`;
   const email = `instructor-${randomUUID()}@e2e.test`;
   const password = randomBytes(24).toString("base64url");
   await page.getByLabel("Nombre", { exact: true }).fill(name);
@@ -83,6 +83,24 @@ test("ADMIN creates and edits a registered instructor with a semantic full-card 
   const card = page.getByRole("link", {
     name: `${name} Sintético ${email} Cuenta activa`,
   });
+  await expect(card).toBeVisible();
+  const search = page.getByRole("searchbox", {
+    name: "Buscar por nombre o correo",
+  });
+  await search.fill(
+    `  ${name.normalize("NFD").replace(/\p{M}/gu, "").toUpperCase()}   SINTETICO  `,
+  );
+  await search.press("Enter");
+  await expect(card).toBeVisible();
+  await search.fill(email.toUpperCase());
+  await search.press("Enter");
+  await expect(card).toBeVisible();
+  await search.fill(`absent-${randomUUID()}`);
+  await search.press("Enter");
+  await expect(card).toBeHidden();
+  await expect(page.getByRole("status")).toBeVisible();
+  await search.fill(email);
+  await search.press("Enter");
   await expect(card).toBeVisible();
   await card.focus();
   await page.keyboard.press("Enter");

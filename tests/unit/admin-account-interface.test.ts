@@ -11,6 +11,8 @@ import { adminAccountPage } from "@/server/admin-accounts/page";
 import {
   adminAccountStatus,
   adminCreateEligible,
+  adminAccountBlockedReason,
+  adminAccountActions,
 } from "@/components/admin-accounts/presentation";
 import { getPrivateRoutePolicy } from "@/server/auth/route-policy";
 import { navigationSkeletonVariant } from "@/components/private-nav/navigation-skeleton";
@@ -36,8 +38,26 @@ const account: AdminAccountDto = {
   hasActivity: false,
   deletionPending: false,
   action: "delete",
+  lifecycleBlockedReason: null,
 };
 const siteUrl = new URL("http://localhost:4578");
+test("last-active lifecycle disability comes from the server projection, not visible account counts", () => {
+  expect(
+    adminAccountBlockedReason({ lifecycleBlockedReason: null }),
+  ).toBeNull();
+  expect(
+    adminAccountBlockedReason({ lifecycleBlockedReason: "last-active-admin" }),
+  ).toBe("Debe quedar al menos un administrador activo.");
+  for (const action of ["delete", "deactivate"] as const) {
+    const blocked = {
+      ...account,
+      action,
+      lifecycleBlockedReason: "last-active-admin" as const,
+    };
+    expect(adminAccountActions[blocked.action].label).toBeTruthy();
+    expect(adminAccountBlockedReason(blocked)).not.toBeNull();
+  }
+});
 test("explicit ADMIN route registration remains fail-closed and classifies structural loads", () => {
   for (const [path, variant] of [
     ["/app/administradores", "list"],

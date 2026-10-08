@@ -132,5 +132,9 @@ const { group, sessionBase, id = "attendance-sessions" } = Astro.props;
       grid-column: 2;
       grid-row: 1;
     }
+    .session-layout[data-calendar-ready="true"] .session-rows {
+      max-height: calc(100svh - 3rem);
+      overflow-y: auto;
+    }
   }
 </style>

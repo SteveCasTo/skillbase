@@ -1,8 +1,6 @@
 ---
 import type { AuthorizedClosureReportDto } from "@/domain/academic-closure/types";
-import { gradeLabel } from "@/components/evaluations/presentation";
-import { EvaluationResult } from "@/components/evaluations/EvaluationResult";
-import { formatMoney } from "@/components/pre-registrations/presentation";
+import { ResultCards, VISIBLE_RESULT_COMPONENTS } from "./ResultCards";
 interface Props {
   report: AuthorizedClosureReportDto;
 }
@@ -17,103 +15,14 @@ const { report } = Astro.props;
     <h2 id="closure-results-title" class="text-xl font-semibold">
       Resultados académicos
     </h2>
-    <p class="text-sm text-muted-foreground">
-      Nota mínima: {report.minimumGrade}/100
-    </p>
   </header>
   {!report.participants.length ? (
     <p class="text-sm text-muted-foreground">
       Este grupo no tiene participantes inscritos para evaluar.
     </p>
+  ) : report.scheme.components.length > VISIBLE_RESULT_COMPONENTS ? (
+    <ResultCards client:load {report} />
   ) : (
-    <ul class="min-w-0 divide-y rounded-xl border bg-card">
-      {report.participants.map((person) => (
-        <li class="min-w-0 p-4 sm:p-5">
-          <article class="flex min-w-0 flex-col gap-4">
-            <header class="flex flex-col justify-between gap-3 lg:flex-row">
-              <div class="min-w-0">
-                <h3 class="break-words font-semibold">
-                  {person.firstName} {person.lastName}
-                </h3>
-                <p class="mt-1 text-sm">
-                  {person.result.status === "PENDING"
-                    ? "Resultado pendiente"
-                    : person.academicallyPassed
-                      ? "Aprobado por nota y asistencia"
-                      : "No aprobado por nota y asistencia"}
-                </p>
-              </div>
-              <EvaluationResult result={person.result} />
-              {person.result.status === "PENDING" && (
-                <p class="text-sm text-muted-foreground">
-                  Decisión provisional:{" "}
-                  {gradeLabel(person.result.decisionGrade)} · Faltan notas
-                </p>
-              )}
-            </header>
-            <dl class="grid min-w-0 gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
-              {report.scheme.components.map((component) => {
-                const score = person.grades.find(
-                  (grade) => grade.componentId === component.id,
-                )?.score;
-                return (
-                  <div class="min-w-0">
-                    <dt class="break-words text-sm text-muted-foreground">
-                      {component.name} ({gradeLabel(component.weight)} %)
-                    </dt>
-                    <dd class="mt-1 text-sm tabular-nums">
-                      {score == null ? "Pendiente" : gradeLabel(score)}
-                    </dd>
-                  </div>
-                );
-              })}
-            </dl>
-            <dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-              <div>
-                <dt class="text-muted-foreground">Asistencia</dt>
-                <dd>
-                  {person.attendance.present} presentes ·{" "}
-                  {person.attendance.excused} justificadas ·{" "}
-                  {person.attendance.absent} ausentes
-                  {person.attendance.pending
-                    ? ` · ${person.attendance.pending} pendientes`
-                    : ""}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-muted-foreground">
-                  Elegibilidad por asistencia
-                </dt>
-                <dd>
-                  {person.attendance.academicallyEligible
-                    ? "Elegible"
-                    : "No elegible"}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-muted-foreground">Racha máxima de ausencias</dt>
-                <dd>{person.attendance.maximumConsecutiveAbsences}</dd>
-              </div>
-            </dl>
-            {report.access === "ADMIN" &&
-              (() => {
-                const privatePerson = report.participants.find(
-                  (p) => p.registrationId === person.registrationId,
-                );
-                return (
-                  privatePerson && (
-                    <p class="text-sm text-muted-foreground">
-                      CI: {privatePerson.ci} · Saldo informativo:{" "}
-                      {privatePerson.balanceCents === null
-                        ? "No disponible"
-                        : formatMoney(privatePerson.balanceCents)}
-                    </p>
-                  )
-                );
-              })()}
-          </article>
-        </li>
-      ))}
-    </ul>
+    <ResultCards {report} />
   )}
 </section>

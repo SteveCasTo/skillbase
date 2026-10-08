@@ -9,6 +9,7 @@ import type {
 } from "@/domain/evaluations/types";
 import { notifications } from "@/lib/notifications";
 import { gradeLabel } from "./presentation";
+import { cn } from "@/lib/utils";
 import { changedGrades, gradeDrafts, type GradeDraft } from "./editing";
 import { EvaluationResult } from "./EvaluationResult";
 import type { EvaluationSaveResult, SaveRow } from "./mutation-types";
@@ -123,7 +124,7 @@ export function GradeRow({
       ref={form}
       aria-label={`Notas de ${name}`}
       aria-busy={saving}
-      className="grid min-w-0 gap-x-5 gap-y-3 p-4 sm:grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_12rem]"
+      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)_auto]"
       onKeyDown={(event) => {
         if (event.key === "Escape" && drafts && !saving) {
           event.preventDefault();
@@ -184,7 +185,7 @@ export function GradeRow({
         }
       }}
     >
-      <div className="min-w-0">
+      <div className="col-span-2 min-w-0 lg:col-span-1">
         <h3 className="pt-2 text-sm font-semibold break-words">{name}</h3>
         {participant.membershipStatus !== "INSCRITO" && (
           <p className="text-muted-foreground mt-1 text-sm">
@@ -192,7 +193,12 @@ export function GradeRow({
           </p>
         )}
       </div>
-      <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-x-3 gap-y-2 sm:col-span-2 lg:col-span-1 lg:col-start-2 lg:row-start-1">
+      <div
+        className={cn(
+          "grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-x-3 gap-y-2 lg:col-span-1 lg:col-start-2 lg:row-start-1",
+          participant.result.status === "COMPLETE" && "col-span-2 row-start-3",
+        )}
+      >
         {components.map((component, index) => {
           const draft = drafts?.find(
             (draft) => draft.componentId === component.id,
@@ -269,7 +275,17 @@ export function GradeRow({
           );
         })}
       </div>
-      <div className="flex min-w-0 flex-col items-start gap-1 sm:col-start-2 sm:row-start-1 sm:items-end lg:col-start-3">
+      <div
+        className={cn(
+          "flex min-w-0 items-center gap-3 self-start lg:col-span-1 lg:col-start-3 lg:row-start-1 lg:justify-end lg:pt-5",
+          participant.result.status === "COMPLETE"
+            ? "col-span-2 row-start-2 justify-between"
+            : "justify-end pt-5",
+        )}
+      >
+        {participant.result.status === "COMPLETE" && (
+          <EvaluationResult result={participant.result} />
+        )}
         <div className="flex min-h-11 items-center justify-end gap-1">
           {participant.canGrade &&
             (drafts ? (
@@ -335,7 +351,6 @@ export function GradeRow({
             </span>
           )}
         </div>
-        <EvaluationResult result={participant.result} />
       </div>
       {message && (
         <p
