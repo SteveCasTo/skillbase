@@ -597,7 +597,7 @@ El ajuste compacto/responsive del panel y formulario de interesados quedó integ
 
 ## Correcciones administrativas aprobadas (implementadas en fuente; gate final pendiente)
 
-Los ajustes siguientes se implementaron en las ramas integradas PRs 258–264 y en el head de feedback/navegación `d057d2d`. Las verificaciones fueron focales por stage y no constituyen el gate combinado; los límites están en [`TESTING.md`](TESTING.md). Cierre de grupo, snapshot y gestión multi-ADMIN de Fase 8 continúan solo planificados en [`PLAN.md`](PLAN.md) y [`REQUIREMENTS.md`](REQUIREMENTS.md).
+Los ajustes siguientes se implementaron en las ramas integradas PRs 258–264 y en el head de feedback/navegación `d057d2d`. Las verificaciones fueron focales por stage y no constituyen el gate combinado; los límites están en [`TESTING.md`](TESTING.md). Core/UI de cierre y exports tienen implementación descrita en `PLAN.md`; la UI de gestión multi-ADMIN está en el feature actual y aún no está integrada a `development`.
 
 - **Edición inline compartida:** lápiz/guardar/cancelar por atributo, posición y tamaño estables; comunicar dirty/validación y mantener controles/iconos accesibles. Loading no debe sustituir el layout ni destruir el SVG/estado del control. Mostrar errores persistentes junto al campo y conflictos accionables; Sileo solo para feedback transitorio no duplicado.
 - **Instructor y perfil:** nombre como texto y correo de solo lectura sin decoración de input editable. El listado de cursos presenta datos personales primero y una explicación/bloqueo debajo junto a los cursos pertinentes. Centrar la tarjeta global del perfil y alinear Google en una fila propia.
@@ -609,3 +609,24 @@ Los ajustes siguientes se implementaron en las ramas integradas PRs 258–264 y 
 La revisión manual prevista cubre desktop/mobile, tabla y lista, light/dark, teclado, errores y loading mediante Playwright CLI. No reemplaza pruebas de reglas de negocio ni justifica tests E2E acoplados a CSS o copy.
 
 En las verificaciones focales de estos cambios se usaron páginas/DTOs y respuestas sintéticas interceptadas cuando se indica en [`TESTING.md`](TESTING.md); no equivalen a una auditoría completa de rutas privadas, persistencia/Auth ni al gate de release.
+
+## Cuentas de administradores (UI Fase 8, feature no integrado)
+
+La feature `feat/admin-account-interface` agrega la sección «Administradores»
+visible a cualquier cuenta ADMIN, sin jerarquía ROOT. La lista SSR usa tarjetas
+responsive en grid y búsqueda por nombre/correo con estado accesible sin
+resultados. La pantalla de alta separa los datos del administrador del acceso
+inicial; el toggle de visibilidad de password es progresivo y nunca vuelve a
+renderizar el valor. Nombre/email tienen validación contextual y la contraseña
+respeta el rango 12–128 establecido por backend.
+
+En el detalle, nombre solo es editable por control inline compartido y email se
+muestra como texto readonly. La acción lifecycle singular se deriva del DTO
+autorizado: eliminar, desactivar/reactivar o reintentar eliminación pendiente;
+no hay selector de acción/rol. La confirmación tiene fallback HTML sin JS y,
+con React, mantiene foco inicial/cancelación y retorno de foco. Los errores,
+pending, drafts no secretos y recarga son contextuales; al auto-desactivar o
+eliminar, el servidor termina la sesión redirigiendo a login. Tarjetas y
+acciones evitan overflow por emails/nombres largos. Pruebas UI focales y límites
+de responsive/teclado están en [`TESTING.md`](TESTING.md). La sección aún no está
+integrada en `development` ni liberada.

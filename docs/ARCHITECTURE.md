@@ -263,7 +263,7 @@ se movieron reglas desde dominio/repositorio a React. El detalle de contrato y
 verificación focal está en [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md)
 y [`TESTING.md`](TESTING.md).
 
-### Cierre académico de grupo (Fase 8, backend parcial)
+### Cierre académico de grupo (Fase 8, implementación en capas)
 
 El agregado nuevo mantiene las capas del monolito: reglas/tipos en
 `src/domain/academic-closure`, casos de uso/port en
@@ -271,13 +271,30 @@ El agregado nuevo mantiene las capas del monolito: reglas/tipos en
 `src/server/academic-closure`, persistencia en
 `src/server/db/repositories/academic-closure-*` y schema/migración Drizzle.
 `loadAcademicClosure`, `loadAcademicClosureVersion` y `handleClosurePost` son
-helpers server-side, no páginas/rutas Astro montadas. El cierre transaccional
-reutiliza el advisory lock de horarios, bloquea curso/grupo y serializa estado,
-snapshot, receipt y auditoría con las escrituras de notas, asistencia,
-calendario y membresía destino. Los guards se comparten entre repositorios;
-0021 añade trigger DB para evidencia cerrada. No hay route policy, UI ni exports
-PDF/CSV conectados; contrato y límites en
+helpers server-side reutilizados por las páginas SSR de workspace/historial
+integradas por PR 282. PR 281 añade renderers y seis GET download adapters; la
+route policy registra workspace, versión y documento con roles acotados por
+contexto, y el loader revalida ownership. No se dispone de evidencia live-browser
+de descarga en esta documentación. El cierre transaccional reutiliza advisory
+locks, bloquea curso/grupo y serializa estado, snapshot, receipt y auditoría con
+escrituras de notas, asistencia, calendario y membresía destino. Los guards se
+comparten entre repositorios; 0021 añade trigger DB para evidencia cerrada.
+Contrato y límites en
 [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md).
+
+### Cuentas ADMIN (Fase 8, feature UI/backend)
+
+El backend vive en reglas/DTO `src/domain/admin-accounts`, casos de uso
+`src/application/admin-accounts`, helpers HTTP/loader/Auth gateway en
+`src/server/admin-accounts` y repositorio Drizzle. Esta interfaz agrega páginas
+Astro en `/app/administradores`, `/nuevo` y `/:id`, componentes SSR en
+`src/components/admin-accounts` y acceso client enhancement pequeño; los POST
+delegan siempre al helper/caso de uso server-side, sin reglas de negocio en UI.
+El route policy fija explícitamente ADMIN para list/create y UUID detail; la
+navegación añade el acceso a todos los usuarios ADMIN. El middleware mantiene
+fallo cerrado para el resto. No existe rol ROOT ni interfaz que altere roles o
+perfiles profesionales. Esta UI/feature aún no se integra a development. Ver
+[`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
 
 El POST público limita y parsea el body en el adaptador server-side, valida Origin y llama el caso de uso de interés. Un limiter persistente usa PostgreSQL y un HMAC server-only sobre `Astro.clientAddress`; no confía en forwarded headers. Sin secreto válido o dirección de cliente confiable, el flujo falla cerrado. Los defaults técnicos y requisitos de despliegue se describen en el contrato y en `docs/DEPLOYMENT.md`; no implican que los valores cloud estén configurados.
 

@@ -132,6 +132,19 @@ Para disponibilidad se consideran grupos `PLANNED` del instructor entre cursos �
 
 La migración `0016_instructor_lifecycle_outbox` añade `instructor_account_deletions`: registro de eliminación pendiente/completada con instructor, actor, `auth_user_id` y tiempos de solicitud/fin; FK `RESTRICT` a users/actor, índice por actor, RLS habilitado y grants Data API revocados. El repositorio conserva una fila tombstone mínima tras quitar perfil/rol para respetar referencias de auditoría, y mantiene el estado bloqueado para reintentar la etapa Auth externa si falla. Solo permite eliminación cuando no existe historia/dependencia y el usuario tiene rol exclusivo `INSTRUCTOR`; perfiles con historia conservan identidad. La migración se integró en `development` mediante PR 134 y se aplicó localmente sin reset (ledger 16→17); el release posterior de Fase 5 lleva cloud a ledger 18. La fuente final validada en PR 136 pasó integration 98 y E2E 120/120.
 
+#### Lifecycle de cuentas ADMIN (0022, feature no integrado)
+
+La migración candidata `0022_phase8_admin_accounts` crea
+`admin_account_deletions`, con intención de baja durable: `user_id`, `actor_id`,
+UUID Auth objetivo, revisión de solicitud y tiempos de creación/completado. FK a
+usuario y actor son `RESTRICT`; tabla con RLS, grants Data API revocados y trigger
+que conserva inmutable la evidencia, permitiendo solo completar una intención
+pendiente. La cuenta `users` se conserva como tombstone para referencias de actor
+e historial. La migración se aplicó solo al QA temporal del feature (ledger
+22→23); el Supabase local canónico y cloud permanecen en ledger 21. La interfaz
+no añade campos al modelo `users`; detalles operativos y autorización están en
+[`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
+
 ### Group
 
 - id

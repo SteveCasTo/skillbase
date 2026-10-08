@@ -68,6 +68,31 @@ No confiar únicamente en ocultar botones.
 - Las pruebas locales del feature branch no son verificación de entrega real. Configurar y verificar SMTP/recovery es trabajo aprobado pendiente; Google OAuth real continúa pendiente de forma independiente.
 - Fase 5 trata CI, email y roster como datos personales. No exponer CI públicamente; exportación CSV/PDF es solo ADMIN, debe neutralizar fórmula CSV y no constituye recibo/boleta. No hay pasarela de cobro ni upload de comprobantes.
 
+### Lifecycle y UI de cuentas ADMIN (feature, no integrado)
+
+- `/app/administradores`, `/nuevo` y el detalle UUID están registrados como
+  rutas privadas exclusivas ADMIN. Navigation solo expone el enlace a usuarios
+  con rol ADMIN, pero servidor y repositorio vuelven a validar actor activo y
+  autorización vigente. Actor, target, rol y revisión no se aceptan como
+  autoridad desde el body.
+- La creación transmite la contraseña solo al Admin API privilegiado server-side;
+  no se almacena, audita ni retorna al cliente. Si la persistencia interna falla,
+  la compensación está acotada al UUID Auth recién creado. Auth/PostgreSQL no
+  tienen transacción distribuida; si también falla la compensación, podría
+  quedar una identidad Auth huérfana que requiera reconciliación operativa. No se
+  afirma que exista reconciliador automático.
+- El body POST tiene límite/allowlist y validación de Origin; respuestas se
+  marcan `private, no-store`/`nosniff`. SSR conserva solo datos no secretos para
+  recuperación de errores; el password no se repuebla ni serializa.
+- El UI renderiza la acción aplicable devuelta por el backend, no determina
+  elegibilidad con reglas cliente. El servidor vuelve a comprobar actividad,
+  rol exclusivo, revisión y guard global de último ADMIN bajo locks. Mantiene al
+  menos un ADMIN activo; puede permitirse auto-desactivación/baja si queda otro
+  ADMIN activo. En auto-baja exitosa la sesión se dirige a login.
+- Las rutas y UI ADMIN son feature WIP, aún no integradas ni release. La migration
+  0022 se probó en QA aislado, no en Supabase canónico/cloud. Contrato en
+  [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
+
 #### Seguridad de preinscripciones (rutas integradas; full-suite local PASS)
 
 - `participants`, `pre_registrations`, `registration_settings`, command receipts y ledger tienen RLS habilitada y privilegios Data API revocados. Las lecturas/escrituras usan repositorios server-side.
