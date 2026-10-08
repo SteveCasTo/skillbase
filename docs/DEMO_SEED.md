@@ -200,5 +200,27 @@ vacío. Esto acredita QA, no una carga o verificación en producción.
   890 assertions y completó su limpieza normal sin error.
 
 Evidencia privada de salida en `comprehensive-seed-*.log` bajo el directorio
-aprobado temporal de OpenCode; no contiene valores de credenciales. Los conteos
-y gates remotos/productivos siguen pendientes del owner del release.
+aprobado temporal de OpenCode; no contiene valores de credenciales. La validación
+remota del runner está registrada debajo; ninguna carga real en canónico o cloud
+se ha ejecutado.
+
+### Estado integrado en development (PR 288; release productivo pendiente)
+
+El runner se integró en `development` mediante PR 288, junto con las correcciones
+UI de PR 289 (`development` `53f171e10c6b5ac922d9f4c5760f788b9f7bdebe`). El CI
+integrado del candidato (`37818957648`) pasó first-pass: 424 unit/2,866
+assertions, 162 integration/1,332 assertions, el caso focal del seed 1/1/890
+assertions en stack temporal independiente y E2E 140/140 (132 desktop + 8
+mobile). Formatter, lint, build y typecheck (0 errores/0 warnings/312 hints)
+PASS; sin retries, flakes ni skips reportados. El test focal preservó 416 filas
+en 70 tablas, añadió 8 cursos, 10 grupos, 26 preinscripciones/25 participantes,
+4 instructores y 5 ADMIN ficticios, además de 3 versiones de cierre, una
+reapertura y una baja ADMIN completada. La repetición del APPLY agregó cero
+cambios. Toda esta evidencia corresponde a la base temporal del test, no a datos
+canónicos o productivos.
+
+La carga local canónica y la de producción siguen sin ejecutar. Para producción,
+el proceso documentado arriba exige release CI/deploy aprobado, checkout limpio
+del SHA exacto de `master`, `DEMO_APPROVED_RELEASE_SHA` revisado por el operador,
+PLAN y después APPLY explícito. No se rota ninguna credencial Auth existente ni
+se envía correo. La Fase 9 no se incluye ni se siembra.

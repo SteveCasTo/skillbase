@@ -822,9 +822,11 @@ Instructor configura evaluación y el sistema calcula resultados finales.
 
 Fase 8 se completó y liberó mediante PR 286 a `master` `68c918119f2ec094ba7cc63b217efd2448480505`. CI `37727200394` y Vercel `READY`; las migraciones 0021/0022 avanzaron canónico/cloud a ledger 23. La comparación pre/post confirmó preservación local/cloud; las cinco tablas F8 estaban vacías en la verificación. Fase 9 no ha iniciado. Evidencia: [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md), [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md), [`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-### Nueva pasada de correcciones UI (acuerdos previos; pendiente)
+### Correcciones UI y runner de demo integral (integrados en development; release pendiente)
 
-Se aprobó una pasada acotada de correcciones visuales/operativas y se registró su contrato en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md). Ningún punto de ese contrato está marcado como implementado por esta preparación documental. Mantener cada corrección en rama/PR propia a `development`; las correcciones se liberarán juntas a `master` solo después de completar y verificar todo el bloque. Las demos sintéticas de producción autorizadas se ejecutarán únicamente después de ese release, sin reset general ni alteración de datos legítimos. El contrato define el reset de fecha/estado al seleccionar un estado específico en el calendario.
+El contrato aprobado está en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md). Las correcciones UI se integraron mediante PR 289 y el runner de demo integral mediante PR 288; ambos están en `development` (`53f171e`). El CI integrado del candidato pasó, pero no se ha liberado a `master`: mantener el release de todo el bloque como paso único posterior y no confundir la integración en `development` con producción. No hubo migración ni cambio de schema.
+
+El runner permite QA con datos enteramente ficticios y de forma aditiva/idempotente, preservando datos preexistentes; no tiene reset general. La carga productiva está expresamente autorizada **solo después** del release completo, con aprobación del SHA exacto y PLAN/APPLY separados, usando guards/provenance y snapshot de preservación según [`DEMO_SEED.md`](DEMO_SEED.md). No se ha ejecutado una carga nueva en el Supabase canónico o producción.
 
 Fase 9 continúa pendiente e independiente. Antes de iniciarla, acordar los tipos de certificado, firmas/autoridad, número institucional, elegibilidad y relación con snapshots de cierre, saldos, boleta/valorado y reemplazo/revocación/verificación pública. El contrato UI enumera estas preguntas como pendientes, no como reglas aprobadas.
 

@@ -412,3 +412,25 @@ verifican por este release.
 **Actualización del gate shards:** el status «requiere nuevo run» del registro previo quedó supersedido por PR 279/run `37684331005`, que pasó los dos shards y el agregador estricto tras la remediación APT. PR 279 se integró a `development`; no movió producción ni el ledger cloud.
 
 Los adapters de export se integraron por PR 281 y UI/policy de cierre por PR 282; PR 284 añadió casos browser para descargas. La evidencia del release final y ledger 23 consta en la sección PR 286 arriba. No implica smoke autenticado ni uso de cuentas ADMIN reales en producción.
+
+## Candidato de correcciones UI y demo integral (integrado en development)
+
+PR 289 integró las correcciones UI y PR 288 el runner manual sintético F1–F8 en
+`development` (`53f171e10c6b5ac922d9f4c5760f788b9f7bdebe`). El CI integrado del
+candidato pasó en PR 288, run `37818957648`, incluidos 424 unit/2,866 assertions,
+162 integration/1,332 assertions, el test focal seed 1/1/890 en stack temporal
+independiente y E2E 140/140; evidencia y cronología en [`TESTING.md`](TESTING.md).
+Esto no es un release a `master`: al documentar este estado, `master` sigue en
+`68c918119f2ec094ba7cc63b217efd2448480505` (release Fase 8), no se ha desplegado
+el candidato y no se ha ejecutado seed en canónico local ni en cloud. El cambio
+no añade migraciones ni modifica el schema. El nuevo CI/deploy de `master` deberá
+pasar los gates existentes antes de promover correcciones o habilitar la operación
+demo productiva.
+
+El runner de demo integral no forma parte del job deploy ni de migraciones. Una
+carga productiva, autorizada solo después del release completo, requiere checkout
+limpio del SHA exacto de `master`, revisión del operador y `DEMO_APPROVED_RELEASE_SHA`,
+PLAN seguido de APPLY manual, proyecto explícito y verificación/preservación
+pre/post. No implica usar credenciales Auth existentes, enviar email, resetear la
+base, ni crear datos de Fase 9. El procedimiento operativo completo y sus guards
+están en [`DEMO_SEED.md`](DEMO_SEED.md).

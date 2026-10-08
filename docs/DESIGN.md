@@ -648,3 +648,14 @@ acciones evitan overflow por emails/nombres largos. Pruebas UI focales y límite
 responsive/teclado están en [`TESTING.md`](TESTING.md). Backend/UI se integraron
 por PRs 283/285 y se liberaron por PR 286. No se hizo smoke autenticado ADMIN ni
 se crearon cuentas reales en producción durante el release.
+
+## Correcciones UI posteriores a Fase 8 (PR 289, integradas en development)
+
+La pasada correctiva ajusta confirmaciones, búsqueda/perfiles ADMIN e instructores,
+calendario, notas, asistencia y presentación adaptable de resultados, conservando
+los guardas/roles del servidor, SSR/POST y el sistema visual existente. El detalle
+de interacción aprobado e implementado, incluidos defaults y estados responsive,
+está en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md). PR 289 está
+integrado en `development`; su release a `master` sigue pendiente. No se afirma
+una revisión visual manual con Playwright/screenshot para este bloque; ver la
+evidencia automatizada y sus límites en [`TESTING.md`](TESTING.md).

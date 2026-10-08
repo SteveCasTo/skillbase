@@ -129,6 +129,12 @@ El usuario autorizó renovar los datos sintéticos de demo de negocio, incluida 
 
 El runner usa manifiestos/contexto hash-bound y permite únicamente alta append-only; no borra ni modifica datasets preexistentes. Debe preservar Auth identities/sesiones, `users`, roles, perfiles, settings/secretos, Storage, migration ledger y todo historial financiero. No deshabilita triggers ni guardas de ledger, y nunca introduce endpoints de borrado financiero en producción. Cada destino requiere revisar el plan de solo lectura y ejecutar APPLY manual explícito; producción sigue condicionada al gate y autorización de release. Ver [`docs/FINANCIAL_DEMO.md`](FINANCIAL_DEMO.md).
 
+### Runner integral de demo F1–F8 (PR 288; productivo aún no ejecutado)
+
+La autorización posterior del usuario incluye registros enteramente ficticios de notas, cierres/reaperturas y cuentas ADMIN en producción, pero **solo después del release de todas las correcciones y su CI verde**. `comprehensive-demo` es una herramienta distinta de `renew-demo` y del runner financiero; es manual, PLAN-first, con destino/proyecto explícitos, identidad/provenance propia, repetición idempotente y sin reset, `TRUNCATE`, `CASCADE`, DDL ni limpieza de filas preexistentes. Su única baja permitida es una cuenta ADMIN demo nueva, propia y sin uso, mediante el lifecycle normal; las filas históricas/tombstone/outbox se conservan. No reutilizar/rotar credenciales de Auth existentes ni enviar correo. La autorización no cubre Fase 9.
+
+La integración de QA pasó en un stack temporal independiente y preservó las filas originales del fixture. No se ha ejecutado PLAN/APPLY en el Supabase canónico local o producción. La operación productiva requiere checkout limpio del SHA liberado, aprobación `DEMO_APPROVED_RELEASE_SHA`, guards de proyecto/actor/provenance, snapshot pre/post y APPLY explícito; ver [`docs/DEMO_SEED.md`](DEMO_SEED.md). No modificar ni relajar los guards globales o el lifecycle para facilitar la demo.
+
 ### Autorización de sesiones/asistencia (Fase 6, release en producción)
 
 Las rutas y operaciones limitan instructor a sus propios grupos y ADMIN a configuración/revisión/correcciones; el roster contiene solo participantes `INSCRITO` sin CI/email/finanzas. Consultas y mutaciones vuelven a comprobar ownership/rol en servidor; correcciones ADMIN quedan auditadas. `0018/0019` se liberaron a cloud mediante PR 211. Las restricciones correctivas C1/C2 se integraron en PR 219 y se liberaron en PR 228. Véase `docs/REQUIREMENTS.md` y `docs/ATTENDANCE_CONTRACT.md`.

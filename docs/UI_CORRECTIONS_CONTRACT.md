@@ -2,7 +2,7 @@
 
 ## Estado y alcance
 
-Este documento registra los acuerdos previos a implementar una nueva pasada de correcciones operativas sobre la aplicación liberada en Fase 8. Es un **contrato de trabajo pendiente**, no evidencia de implementación ni autorización para cambiar reglas de dominio. Cada corrección se implementará en su propia rama/PR a `development`; los cambios de código, SQL, tests y gates quedan fuera de esta rama documental. El release de correcciones a `master` es un paso coordinado posterior, una vez terminadas y verificadas todas las correcciones. La carga de demos productivos solo podrá ocurrir después de ese release y requiere su operación aprobada separadamente.
+Este documento registró los acuerdos previos para una pasada de correcciones operativas sobre la aplicación liberada en Fase 8. La implementación de correcciones y el runner de demo integral se integraron en `development` mediante PRs 289 y 288, respectivamente. El contrato describe el alcance acordado, no acredita un release a `master`: el release de todas las correcciones sigue pendiente hasta completar su flujo de promoción. La carga de demos productivos solo podrá ocurrir después de ese release y requiere seguir los guards y la operación explícita descritos en [`DEMO_SEED.md`](DEMO_SEED.md).
 
 Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Este contrato no la reabre. La Fase 9 no se implementa aquí; sus decisiones pendientes se enumeran al final y no se deben asumir por anticipado.
 
