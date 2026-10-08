@@ -1,6 +1,7 @@
 ---
 import type { AttendanceSessionDto } from "@/domain/attendance/types";
 import { buttonVariants } from "@/components/ui/button";
+import { confirmationFooterClassName } from "@/components/ui/confirmation-footer";
 import { Input } from "@/components/ui/input";
 import DatePicker from "@/components/ui/date-picker";
 import RegistrationActionDialog from "@/components/pre-registrations/RegistrationActionDialog";
@@ -205,7 +206,7 @@ const canReplace = session.canReplace === true;
               >
                 {attempted ? message : ""}
               </p>
-              <div class="grid grid-cols-2 items-end gap-3">
+              <div class={confirmationFooterClassName}>
                 <div data-dialog-cancel>
                   <a
                     href={path}

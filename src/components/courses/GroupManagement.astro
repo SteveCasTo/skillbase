@@ -5,6 +5,7 @@ import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 import { groupEndTime } from "./group-schedule-preview";
 import { Check, CircleOff, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { confirmationFooterClassName } from "@/components/ui/confirmation-footer";
 
 interface Props {
   course: AdminCourseDto;
@@ -617,7 +618,7 @@ const prototype: Group = {
         class="mt-1 text-sm text-destructive"
       ></p>
     </div>
-    <div class="flex justify-end gap-2">
+    <div class={confirmationFooterClassName}>
       <button
         type="button"
         data-dialog-close
@@ -646,7 +647,7 @@ const prototype: Group = {
   <form
     method="post"
     data-group-form
-    class="mt-6 flex flex-wrap justify-end gap-2"
+    class:list={["mt-6", confirmationFooterClassName]}
   >
     <input type="hidden" name="intent" />
     <input type="hidden" name="groupId" />

@@ -12,8 +12,9 @@ import {
 } from "@/components/ui/dialog";
 import type { AdminAccountDto } from "@/domain/admin-accounts/types";
 import { notifications } from "@/lib/notifications";
-import { adminAccountActions } from "./presentation";
+import { adminAccountActions, adminAccountBlockedReason } from "./presentation";
 import { postAdminAccount } from "./request";
+import { confirmationFooterClassName } from "@/components/ui/confirmation-footer";
 
 interface Props {
   initialAccount: AdminAccountDto;
@@ -60,13 +61,15 @@ export default function AdminAccountLifecycle({
     if (error && enhanced) errorNode.current?.focus();
   }, [error, enhanced]);
   const action = account.action;
+  const blockedReason = adminAccountBlockedReason(account);
   const presentation = action ? adminAccountActions[action] : null;
   const copy = presentation
     ? `${presentation.copy}${actorId === account.id && action !== "activate" ? " Tu sesión se cerrará." : ""}`
     : "";
   const mutate = async () => {
     const container = page();
-    if (!action || !container || container.dataset.pending) return;
+    if (!action || blockedReason || !container || container.dataset.pending)
+      return;
     container.dataset.pending = "true";
     container.setAttribute("aria-busy", "true");
     container.dispatchEvent(new Event("admin-account:pending"));
@@ -116,7 +119,13 @@ export default function AdminAccountLifecycle({
               ref={trigger}
               variant={presentation.destructive ? "destructive" : "outline"}
               className="min-h-11"
-              disabled={pending}
+              disabled={pending || Boolean(blockedReason)}
+              aria-label={
+                blockedReason
+                  ? `${presentation.label}: ${blockedReason}`
+                  : undefined
+              }
+              title={blockedReason ?? undefined}
               onClick={() => setOpen(true)}
             >
               {presentation.label}
@@ -141,14 +150,14 @@ export default function AdminAccountLifecycle({
                   <DialogTitle>{presentation.label}</DialogTitle>
                   <DialogDescription>{copy}</DialogDescription>
                 </DialogHeader>
-                <DialogFooter className="grid grid-cols-2">
+                <DialogFooter>
                   <DialogClose asChild>
                     <Button
                       data-admin-dialog-cancel
                       variant="outline"
                       className="min-h-11"
                     >
-                      Cancelar
+                      Volver
                     </Button>
                   </DialogClose>
                   <Button
@@ -158,12 +167,22 @@ export default function AdminAccountLifecycle({
                     className="min-h-11"
                     onClick={() => void mutate()}
                   >
-                    Confirmar
+                    {presentation.label}
                   </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
           </>
+        ) : blockedReason ? (
+          <Button
+            disabled
+            variant={presentation.destructive ? "destructive" : "outline"}
+            aria-label={`${presentation.label}: ${blockedReason}`}
+            title={blockedReason}
+            className="min-h-11"
+          >
+            {presentation.label}
+          </Button>
         ) : (
           <details>
             <summary
@@ -182,24 +201,28 @@ export default function AdminAccountLifecycle({
             >
               <p className="text-sm">{copy}</p>
               <input type="hidden" name="revision" value={account.revision} />
-              <button
-                type="submit"
-                className={buttonVariants({
-                  variant: presentation.destructive ? "destructive" : "default",
-                  className: "min-h-11",
-                })}
-              >
-                Confirmar
-              </button>
-              <a
-                href={endpoint}
-                className={buttonVariants({
-                  variant: "outline",
-                  className: "min-h-11",
-                })}
-              >
-                Cancelar
-              </a>
+              <div className={confirmationFooterClassName}>
+                <button
+                  type="submit"
+                  className={buttonVariants({
+                    variant: presentation.destructive
+                      ? "destructive"
+                      : "default",
+                    className: "min-h-11",
+                  })}
+                >
+                  {presentation.label}
+                </button>
+                <a
+                  href={endpoint}
+                  className={buttonVariants({
+                    variant: "outline",
+                    className: "min-h-11",
+                  })}
+                >
+                  Volver
+                </a>
+              </div>
             </form>
           </details>
         ))}

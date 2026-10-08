@@ -36,7 +36,10 @@ test("instructor lifecycle confirmation and mutations remain available without J
     await expect(
       panel.getByText("Desactivar instructor", { exact: true }),
     ).toBeHidden();
-    await panel.getByText("Eliminar instructor", { exact: true }).click();
+    await panel
+      .locator("summary")
+      .filter({ hasText: /^Eliminar instructor$/u })
+      .click();
     await panel
       .getByRole("button", {
         name: "Confirmar eliminar instructor",
@@ -128,7 +131,7 @@ test("ADMIN lifecycle preserves credentials on reactivation and denies existing 
   await page.reload();
   const blocked = page.locator("[data-instructor-lifecycle]");
   await expect(
-    blocked.getByText("Desactivar instructor", { exact: true }),
+    blocked.locator("summary").filter({ hasText: /^Desactivar instructor$/u }),
   ).toHaveAttribute("aria-disabled", "true");
   await expect(
     blocked.getByRole("link", {
@@ -188,7 +191,7 @@ test("ADMIN lifecycle preserves credentials on reactivation and denies existing 
     await deactivate.click();
     await page
       .getByRole("dialog")
-      .getByRole("button", { name: "Confirmar", exact: true })
+      .getByRole("button", { name: "Desactivar instructor", exact: true })
       .click();
     await expect(page).toHaveURL(
       `${new URL(page.url()).origin}${endpoint}?success=deactivate`,
@@ -200,10 +203,13 @@ test("ADMIN lifecycle preserves credentials on reactivation and denies existing 
     await expect(instructor).toHaveURL(/\/unauthorized\?reason=disabled$/u);
     // A fresh password login is a separate assertion from the existing-session denial above.
     await instructorContext.clearCookies();
-    await panel.getByText("Activar instructor", { exact: true }).click();
+    await panel
+      .locator("summary")
+      .filter({ hasText: /^Activar instructor$/u })
+      .click();
     await page
       .getByRole("dialog")
-      .getByRole("button", { name: "Confirmar", exact: true })
+      .getByRole("button", { name: "Activar instructor", exact: true })
       .click();
     await expect(page).toHaveURL(
       `${new URL(page.url()).origin}${endpoint}?success=activate`,
@@ -264,10 +270,13 @@ test("instructor lifecycle preserves inline error and shows pending feedback wit
       }),
     });
   });
-  await panel.getByText("Eliminar instructor", { exact: true }).click();
+  await panel
+    .locator("summary")
+    .filter({ hasText: /^Eliminar instructor$/u })
+    .click();
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: "Confirmar", exact: true })
+    .getByRole("button", { name: "Eliminar instructor", exact: true })
     .click();
   await expect(panel).toHaveAttribute("aria-busy", "true");
   release();

@@ -1,6 +1,7 @@
 ---
 import type { AdminInterestCourseDto } from "@/domain/interests/types";
 import { buttonVariants } from "@/components/ui/button";
+import { confirmationFooterClassName } from "@/components/ui/confirmation-footer";
 import { Skeleton } from "@/components/private-nav/Skeleton";
 import { preferenceDemand } from "./admin-presentation";
 import "@/styles/admin-interests.css";
@@ -258,17 +259,25 @@ const filters = [
                     ? "¿Cancelar este registro? Se conservará en el historial."
                     : "¿Reactivar este registro de interés?"}
                 </p>
-                <button
-                  type="submit"
-                  class={buttonVariants({
-                    variant: "secondary",
-                    className: "min-h-11",
-                  })}
-                >
-                  {registration.status === "ACTIVE"
-                    ? "Confirmar cancelación"
-                    : "Confirmar reactivación"}
-                </button>
+                <div class={confirmationFooterClassName}>
+                  <a
+                    href={status ? `${path}?status=${status}` : path}
+                    class={buttonVariants({ variant: "outline" })}
+                  >
+                    Volver
+                  </a>
+                  <button
+                    type="submit"
+                    class={buttonVariants({
+                      variant: "secondary",
+                      className: "min-h-11",
+                    })}
+                  >
+                    {registration.status === "ACTIVE"
+                      ? "Cancelar interés"
+                      : "Reactivar interés"}
+                  </button>
+                </div>
               </form>
             </details>
           </article>
@@ -294,7 +303,7 @@ const filters = [
       id="interest-dialog-description"
       class="mt-3 text-sm text-muted-foreground"
     ></p>
-    <div class="mt-6 flex flex-wrap justify-end gap-3">
+    <div class={`mt-6 ${confirmationFooterClassName}`}>
       <button
         data-dialog-dismiss
         type="button"

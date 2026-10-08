@@ -1,4 +1,5 @@
 ---
+import { confirmationFooterClassName } from "@/components/ui/confirmation-footer";
 import {
   archiveCourse,
   getAdminCourse,
@@ -457,7 +458,7 @@ const statusLabel = {
                       {
                         intent: "publish",
                         label: "Publicar curso",
-                        confirm: "Confirmar publicación",
+                        confirm: "Publicar curso",
                         description:
                           "El curso y sus precios serán visibles para todos.",
                       },
@@ -466,7 +467,7 @@ const statusLabel = {
                       {
                         intent: "withdraw",
                         label: "Retirar publicación",
-                        confirm: "Confirmar retiro",
+                        confirm: "Retirar curso",
                         description:
                           "El curso dejará de ser público y volverá a borrador.",
                       },
@@ -476,7 +477,7 @@ const statusLabel = {
                     {
                       intent: "archive",
                       label: "Archivar curso",
-                      confirm: "Confirmar archivo",
+                      confirm: "Archivar curso",
                       description: "No podrás editar ni reactivar este curso.",
                     },
                   ])
@@ -507,12 +508,20 @@ const statusLabel = {
                         <p class="mb-3 text-sm text-muted-foreground">
                           {action.description}
                         </p>
-                        <button
-                          type="submit"
-                          class="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
-                        >
-                          {action.confirm}
-                        </button>
+                        <div class={confirmationFooterClassName}>
+                          <button
+                            type="submit"
+                            class="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+                          >
+                            {action.confirm}
+                          </button>
+                          <a
+                            href={`/app/cursos/${id}/editar`}
+                            class="inline-flex min-h-11 items-center justify-center rounded-lg border px-4 text-sm font-medium"
+                          >
+                            Volver
+                          </a>
+                        </div>
                       </form>
                     </details>
                   ))}
@@ -537,7 +546,7 @@ const statusLabel = {
             method="post"
             data-course-dialog-form
             data-course-mutation-id={course.id}
-            class="mt-6 flex flex-wrap justify-end gap-3"
+            class={`mt-6 ${confirmationFooterClassName}`}
           >
             <input type="hidden" name="intent" />
             <input type="hidden" name="revision" value={renderedRevision} />
@@ -546,7 +555,7 @@ const statusLabel = {
               data-dialog-cancel
               class="min-h-11 rounded-lg border px-4"
             >
-              Cancelar
+              Volver
             </button>
             <button
               type="submit"
@@ -765,9 +774,9 @@ const statusLabel = {
               archive: "No podrás editar ni reactivar este curso.",
             };
             const labels: Record<string, string> = {
-              publish: "Confirmar publicación",
-              withdraw: "Confirmar retiro",
-              archive: "Confirmar archivo",
+              publish: "Publicar curso",
+              withdraw: "Retirar curso",
+              archive: "Archivar curso",
             };
             actions
               .querySelectorAll<HTMLButtonElement>("[data-confirm-trigger]")

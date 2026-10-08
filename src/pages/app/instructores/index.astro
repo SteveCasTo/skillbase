@@ -2,6 +2,8 @@
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
 import PrivateBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import { buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { normalizeRegistrationSearch } from "@/domain/pre-registrations/search";
 import { listInstructors } from "@/application/instructors/manage-instructors";
 import { requireInternalUser } from "@/server/auth/context";
 import { getDatabase } from "@/server/db/client";
@@ -12,6 +14,8 @@ import {
 } from "@/domain/instructors/profile";
 let instructors: readonly InstructorProfile[] = [];
 let error = false;
+const search = Astro.url.searchParams.get("search") ?? "";
+const query = normalizeRegistrationSearch(search);
 try {
   instructors = await listInstructors(
     new DrizzleInstructorRepository(getDatabase()),
@@ -21,6 +25,11 @@ try {
   error = true;
   Astro.response.status = 503;
 }
+const matches = instructors.filter((instructor) =>
+  normalizeRegistrationSearch(
+    `${instructorFullName(instructor)} ${instructor.email}`,
+  ).includes(query),
+);
 ---
 
 <PrivateLayout title="Instructores">
@@ -49,6 +58,33 @@ try {
       Crear instructor
     </a>
   </header>
+  <form
+    method="get"
+    class="mt-8 flex min-w-0 flex-col gap-2"
+    role="search"
+    aria-label="Buscar instructores"
+  >
+    <label for="instructor-search" class="text-sm font-medium">
+      Buscar por nombre o correo
+    </label>
+    <Input
+      id="instructor-search"
+      name="search"
+      type="search"
+      autoComplete="off"
+      defaultValue={search}
+      className="min-h-11 min-w-0 w-full"
+    />
+    <button
+      type="submit"
+      class={buttonVariants({
+        variant: "outline",
+        className: "min-h-11 self-end",
+      })}
+    >
+      Buscar
+    </button>
+  </form>
   {error ? (
     <p role="alert" class="mt-8 text-destructive">
       No se pudieron cargar los instructores. Recarga para intentarlo
@@ -61,13 +97,17 @@ try {
         Crea el primer perfil para asignarlo a un curso.
       </p>
     </section>
+  ) : matches.length === 0 ? (
+    <p role="status" class="mt-8 text-muted-foreground">
+      No hay instructores que coincidan. Prueba otro nombre o correo.
+    </p>
   ) : (
-    <ul class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {instructors.map((instructor) => (
-        <li class="flex flex-col gap-2">
+    <ul class="mt-8 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {matches.map((instructor) => (
+        <li class="flex min-w-0 flex-col gap-2">
           <a
             href={`/app/instructores/${instructor.id}/editar`}
-            class="flex h-full flex-col gap-3 rounded-xl border bg-card p-6 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+            class="flex h-full min-w-0 flex-col gap-3 rounded-xl border bg-card p-6 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
           >
             <h2 class="break-words text-xl font-semibold">
               {instructorFullName(instructor)}
