@@ -132,6 +132,26 @@ Para disponibilidad se consideran grupos `PLANNED` del instructor entre cursos �
 
 La migración `0016_instructor_lifecycle_outbox` añade `instructor_account_deletions`: registro de eliminación pendiente/completada con instructor, actor, `auth_user_id` y tiempos de solicitud/fin; FK `RESTRICT` a users/actor, índice por actor, RLS habilitado y grants Data API revocados. El repositorio conserva una fila tombstone mínima tras quitar perfil/rol para respetar referencias de auditoría, y mantiene el estado bloqueado para reintentar la etapa Auth externa si falla. Solo permite eliminación cuando no existe historia/dependencia y el usuario tiene rol exclusivo `INSTRUCTOR`; perfiles con historia conservan identidad. La migración se integró en `development` mediante PR 134 y se aplicó localmente sin reset (ledger 16→17); el release posterior de Fase 5 lleva cloud a ledger 18. La fuente final validada en PR 136 pasó integration 98 y E2E 120/120.
 
+#### Lifecycle de cuentas ADMIN (schema candidato 0022; backend PR 283)
+
+La migración candidata `0022_phase8_admin_accounts` añade
+`admin_account_deletions` mediante `drizzle/0022_phase8_admin_accounts.sql`.
+Registra por `user_id` la intención de
+baja, `actor_id`, UUID Auth objetivo, revisión observada, timestamps de solicitud
+y finalización. Las FK a usuario/actor son `RESTRICT`; RLS está habilitado, los
+grants Data API se revocan incluyendo `service_role`, y un trigger impide borrar
+la evidencia o modificar sus campos; solo permite pasar `completed_at` de NULL
+a un instante válido. La fila `users` permanece como tombstone para preservar
+referencias actor/dependencia.
+
+La migración tiene timestamp `1791414145526` y SHA-256
+`c9792638377a89d162c64c951596b680c39c4f4017589f61a72844e85f55b856`. Se aplicó
+solo en el stack aislado de QA del feature, avanzando su ledger de 22 a 23; no se
+aplicó al Supabase local canónico ni cloud, que permanecen en ledger 21. La
+implementación del repositorio/actividad está en development por PR 283. La UI
+no añade campos de datos a `users`; contrato en
+[`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
+
 ### Group
 
 - id
@@ -206,6 +226,47 @@ grading. DTOs entregan nombre/apellido y datos académicos requeridos, no CI,
 contacto ni finanzas; el historial administrativo de correcciones es solo para
 ADMIN. La superficie HTTP/helpers y errores se describen en
 [`ARCHITECTURE.md`](ARCHITECTURE.md) y [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md).
+
+### Cierre académico por grupo (Fase 8, schema integrado en development)
+
+PR 280 integra `0021_phase8_academic_group_closure.sql` y cuatro tablas al
+schema Drizzle:
+
+- `academic_group_states`: estado mutable OPEN/CLOSED, revisión y última versión
+  por grupo. Sin fila representa OPEN/revisión 0.
+- `academic_closure_versions`: snapshot JSONB inmutable por `(group_id, version)`;
+  registra course/group, `closed_at`, `actor_id`, `actor_name` capturado y el
+  `ClosureReportDto` completo (roster, notas/resultados, umbral, asistencia y
+  elegibilidad). Sus FK de grupo/curso y actor usan `RESTRICT`.
+- `academic_group_reopenings`: evento append-only con referencia a versión,
+  instante, actor UUID/name y razón obligatoria de 1–500 caracteres; unique por
+  versión reabierta.
+- `academic_closure_receipts`: resultado append-only con actor, UUID request key,
+  fingerprint SHA-256 y comando result; unique `(actor_id, request_key)`.
+
+Las tablas tienen RLS y grants Data API revocados a `PUBLIC`, `anon`,
+`authenticated` y `service_role`. Triggers bloquean UPDATE/DELETE de snapshots,
+reaperturas y receipts. Otro trigger rechaza mutaciones en `evaluation_grades`,
+`group_sessions`, `session_roster`, `participant_attendance` e
+`instructor_attendance` asociadas a grupos cerrados, incluyendo mover evidencia
+de un grupo cerrado. La capa de aplicación serializa operaciones de cierre y
+entrada de membresía mediante el advisory lock compartido y locks de filas; el
+trigger comparte el lock y sirve como defensa frente a otros repositorios
+server-side.
+
+Migración 0021 tiene timestamp `1791407807898` y SHA-256
+`9b4c19be336426441b35d0ef1b0cd68ed7d980e4481420051d56fbb24d424259`. Solo se
+aplicó en Supabase aislado de QA (ledger temporal 21→22); el canónico local y
+cloud siguen en 21, sin apply persistente. El snapshot JSONB incluye CI y
+balance actuales, pero no email/teléfono. La proyección de instructor usa
+allowlist recursiva sin CI/contacto/categorías/finanzas; ADMIN conserva vista
+privada completa. Exports futuros deben usar el DTO por rol, no leer el JSONB
+directamente. PRs 281/282/284/285 integraron exporters, UI/policies de cierre,
+validación focal de downloads y administración multi-ADMIN al árbol de
+development; ver el contrato y evidencia/límites en
+[`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y
+[`TESTING.md`](TESTING.md). Ledger canónico/cloud continúa en 21 hasta el release
+autorizado.
 
 ### Participant
 

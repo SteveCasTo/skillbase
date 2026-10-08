@@ -49,6 +49,7 @@ export function attendanceFailure(error: unknown): {
             : [
                   "CONCURRENT_UPDATE",
                   "IDEMPOTENCY_CONFLICT",
+                  "GROUP_CLOSED",
                   "SCHEDULE_CONFLICT",
                 ].includes(error.code)
               ? 409

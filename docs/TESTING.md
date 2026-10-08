@@ -246,6 +246,43 @@ También se verifica signup público deshabilitado, creación de fixture por Adm
 
 Las pruebas añadidas en la rama `feat/dual-auth-and-profile` cubren login password solo para cuenta interna autorizada, rechazo de identidad/método no permitido, validación de sesión actual con `getUser()` y claims firmados, provisión interna de instructor con autorización ADMIN/transacción/compensación, cambio/recovery de contraseña, asociación Google explícita ligada al actor y sesión, PKCE, nonce de un uso/expiración, mismatch de email/provider, identidades Google preexistentes y restauración de la sesión original. Los tests Google usan un fixture de provider OAuth aislado; no son login con Google real ni prueba de entrega de email.
 
+Los escenarios de `google-association.spec.ts` preparan su presupuesto de login
+por red loopback en la DB temporal antes de cada caso, sin borrar buckets por
+cuenta ni modificar el límite runtime (10 intentos por ventana de 15 minutos).
+El helper limpia únicamente la clave HMAC exacta de `network:127.0.0.1:login`;
+no omite rate limiting ni altera la protección aplicada en producción. El caso
+Google-only ADMIN crea una identidad Auth/internal user exclusiva por intento,
+sin identidad Email/password, con el campo de password en Auth vacío y una
+identidad Google de fixture. Su cleanup deshabilita solo el internal user propio
+y elimina solo su UUID Auth; conserva UUIDs/roles/evidencia interna hasta que el
+runner destruye su stack aislado. No modifica el ADMIN compartido, sus credenciales
+ni evidencia histórica de otros actores. Una identidad nueva por intento evita
+que un retry acumule identidades Google sobre el mismo fixture.
+
+El release-validation CI `37720672015` tuvo 138/139 first-pass; el escenario
+Google-only falló también en ambos retries automáticos. No hubo trace del primer
+intento disponible en el artefacto entregado; el trace del retry mostró un
+conflicto de identidad secundario del fixture, no la causa del primer fallo. La
+reproducción controlada dio 8/9: los escenarios previos consumen 10 requests del
+bucket loopback compartido y el login final incrementaba a 11, siendo rechazado
+por el límite antes de llegar a Auth. Por ello no se atribuye la primera failure
+al password ni a estado/role inválidos; tampoco se afirma la intercalación exacta
+del primer paquete, cuyo trace no existe.
+
+Con la corrección test-only, el focused Google-association cohort pasó 9/9
+first-pass sin retries; el caso Google-only repetido sobre stack manejado pasó
+2/2 first-pass, usando una identidad Auth propiedad de cada intento. El límite de
+runtime permanece intacto y estas corridas no prueban Google OAuth real, SMTP ni
+entrega cloud. Evidencia/progresión de intentos en el handoff local
+`C:/Users/Steve/AppData/Local/Temp/opencode/phase8-release-ci/recovery-isolation-ledger.md`.
+
+La corrección cambia fixtures/helpers E2E únicamente; no cambia código de Auth,
+políticas runtime, límites, aplicación, roles, migraciones o dependencias. No se
+repitieron unit/integration/build completos para este ajuste. Un focused pass no
+sustituye el nuevo CI full de release: el gate integrado sigue bloqueado hasta
+que el nuevo E2E CI pase sin fallos/retries y el resto de checks requeridos quede
+verde.
+
 Estado local comunicado por el implementador: unit 146 PASS, integration 71 PASS, 27 E2E dirigidos PASS; lint PASS; typecheck 0 errores/0 warnings/83 hints; build, Drizzle y formatter PASS; `git diff --check` PASS. Después, el full E2E aislado en el puerto canónico 4321 pasó 104/104 (5.9 min). La corrida full anterior en 4323 obtuvo 73 PASS/31 FAIL: tests heredados enviaban `Origin: http://127.0.0.1:4321` y sus POST fueron rechazados como cross-site. Se corrigió solo la invocación al puerto canónico, sin editar código/tests ni modificar retries; el puerto alternativo aún no cubre todos los tests heredados.
 
 [PR 118](https://github.com/SteveCasTo/skillbase/pull/118) se integró en `development` como `f06b4fdf8f8c7691ffdd7937efb0f813a27666d4`. No reportó checks remotos; estos resultados son locales, no CI PASS. En ese momento 0012/0013 solo se habían probado en stacks aislados; su aplicación local posterior y 0014/0015 constan abajo. Cloud, SMTP/entrega real y Google real siguen sin verificarse. El servidor original estuvo apagado durante esa validación histórica; el smoke local posterior está registrado en la sección de PR 123.
@@ -546,3 +583,63 @@ Los resultados anteriores son evidencia focal por PR/stage y no se suman como un
 - Intentos intermedios con fixtures/base incorrectos, dependencias faltantes o selección E2E mal acotada quedaron preservados como cronología; la selección exacta se corrigió y verificó por `--list` **antes** de contar y ejecutar los 77 casos finales. No se cuentan esos errores de harness/base como defectos de aplicación ni como pases.
 - Evidencia reproducible, status/coverage ledger, reporters y build están en `C:/Users/Steve/AppData/Local/Temp/opencode/interface-corrections-final-validation-evidence/` (`REMAINDER8-RESULT.md`, `remainder8-coverage-ledger.json`, `remainder8-e2e-list.json`, `remainder8-execution-status.json`, `remainder8-build.log`).
 - **Límites de release:** el push y la publicación GitData REST fallaron con HTTP 500; el publicador se detuvo. No se afirma que GitHub se recuperara ni que PR/CI existan o pasaran. No hubo escrituras cloud/canónicas, migraciones, deploys ni actualización de producción. `master` continúa en Fase 7 `4afa485`, cloud ledger 21. La intermitencia histórica de `public-interest` y guardado de grupo sigue sin causa general identificada; este resultado no la resuelve. No inicia Fase 8.
+
+## Release de correcciones Fase 7 — PR 278
+
+PR 278 liberó las correcciones post-release a `master` como `91beccf8`. CI master run `37670004492` pasó en el primer intento limpio: **358 unit/2160 assertions**, **142 integration/1077 assertions**, **134/134 E2E**, sin retries ni flakes reportados. Formatter, lint, typecheck (0 errores/0 warnings/245 hints), build, migraciones y deploy también PASS. Vercel `dpl_CM7pwMYLxoqYBzP96KAeqQb8dxP7` está `READY` para el SHA de master.
+
+Smoke post-release: rutas públicas/Auth respondieron 200 y cuatro rutas privadas de evaluaciones sin sesión redirigieron 303 a login. No hubo signin productivo, envío de correo, mutación pública/interesados, seed ni escritura de datos. No afirmar Google OAuth real, recuperación SMTP completa o delivery cloud. Supabase cloud se consultó en modo read-only: ledger 21, timestamp `1791341690577`, hash `ad01e4dea9f51c4d503eef524a458e9adffe4f90e37397c784b9ddffd25aa32b`; 11 cursos, 22 grupos, 15 preinscripciones, 12 movimientos, 282 sesiones, 16 marcas de participantes y 5 de instructor, 5 usuarios Auth, 10 sesiones, 1 ADMIN, 4 instructores, 2 objetos Storage y una fila por tabla settings; tablas F7 vacías. No se tomaron hashes pre/post de todas las filas ni se afirma preservación cloud integral. No hubo cambio de schema ni migración nueva.
+
+Cronología de expectativas/intermitencias: PR 275 (`4cbe510`) registró 133 PASS y un flaky de selector de formatos (toast activo vs. toast en salida); PR 277 corrigió el selector de test y PR 278 pasó sin flakes/retries reportados. PR 275 también tuvo el fallo de readiness de `public-interest`. PR 276 corrigió readiness DOM/hidratación; la validación posterior pasó nueve ejecuciones de suite y seis repeticiones focales, pero no hay trace para demostrar que ese mecanismo explicara exactamente el interleaving CI. La intermitencia histórica de guardado de grupo sigue sin causa raíz general; el CI limpio no acredita que todos los flakies históricos estén resueltos.
+
+## Shards E2E aislados — PR 279 integrado en development
+
+El usuario aprobó dos shards Playwright concurrentes, cada uno en runner GitHub separado y con proyecto Supabase/Auth/DB y servidor Astro independientes. PR 279 integró esta infraestructura a `development`; el run final exitoso se registra abajo. Integration corre una vez y `integration-e2e` exige éxito de `quality`, integration y ambos shards. `deploy` conserva master-only, depende de `quality` + agregador y el shard chore no se promueve por separado a `master`.
+
+- La ejecución propuesta usa shards `1/2` y `2/2`, puertos Astro 44891/44892 y mantiene `workers: 1`, `fullyParallel: false` y la política existente de retry. No se multiplexan browsers contra la misma DB.
+- Inventario exacto local: 134 casos (126 Chromium + 8 Chromium mobile). Shard 1: 69 Chromium; shard 2: 57 Chromium + 8 mobile. Paridad comprobada por identidad de proyecto/archivo/título/línea: unión 134, solapamiento/faltantes/extras cero. El agregador always-run falla cerrado ante test/job fallido, omitido, cancelado, timeout o interrupción; solo el par `success/success` pasa. Los 16 pares posibles de estado fueron probados. Cada shard adjunta `e2e-shard-1` o `e2e-shard-2` con evidencia, blob report y `test-results`.
+- Validación focal local del candidato: 13 unit PASS/21 assertions, formatter/lint/typecheck/build/diff PASS, inventario/paridad y smoke Foundation desktop/mobile 2/2 con retries 0. Ese smoke por sí solo **no** representa 134 E2E; el full 134/134 se verificó después en CI remoto PR 279 (abajo).
+- No se hizo benchmark local de shards por límite de memoria: 4.12 GiB libres de 15.19 GiB, Docker con 7.36 GiB, además de stacks ajenos/preexistentes. No arrancar stacks adicionales ni detenerlos; el smoke no tocó el listener root 4321 ni el stack canónico.
+- Baseline remoto master `37670004492`: `integration-e2e` 12m10s; Chromium install 2m15s; integration 2m03s; E2E 7m40s; quality 59s. Antes de merge/activación, el PR de CI debe demostrar outcomes y paridad para los 134 casos en ambos runners concurrentes y medir duración total comparable —incluidos stack, migraciones, fixtures/inventario, servidor, tests y cleanup—. No afirmar aceleración hasta tener esa medición en el mismo entorno.
+- Artifact/inventario original reportado en `C:/Users/Steve/AppData/Local/Temp/opencode/e2e-sharding-evidence/handoff.md`; PR 279 integró la infraestructura a `development`. No se promovió por separado a `master` ni se cambiaron secrets/schema.
+
+### Primera validación remota del candidato y revisión del gate requerido
+
+- El primer run de PR 279 (`37675836980`) validó la revisión `4ecf1e`: 371 unit/2181 assertions, 142 integration/1077 assertions y ambos runners E2E independientes. Los shards cubrieron sus cohortes `69 + 65 = 134`, y todos los casos fueron PASS en el primer intento, sin skips, flakes ni retries. Ubuntu ejecutó cada job con su propio proyecto Supabase/Auth/DB y servidor/puerto. Artifact de cohorte citado por el owner: `1150604945611507347422`; el resumen quedó en el comentario de PR `6045563750` y los artifacts tienen retención de 7 días.
+- Después de ese run, el source owner endureció el DAG y añadió remediation de APT; las pruebas focales de gate/provisioning suman 18 tests/106 assertions. El intento intermedio `37678477638` pasó quality (375 unit/2257) e integration (142), pero falló en provisioning del segundo shard. El run final post-remediation `37684331005` pasó y se detalla abajo.
+- Benchmark de **una sola observación** entre CI baseline run `37670004492` y candidato run `37675836980`: envelope E2E 460 s vs. 387 s (-15.87 %); critical path requerido sin espera inicial 730 s vs. 426 s (-41.64 %); tiempo agregado no-deploy 789 s baseline vs. 931 s candidato (+18 % runner consumption). Shards de 343.884/267.106 s de comando, jobs de 416/297 s, integration 132 s, quality 78 s, agregador 8 s y envelope candidato ~430 s. Hosts/redes/referencias difieren; workflow de deploy del baseline no es comparable. No afirmar mejora robusta ni 2× por esta única observación.
+- La validación local comprobó inventario y smoke, pero no ejecutó los shards simultáneamente por los límites de memoria ya descritos. El run final de PR 279, abajo, ejecutó la matriz completa en GitHub.
+- El workflow agrega checks para PRs a `development`, pero las reglas de branch protection no los exigen de forma efectiva (situación preexistente). El operador verificó todos los checks requeridos antes de integrar PR 279. Las reglas/gates de `master`, permisos, secrets y deploy permanecen intactos.
+
+### Intento intermedio bloqueado por provisioning APT (run `37678477638`; histórico)
+
+- El run intermedio `37678477638` se canceló tras **1870 s** (gate 1866 s; jobs agregados 3013 s). `quality` pasó 375 unit/2257 assertions; integration 142/142 / 1077; shard 1 pasó 69 tests y shard 2 no ejecutó tests, detenido antes de Chromium durante APT. El agregador falló y deploy se omitió. Este intento fue incompleto y quedó supersedido por el CI final de PR 279.
+- En logs del shard 2, `bunx playwright install --with-deps chromium` entró a instalar APT deps y `apt` siguió consultando `azure.archive.ubuntu.com` por HTTP desde `apt-mirrors.txt`; no se observó progreso de acquisition durante ~30 min. El shard 1 descargó 32.5 MB APT desde Azure en 9m01s (~59.9 kB/s) antes de iniciar la descarga del Chromium CDN. El InRelease HTTPS de `archive.ubuntu.com` respondió, pero Packages/Translation continuaron por la fuente Azure HTTP. Esto identifica una demora de provisioning APT/mirror, no un fallo de descarga del browser ni aserción de tests. Logs no determinan una causa DNS/socket específica y no muestran apt lock: no atribuir una causa de transporte más concreta.
+- Remediation integrada por PR 279: fijar solo jobs E2E a `ubuntu-24.04`; validar el sources list, retirar Azure HTTP y mantener fuentes oficiales HTTPS; timeout APT de conexión/datos 30 s, retries 0 y error ante índices incompletos; paso de configuración de mirrors máximo 1 min y `bunx playwright install --with-deps chromium` máximo 5 min. Job total conserva 30 min. Sin `continue-on-error`, dependencias omitidas, retries extra o caché de paquetes sistema. Playwright/Chromium, lockfile, workers, stacks/puertos, secrets, permisos y deploy no cambiaron.
+- Evidencia local de remediation: 18 tests focales/106 assertions; formatter/lint/diff PASS; typecheck 0/0/245. Dry-run y launch de Chromium disponible `153.0.8010.12` en Windows, y HEAD HTTPS local a InRelease oficiales 200. No probaba APT Linux; el run final abajo sí ejecutó provisioning en ambos Ubuntu runners.
+- Evidencia/handoff histórico: `C:/Users/Steve/AppData/Local/Temp/opencode/e2e-sharding-evidence/browser-provisioning-remediation-handoff.md`.
+
+### CI final post-remediation PR 279 — PASS
+
+Run `37684331005` pasó **376 unit/2266 assertions**, **142 integration/1077 assertions** y **134/134 E2E** en dos stacks independientes (69+65). Ambos runners completaron APT/Chromium; todos los tests fueron first-pass sin flakies, retries o skips reportados. Quality, integration y el agregador estricto de statuses pasaron. PR 279 se integró a `development`; el operador comprobó manualmente los estados requeridos, porque development carece de branch protection efectiva. No se promovió el chore a master ni se alteraron master/deploy.
+
+El run valida la remediación en esa ejecución, pero no identifica causalidad DNS/socket del stall previo ni garantiza disponibilidad futura de los mirrors.
+
+## Fase 8: cierre de grupo y cuentas ADMIN (integrada en development; release pendiente)
+
+- Core de cierre integrado por PR 280; migration candidata 0021 se aplicó solo a QA aislado (ledger temporal 21→22), no a DB canónica/cloud. Exporters se integraron por PR 281 y UI SSR/policy de workspace/history por PR 282. Los paths de workspace, versiones y export están acotados por policy/rol; el loader vuelve a validar ownership. El owner reportó verificación focal live de los seis GET/download paths en QA; no es full gate ni release F8.
+- QA focal por etapas de cierre, sin sumar como full suite: core 21 unit/123 assertions + 19 integration/238; guards F5 54 unit/189 + 22 integration/168; privacy projection 1 unit/92 + 2 integration/81. Instructor projection es allowlist recursiva sin CI/contacto/categoría/finanzas; snapshot no se muta.
+- UI de cierre reportó 21 unit/137 assertions, 3 E2E first-pass y revisión manual de 12 screenshots en 390/768/1440 light/dark. Los E2E cubren flujo SSR, ownership/roles, histórico y fallback no-JS; no verifican descargas.
+- Export adapter focal: 12 unit/169 assertions y 1 integration/30; estas pruebas unit/integration ejercitan helper/adapter. Después, PR 284 añadió 3 E2E focales de descarga; el owner también verificó los seis GET/download paths live por CLI en QA. Run PR 284 `37718702107`: 400 unit, 160 integration y 137 E2E, first-pass reportado. Run PR 282 `37704840097`: 393 unit/2490 assertions, 150 integration/1246 assertions y 137 E2E (72+65), sin retries/flakies/skips. Son gates de PR individuales, no el gate final F8.
+- Migration 0022 de lifecycle ADMIN aplicada solo en QA backend aislado (ledger 22→23); canónico/cloud siguen en ledger 21 según baseline conocido. No se hizo aplicación manual, reseed o despliegue a producción; producción sigue en PR 278/master `91beccf8`.
+- Handoff del core closure en `C:/Users/Steve/AppData/Local/Temp/opencode/academic-closure-integration-final.log`, `academic-closure-entry-integration.log`, `academic-closure-typecheck-final.log`, `academic-closure-build-final.log` y `academic-closure-format-final.log`. La nota de no escritura en esos logs no implica que todos los stacks QA de etapas posteriores hayan quedado intactos.
+
+### UI de cuentas ADMIN (PR 285 integrado en development; no release)
+
+- Incluye 32 unit tests y dos E2E dedicados, ambos first-pass sin retries. Las E2E verifican desde sesión ADMIN la creación de cuenta, ausencia del password en HTML, edición independiente de nombre, readonly de correo, búsqueda/teclado desde tarjeta mobile y eliminación no usada; el otro flujo valida login con contraseña creada, auto-desactivación de cuenta con uso, invalidación de sesión y reactivación por otro ADMIN sin resetear credenciales.
+- Route-policy tests cubren list/create/detalle UUID como ADMIN-only, rechazo de rutas estructuralmente inválidas/wildcards y paridad con rutas privadas de cierre. Helpers SSR verifican fallback HTML, error 422 renderizado con draft nombre, actualización del nombre tras respuesta y manejo de actor que pierde sesión. La navegación y las tres páginas ADMIN quedaron integradas por PR 285.
+- Calidad reportada para el feature: lint, formatter, typecheck y build PASS. La revisión visual final fue hecha en la app sobre QA aislado con 20 PNG, incluyendo grid/lista responsive, long text, focus/dialog, empty/success/error y status UX. Algunos intentos focales anteriores tuvieron expectativas/locators fallidos y no se cuentan como passing suite; el resultado documentado se limita a las dos pruebas E2E que pasaron first-pass y verificaciones independientes reportadas.
+- Un intento QA anterior eligió incorrectamente un stack paralelo por heurística de “más reciente” y creó fixtures sintéticos allí; el owner retiró identidades Auth sintéticas y eliminó el stack. Los tests finales usaron el stack explícito propio del runner; el stack temporal fue eliminado al terminar. No se tocó el Supabase local raíz/canónico, cloud ni producción. Para futuras ejecuciones: fijar project ID/puertos, no inspeccionar “stack más reciente”, no hacer cleanup Docker global y limitar limpieza a fixtures propiedad del run.
+- Backend ADMIN PR 283 pasó CI run `37717389828`: 400 unit/2530 assertions, 160 integration/1314 assertions y 137 E2E en dos shards (72+65), first-pass sin flakies/skips/retries reportados. Antes hubo una corrida PR previa con fallo de expectativa del nombre HTML 422 y retries; el test se corrigió para verificar la respuesta HTML y actualización del nombre. La integración QA aplicó 0022 (ledger 22→23) en stack aislado.
+- CI PR 285 run `37718988907`: 412 unit/2608 assertions, 160 integration/1314 assertions y 139 E2E en dos shards (74+65), first-pass sin fallos, skips, flakes ni retries reportados. Es evidencia del PR, no un nuevo gate combinado del HEAD final `f024a2d` de development.
+- Fase 8 aún no está liberada a master. Rutas de cuentas ADMIN están en development; UI del release no se afirma disponible en producción. Datos Auth reales/canónicos, migraciones canónicas, producción y servicios externos no se modificaron.

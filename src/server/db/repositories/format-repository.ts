@@ -14,6 +14,7 @@ import { CourseInfrastructureError } from "./course-infrastructure-error";
 
 type Database = PostgresJsDatabase<typeof schema>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+import { requireFreshRegistrationActor } from "./registration-support";
 
 async function persistence<T>(
   operation: string,
@@ -137,6 +138,8 @@ export class DrizzleFormatRepository implements FormatRepository {
   ): Promise<CourseFormat> {
     return persistence("renameFormat", () =>
       this.db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+        await requireFreshRegistrationActor(tx, actorId);
         const { type, format } = await locked(tx, id);
         assertFresh(format, revisionId, updatedAt);
         if (type.name === name) return format;
@@ -168,6 +171,8 @@ export class DrizzleFormatRepository implements FormatRepository {
   ): Promise<void> {
     return persistence("deleteFormat", () =>
       this.db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+        await requireFreshRegistrationActor(tx, actorId);
         const { format } = await locked(tx, id);
         assertFresh(format, revisionId, updatedAt);
         if (format.used)
@@ -201,6 +206,8 @@ export class DrizzleFormatRepository implements FormatRepository {
   ): Promise<CourseFormat> {
     return persistence("createFormat", () =>
       this.db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+        await requireFreshRegistrationActor(tx, actorId);
         const [type] = await tx
           .insert(schema.courseTypes)
           .values({ name })
@@ -230,6 +237,7 @@ export class DrizzleFormatRepository implements FormatRepository {
     return persistence("reviseFormat", () =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+        await requireFreshRegistrationActor(tx, actorId);
         const [type] = await tx
           .select()
           .from(schema.courseTypes)
@@ -360,6 +368,7 @@ export class DrizzleFormatRepository implements FormatRepository {
     return persistence("setFormatActive", () =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+        await requireFreshRegistrationActor(tx, actorId);
         const [type] = await tx
           .select()
           .from(schema.courseTypes)

@@ -22,6 +22,8 @@ export const PRIVATE_ROUTE_POLICIES = {
   "/app/perfil/contrasena": { access: "ACTIVE_USER" },
   "/app/instructores": { access: "ROLES", roles: ["ADMIN"] },
   "/app/instructores/nuevo": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/administradores": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/administradores/nuevo": { access: "ROLES", roles: ["ADMIN"] },
   "/app/mis-cursos": { access: "ROLES", roles: ["INSTRUCTOR"] },
 } as const satisfies Readonly<Record<string, PrivateRoutePolicy>>;
 
@@ -33,6 +35,14 @@ const FORMAT_DETAIL_PATH =
   /^\/app\/formatos\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const INTEREST_DETAIL_PATH =
   /^\/app\/interesados\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const CLOSURE_CONTEXT = String.raw`\/app\/(cursos|mis-cursos)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/grupos\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/cierre`;
+const CLOSURE_WORKSPACE_PATH = new RegExp(`^${CLOSURE_CONTEXT}$`, "iu");
+const CLOSURE_VERSION_PATH = new RegExp(`^${CLOSURE_CONTEXT}/[1-9]\\d*$`, "iu");
+const CLOSURE_DOCUMENT_PATH = new RegExp(
+  `^${CLOSURE_CONTEXT}/[1-9]\\d*/(?:planilla\\.pdf|planilla\\.csv|informe\\.pdf)$`,
+  "iu",
+);
 
 export function getPrivateRoutePolicy(
   pathname: string,
@@ -46,6 +56,23 @@ export function getPrivateRoutePolicy(
       normalizedPath as keyof typeof PRIVATE_ROUTE_POLICIES
     ] ?? null;
   if (exact) return exact;
+  if (
+    /^\/app\/administradores\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(
+      normalizedPath,
+    )
+  )
+    return { access: "ROLES", roles: ["ADMIN"] };
+  if (
+    CLOSURE_WORKSPACE_PATH.test(normalizedPath) ||
+    CLOSURE_VERSION_PATH.test(normalizedPath) ||
+    CLOSURE_DOCUMENT_PATH.test(normalizedPath)
+  )
+    return {
+      access: "ROLES",
+      roles: normalizedPath.startsWith("/app/mis-cursos/")
+        ? ["INSTRUCTOR"]
+        : ["ADMIN"],
+    };
   if (
     /^\/app\/(?:cursos|mis-cursos)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?:\/grupos\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})?\/evaluaciones$/iu.test(
       normalizedPath,

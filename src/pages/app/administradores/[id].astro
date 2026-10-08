@@ -1,0 +1,53 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import PrivateBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
+import AdminAccountDetails from "@/components/admin-accounts/AdminAccountDetails.astro";
+import { adminAccountPage } from "@/server/admin-accounts/page";
+const editor = await adminAccountPage(Astro, Astro.params.id ?? "");
+if (editor.response) return editor.response;
+---
+
+<PrivateLayout title={editor.account?.name ?? "Administrador no disponible"}>
+  <PrivateBreadcrumbs
+    current="Administrador"
+    parents={[
+      { label: "Resumen", href: "/app" },
+      { label: "Administradores", href: "/app/administradores" },
+    ]}
+  />
+  {editor.account ? (
+    <>
+      {Astro.url.searchParams.get("success") === "saved" && (
+        <p role="status" class="mt-5">
+          Cuenta guardada.
+        </p>
+      )}
+      <AdminAccountDetails
+        account={editor.account}
+        actorId={editor.actorId}
+        values={editor.values}
+        issues={editor.issues}
+        error={editor.error}
+        submittedName={editor.submittedName}
+      />
+    </>
+  ) : (
+    <section class="mt-5 flex flex-col gap-3">
+      <h1 class="text-3xl font-semibold tracking-tight">
+        Cuenta no disponible
+      </h1>
+      <p role="alert" class="text-destructive">
+        {editor.error ?? "La cuenta ya no está disponible."}
+      </p>
+      {editor.code !== "NOT_FOUND" && (
+        <a
+          href={Astro.url.pathname}
+          data-astro-reload
+          class="self-start underline underline-offset-4"
+        >
+          Reintentar
+        </a>
+      )}
+    </section>
+  )}
+</PrivateLayout>

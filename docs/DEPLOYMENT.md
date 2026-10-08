@@ -154,6 +154,16 @@ El job `quality` instala con lockfile y ejecuta checks estáticos, unit tests y 
 
 El job `integration-e2e` instala Chromium y ejecuta los runners aislados. `test:integration` y `test:e2e` crean cada uno su propio stack temporal, asignan puertos/credenciales temporales, aplican migraciones Drizzle y limpian el proyecto al terminar. El runner inyecta placeholders locales para las variables de proveedor Google requeridas por la configuración Supabase; no usa OAuth real. No se inyectan credenciales del stack de desarrollo ni se ejecuta `db:reset`. La salida de error de comandos Supabase se retiene para evitar que keys locales aparezcan en los logs.
 
+### Shards E2E aislados — PR 279 integrado en development
+
+El usuario aprobó dos jobs E2E concurrentes en runners separados, cada uno con stack Supabase/Auth/DB y servidor Astro propios, conservando workers=1 y `fullyParallel=false`. PR 279 integró el workflow a `development`: integration corre una vez, E2E se divide en shards 1/2 y 2/2, y el agregador `integration-e2e` always-run exige éxito de `quality`, integration y ambos shards. Deploy sigue master-only y gated; secrets y branch protections no cambiaron.
+
+PR 279 integró la rama `chore/isolated-e2e-shards` (base `development` `510e62d`). `development` no tiene enforcement efectivo de branch protection para los checks E2E nuevos; el operador revisó todos los estados requeridos antes del merge. La lista de 134 identidades (126 Chromium + 8 mobile, shards 69 y 57+8) y el test sintético de los 16 pares de estados son verificaciones previas; el CI remoto final real está debajo. No se promueve esta mejora de CI por separado a master. Metodología y límites en [`TESTING.md`](TESTING.md).
+
+Run `37675836980` fue el primer candidato verde (371 unit, 142 integration, 134 E2E). Un intento posterior quedó incompleto por APT; PR 279 corrigió provisioning y el CI final `37684331005` pasó 376 unit/2266 assertions, 142 integration/1077 y 134/134 E2E en shards separados, first-pass sin retry/flake. `quality`, integration y agregador estricto pasaron. Una observación de duración previa dio E2E envelope 460 s baseline vs. 387 s candidato, critical path sin cola inicial 730 vs. 426 s, y runner time no-deploy 789 s vs. 931 s (más consumo agregado con concurrencia); hosts/redes difieren. No afirmar beneficio robusto ni 2× a partir de una sola medición. Evidencia y cronología en [`TESTING.md`](TESTING.md).
+
+Run intermedio `37678477638` se canceló en provisioning APT: quality 375 unit e integration 142 pasaron, shard 1 cubrió 69 tests y shard 2 cero; agregador falló/deploy fue omitido. Logs mostraron espera hacia Azure HTTP sin identificar causa DNS/socket específica. La remediation de PR 279 usó Ubuntu 24.04, sources oficiales HTTPS y límites APT/install fail-closed; CI final `37684331005` completó provisioning/test en ambos shards. Esto prueba el comportamiento en esa ejecución, no inmunidad futura a fallos externos.
+
 El proyecto cloud Supabase `SkillBase` (`fvzxqlezdrlzykyoevub`) y el proyecto Vercel `stevecasto-projects/skillbase` están enlazados. El dominio de producción es `https://skillbase-alpha.vercel.app`; `skillbase.vercel.app` no está disponible porque pertenece a otra cuenta.
 
 Por petición explícita se cargaron manualmente en producción los dos formatos de ejemplo de 20 y 30 horas (80/100 y 120/150 BOB) y los cinco cursos sintéticos de `seed-demo`. El formato local adicional `Promedio` no se cargó. Esta carga puntual no forma parte de las migraciones ni del despliegue automático. Cuatro demos están publicados y `demo-gestion-de-proyectos` permanece en borrador; su estado editorial no se cambia durante la reconciliación.
@@ -332,12 +342,52 @@ El inventario cloud post-release observó 11 cursos, 22 grupos, 15 preinscripcio
 
 La verificación cloud fue de solo lectura y **no** comparó hashes pre/post de todas las filas; no afirmar preservación hash completa de filas cloud a través del release. La preservación verificada de 2 802 filas/59 tablas corresponde a la migración local descrita en [`TESTING.md`](TESTING.md). Las cinco tablas F7 están vacías: no se cargó demo/seed de notas. Las intermitencias E2E históricas de `public-interest` y guardado de grupos siguen sin causa raíz identificada, aunque el full master run final pasó sin flakes reportados.
 
-Fase 7 quedó liberada dentro de su alcance. Fases 8 (cierre/planilla/reapertura) y 9 (certificados) no se iniciaron. Recovery/cambio de contraseña con entrega de correo, entrega cloud de SMTP, OAuth Google real y política de retención siguen pendientes según [`AUTHENTICATION.md`](AUTHENTICATION.md) y [`PLAN.md`](PLAN.md).
+Fase 7 quedó liberada dentro de su alcance; al boundary de ese release, Fases 8 (cierre/planilla/reapertura) y 9 (certificados) no se habían iniciado. Fase 8 se integró posteriormente en development mediante PRs 280–285; su estado actual pre-release está descrito abajo. Recovery/cambio de contraseña con entrega de correo, entrega cloud de SMTP, OAuth Google real y política de retención siguen pendientes según [`AUTHENTICATION.md`](AUTHENTICATION.md) y [`PLAN.md`](PLAN.md).
 
-## Correcciones post-release Fase 7 — validación local; publicación bloqueada
+### Correcciones post-release Fase 7 — PR 278
 
-El source final local `6b87d24d80df3810889139aa776604b0041b2802` (base `274db4cfdb7c927b3a69552eb8c0342fd363dbd2`) tiene validación local combinada completada, documentada con límites en [`TESTING.md`](TESTING.md). Los 132 casos E2E distintos están cubiertos por corridas separadas; no se afirma un full local único 132/132. Calidad/format/lint/typecheck/Drizzle/build están PASS según sus fuentes, con integración 142/142 reutilizada desde una fuente con aplicación/schema sin cambios.
+PR 278 promovió las correcciones a `master` (`91beccf8`). CI run `37670004492` pasó al primer intento: 358 unit, 142 integration y full E2E 134/134, además de quality/build/migración/deploy PASS sin retries ni flakes reportados. Vercel deployment `dpl_CM7pwMYLxoqYBzP96KAeqQb8dxP7` está `READY` para el SHA exacto de master y alias `https://skillbase-alpha.vercel.app`. El smoke obtuvo 200 en rutas públicas/Auth y 303 en cuatro rutas privadas de evaluaciones sin sesión.
 
-La publicación del commit quedó bloqueada: el push Git y las escrituras de blobs GitData REST reportaron HTTP 500; el publicador detuvo el intento. No se afirma recuperación, creación de PR ni CI remoto verde. `origin/development` sigue reportado en `274db4c`; el commit `6b87d24` es local y no está mergeado. No se cambiaron branch protections ni se promovió código.
+Supabase cloud sigue en ledger 21 (timestamp/hash de la migración F7 sin cambio); una consulta read-only observó inventario actual descrito en [`TESTING.md`](TESTING.md). No hubo comparación cloud de hashes pre/post completa, migración nueva, reseed ni escritura manual de datos. Esto no afirma Google OAuth real o recovery/SMTP verificado y no inicia Fase 8. La historia de PR 275/276/277 y los límites de causalidad de flakies se preservan en [`TESTING.md`](TESTING.md).
 
-Producción sigue en el release Fase 7 `master` `4afa485`, Vercel `READY`, Supabase cloud ledger 21. Esta verificación no ejecutó migraciones, DDL, SQL canónico, Auth/cloud writes, seeds ni deploys; tampoco revalidó ni cambió los conteos cloud. Esperar a poder publicar el commit y completar el CI remoto full requerido antes de release. Las correcciones no implementan Fase 8; su inicio sigue separado y posterior al release de este milestone.
+La primera revisión del workflow de shards (`4ecf1e`) pasó CI del PR `37675836980`: unit 371/2181 assertions, integration 142/1077 una vez y E2E 134/134 por dos runners independientes, sin skips/flakes/retries. La revisión actual añadió gating estricto por `quality`, integration y E2E, más cuatro tests/76 assertions; necesita nuevo run remoto antes de merge. En una observación, el envelope E2E fue 460 s baseline vs. 387 s candidato (-15.87 %), critical path requerido 730 vs. 426 s (-41.64 %) y consumo agregado no-deploy 789 s baseline vs. 931 s candidato (+18 %). Los jobs reportaron shards 416/297 s, integration 132 s, quality 78 s y aggregator 8 s; medición de un solo run, no garantía de reducción estable. El baseline production workflow no es directamente comparable: instalación Chromium 135 s vs. 62/19 s por runners ocurrió en hosts/redes diferentes, aunque la imagen Ubuntu coincidiera. No afirmar speedup robusto ni “2×”; medir más ejecuciones comparables antes de aceptarlo como optimización.
+
+## Correcciones post-release Fase 7 — estado local pre-release (histórico)
+
+En el snapshot anterior a la publicación, el source local `6b87d24d80df3810889139aa776604b0041b2802` (base `274db4cfdb7c927b3a69552eb8c0342fd363dbd2`) tenía validación local combinada completada. Los 132 casos E2E distintos estaban cubiertos por corridas separadas; no fue un full local único 132/132. Calidad/format/lint/typecheck/Drizzle/build estaban PASS, con integración 142/142 reutilizada desde una fuente con aplicación/schema sin cambios. Este estado de publicación bloqueada es histórico y queda supersedido por PR 278, documentado debajo.
+
+En ese momento la publicación del commit quedó bloqueada: el push Git y las escrituras de blobs GitData REST reportaron HTTP 500; el publicador detuvo el intento. `origin/development` estaba reportado en `274db4c`; el commit `6b87d24` aún era local y no estaba mergeado. Este bloqueo se resolvió después con el release PR 278 registrado arriba; no se cambiaron branch protections.
+
+En ese estado pre-release, producción seguía en Fase 7 `master` `4afa485`, Vercel `READY`, Supabase cloud ledger 21. Después PR 278 liberó las correcciones; su estado actual es el registrado en la sección de release. Fase 8 continúa separada y sin implementar.
+
+## Estado actual de shards y backend Fase 8
+
+La nota intermedia de workflow pendiente arriba quedó supersedida cuando PR 279 se integró a `development`. El CI final `37684331005` pasó con 376 unit/2266 assertions, 142 integration/1077 assertions y 134/134 E2E (69+65), first-pass tras remediar provisioning APT. El shard fijo a Ubuntu 24.04 y sus timeouts/fuentes HTTPS quedaron verificados en ambos runners; no se cambia `master`/deploy por un chore separado.
+
+El core cierre (PR 280), export adapters (PR 281), UI workspace/history/policy
+(PR 282), backend multi-ADMIN (PR 283), descarga focal E2E (PR 284) y UI cuentas
+ADMIN (PR 285) están integrados en `development`. CI de PR 283 run `37717389828`:
+400 unit/2530 assertions, 160 integration/1314 assertions y 137 E2E (72+65),
+first-pass sin flakies, skips ni retries reportados. PR 284 run `37718702107`:
+400 unit, 160 integration y 137 E2E, first-pass. PR 285 run `37718988907`:
+412 unit/2608 assertions, 160 integration/1314 assertions y 139 E2E (74+65),
+first-pass sin fallos, skips, flakes ni retries reportados.
+
+El release-validation run `37720672015` posterior quedó **FAIL**: 138/139 E2E
+first-pass y el caso restante falló también en los dos retries automáticos. La
+reproducción controlada identificó agotamiento del límite correcto de login por
+red al combinar escenarios; un test-only fixture fix está en
+`fix/google-admin-recovery-isolation`. Su focused pass 9/9 y repetición
+Google-only 2/2 pasaron sin retries, pero no hay un nuevo full CI verde todavía.
+No se promovió a `master`, no se desplegó y no se aplicaron migrations 0021/0022
+a canónico/cloud.
+
+Las migraciones candidatas 0021/0022 se aplicaron solo a QA aislado (ledger
+temporal 21→22→23); Supabase canónico y cloud permanecen en ledger 21. El owner
+verificó seis descargas GET reales en QA; esto no equivale al gate combinado
+posterior a PR 285 ni a release. Producción sigue en PR 278 (`master`
+`91beccf8`, Vercel `READY`); no afirmar UI ADMIN ni lifecycle F8 disponible allí.
+
+**Actualización del gate shards:** el status «requiere nuevo run» del registro previo quedó supersedido por PR 279/run `37684331005`, que pasó los dos shards y el agregador estricto tras la remediación APT. PR 279 se integró a `development`; no movió producción ni el ledger cloud.
+
+Los adapters de export se integraron por PR 281 y la UI/policy de cierre por PR 282. La verificación focal reportada de descarga no implica disponibilidad en producción ni reemplaza el gate/release F8. Cloud/canónico permanecen en ledger 21.

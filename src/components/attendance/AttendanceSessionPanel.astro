@@ -16,6 +16,7 @@ interface Props {
   errors?: Readonly<Record<string, string>>;
   message?: string | undefined;
   failedOperation?: string | undefined;
+  closedVersion?: number | undefined;
 }
 const {
   detail,
@@ -26,6 +27,7 @@ const {
   errors = {},
   message,
   failedOperation,
+  closedVersion,
 } = Astro.props;
 const { group, session, participants } = detail;
 let attemptedId = "";
@@ -117,7 +119,7 @@ const inlineFailure =
         )}
       </div>
     </div>
-    {isAdmin && (
+    {isAdmin && !closedVersion && (
       <SessionActions
         {session}
         {path}
@@ -128,6 +130,17 @@ const inlineFailure =
       />
     )}
   </header>
+  {closedVersion && (
+    <p class="text-sm text-muted-foreground">
+      Grupo cerrado · Solo lectura ·{" "}
+      <a
+        class="inline-flex min-h-11 items-center underline underline-offset-4"
+        href={`${path.slice(0, path.lastIndexOf("/sesiones/"))}/cierre/${closedVersion}`}
+      >
+        Versión oficial {closedVersion}
+      </a>
+    </p>
+  )}
   {session.status === "CANCELLED" && (
     <p class="text-sm text-muted-foreground">
       Sesión cancelada.

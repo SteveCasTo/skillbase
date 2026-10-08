@@ -8,6 +8,7 @@ export class EvaluationError extends Error {
   constructor(
     public readonly code:
       | "VALIDATION_FAILED"
+      | "GROUP_CLOSED"
       | "FORBIDDEN"
       | "NOT_FOUND"
       | "NOT_ENROLLED"

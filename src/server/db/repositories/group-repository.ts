@@ -25,6 +25,7 @@ import {
 
 type Database = PostgresJsDatabase<typeof schema>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+import { requireFreshRegistrationActor } from "./registration-support";
 type Row = typeof schema.groups.$inferSelect;
 
 function nextVersion(previous: Date): Date {
@@ -187,6 +188,8 @@ export class DrizzleGroupRepository implements GroupRepository {
   ): Promise<Row> {
     assertCapacity(capacity);
     return this.db.transaction(async (tx) => {
+      await lockInstructorSchedules(tx);
+      await requireFreshRegistrationActor(tx, actorId);
       // Serialize all creates and updates of this course before reading competing schedules.
       const { course, revision } = await this.lockedCourse(tx, courseId);
       const plan = groupPlan(course, revision, startTime);
@@ -220,6 +223,8 @@ export class DrizzleGroupRepository implements GroupRepository {
     value?: string | number,
   ): Promise<Row> {
     return this.db.transaction(async (tx) => {
+      await lockInstructorSchedules(tx);
+      await requireFreshRegistrationActor(tx, actorId);
       // Discover the parent without locking the child; re-read after locking parent.
       const [reference] = await tx
         .select({ courseId: schema.groups.courseId })
@@ -389,6 +394,8 @@ export class DrizzleGroupRepository implements GroupRepository {
 
   async delete(id: string, actorId: string, expected: Date): Promise<void> {
     await this.db.transaction(async (tx) => {
+      await lockInstructorSchedules(tx);
+      await requireFreshRegistrationActor(tx, actorId);
       const [reference] = await tx
         .select({ courseId: schema.groups.courseId })
         .from(schema.groups)

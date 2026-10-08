@@ -2,6 +2,9 @@ import type { TransitionBeforePreparationEvent } from "astro:transitions/client"
 
 export function navigationSkeletonVariant(path: string) {
   const normalized = path.replace(/\/$/, "");
+  if (normalized === "/app/administradores") return "list";
+  if (normalized === "/app/administradores/nuevo") return "form";
+  if (/^\/app\/administradores\/[^/]+$/.test(normalized)) return "detail";
   if (/^\/app\/(cursos|mis-cursos)\/[^/]+\/evaluaciones$/.test(normalized))
     return "form";
   if (

@@ -136,36 +136,65 @@ distintos de `INSCRITO` e independencia de la elegibilidad por asistencia.
 - Certificados, PDF, firmas de certificado, QR, verificación o revocación
   (Fase 9).
 
-El cierre de grupo/planilla de Fase 8 recibió aprobación de alcance después del
-release F7, pero aún no está implementado. Sus condiciones funcionales están en
-[`REQUIREMENTS.md`](REQUIREMENTS.md) y la secuencia en [`PLAN.md`](PLAN.md). Esta
-aprobación no cambia las invariantes de evaluación definidas arriba: solo
-`INSCRITO` se califica, una nota faltante sigue pendiente, elegibilidad de
-asistencia no bloquea la calificación y el esquema/pesos permanecen congelados
-después de la primera nota incluso si un grupo se reabre.
+El cierre por grupo de Fase 8 recibió aprobación después del release F7. El
+core backend se integró mediante PR 280, incluido su guard de escritura de
+notas. Renderers de export y seis GET adapter modules están en el worktree
+`feat/academic-closure-exports`, aún sin integrar. Sus reglas,
+helpers y estado están en [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md),
+[`REQUIREMENTS.md`](REQUIREMENTS.md) y [`PLAN.md`](PLAN.md). El cierre no cambia
+las invariantes F7: solo `INSCRITO` se califica, una nota faltante sigue
+pendiente, elegibilidad de asistencia no bloquea calificar y esquema/pesos no
+se descongelan al reabrir.
 
-### Límite de escritura y snapshot de cierre aprobado (pendiente de implementación)
+### Escritura por fila y cierre de grupo (backend parcial; no liberado)
 
 - Un guardado de una fila de calificaciones debe guardar todas las celdas
   modificadas de esa persona atómicamente; la presentación puede permitir edición
   independiente por componente. Una celda vacía significa pendiente, no cero ni
   eliminación autorizada de una nota persistida.
+- Los repositorios `saveRow` y `saveGrade` consultan el estado de cierre en su
+  transacción y rechazan escrituras si el grupo de la inscripción está cerrado.
+  La migración candidata también añade una guarda DB sobre `evaluation_grades`,
+  como defensa en profundidad. Reabrir permite corregir notas, pero no descongela el esquema
+  de Fase 7.
 - El cierre requiere sesiones y asistencia resueltas y notas completas para todo
-  el roster `INSCRITO`. Cancelar una sesión resuelve esa sesión; no es necesario
-  restaurarla. No se crean marcas ocultas para completar el cierre. Las señales
-  de elegibilidad de asistencia son informativas y no constituyen gate de cierre.
+  el roster `INSCRITO` del grupo. Cancelar una sesión la resuelve; no es necesario
+  restaurarla. Revisión histórica pendiente y marcas pendientes bloquean. No se
+  crean marcas ocultas para completar el cierre. Las señales de elegibilidad de
+  asistencia son informativas y no bloquean el cierre, pero forman parte del resultado
+  académico combinado.
 - Mientras el grupo está cerrado, el servidor debe rechazar escrituras de notas o
   asistencia que afecten el registro oficial, incluidas operaciones alternativas
   al editor visible. Reabrir requiere `ADMIN`, motivo obligatorio y auditoría;
-  instructor solo puede cerrar grupos con ownership vigente. Todos los ADMIN
-  tienen permisos iguales; las reglas aprobadas de creación y lifecycle se
-  registran en [`PLAN.md`](PLAN.md), no como un rol adicional en este contrato.
+  instructor solo puede cerrar grupos con ownership vigente y desde el inicio
+  del curso; ADMIN puede cerrar cualquier grupo. Todos los ADMIN tienen permisos
+  iguales, pero su creación/lifecycle permanece pendiente.
+- Alta/preinscripción y transferencia hacia un grupo cerrado se rechazan incluso
+  si la ventana Fase 5 sigue abierta. Reabrir primero mantiene sus ventanas y
+  demás reglas financieras Fase 5. El guard no añade restricciones a transferir
+  fuera del grupo cerrado, pagar, cancelar/refund ni caja existente. Replay de
+  comando completado conserva su receipt/respuesta original; un intento nuevo
+  rechazado no deja escritura parcial de participant/registration/payment/receipt
+  ni auditoría.
 - Cada cierre publica una versión inmutable con timestamp, UUID del actor y
   nombre del actor como se mostraba en ese momento; los reportes históricos no
   resuelven el nombre dinámicamente desde el perfil actual. La planilla puede
   exportarse como PDF/CSV; el PDF incluye resumen de resultados, elegibilidad y
   asistencia. Reapertura seguida de otro cierre genera una versión adicional y
   conserva la anterior. Este alcance no exige formato institucional, firma ni
-  certificado. El diseño de persistencia del snapshot forma parte de la
-  implementación; este contrato no prescribe un esquema ni afirma que la
-  versionación ya exista.
+  certificado. El snapshot JSONB y su versión se implementan en la migración
+  candidata 0021; 0021 solo se aplicó a stacks QA temporales, no a la base local
+  canónica ni a cloud. Renderers CSV/PDF y seis route adapter files están en el
+  worktree de exports, sin integrar. No se han añadido a
+  `PRIVATE_ROUTE_POLICIES`, por lo que middleware los bloquea hasta la integración;
+  UI/descargas no están disponibles en la app.
+
+El snapshot interno `ClosureReportDto` conserva CI/balance para ADMIN y no añade
+email/teléfono. Las lecturas actuales proyectan un DTO discriminado por role:
+INSTRUCTOR recibe una allowlist recursiva de nombres/IDs operativos, notas y
+asistencia, sin CI/contacto/categoría/finanzas, incluso ante propiedades
+sensibles futuras en el JSON. Todas las vistas autorizadas —actual/provisional e
+histórica— usan esa proyección; el JSON serializado se cubre en pruebas focales.
+No hay todavía route/UI montada. Los futuros exports PDF/CSV deben consumir el
+reporte autorizado de los loaders server-side, nunca leer/entregar el snapshot
+raw sin autorización/proyección.

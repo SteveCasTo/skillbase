@@ -169,6 +169,22 @@ La migración aditiva 0014 vincula el perfil profesional con el ID interno estab
 
 El full E2E Auth PR 118 pasó 104/104 y PR 120 había pasado 107/107 antes de cambios posteriores. Tras restaurar la dependencia opcional Astro Sharp con `bun install --frozen-lockfile`, la fuente final pasó full E2E 107/107 en `127.0.0.1:4321`; el smoke público/privado pasó y el release CI/deploy de PR 126 se completó. Google OAuth real y SMTP/recovery no estaban probados en ese release histórico. El estado operacional vigente de SMTP (configuración cloud/local y receipt local confirmada, límites de recovery/cloud pendientes) está arriba y en `docs/DEPLOYMENT.md`.
 
-### Gestión multi-ADMIN aprobada para Fase 8 (planificada; no implementada)
+### Gestión multi-ADMIN aprobada para Fase 8 (backend/UI en development; no release)
 
-El release actual todavía no permite crear/gestionar cuentas ADMIN adicionales; la afirmación histórica de Fase 4 sigue describiendo lo que implementó aquel release. Para Fase 8 se aprobó creación ADMIN server-side con contraseña inicial vía Supabase Auth privilegiado y el lifecycle/guard de actividad descritos en [`PLAN.md`](PLAN.md). Las cuentas tendrán iguales permisos: sin `ROOT` ni privilegio especial del primero; la cuenta usada por un actor debe conservar su UUID/historial. Esta aprobación de alcance no acredita rutas, cambios de Auth, schema, migraciones ni release ya realizados.
+El backend de aprovisionamiento y lifecycle ADMIN se integró a `development` por
+PR 283 y las páginas/UI por PR 285. El flujo está en development, aún no en
+producción. ADMIN activo crea otra identidad confirmada con
+contraseña inicial vía Supabase Auth Admin API server-side; la credencial no se
+persiste, registra ni retorna y no se fuerza cambio en primer login. Permisos
+ADMIN son iguales, sin rol ROOT ni privilegio del primero.
+
+Las rutas `/app/administradores`, `/app/administradores/nuevo` y detalle UUID
+son privadas ADMIN. Listado/búsqueda, alta y edición de nombre usan
+helpers/loaders server-side; correo es readonly. El backend calcula una acción:
+eliminar solo cuenta sin actividad propia/dependencia, o desactivar/reactivar
+conservando UUID/historial; baja pendiente se reintenta sobre la misma identidad.
+El guard serial mantiene al menos un ADMIN activo, sin prohibición general de
+auto-baja cuando queda otro ADMIN. Auth ocurre fuera de la transacción DB y la
+compensación de alta solo apunta al UUID recién creado. Migración 0022 se aplicó
+solo en QA; no usar este feature para inferir estado Auth/migraciones en
+producción. Contrato en [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).

@@ -14,7 +14,15 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? "github" : "list",
+  reporter: process.env.E2E_EVIDENCE_DIR
+    ? [
+        [process.env.CI ? "github" : "list"],
+        ["blob"],
+        ["./scripts/e2e-evidence-reporter.ts"],
+      ]
+    : process.env.CI
+      ? "github"
+      : "list",
   use: {
     baseURL: e2eSiteUrl(),
     trace: "on-first-retry",

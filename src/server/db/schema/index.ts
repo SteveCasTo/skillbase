@@ -265,6 +265,37 @@ export const attendanceState = pgEnum("attendance_state", [
   "ABSENT",
   "EXCUSED",
 ]);
+
+export const adminAccountDeletions = pgTable(
+  "admin_account_deletions",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "restrict" }),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    authUserId: uuid("auth_user_id").notNull(),
+    requestedRevision: timestamp("requested_revision", {
+      withTimezone: true,
+      precision: 3,
+    }).notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completed_at", {
+      withTimezone: true,
+      precision: 3,
+    }),
+  },
+  (t) => [
+    index("admin_account_deletions_actor_idx").on(t.actorId),
+    check(
+      "admin_account_deletions_completion_check",
+      sql`${t.completedAt} is null or ${t.completedAt} >= ${t.requestedAt}`,
+    ),
+  ],
+).enableRLS();
 export const attendanceSettings = pgTable(
   "attendance_settings",
   {
@@ -882,6 +913,117 @@ export const auditEvents = pgTable(
     ),
   ],
 );
+
+export const academicGroupStates = pgTable(
+  "academic_group_states",
+  {
+    groupId: uuid("group_id")
+      .primaryKey()
+      .references(() => groups.id, { onDelete: "restrict" }),
+    revision: integer("revision").notNull().default(0),
+    closed: boolean("closed").notNull().default(false),
+    lastVersion: integer("last_version").notNull().default(0),
+  },
+  (t) => [
+    check(
+      "academic_group_states_revision_check",
+      sql`${t.revision} >= 0 and ${t.lastVersion} >= 0 and (not ${t.closed} or ${t.lastVersion} > 0)`,
+    ),
+  ],
+).enableRLS();
+
+export const academicClosureVersions = pgTable(
+  "academic_closure_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    courseId: uuid("course_id").notNull(),
+    groupId: uuid("group_id").notNull(),
+    version: integer("version").notNull(),
+    closedAt: timestamp("closed_at", {
+      withTimezone: true,
+      precision: 3,
+    }).notNull(),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    actorName: text("actor_name").notNull(),
+    report: jsonb("report")
+      .$type<import("@/domain/academic-closure/types").ClosureReportDto>()
+      .notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "academic_closure_versions_course_group_fk",
+      columns: [t.courseId, t.groupId],
+      foreignColumns: [groups.courseId, groups.id],
+    }).onDelete("restrict"),
+    unique("academic_closure_versions_group_version_unique").on(
+      t.groupId,
+      t.version,
+    ),
+    index("academic_closure_versions_actor_idx").on(t.actorId),
+    index("academic_closure_versions_course_group_idx").on(
+      t.courseId,
+      t.groupId,
+    ),
+    check(
+      "academic_closure_versions_check",
+      sql`${t.version} > 0 and char_length(btrim(${t.actorName})) > 0 and jsonb_typeof(${t.report}) = 'object'`,
+    ),
+  ],
+).enableRLS();
+
+export const academicGroupReopenings = pgTable(
+  "academic_group_reopenings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    versionId: uuid("version_id")
+      .notNull()
+      .references(() => academicClosureVersions.id, { onDelete: "restrict" }),
+    reopenedAt: timestamp("reopened_at", {
+      withTimezone: true,
+      precision: 3,
+    }).notNull(),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    actorName: text("actor_name").notNull(),
+    reason: text("reason").notNull(),
+  },
+  (t) => [
+    uniqueIndex("academic_group_reopenings_version_unique").on(t.versionId),
+    index("academic_group_reopenings_actor_idx").on(t.actorId),
+    check(
+      "academic_group_reopenings_reason_check",
+      sql`char_length(btrim(${t.reason})) between 1 and 500 and ${t.reason} !~ '[[:cntrl:]]' and char_length(btrim(${t.actorName})) > 0`,
+    ),
+  ],
+).enableRLS();
+
+export const academicClosureReceipts = pgTable(
+  "academic_closure_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    requestKey: uuid("request_key").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    result: jsonb("result")
+      .$type<import("@/domain/academic-closure/types").ClosureCommandResult>()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("academic_closure_receipts_actor_key_unique").on(
+      t.actorId,
+      t.requestKey,
+    ),
+    check(
+      "academic_closure_receipts_check",
+      sql`${t.fingerprint} ~ '^[0-9a-f]{64}$' and jsonb_typeof(${t.result}) = 'object'`,
+    ),
+  ],
+).enableRLS();
 
 export const registrationParticipantType = pgEnum(
   "registration_participant_type",

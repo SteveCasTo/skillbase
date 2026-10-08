@@ -8,14 +8,16 @@ import {
 import {
   signInOAuthFixture,
   prepareBrowserRecoveryFixture,
+  resetLoginNetworkBudgetFixture,
 } from "./auth-helper";
-import { createDatabase } from "@/server/db/client";
-import { sql } from "drizzle-orm";
+import { createGoogleOnlyAdminFixture } from "../fixtures/google-only-admin";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 const environment = getTestSupabaseEnvironment();
 const provider = createClient(environment.apiUrl, environment.serviceRoleKey, {
   auth: { persistSession: false },
 });
+
+test.beforeEach(resetLoginNetworkBudgetFixture);
 
 async function authId(email: string): Promise<string> {
   const { data, error } = await provider.auth.admin.listUsers();
@@ -205,92 +207,85 @@ test("Google-only ADMIN creates a password with recent approved OAuth, then reco
   baseURL,
 }) => {
   test.setTimeout(60_000);
-  const fixture = AUTH_FIXTURES.googleLegacyAdmin;
-  const id = await authId(fixture.email);
-  await attachGoogleFixture(id, fixture.email);
-  const database = createDatabase(environment.databaseUrl);
+  const fixture = await createGoogleOnlyAdminFixture();
+  const id = fixture.authUserId;
   try {
-    await database.db.execute(
-      sql`delete from auth.identities where user_id = ${id}::uuid and provider = 'email'`,
+    await signInOAuthFixture(context, id);
+    await page.goto("/app/perfil");
+    await expect(
+      page.getByRole("heading", { name: "Mi perfil" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Asociar Google" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Enviar enlace de confirmación" }),
+    ).toHaveCount(0);
+    await page
+      .getByRole("link", { name: "Crear contraseña", exact: true })
+      .click();
+    await expect(
+      page.getByLabel("Contraseña actual", { exact: true }),
+    ).toHaveCount(0);
+    const password = "Synthetic-Optional-Google-Password-2026";
+    await page.getByLabel("Nueva contraseña", { exact: true }).fill(password);
+    await page
+      .getByLabel("Repetir nueva contraseña", { exact: true })
+      .fill(password);
+    await page
+      .getByRole("button", { name: "Crear contraseña", exact: true })
+      .click();
+    await expect(page).toHaveURL("/app/perfil?status=password_changed");
+    await expect(
+      page.getByRole("link", { name: "Cambiar contraseña", exact: true }),
+    ).toBeVisible();
+    // A historical Google identity/current OAuth session must not bypass the old
+    // password once Auth reports that a credential exists.
+    const bypass = await context.request.post("/app/perfil/contrasena", {
+      headers: { origin: new URL(baseURL!).origin, accept: "application/json" },
+      form: {
+        password: "Synthetic-Unauthorized-Change-2026",
+        confirmation: "Synthetic-Unauthorized-Change-2026",
+      },
+    });
+    expect(bypass.status()).toBe(422);
+    expect((await bypass.json()).fields.currentPassword).toContain(
+      "actual es incorrecta",
     );
-    // Model actual OAuth-only credentials; Admin API fixtures otherwise have a password.
-    await database.db.execute(
-      sql`update auth.users set encrypted_password = '' where id = ${id}::uuid`,
+    const recovery = await prepareBrowserRecoveryFixture(context, id, baseURL!);
+    await page.goto(
+      `/auth/recovery?code=${encodeURIComponent(recovery.code)}&sb_flow_id=${encodeURIComponent(recovery.flowId)}`,
     );
+    await expect(page).toHaveURL("/app/perfil/contrasena?status=confirmed");
+    await expect(
+      page.getByLabel("Contraseña actual", { exact: true }),
+    ).toHaveCount(0);
+    const recoveredPassword = "Synthetic-Recovered-Google-Password-2026";
+    await page
+      .getByLabel("Nueva contraseña", { exact: true })
+      .fill(recoveredPassword);
+    await page
+      .getByLabel("Repetir nueva contraseña", { exact: true })
+      .fill(recoveredPassword);
+    await page
+      .getByRole("button", { name: "Restablecer contraseña", exact: true })
+      .click();
+    await expect(
+      page.getByRole("status").filter({ hasText: "Contraseña actualizada" }),
+    ).toContainText("Contraseña actualizada");
+    await page
+      .getByRole("button", { name: "Cerrar sesión", exact: true })
+      .first()
+      .click();
+    await login(page, { email: fixture.email, password: recoveredPassword });
+    await expect(
+      page
+        .getByRole("form", { name: "Editar nombre" })
+        .getByLabel("Nombre", { exact: true }),
+    ).toHaveValue(fixture.name);
+    await page.goto("/app/configuracion");
+    await expect(page).toHaveURL("/app/configuracion");
   } finally {
-    await database.close();
+    await fixture.cleanup();
   }
-  await signInOAuthFixture(context, id);
-  await page.goto("/app/perfil");
-  await expect(page.getByRole("heading", { name: "Mi perfil" })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Asociar Google" }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Enviar enlace de confirmación" }),
-  ).toHaveCount(0);
-  await page
-    .getByRole("link", { name: "Crear contraseña", exact: true })
-    .click();
-  await expect(
-    page.getByLabel("Contraseña actual", { exact: true }),
-  ).toHaveCount(0);
-  const password = "Synthetic-Optional-Google-Password-2026";
-  await page.getByLabel("Nueva contraseña", { exact: true }).fill(password);
-  await page
-    .getByLabel("Repetir nueva contraseña", { exact: true })
-    .fill(password);
-  await page
-    .getByRole("button", { name: "Crear contraseña", exact: true })
-    .click();
-  await expect(page).toHaveURL("/app/perfil?status=password_changed");
-  await expect(
-    page.getByRole("link", { name: "Cambiar contraseña", exact: true }),
-  ).toBeVisible();
-  // A historical Google identity/current OAuth session must not bypass the old
-  // password once Auth reports that a credential exists.
-  const bypass = await context.request.post("/app/perfil/contrasena", {
-    headers: { origin: new URL(baseURL!).origin, accept: "application/json" },
-    form: {
-      password: "Synthetic-Unauthorized-Change-2026",
-      confirmation: "Synthetic-Unauthorized-Change-2026",
-    },
-  });
-  expect(bypass.status()).toBe(422);
-  expect((await bypass.json()).fields.currentPassword).toContain(
-    "actual es incorrecta",
-  );
-  const recovery = await prepareBrowserRecoveryFixture(context, id, baseURL!);
-  await page.goto(
-    `/auth/recovery?code=${encodeURIComponent(recovery.code)}&sb_flow_id=${encodeURIComponent(recovery.flowId)}`,
-  );
-  await expect(page).toHaveURL("/app/perfil/contrasena?status=confirmed");
-  await expect(
-    page.getByLabel("Contraseña actual", { exact: true }),
-  ).toHaveCount(0);
-  const recoveredPassword = "Synthetic-Recovered-Google-Password-2026";
-  await page
-    .getByLabel("Nueva contraseña", { exact: true })
-    .fill(recoveredPassword);
-  await page
-    .getByLabel("Repetir nueva contraseña", { exact: true })
-    .fill(recoveredPassword);
-  await page
-    .getByRole("button", { name: "Restablecer contraseña", exact: true })
-    .click();
-  await expect(
-    page.getByRole("status").filter({ hasText: "Contraseña actualizada" }),
-  ).toContainText("Contraseña actualizada");
-  await page
-    .getByRole("button", { name: "Cerrar sesión", exact: true })
-    .first()
-    .click();
-  await login(page, { email: fixture.email, password: recoveredPassword });
-  await expect(
-    page
-      .getByRole("form", { name: "Editar nombre" })
-      .getByLabel("Nombre", { exact: true }),
-  ).toHaveValue(fixture.name);
-  await page.goto("/app/configuracion");
-  await expect(page).toHaveURL("/app/configuracion");
 });
