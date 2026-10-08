@@ -822,6 +822,12 @@ Instructor configura evaluación y el sistema calcula resultados finales.
 
 Fase 8 se completó y liberó mediante PR 286 a `master` `68c918119f2ec094ba7cc63b217efd2448480505`. CI `37727200394` y Vercel `READY`; las migraciones 0021/0022 avanzaron canónico/cloud a ledger 23. La comparación pre/post confirmó preservación local/cloud; las cinco tablas F8 estaban vacías en la verificación. Fase 9 no ha iniciado. Evidencia: [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md), [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md), [`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
+### Nueva pasada de correcciones UI (acuerdos previos; pendiente)
+
+Se aprobó una pasada acotada de correcciones visuales/operativas y se registró su contrato en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md). Ningún punto de ese contrato está marcado como implementado por esta preparación documental. Mantener cada corrección en rama/PR propia a `development`; las correcciones se liberarán juntas a `master` solo después de completar y verificar todo el bloque. Las demos sintéticas de producción autorizadas se ejecutarán únicamente después de ese release, sin reset general ni alteración de datos legítimos. El contrato define el reset de fecha/estado al seleccionar un estado específico en el calendario.
+
+Fase 9 continúa pendiente e independiente. Antes de iniciarla, acordar los tipos de certificado, firmas/autoridad, número institucional, elegibilidad y relación con snapshots de cierre, saldos, boleta/valorado y reemplazo/revocación/verificación pública. El contrato UI enumera estas preguntas como pendientes, no como reglas aprobadas.
+
 ### Objetivos
 
 - Determinar elegibilidad.
