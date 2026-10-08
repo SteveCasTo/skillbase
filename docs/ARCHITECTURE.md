@@ -377,9 +377,10 @@ Ejemplos:
 
 Toda ruta privada debe validar sesión y autorización server-side.
 
-Las rutas de certificados de esta lista son una arquitectura objetivo, no rutas
-implementadas en el checkout actual. Fase 9 continúa pendiente; su contrato y
-dependencias están en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md).
+Las rutas de certificados de esta lista son una arquitectura objetivo y todavía
+no están integradas en el baseline de `development`; Fase 9 está en progreso en
+ramas de feature. Contrato, permisos y flujo aprobados en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md).
 
 ## LÓGICA DE NEGOCIO
 

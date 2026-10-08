@@ -2,9 +2,9 @@
 
 ## Estado y alcance
 
-Este documento registra los acuerdos para una pasada de correcciones operativas sobre la aplicación de Fase 8. La implementación UI y runner se integraron en `development` mediante PRs 289/288 y luego se liberaron a `master` como `4e067311` (CI `37828609916`, Vercel `READY`). El release no cambia el requisito de PLAN/APPLY manuales y guards descritos en [`DEMO_SEED.md`](DEMO_SEED.md): el seed local canónico ya se completó y el paso cloud sigue pendiente.
+Este documento registra los acuerdos para una pasada de correcciones operativas sobre la aplicación de Fase 8. La implementación UI y runner se integraron mediante PRs 289/288; PR 292 añadió el canal de ejecución cloud protegido. La release actual es `master` `2789d55e93a97cc5344930e690e9feecc2cc10f5` (CI `37846141904`, Vercel `dpl4CZ READY`); los seeds local y cloud F1–F8 se completaron por los workflows/operaciones aprobados. El proceso y la evidencia están en [`DEMO_SEED.md`](DEMO_SEED.md).
 
-Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Este contrato no la reabre. Fase 9 no se implementa aquí; su alcance fue aprobado posteriormente y se mantiene en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md), con implementación bloqueada hasta el paso cloud F1–F8.
+Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Este contrato no la reabre. Fase 9 no se implementa aquí; su alcance fue aprobado posteriormente y se mantiene en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). Tras completar los seeds F1–F8 local/cloud, la implementación F9 está en progreso en ramas de feature.
 
 ## Reglas transversales de interfaz
 
@@ -76,6 +76,6 @@ Al redactar este contrato de correcciones, Fase 9 seguía sin decisiones
 aprobadas. El owner aprobó después el alcance de certificados; la especificación
 vigente es [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y la decisión
 ADR-028 en [`DECISIONS.md`](DECISIONS.md). No se deben usar como pendientes las
-preguntas históricas enumeradas en esta versión del contrato. Fase 9 aún no se
-implementa; el paso cloud F1–F8 pendiente y su bloqueo operativo se registran en
-[`PLAN.md`](PLAN.md)/[`DEMO_SEED.md`](DEMO_SEED.md).
+preguntas históricas enumeradas en esta versión del contrato. Los seeds F1–F8
+local/cloud ya se completaron y Fase 9 está en progreso; su estado vigente está
+en [`PLAN.md`](PLAN.md)/[`DEMO_SEED.md`](DEMO_SEED.md).

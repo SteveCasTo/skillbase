@@ -745,7 +745,7 @@ El job `integration-e2e` secuencial del master CI `37670004492` duró 12m10s: Ch
 
 **Fecha:** 2026-10-07
 
-**Estado:** Implementado en backend de feature; integración/release pendientes
+**Estado:** Implementado e integrado; liberado mediante PR 286 (detalles históricos en las consecuencias de esta decisión)
 
 ### Contexto
 
@@ -811,7 +811,7 @@ asistencia y cambios de membresía.
 
 **Fecha:** 2026-10-08
 
-**Estado:** Accepted — alcance aprobado; implementación pendiente
+**Estado:** Accepted — alcance aprobado; implementación en progreso
 
 ### Contexto
 
@@ -873,8 +873,10 @@ los detalles de almacenamiento/ordinal que corresponderán al diseño técnico.
 - [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) es el detalle normativo
   del formato, procedencia, operación, privacidad y dependencias de
   implementación.
-- La implementación F9 sigue bloqueada en `PLAN.md` hasta completar la carga
-  cloud F1–F8 autorizada. Persistir ordinal ADMIN-editable de grupo y
-  configuración/versiones de plantilla/assets sin modificar historia F8.
+- La carga autorizada F1–F8 local/cloud ya pasó sus gates y está documentada en
+  `DEMO_SEED.md`. Implementación F9 está en progreso en ramas de feature; el
+  baseline `development` aún no contiene migración F9 aplicada a canónico/cloud.
+  Persistir ordinal ADMIN-editable de grupo y configuración/versiones de
+  plantilla/assets sin modificar historia F8.
 - La aprobación del alcance no equivale a implementación, schema, migración,
   despliegue ni autorización de seed. Fase 9 sigue pendiente en `PLAN.md`.

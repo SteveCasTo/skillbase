@@ -381,11 +381,13 @@ El boceto `Enrollment`/`Refund`/`PaymentReference` a continuación es histórico
 
 ### Certificate
 
-Entidad conceptual de Fase 9, todavía no implementada en el schema ni en
-PostgreSQL. El contrato aprobado de elegibilidad, snapshot de impresión,
+Entidad conceptual de Fase 9. El baseline `development` actual aún no incorpora
+su tabla; el schema/migration candidata `0023` se trabaja en una rama de feature
+y solo se prueba en el stack aislado ledger 24, no está aplicada en canónico/cloud
+(ledger 23). El contrato aprobado de elegibilidad, snapshot de impresión,
 artefactos y ciclo de vida está en
 [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md); esta lista no autoriza a
-inferir columnas/migraciones finales ni representa una tabla existente.
+inferir columnas/migraciones finales ni representa una tabla desplegada.
 El contrato exige preservar reaperturas/versiones históricas, relacionar
 reemplazos sin borrado y permitir como máximo un certificado activo por
 curso/tipo/destinatario; la estructura concreta e índices se definirán durante

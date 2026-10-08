@@ -560,5 +560,6 @@ Protección de datos personales.
 
 Tipos de certificado, elegibilidad, firmantes requeridos/posiciones, carga de
 PDF firmado, no-dependencia financiera y exclusión de la boleta física ya están
-resueltos para Fase 9; ver el contrato enlazado. La implementación sigue
-bloqueada operacionalmente por la carga cloud F1–F8 pendiente en `PLAN.md`.
+resueltos para Fase 9; ver el contrato enlazado. Las cargas autorizadas F1–F8
+local/cloud se completaron; la implementación F9 está en progreso y requiere aún
+integración/validación antes de marcarse completa.

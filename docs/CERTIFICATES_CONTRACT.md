@@ -95,11 +95,13 @@ denominación institucional se conservan literalmente como en la referencia
 Cochabamba en la línea de fecha). Capturar estos valores y la versión de
 configuración/branding en la metadata del certificado.
 
-La etiqueta visible del grupo es un ordinal humano positivo (`GRUPO 1`, `GRUPO
-2`, …), por orden de creación dentro del curso. ADMIN puede corregirlo antes de
-generar el certificado; congelar entonces el valor y no recalcularlo si cambia
-el orden. El horario impreso usa el horario nominal del grupo; nunca inferir o
-inventar una etiqueta/horario desde asistencia o sesión individual.
+La etiqueta visible del grupo es un ordinal humano positivo (por ejemplo,
+`GRUPO 1`, `GRUPO 2`), inicialmente por orden de creación dentro del curso
+(`groups.createdAt`, con `groups.id` como desempate estable). ADMIN puede corregirlo antes de generar
+el certificado; congelar entonces el valor y no recalcularlo si cambia el orden
+ni alterar certificados ya generados. El horario impreso usa el horario nominal
+del grupo; nunca inferir o inventar una etiqueta/horario desde asistencia o
+sesión individual.
 
 Los instantes internos del ciclo (generación, carga, emisión, revocación y
 reemplazo) se guardan aparte de las fechas civiles nominales. La fecha de
@@ -268,20 +270,19 @@ snapshot de cierre ni el certificado emitido. Mantener como máximo un
 certificado activo por curso/tipo/destinatario; el reemplazo marca el previo
 `replaced`, lo enlaza al nuevo y conserva ambos registros y artefactos.
 
-## Requisitos de implementación pendientes
+## Implementación y límites de estado
 
-- Completar la operación de carga del demo autorizado F1–F8 en cloud según
-  [`PLAN.md`](PLAN.md), con checkout/credenciales seguros y los controles del
-  procedimiento. No crear certificados de demo ni iniciar implementación F9
-  antes de ese boundary.
-- Persistir el ordinal ADMIN-editable por orden de creación dentro del curso y
-  mapear horario nominal del grupo sin derivarlo de sesiones.
-- Ubicación/leyendas institucionales y assets deben usar el contenido y PNG
-  fuente autorizados; mantener una configuración versionada/congelada. No
-  cambiarlos sin aprobación.
+La autorización/gates del seed de datos F1–F8 local y cloud quedaron completados;
+la implementación F9 está en progreso en ramas de feature. Este contrato no
+declara implementados ni liberados los nuevos módulos/migraciones. Al integrar
+F9, persistir el ordinal ADMIN-editable del grupo por orden de creación dentro
+del curso, capturar sus correcciones antes de generar y congelar el valor; no
+derivarlo de sesiones. Ubicación/leyendas institucionales y assets deben usar el
+contenido y PNG fuente autorizados y guardarse con configuración/versión
+congelada.
 
 No quedan abiertas decisiones de negocio sobre tipo/elegibilidad, finanzas,
 firmas, QR, exposición de la verificación, privacidad del PDF, reapertura,
-vigencia de emitidos ni reemplazo. El alcance aprobado no equivale a
-implementación, schema, migración, release ni autorización de crear certificados
-demo.
+vigencia de emitidos ni reemplazo. Aún faltan integración/validación del código,
+schema, renderer, UI y gates de release. El seed F1–F8 no generó certificados ni
+autoriza datos de Fase 9.
