@@ -40,6 +40,7 @@ const account: AdminAccountDto = {
   exclusiveAdmin: true,
   hasActivity: false,
   deletionPending: false,
+  lifecycleBlockedReason: null,
   action: "delete",
 };
 const input = {

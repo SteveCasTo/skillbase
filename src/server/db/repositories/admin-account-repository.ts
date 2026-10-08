@@ -51,6 +51,7 @@ async function requireActor(tx: AttendanceTransaction, id: string) {
 async function inspect(
   tx: AttendanceTransaction,
   user: User,
+  activeAdminTotal?: number,
 ): Promise<AdminAccountDto> {
   const roles = await tx
     .select()
@@ -60,6 +61,7 @@ async function inspect(
     .select()
     .from(s.adminAccountDeletions)
     .where(eq(s.adminAccountDeletions.userId, user.id));
+  const adminCount = activeAdminTotal ?? (await countActiveAdmins(tx));
   const state = {
     id: user.id,
     name: user.name,
@@ -70,7 +72,27 @@ async function inspect(
     hasActivity: await hasAdminActorActivity(tx, user.id),
     deletionPending: Boolean(deletion && !deletion.completedAt),
   };
-  return { ...state, action: applicableAdminAction(state) };
+  return {
+    ...state,
+    lifecycleBlockedReason:
+      state.exclusiveAdmin &&
+      user.status === "ACTIVE" &&
+      !state.deletionPending &&
+      adminCount < 2
+        ? "last-active-admin"
+        : null,
+    action: applicableAdminAction(state),
+  };
+}
+async function countActiveAdmins(tx: AttendanceTransaction) {
+  const [row] = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(s.users)
+    .innerJoin(s.userRoles, eq(s.userRoles.userId, s.users.id))
+    .where(
+      and(eq(s.users.status, "ACTIVE"), eq(s.userRoles.roleCode, "ADMIN")),
+    );
+  return row?.count ?? 0;
 }
 /** Schedule barrier first, then ADMIN barrier, then sorted exclusive user rows.
  * FOR UPDATE conflicts with every existing business actor FOR SHARE and FK KEY SHARE.
@@ -133,7 +155,8 @@ export class DrizzleAdminAccountRepository implements AdminAccountRepository {
         .innerJoin(s.userRoles, eq(s.userRoles.userId, s.users.id))
         .where(eq(s.userRoles.roleCode, "ADMIN"))
         .orderBy(asc(s.users.name), asc(s.users.id));
-      return Promise.all(rows.map((r) => inspect(tx, r.user)));
+      const activeCount = await countActiveAdmins(tx);
+      return Promise.all(rows.map((r) => inspect(tx, r.user, activeCount)));
     });
   }
   get(actorId: string, id: string) {
@@ -144,7 +167,7 @@ export class DrizzleAdminAccountRepository implements AdminAccountRepository {
         .from(s.users)
         .innerJoin(s.userRoles, eq(s.userRoles.userId, s.users.id))
         .where(and(eq(s.users.id, id), eq(s.userRoles.roleCode, "ADMIN")));
-      return row ? inspect(tx, row.user) : null;
+      return row ? inspect(tx, row.user, await countActiveAdmins(tx)) : null;
     });
   }
   emailExists(actorId: string, email: string) {

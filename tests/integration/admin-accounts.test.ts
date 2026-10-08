@@ -148,6 +148,48 @@ test("two cross-deletes serialize and never leave zero ACTIVE ADMIN, with no spe
   first = active;
   second = await fixture("Synthetic Replacement Admin");
 });
+test("list and detail project last-active lifecycle block without replacing actions", async () => {
+  const target = await fixture("Synthetic Last Admin Projection");
+  const available = (await repository.get(first.id, target.id))!;
+  expect(available).toMatchObject({
+    action: "delete",
+    lifecycleBlockedReason: null,
+  });
+
+  const rollback = new Error("QA rollback-only eligibility projection proof");
+  await expect(
+    db.db.transaction(async (tx) => {
+      await tx
+        .update(s.users)
+        .set({ status: "DISABLED" })
+        .where(sql`${s.users.id} in (${first.id}, ${second.id})`);
+      const scoped = new DrizzleAdminAccountRepository(tx);
+      const listed = (await scoped.list(target.id)).find(
+        (account) => account.id === target.id,
+      );
+      expect(listed).toMatchObject({
+        action: "delete",
+        lifecycleBlockedReason: "last-active-admin",
+      });
+      expect(await scoped.get(target.id, target.id)).toMatchObject({
+        action: "delete",
+        lifecycleBlockedReason: "last-active-admin",
+      });
+
+      await tx.insert(s.auditEvents).values({
+        actorId: target.id,
+        entityType: "USER",
+        entityId: target.id,
+        action: "QA_SYNTHETIC_ADMIN_ACTIVITY",
+      });
+      expect(await scoped.get(target.id, target.id)).toMatchObject({
+        action: "deactivate",
+        lifecycleBlockedReason: "last-active-admin",
+      });
+      throw rollback;
+    }),
+  ).rejects.toBe(rollback);
+});
 test("schema RLS, all Data API grants revoked, restrictive evidence, QA ledger23", async () => {
   const rows = await db.db.execute<{ rls: boolean; grants: boolean }>(
     sql`select relrowsecurity as rls, has_table_privilege('anon', oid, 'SELECT,INSERT,UPDATE,DELETE') or has_table_privilege('authenticated', oid, 'SELECT,INSERT,UPDATE,DELETE') or has_table_privilege('service_role', oid, 'SELECT,INSERT,UPDATE,DELETE') as grants from pg_class where oid='public.admin_account_deletions'::regclass`,
