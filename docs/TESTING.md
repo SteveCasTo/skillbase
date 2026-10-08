@@ -246,6 +246,43 @@ También se verifica signup público deshabilitado, creación de fixture por Adm
 
 Las pruebas añadidas en la rama `feat/dual-auth-and-profile` cubren login password solo para cuenta interna autorizada, rechazo de identidad/método no permitido, validación de sesión actual con `getUser()` y claims firmados, provisión interna de instructor con autorización ADMIN/transacción/compensación, cambio/recovery de contraseña, asociación Google explícita ligada al actor y sesión, PKCE, nonce de un uso/expiración, mismatch de email/provider, identidades Google preexistentes y restauración de la sesión original. Los tests Google usan un fixture de provider OAuth aislado; no son login con Google real ni prueba de entrega de email.
 
+Los escenarios de `google-association.spec.ts` preparan su presupuesto de login
+por red loopback en la DB temporal antes de cada caso, sin borrar buckets por
+cuenta ni modificar el límite runtime (10 intentos por ventana de 15 minutos).
+El helper limpia únicamente la clave HMAC exacta de `network:127.0.0.1:login`;
+no omite rate limiting ni altera la protección aplicada en producción. El caso
+Google-only ADMIN crea una identidad Auth/internal user exclusiva por intento,
+sin identidad Email/password, con el campo de password en Auth vacío y una
+identidad Google de fixture. Su cleanup deshabilita solo el internal user propio
+y elimina solo su UUID Auth; conserva UUIDs/roles/evidencia interna hasta que el
+runner destruye su stack aislado. No modifica el ADMIN compartido, sus credenciales
+ni evidencia histórica de otros actores. Una identidad nueva por intento evita
+que un retry acumule identidades Google sobre el mismo fixture.
+
+El release-validation CI `37720672015` tuvo 138/139 first-pass; el escenario
+Google-only falló también en ambos retries automáticos. No hubo trace del primer
+intento disponible en el artefacto entregado; el trace del retry mostró un
+conflicto de identidad secundario del fixture, no la causa del primer fallo. La
+reproducción controlada dio 8/9: los escenarios previos consumen 10 requests del
+bucket loopback compartido y el login final incrementaba a 11, siendo rechazado
+por el límite antes de llegar a Auth. Por ello no se atribuye la primera failure
+al password ni a estado/role inválidos; tampoco se afirma la intercalación exacta
+del primer paquete, cuyo trace no existe.
+
+Con la corrección test-only, el focused Google-association cohort pasó 9/9
+first-pass sin retries; el caso Google-only repetido sobre stack manejado pasó
+2/2 first-pass, usando una identidad Auth propiedad de cada intento. El límite de
+runtime permanece intacto y estas corridas no prueban Google OAuth real, SMTP ni
+entrega cloud. Evidencia/progresión de intentos en el handoff local
+`C:/Users/Steve/AppData/Local/Temp/opencode/phase8-release-ci/recovery-isolation-ledger.md`.
+
+La corrección cambia fixtures/helpers E2E únicamente; no cambia código de Auth,
+políticas runtime, límites, aplicación, roles, migraciones o dependencias. No se
+repitieron unit/integration/build completos para este ajuste. Un focused pass no
+sustituye el nuevo CI full de release: el gate integrado sigue bloqueado hasta
+que el nuevo E2E CI pase sin fallos/retries y el resto de checks requeridos quede
+verde.
+
 Estado local comunicado por el implementador: unit 146 PASS, integration 71 PASS, 27 E2E dirigidos PASS; lint PASS; typecheck 0 errores/0 warnings/83 hints; build, Drizzle y formatter PASS; `git diff --check` PASS. Después, el full E2E aislado en el puerto canónico 4321 pasó 104/104 (5.9 min). La corrida full anterior en 4323 obtuvo 73 PASS/31 FAIL: tests heredados enviaban `Origin: http://127.0.0.1:4321` y sus POST fueron rechazados como cross-site. Se corrigió solo la invocación al puerto canónico, sin editar código/tests ni modificar retries; el puerto alternativo aún no cubre todos los tests heredados.
 
 [PR 118](https://github.com/SteveCasTo/skillbase/pull/118) se integró en `development` como `f06b4fdf8f8c7691ffdd7937efb0f813a27666d4`. No reportó checks remotos; estos resultados son locales, no CI PASS. En ese momento 0012/0013 solo se habían probado en stacks aislados; su aplicación local posterior y 0014/0015 constan abajo. Cloud, SMTP/entrega real y Google real siguen sin verificarse. El servidor original estuvo apagado durante esa validación histórica; el smoke local posterior está registrado en la sección de PR 123.
