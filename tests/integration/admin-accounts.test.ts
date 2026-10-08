@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
@@ -150,20 +150,58 @@ test("two cross-deletes serialize and never leave zero ACTIVE ADMIN, with no spe
 });
 test("list and detail project last-active lifecycle block without replacing actions", async () => {
   const target = await fixture("Synthetic Last Admin Projection");
-  const available = (await repository.get(first.id, target.id))!;
-  expect(available).toMatchObject({
-    action: "delete",
-    lifecycleBlockedReason: null,
-  });
-
   const rollback = new Error("QA rollback-only eligibility projection proof");
   await expect(
     db.db.transaction(async (tx) => {
+      // Other integration files also create ADMIN fixtures in this shared,
+      // runner-owned stack. Keep exactly two known admins for the eligibility
+      // assertion, then one; rollback restores every unrelated fixture.
+      await tx.execute(sql`select pg_advisory_xact_lock(20261007, 8)`);
+      const activeAdmins = await tx
+        .select({ id: s.users.id })
+        .from(s.users)
+        .innerJoin(s.userRoles, eq(s.userRoles.userId, s.users.id))
+        .where(
+          and(eq(s.users.status, "ACTIVE"), eq(s.userRoles.roleCode, "ADMIN")),
+        );
+      const otherIds = [
+        ...new Set(
+          activeAdmins
+            .map((admin) => admin.id)
+            .filter((id) => id !== target.id && id !== first.id),
+        ),
+      ];
+      if (otherIds.length)
+        await tx
+          .update(s.users)
+          .set({ status: "DISABLED" })
+          .where(inArray(s.users.id, otherIds));
+
+      const activeCount = async () => {
+        const [row] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(s.users)
+          .innerJoin(s.userRoles, eq(s.userRoles.userId, s.users.id))
+          .where(
+            and(
+              eq(s.users.status, "ACTIVE"),
+              eq(s.userRoles.roleCode, "ADMIN"),
+            ),
+          );
+        return row?.count ?? 0;
+      };
+      expect(await activeCount()).toBe(2);
+      const scoped = new DrizzleAdminAccountRepository(tx);
+      expect(await scoped.get(target.id, target.id)).toMatchObject({
+        action: "delete",
+        lifecycleBlockedReason: null,
+      });
+
       await tx
         .update(s.users)
         .set({ status: "DISABLED" })
-        .where(sql`${s.users.id} in (${first.id}, ${second.id})`);
-      const scoped = new DrizzleAdminAccountRepository(tx);
+        .where(eq(s.users.id, first.id));
+      expect(await activeCount()).toBe(1);
       const listed = (await scoped.list(target.id)).find(
         (account) => account.id === target.id,
       );
