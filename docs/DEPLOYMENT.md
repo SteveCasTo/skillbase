@@ -342,7 +342,7 @@ El inventario cloud post-release observó 11 cursos, 22 grupos, 15 preinscripcio
 
 La verificación cloud fue de solo lectura y **no** comparó hashes pre/post de todas las filas; no afirmar preservación hash completa de filas cloud a través del release. La preservación verificada de 2 802 filas/59 tablas corresponde a la migración local descrita en [`TESTING.md`](TESTING.md). Las cinco tablas F7 están vacías: no se cargó demo/seed de notas. Las intermitencias E2E históricas de `public-interest` y guardado de grupos siguen sin causa raíz identificada, aunque el full master run final pasó sin flakes reportados.
 
-Fase 7 quedó liberada dentro de su alcance; al boundary de ese release, Fases 8 (cierre/planilla/reapertura) y 9 (certificados) no se habían iniciado. Fase 8 tiene ahora backend parcial en branch de feature, documentado al final de este documento; no está integrado ni deployed. Recovery/cambio de contraseña con entrega de correo, entrega cloud de SMTP, OAuth Google real y política de retención siguen pendientes según [`AUTHENTICATION.md`](AUTHENTICATION.md) y [`PLAN.md`](PLAN.md).
+Fase 7 quedó liberada dentro de su alcance; al boundary de ese release, Fases 8 (cierre/planilla/reapertura) y 9 (certificados) no se habían iniciado. Fase 8 se integró posteriormente en development mediante PRs 280–285; su estado actual pre-release está descrito abajo. Recovery/cambio de contraseña con entrega de correo, entrega cloud de SMTP, OAuth Google real y política de retención siguen pendientes según [`AUTHENTICATION.md`](AUTHENTICATION.md) y [`PLAN.md`](PLAN.md).
 
 ### Correcciones post-release Fase 7 — PR 278
 
@@ -364,17 +364,19 @@ En ese estado pre-release, producción seguía en Fase 7 `master` `4afa485`, Ver
 
 La nota intermedia de workflow pendiente arriba quedó supersedida cuando PR 279 se integró a `development`. El CI final `37684331005` pasó con 376 unit/2266 assertions, 142 integration/1077 assertions y 134/134 E2E (69+65), first-pass tras remediar provisioning APT. El shard fijo a Ubuntu 24.04 y sus timeouts/fuentes HTTPS quedaron verificados en ambos runners; no se cambia `master`/deploy por un chore separado.
 
-El core cierre (PR 280), export adapters (PR 281) y UI workspace/history/policy
-(PR 282) están integrados en `development`. El backend multi-ADMIN se integró por
-PR 283; la UI de cuentas sigue en `feat/admin-account-interface` y no está
-integrada ni desplegada. El CI de PR 283 pasó run `37717389828`: 400 unit/2530
-assertions, 160 integration/1314 assertions y 137 E2E (72+65), first-pass sin
-flakies, skips ni retries reportados.
+El core cierre (PR 280), export adapters (PR 281), UI workspace/history/policy
+(PR 282), backend multi-ADMIN (PR 283), descarga focal E2E (PR 284) y UI cuentas
+ADMIN (PR 285) están integrados en `development`. CI de PR 283 run `37717389828`:
+400 unit/2530 assertions, 160 integration/1314 assertions y 137 E2E (72+65),
+first-pass sin flakies, skips ni retries reportados. PR 284 run `37718702107`:
+400 unit, 160 integration y 137 E2E, first-pass. PR 285 run `37718988907`:
+412 unit/2608 assertions, 160 integration/1314 assertions y 139 E2E (74+65),
+first-pass sin fallos, skips, flakes ni retries reportados.
 
 Las migraciones candidatas 0021/0022 se aplicaron solo a QA aislado (ledger
 temporal 21→22→23); Supabase canónico y cloud permanecen en ledger 21. El owner
-reportó verificación focal live de los seis endpoints de descarga en QA; esto no
-equivale a release ni full gate F8. Producción sigue en PR 278 (`master`
+verificó seis descargas GET reales en QA; esto no equivale al gate combinado
+posterior a PR 285 ni a release. Producción sigue en PR 278 (`master`
 `91beccf8`, Vercel `READY`); no afirmar UI ADMIN ni lifecycle F8 disponible allí.
 
 **Actualización del gate shards:** el status «requiere nuevo run» del registro previo quedó supersedido por PR 279/run `37684331005`, que pasó los dos shards y el agregador estricto tras la remediación APT. PR 279 se integró a `development`; no movió producción ni el ledger cloud.

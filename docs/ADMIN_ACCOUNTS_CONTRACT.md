@@ -1,9 +1,9 @@
 # Contrato de cuentas ADMIN (Fase 8)
 
-Este contrato reúne el backend de aprovisionamiento/lifecycle integrado por PR
-283 y la interfaz implementada en `feat/admin-account-interface` (base
-`4bed53b`), aún no integrada a `development` ni liberada. Migración 0022 se probó
-solo en QA. Plan y evidencia focal en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
+Este contrato describe el backend de aprovisionamiento/lifecycle (PR 283) y la
+interfaz (PR 285) integrados en `development`. La funcionalidad no se ha
+promovido a producción. Migration 0022 se probó solo en QA. Plan/evidencia en
+[`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 
 ## Reglas de cuenta
 
@@ -93,8 +93,9 @@ bytes; respuestas son `private, no-store`/`nosniff`. Actor/target vienen del
 contexto de sesión y ruta, nunca de body. Las acciones son `create`, `name`,
 `delete`, `deactivate`, `activate`, `retry-delete`.
 
-La UI de feature tiene 32 tests unitarios y dos E2E (2/2 first-pass sin retries),
+La UI tuvo 32 unit tests PASS y dos E2E dedicados a cuentas (2/2 first-pass sin retries),
 además de checks lint/format/typecheck/build reportados PASS. QA E2E usó stack
 temporal aislado. Se reportaron intentos focales previos con expectations/locators
-fallidos; no se cuentan como suite exitosa. UI/policy ADMIN permanece feature,
-sin integración a development ni release. El backend PR 283 está en development.
+fallidos; no se cuentan como suite exitosa. PR 285 integra la UI/policy ADMIN en
+development, pero no equivale a release de producción ni al gate combinado
+final de Fase 8. CI del PR y límites QA están detallados en [`TESTING.md`](TESTING.md).

@@ -227,10 +227,10 @@ contacto ni finanzas; el historial administrativo de correcciones es solo para
 ADMIN. La superficie HTTP/helpers y errores se describen en
 [`ARCHITECTURE.md`](ARCHITECTURE.md) y [`EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md).
 
-### Cierre académico por grupo (Fase 8, schema candidato 0021)
+### Cierre académico por grupo (Fase 8, schema integrado en development)
 
-La rama `feat/academic-group-closure` añade `0021_phase8_academic_group_closure.sql`
-y cuatro tablas al schema Drizzle:
+PR 280 integra `0021_phase8_academic_group_closure.sql` y cuatro tablas al
+schema Drizzle:
 
 - `academic_group_states`: estado mutable OPEN/CLOSED, revisión y última versión
   por grupo. Sin fila representa OPEN/revisión 0.
@@ -257,13 +257,16 @@ server-side.
 Migración 0021 tiene timestamp `1791407807898` y SHA-256
 `9b4c19be336426441b35d0ef1b0cd68ed7d980e4481420051d56fbb24d424259`. Solo se
 aplicó en Supabase aislado de QA (ledger temporal 21→22); el canónico local y
-cloud siguen en 21. No se hizo apply persistente. El snapshot JSONB incluye CI y
+cloud siguen en 21, sin apply persistente. El snapshot JSONB incluye CI y
 balance actuales, pero no email/teléfono. La proyección de instructor usa
 allowlist recursiva sin CI/contacto/categorías/finanzas; ADMIN conserva vista
 privada completa. Exports futuros deben usar el DTO por rol, no leer el JSONB
-directamente. El estado, loader, API-helper y límites de cierre están en
-[`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md); no existen aún
-pantallas ni exporters PDF/CSV.
+directamente. PRs 281/282/284/285 integraron exporters, UI/policies de cierre,
+validación focal de downloads y administración multi-ADMIN al árbol de
+development; ver el contrato y evidencia/límites en
+[`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y
+[`TESTING.md`](TESTING.md). Ledger canónico/cloud continúa en 21 hasta el release
+autorizado.
 
 ### Participant
 

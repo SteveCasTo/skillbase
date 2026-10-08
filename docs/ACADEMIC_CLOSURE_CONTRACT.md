@@ -2,9 +2,9 @@
 
 ## Estado y límite de release
 
-El alcance funcional de Fase 8 está aprobado. El backend base de cierre está integrado en `development` por PR 280 (`7807fc1`). UI SSR y policy están en `feat/academic-closure-interface`; los renderers PDF/CSV y seis Astro GET adapters de `feat/academic-closure-exports` están incorporados en el árbol combinado actual, aún no integrado en development. La migración candidata `drizzle/0021_phase8_academic_group_closure.sql` solo se aplicó a stacks QA temporales (ledger temporal 21→22), no al Supabase local canónico ni a cloud. El release `master` sigue en `91beccf8`, cloud ledger 21.
+El alcance funcional de Fase 8 está aprobado. El core de cierre se integró por PR 280, exporters por PR 281, UI SSR/policy de cierre por PR 282, backend ADMIN por PR 283, pruebas de descarga por PR 284 y UI ADMIN por PR 285, todos en `development`. Las migraciones candidatas 0021/0022 solo se aplicaron en QA temporal (ledger 21→22→23), no en Supabase canónico/cloud (ledger 21). El release `master` sigue en Fase 7 `91beccf8`; Fase 8 aún no se ha promovido a producción y el gate combinado final sigue pendiente.
 
-Los helpers, la interfaz SSR y los seis GET adapters PDF/CSV están presentes en el árbol combinado de `feat/academic-closure-interface` con `feat/academic-closure-exports`; aún no están integrados en `development` ni liberados. El route policy de UI incluye patrones acotados para workspace, historial y los tres artefactos bajo ambos contextos, con ADMIN para `/app/cursos` e INSTRUCTOR para `/app/mis-cursos`; el loader vuelve a validar actor/ownership. La UI enlaza a los adapters integrados en este árbol. La descarga desde navegador aún no se ha verificado, y Fase 8 sigue parcial: falta gate/revisión/release y lifecycle multi-ADMIN. El progreso por etapa está en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
+El árbol integrado contiene workspace SSR/historial, los seis GET adapters y policy de rutas acotadas para ambos contextos: ADMIN en `/app/cursos`, INSTRUCTOR en `/app/mis-cursos`; loaders revalidan actor/ownership. El owner verificó los seis endpoints de descarga de forma focal live en QA; esto no equivale al gate combinado ni a disponibilidad en producción. Fase 8 permanece pre-release. Progreso/evidencia en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 
 ## Responsabilidades y helpers actuales
 
@@ -26,22 +26,20 @@ src/domain/academic-closure
 Se añadieron seis Astro GET route modules bajo contextos ADMIN/INSTRUCTOR:
 `/app/cursos/:id/grupos/:groupId/cierre/:version/{planilla.pdf,planilla.csv,informe.pdf}`
 y equivalentes bajo `/app/mis-cursos/:id/grupos/:groupId/cierre/:version/`.
-Fijan role requerido y artifact. En el árbol combinado actual, las rutas están
-registradas en `PRIVATE_ROUTE_POLICIES` con patrones acotados; el middleware
-sigue fail-closed para rutas privadas no declaradas y el loader revalida contexto
-y ownership. La descarga real por navegador permanece sin verificar.
+Fijan role requerido y artifact. Las rutas están registradas en
+`PRIVATE_ROUTE_POLICIES` con patrones acotados; el middleware sigue fail-closed
+para rutas privadas no declaradas y el loader revalida contexto y ownership. Se
+reportó una prueba focal live-browser/GET de las seis rutas en QA; no demuestra
+disponibilidad en producción ni reemplaza el gate final.
 
-La UI/adapter SSR se encuentra en `feat/academic-closure-interface`. Sus rutas
-son `/app/cursos/:id/grupos/:groupId/cierre` y `/:version`, con equivalentes
-`/app/mis-cursos/:id/grupos/:groupId/cierre` y `/:version`. El route policy
-fail-closed acotado incluye workspace, historial y los paths `planilla.pdf`,
-`planilla.csv` e `informe.pdf`: ADMIN para cursos e INSTRUCTOR para Mis cursos;
-el loader revalida ownership. Los seis route modules de export están incorporados
-al árbol combinado actual y los enlaces SSR apuntan a ellos. Su descarga HTTP o
-browser real aún no se ha verificado; esto no equivale a gate completo ni a
-disponibilidad en development o producción.
+Las rutas SSR de workspace/version son `/app/cursos/:id/grupos/:groupId/cierre`
+y `/:version`, con equivalentes bajo `/app/mis-cursos`. La policy fail-closed
+acotada incluye workspace, historial y `planilla.pdf`, `planilla.csv`,
+`informe.pdf`: ADMIN para cursos e INSTRUCTOR para Mis cursos; loader revalida
+ownership. Los seis route modules y enlaces SSR están integrados por PRs 281/282.
+Su disponibilidad en producción depende del release F8.
 
-El comando requiere `requestKey` UUID y `revision`; `reopen` requiere además `reason` (1–500 caracteres). El body admite opcionalmente `courseId`/`groupId` solo como referencias que deben coincidir con el contexto de ruta; para reabrir no se aceptan campos desconocidos. El helper valida origen y límite de 65 536 bytes. Respuestas usan `{ok:true,value,message}` o `{ok:false,code,message,issues}`, JSON `private, no-store` y `nosniff`. Mapeo: autorización 403, contexto inexistente/ajeno 404, revisión/idempotencia/estado cerrado o bloqueo 409, validación 422 y fallo inesperado 503 saneado. Esto no constituye todavía endpoint HTTP desplegado.
+El comando requiere `requestKey` UUID y `revision`; `reopen` requiere además `reason` (1–500 caracteres). El body admite opcionalmente `courseId`/`groupId` solo como referencias que deben coincidir con el contexto de ruta; para reabrir no se aceptan campos desconocidos. El helper valida origen y límite de 65 536 bytes. Respuestas usan `{ok:true,value,message}` o `{ok:false,code,message,issues}`, JSON `private, no-store` y `nosniff`. Mapeo: autorización 403, contexto inexistente/ajeno 404, revisión/idempotencia/estado cerrado o bloqueo 409, validación 422 y fallo inesperado 503 saneado. Páginas SSR workspace/history y los adapters GET están montados en development por PRs 281/282; no están desplegados en producción.
 
 Las descargas reciben IDs/role context desde el route adapter y sesión fresca de
 `Astro.locals`; versión debe ser entero positivo canónico. Requieren role
@@ -81,7 +79,7 @@ El receipt se acota por `(actorId, requestKey)` y guarda fingerprint del comando
 
 Triggers hacen inmutables snapshots/reaperturas/receipts y rechazan insert/update/delete de grades, sesiones, roster y attendance que afecten un grupo cerrado; updates tampoco permiten mover evidencia cerrada a grupo abierto. Esta defensa complementa los guards transaccionales de los repositorios, no expone una RPC ni sustituye autorización server-side. `academic_group_states` es administrado por el repositorio autorizado.
 
-## Proyección de privacidad y documentos exportados (renderers en feature worktree)
+## Proyección de privacidad y documentos exportados (integrados en development)
 
 El snapshot de administración queda privado en el backend e incluye los campos
 actuales del reporte, entre ellos CI y balance; el modelo no incorpora email ni
@@ -106,9 +104,9 @@ Los seis route modules implementan estos GET versionados:
   `/app/mis-cursos/:id/grupos/:groupId/cierre/:version/`.
 
 Cada módulo fija role requerido y artifact. Los paths están registrados en
-`PRIVATE_ROUTE_POLICIES` del árbol combinado actual con patrones acotados por
-contexto; la route policy más el loader revalidan rol y ownership. La descarga por
-navegador aún no se verificó y el árbol no está integrado a development.
+`PRIVATE_ROUTE_POLICIES` con patrones acotados por contexto; policy más loader
+revalidan rol y ownership. La verificación live focal pasó en QA; no se afirma
+release a producción.
 
 El CSV de planilla usa UTF-8 BOM, separador `;`, quoting/escaping y mitigación de
 formula injection incluyendo espacios/caracteres Unicode iniciales. Notas/pesos
@@ -123,13 +121,9 @@ soportados fallan explícitamente (`PDF_UNSUPPORTED_TEXT`/409), no se truncan ni
 sustituyen. Se reutilizan `pdf-lib`, `@pdf-lib/fontkit` y la fuente ya incluida;
 no se añadieron dependencias.
 
-Sigue pendiente comprobar las seis rutas y las descargas por HTTP/E2E de navegador.
-El test de integración ejerce el handler con sesión/fixtures reales del stack
-aislado, no las rutas Astro a través del navegador. Por ello, la presencia de UI,
-policy y adapters en este feature no se documenta como descarga verificada ni
-como disponibilidad en development/producción.
-El lifecycle/provisionamiento multi-ADMIN está
-aprobado pero sigue siendo paquete posterior; `closureActorDependencies` solo
-expone las nuevas referencias actor-dependent para esa futura validación. No se
-implementan certificados, firmas de certificado, QR, emisión o verificación de
-Fase 9.
+PR 284 añadió tres E2E focales de descarga; el owner verificó seis GET/download
+paths reales en QA. La suite directa de handler/adapter no sustituye la prueba
+por navegador ni el gate combinado. El backend multi-ADMIN está integrado por PR
+283 y su UI por PR 285; `closureActorDependencies` forma parte del inventario de
+actividad usado por lifecycle. No se implementan certificados, firmas, QR,
+emisión o verificación de Fase 9.

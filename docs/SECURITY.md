@@ -68,7 +68,7 @@ No confiar únicamente en ocultar botones.
 - Las pruebas locales del feature branch no son verificación de entrega real. Configurar y verificar SMTP/recovery es trabajo aprobado pendiente; Google OAuth real continúa pendiente de forma independiente.
 - Fase 5 trata CI, email y roster como datos personales. No exponer CI públicamente; exportación CSV/PDF es solo ADMIN, debe neutralizar fórmula CSV y no constituye recibo/boleta. No hay pasarela de cobro ni upload de comprobantes.
 
-### Lifecycle y UI de cuentas ADMIN (backend PR 283; UI feature)
+### Lifecycle y UI de cuentas ADMIN (PRs 283/285; no release)
 
 - `/app/administradores`, `/nuevo` y el detalle UUID están registrados como
   rutas privadas exclusivas ADMIN. Navigation solo expone el enlace a usuarios
@@ -89,10 +89,9 @@ No confiar únicamente en ocultar botones.
   rol exclusivo, revisión y guard global de último ADMIN bajo locks. Mantiene al
   menos un ADMIN activo; puede permitirse auto-desactivación/baja si queda otro
   ADMIN activo. En auto-baja exitosa la sesión se dirige a login.
-- El backend PR 283 revalida ADMIN activo en loader, caso de uso y transacción;
-  actor, target y rol vienen de sesión/ruta server-side. UI `/app/administradores`
-  lista/nuevo/detalle está en feature branch y no se ha integrado. Sus policies
-  son ADMIN-only; la autorización de servidor sigue siendo obligatoria.
+- Backend PR 283 y UI PR 285 están integrados en development, no en producción.
+  `/app/administradores` lista/nuevo/detalle tiene policy ADMIN-only; servidor y
+  repositorio vuelven a revalidar actor, rol y lifecycle.
 - POST valida Origin, limita el body a 8192 bytes, rechaza campos extra y devuelve
   `private, no-store`/`nosniff`. Contraseña solo se transmite al Admin API
   server-side, no se persiste/retorna/audita. Compensación de alta solo puede
@@ -175,17 +174,13 @@ El backend y las páginas UI se liberaron mediante PR 235. El detalle de modelo/
   [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y
   [`DATA_MODEL.md`](DATA_MODEL.md).
 
-### Gestión multi-ADMIN (backend PR 283; UI feature)
+### Gestión multi-ADMIN — estado de integración
 
-El backend de cuentas ADMIN se integró por PR 283. La UI SSR y navegación están
-en `feat/admin-account-interface`, aún no integradas ni disponibles en release.
-El servidor revalida actor ADMIN y acción/target vigentes; permisos son iguales,
-sin `ROOT`. La contraseña inicial solo pasa por Auth Admin API y nunca se
-persiste, registra ni retorna. Lifecycle conserva UUID/tombstone e historial,
-usa una intención durable para baja Auth fuera de la transacción, y serializa
-actividad/último ADMIN. El código permite auto-baja si queda otro ADMIN activo;
-no añadir una prohibición general. Migration 0022 solo se aplicó a QA, no a
-canónico/cloud. Detalle en [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
+PR 283/285 integraron backend/UI ADMIN en development. La migración 0022 se
+aplicó solo a QA, no a canónico/cloud; el detalle de lifecycle, retención,
+actividad y límites de compensación está en
+[`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md). No se ha liberado la
+UI a producción.
 
 ## RUTAS
 

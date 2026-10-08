@@ -597,7 +597,7 @@ El ajuste compacto/responsive del panel y formulario de interesados quedó integ
 
 ## Correcciones administrativas aprobadas (implementadas en fuente; gate final pendiente)
 
-Los ajustes siguientes se implementaron en las ramas integradas PRs 258–264 y en el head de feedback/navegación `d057d2d`. Las verificaciones fueron focales por stage y no constituyen el gate combinado; límites en [`TESTING.md`](TESTING.md). Core/UI de cierre y exports se integraron por PRs 280–282. La UI multi-ADMIN está implementada en `feat/admin-account-interface`, pendiente de integración.
+Los ajustes siguientes se implementaron en las ramas integradas PRs 258–264 y en el head de feedback/navegación `d057d2d`. Las verificaciones fueron focales por stage y no constituyen el gate combinado; límites en [`TESTING.md`](TESTING.md). Core/UI de cierre y exports se integraron por PRs 280–282; backend/UI multi-ADMIN por PRs 283 y 285. Fase 8 aún no está liberada.
 
 - **Edición inline compartida:** lápiz/guardar/cancelar por atributo, posición y tamaño estables; comunicar dirty/validación y mantener controles/iconos accesibles. Loading no debe sustituir el layout ni destruir el SVG/estado del control. Mostrar errores persistentes junto al campo y conflictos accionables; Sileo solo para feedback transitorio no duplicado.
 - **Instructor y perfil:** nombre como texto y correo de solo lectura sin decoración de input editable. El listado de cursos presenta datos personales primero y una explicación/bloqueo debajo junto a los cursos pertinentes. Centrar la tarjeta global del perfil y alinear Google en una fila propia.
@@ -628,7 +628,7 @@ equivale a full release/gate F8. UI reportó 21 unit/137 assertions y 3 E2E
 first-pass, además de revisión manual de 12 capturas responsive/light-dark; ver
 [`TESTING.md`](TESTING.md).
 
-## Cuentas de administradores (UI Fase 8, feature no integrado)
+## Cuentas de administradores (UI Fase 8, integrada en development)
 
 La feature `feat/admin-account-interface` agrega la sección «Administradores»
 visible a cualquier cuenta ADMIN, sin jerarquía ROOT. La lista SSR usa tarjetas
@@ -646,6 +646,5 @@ con React, mantiene foco inicial/cancelación y retorno de foco. Los errores,
 pending, drafts no secretos y recarga son contextuales; al auto-desactivar o
 eliminar, el servidor termina la sesión redirigiendo a login. Tarjetas y
 acciones evitan overflow por emails/nombres largos. Pruebas UI focales y límites
-de responsive/teclado están en [`TESTING.md`](TESTING.md). La sección aún no está
-integrada en `development` ni liberada. El backend está en development por PR
-283; la presentación ADMIN no.
+de responsive/teclado están en [`TESTING.md`](TESTING.md). El backend/UI se
+integraron a development por PRs 283/285; no se han liberado a producción.
