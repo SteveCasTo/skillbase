@@ -8,6 +8,7 @@ import {
 } from "@/domain/instructors/profile";
 import * as schema from "@/server/db/schema";
 import { lockInstructorSchedules } from "./instructor-schedule";
+import { requireFreshRegistrationActor } from "./registration-support";
 
 type Database = PostgresJsDatabase<typeof schema>;
 export class DrizzleInstructorRepository implements InstructorRepository {
@@ -60,6 +61,11 @@ export class DrizzleInstructorRepository implements InstructorRepository {
   ) {
     await this.db.transaction(async (tx) => {
       await lockInstructorSchedules(tx, undefined, id);
+      await requireFreshRegistrationActor(
+        tx,
+        actorId,
+        actorId === id ? "INSTRUCTOR" : "ADMIN",
+      );
       const [deletion] = await tx
         .select({ id: schema.instructorAccountDeletions.userId })
         .from(schema.instructorAccountDeletions)

@@ -271,20 +271,36 @@ El agregado nuevo mantiene las capas del monolito: reglas/tipos en
 `src/server/academic-closure`, persistencia en
 `src/server/db/repositories/academic-closure-*` y schema/migración Drizzle.
 `loadAcademicClosure`, `loadAcademicClosureVersion` y `handleClosurePost` son
-helpers server-side. `feat/academic-closure-interface` añade páginas Astro SSR
-workspace e historial de versión para ADMIN/INSTRUCTOR y un adaptador de
-presentación SSR/POST sobre esos helpers. El cierre transaccional
-reutiliza el advisory lock de horarios, bloquea curso/grupo y serializa estado,
-snapshot, receipt y auditoría con las escrituras de notas, asistencia,
-calendario y membresía destino. Los guards se comparten entre repositorios;
-0021 añade trigger DB para evidencia cerrada. El feature de interfaz incluye
-páginas SSR y route policy fail-closed con patrones acotados para workspace,
-historial y documentos; ADMIN opera bajo `/app/cursos`, INSTRUCTOR bajo
-`/app/mis-cursos`, con ownership revalidado por loader. El árbol combinado
-incorpora renderers CSV/PDF y seis GET adapters que cargan la versión autorizada.
-No agregar wildcards amplios. El código está en el feature actual; la verificación
-de descargas por navegador sigue pendiente. Contrato y límites en
+helpers server-side. El core se integró por PR 280; PR 281 añadió renderers
+PDF/CSV y seis GET adapters sobre `loadAcademicClosureVersion`. La integración
+actual también incluye las páginas SSR workspace/historial y route policy
+fail-closed del UI feature. ADMIN opera bajo `/app/cursos`; INSTRUCTOR, bajo
+`/app/mis-cursos`, con ownership revalidado por loaders. Los patrones acotados
+de workspace, versión y documentos están registrados en la policy; no agregar
+wildcards amplios. El cierre transaccional reutiliza advisory locks, bloquea
+curso/grupo y serializa estado, snapshot, receipt y auditoría con escrituras de
+notas, asistencia, calendario y membresía destino. Los guards se comparten
+entre repositorios; 0021 añade trigger DB para evidencia cerrada. Aunque las
+páginas y rutas están en el árbol integrado, no se dispone aquí de evidencia de
+verificación de descarga live por navegador. Contrato y límites en
 [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md).
+
+### Gestión de cuentas ADMIN (Fase 8, backend feature)
+
+El módulo sigue las capas existentes: reglas/DTO en `src/domain/admin-accounts`,
+casos de uso/puertos en `src/application/admin-accounts`, loaders/HTTP/Auth
+privilegiado en `src/server/admin-accounts` y persistencia en
+`src/server/db/repositories/admin-account-repository.ts`. La migración candidata
+0022 aporta solamente el registro durable e inmutable de baja pendiente; los
+datos internos `users`/`user_roles` reutilizan el modelo existente. Los casos de
+uso coordinan la autorización y normalización con Supabase Auth fuera de la
+transacción PostgreSQL, y el repositorio transaccional es responsable de la
+revisión, actividad/dependencias, actor vigente y guard global de último ADMIN.
+`loadAdminAccounts`, `loadAdminAccount` y `handleAdminAccountPost` son helpers,
+no páginas/endpoints Astro registrados. El módulo está en
+El backend está implementado en el feature actual, pero aún no hay página/ruta
+ADMIN ni entrada de route policy; no está disponible desde la aplicación. Ver
+[`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
 
 El POST público limita y parsea el body en el adaptador server-side, valida Origin y llama el caso de uso de interés. Un limiter persistente usa PostgreSQL y un HMAC server-only sobre `Astro.clientAddress`; no confía en forwarded headers. Sin secreto válido o dirección de cliente confiable, el flujo falla cerrado. Los defaults técnicos y requisitos de despliegue se describen en el contrato y en `docs/DEPLOYMENT.md`; no implican que los valores cloud estén configurados.
 

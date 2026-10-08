@@ -796,7 +796,7 @@ test("academic closure private HTTP and database guards preserve snapshots and d
   const ledger = await db.execute<{ count: string }>(
     sql`select count(*)::text as count from drizzle.__drizzle_migrations`,
   );
-  expect(ledger[0]!.count).toBe("22");
+  expect(ledger[0]!.count).toBe("23");
   // Revoked current roles also deny loader access despite a stale ADMIN DTO.
   await db
     .delete(s.userRoles)
