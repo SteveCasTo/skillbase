@@ -1,6 +1,10 @@
 import type { BrowserContext } from "@playwright/test";
 import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import { createHmac } from "node:crypto";
+import { eq } from "drizzle-orm";
+import { createDatabase } from "@/server/db/client";
+import { authAttemptBuckets } from "@/server/db/schema";
 
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import {
@@ -13,6 +17,25 @@ interface CapturedCookie {
   readonly name: string;
   readonly value: string;
   readonly options: CookieOptionsWithName;
+}
+
+/** Isolate a serial scenario's loopback login budget, never account limits. */
+export async function resetLoginNetworkBudgetFixture(): Promise<void> {
+  const environment = getTestSupabaseEnvironment();
+  const secret = process.env.AUTH_RATE_LIMIT_SECRET;
+  if (!secret || secret.length < 32)
+    throw new Error("Isolated Auth fixture configuration unavailable");
+  const key = createHmac("sha256", secret)
+    .update("network:127.0.0.1:login")
+    .digest("hex");
+  const database = createDatabase(environment.databaseUrl);
+  try {
+    await database.db
+      .delete(authAttemptBuckets)
+      .where(eq(authAttemptBuckets.key, key));
+  } finally {
+    await database.close();
+  }
 }
 
 /** Simulates email confirmation at the provider boundary, not SMTP delivery. */
