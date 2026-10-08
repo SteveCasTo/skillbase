@@ -1,9 +1,9 @@
 # Contrato de cuentas ADMIN (Fase 8)
 
 Este contrato describe el backend de aprovisionamiento/lifecycle (PR 283) y la
-interfaz (PR 285) integrados en `development`. La funcionalidad no se ha
-promovido a producción. Migration 0022 se probó solo en QA. Plan/evidencia en
-[`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
+interfaz (PR 285), liberados a producción por PR 286. Migration 0022 se aplicó
+por el pipeline normal; no se crearon cuentas ADMIN reales durante el release.
+Plan/evidencia en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 
 ## Reglas de cuenta
 
@@ -48,10 +48,11 @@ el repositorio. Auth ocurre fuera de la transacción DB. La compensación de
 creación se limita al UUID recién creado; si falla también la compensación puede
 quedar identidad Auth huérfana sin reconciliador automático documentado.
 
-La migration candidata `0022_phase8_admin_accounts` crea
+La migration `0022_phase8_admin_accounts` crea
 `admin_account_deletions`, intención durable con FK restrictivas, RLS, grants
-Data API revocados y trigger de evidencia inmutable. Se probó en QA aislado,
-ledger 22→23; no se aplicó a canónico/cloud (ledger 21). El código vive en
+Data API revocados y trigger de evidencia inmutable. El pipeline PR 286 la
+aplicó a Supabase canónico local y cloud, llevando ambos a ledger 23 (0021 es la
+entrada 22). El release verificó la tabla vacía y sus protecciones. El código vive en
 `src/domain/admin-accounts`, `src/application/admin-accounts` y
 `src/server/admin-accounts`.
 
@@ -96,6 +97,7 @@ contexto de sesión y ruta, nunca de body. Las acciones son `create`, `name`,
 La UI tuvo 32 unit tests PASS y dos E2E dedicados a cuentas (2/2 first-pass sin retries),
 además de checks lint/format/typecheck/build reportados PASS. QA E2E usó stack
 temporal aislado. Se reportaron intentos focales previos con expectations/locators
-fallidos; no se cuentan como suite exitosa. PR 285 integra la UI/policy ADMIN en
-development, pero no equivale a release de producción ni al gate combinado
-final de Fase 8. CI del PR y límites QA están detallados en [`TESTING.md`](TESTING.md).
+fallidos; no se cuentan como suite exitosa. PR 285 integró la UI/policy ADMIN a
+development y PR 286 la liberó a producción. CI/límites QA están detallados en
+[`TESTING.md`](TESTING.md). El smoke production fue anónimo; no se afirma
+operación autenticada ADMIN ni creación de cuentas en producción.

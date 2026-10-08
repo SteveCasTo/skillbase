@@ -68,7 +68,7 @@ No confiar únicamente en ocultar botones.
 - Las pruebas locales del feature branch no son verificación de entrega real. Configurar y verificar SMTP/recovery es trabajo aprobado pendiente; Google OAuth real continúa pendiente de forma independiente.
 - Fase 5 trata CI, email y roster como datos personales. No exponer CI públicamente; exportación CSV/PDF es solo ADMIN, debe neutralizar fórmula CSV y no constituye recibo/boleta. No hay pasarela de cobro ni upload de comprobantes.
 
-### Lifecycle y UI de cuentas ADMIN (PRs 283/285; no release)
+### Lifecycle y UI de cuentas ADMIN (release PR 286)
 
 - `/app/administradores`, `/nuevo` y el detalle UUID están registrados como
   rutas privadas exclusivas ADMIN. Navigation solo expone el enlace a usuarios
@@ -89,9 +89,10 @@ No confiar únicamente en ocultar botones.
   rol exclusivo, revisión y guard global de último ADMIN bajo locks. Mantiene al
   menos un ADMIN activo; puede permitirse auto-desactivación/baja si queda otro
   ADMIN activo. En auto-baja exitosa la sesión se dirige a login.
-- Backend PR 283 y UI PR 285 están integrados en development, no en producción.
-  `/app/administradores` lista/nuevo/detalle tiene policy ADMIN-only; servidor y
-  repositorio vuelven a revalidar actor, rol y lifecycle.
+- Backend PR 283 y UI PR 285 se liberaron por PR 286. `/app/administradores`
+  lista/nuevo/detalle tiene policy ADMIN-only; servidor y repositorio vuelven a
+  revalidar actor, rol y lifecycle. El release smoke fue anónimo, sin operación
+  autenticada ADMIN.
 - POST valida Origin, limita el body a 8192 bytes, rechaza campos extra y devuelve
   `private, no-store`/`nosniff`. Contraseña solo se transmite al Admin API
   server-side, no se persiste/retorna/audita. Compensación de alta solo puede
@@ -105,7 +106,9 @@ No confiar únicamente en ocultar botones.
   mantienen al menos un ADMIN ACTIVE. No hay prohibición global de auto-baja si
   otra cuenta ADMIN queda activa; no se gestionan roles multirol/perfil instructor.
 - Migration 0022 mantiene RLS/grants revocados y trigger de intención inmutable;
-  se aplicó solo en QA, no canónico/cloud. Contrato: [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
+  PR 286 la aplicó por pipeline a canónico local y cloud (ledger 23), con la
+  tabla vacía y preservación de filas verificadas. Contrato en
+  [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
 
 #### Seguridad de preinscripciones (rutas integradas; full-suite local PASS)
 
@@ -141,7 +144,7 @@ Las rutas y operaciones limitan instructor a sus propios grupos y ADMIN a config
 
 El backend y las páginas UI se liberaron mediante PR 235. El detalle de modelo/API y los límites de verificación cloud están en `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`, `docs/EVALUATIONS_CONTRACT.md` y `docs/TESTING.md`.
 
-### Cierre académico por grupo (Fase 8, integrado; no release)
+### Cierre académico por grupo (Fase 8, release PR 286)
 
 - Loader/casos de uso de cierre revalidan actor `ACTIVE`, rol y ownership en el
   repositorio: ADMIN puede cualquier grupo; INSTRUCTOR solo grupo propio y desde
@@ -149,7 +152,7 @@ El backend y las páginas UI se liberaron mediante PR 235. El detalle de modelo/
   Las páginas SSR/JSON de workspace/history y policy fail-closed se integraron
   por PR 282; los GET export adapters por PR 281. Role policy está acotada por
   contexto y loaders revalidan ownership.
-- La migración 0021 candidata habilita RLS y revoca grants Data API en estado,
+- La migración 0021 habilita RLS y revoca grants Data API en estado,
   versiones, reaperturas y receipts. Triggers hacen inmutable la historia y
   protegen notas/sesiones/roster/asistencia con el advisory lock compartido.
   Altas y transferencias hacia grupo cerrado se protegen server-side dentro de
@@ -167,20 +170,13 @@ El backend y las páginas UI se liberaron mediante PR 235. El detalle de modelo/
   loaders server-side, nunca el snapshot JSONB crudo. La policy permite solo las
   rutas de artefacto acotadas bajo ADMIN/instructor y el middleware falla cerrado
   para otras rutas. La proyección INSTRUCTOR sigue excluyendo CI/contacto/finanzas;
-  El owner reportó verificación focal live de los seis GET/download paths en QA;
-  esto no equivale a release ni full gate F8.
-- Migration 0021 solo se aplicó en stacks QA temporales; no se aplicó a DB
-  canónica/cloud. Integridad/privacidad y estado parcial están en
+  PR 286 liberó el flujo. Se reportó verificación focal live de los seis
+  GET/download paths en QA; el smoke de producción fue anónimo.
+- Migrations 0021/0022 se aplicaron por el pipeline a canónico local y cloud
+  (ledger 23); la comparación pre/post confirmó preservación de filas existentes
+  y tablas F8 vacías. Integridad/privacidad y evidencia están en
   [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y
   [`DATA_MODEL.md`](DATA_MODEL.md).
-
-### Gestión multi-ADMIN — estado de integración
-
-PR 283/285 integraron backend/UI ADMIN en development. La migración 0022 se
-aplicó solo a QA, no a canónico/cloud; el detalle de lifecycle, retención,
-actividad y límites de compensación está en
-[`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md). No se ha liberado la
-UI a producción.
 
 ## RUTAS
 

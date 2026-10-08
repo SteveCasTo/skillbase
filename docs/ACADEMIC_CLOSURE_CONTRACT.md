@@ -1,10 +1,10 @@
-# Contrato backend de cierre académico por grupo (Fase 8)
+# Contrato de cierre académico por grupo y exports (Fase 8)
 
 ## Estado y límite de release
 
-El alcance funcional de Fase 8 está aprobado. El core de cierre se integró por PR 280, exporters por PR 281, UI SSR/policy de cierre por PR 282, backend ADMIN por PR 283, pruebas de descarga por PR 284 y UI ADMIN por PR 285, todos en `development`. Las migraciones candidatas 0021/0022 solo se aplicaron en QA temporal (ledger 21→22→23), no en Supabase canónico/cloud (ledger 21). El release `master` sigue en Fase 7 `91beccf8`; Fase 8 aún no se ha promovido a producción y el gate combinado final sigue pendiente.
+Fase 8 se liberó a producción mediante PR 286 como `master` `68c918119f2ec094ba7cc63b217efd2448480505`; PRs 280–285 integraron core, exports, UI/policy, backend ADMIN y UI ADMIN. PR 287 solo cambió aislamiento de fixtures E2E. El pipeline de release aplicó 0021/0022 a canónico local y cloud (ledger 21→23) y la comparación completa confirmó preservación. El gate combinado final pasó en run `37727200394`; detalles en [`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-El árbol integrado contiene workspace SSR/historial, los seis GET adapters y policy de rutas acotadas para ambos contextos: ADMIN en `/app/cursos`, INSTRUCTOR en `/app/mis-cursos`; loaders revalidan actor/ownership. El owner verificó los seis endpoints de descarga de forma focal live en QA; esto no equivale al gate combinado ni a disponibilidad en producción. Fase 8 permanece pre-release. Progreso/evidencia en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
+Production incorpora workspace SSR/historial, los seis GET adapters y policy de rutas acotadas para ambos contextos: ADMIN en `/app/cursos`, INSTRUCTOR en `/app/mis-cursos`; loaders revalidan actor/ownership. Los seis endpoints se probaron focalmente en QA; el CI/release integrado pasó y el deploy quedó READY. El smoke de producción fue anónimo, no una operación autenticada de ADMIN/cierre. Los registros de grupo existentes no se prellenaron con cierres ni resultados.
 
 ## Responsabilidades y helpers actuales
 
@@ -28,18 +28,19 @@ Se añadieron seis Astro GET route modules bajo contextos ADMIN/INSTRUCTOR:
 y equivalentes bajo `/app/mis-cursos/:id/grupos/:groupId/cierre/:version/`.
 Fijan role requerido y artifact. Las rutas están registradas en
 `PRIVATE_ROUTE_POLICIES` con patrones acotados; el middleware sigue fail-closed
-para rutas privadas no declaradas y el loader revalida contexto y ownership. Se
-reportó una prueba focal live-browser/GET de las seis rutas en QA; no demuestra
-disponibilidad en producción ni reemplaza el gate final.
+para rutas privadas no declaradas y el loader revalida contexto y ownership. Los
+seis GET/download paths se verificaron live focalmente en QA. PR 286 integró el
+feature y pasó el gate de release; el smoke de producción fue anónimo, por lo
+que no se afirma una operación autenticada de cierre/descarga en producción.
 
 Las rutas SSR de workspace/version son `/app/cursos/:id/grupos/:groupId/cierre`
 y `/:version`, con equivalentes bajo `/app/mis-cursos`. La policy fail-closed
 acotada incluye workspace, historial y `planilla.pdf`, `planilla.csv`,
 `informe.pdf`: ADMIN para cursos e INSTRUCTOR para Mis cursos; loader revalida
-ownership. Los seis route modules y enlaces SSR están integrados por PRs 281/282.
-Su disponibilidad en producción depende del release F8.
+ownership. Los seis route modules y enlaces SSR se integraron por PRs 281/282 y
+se liberaron por PR 286.
 
-El comando requiere `requestKey` UUID y `revision`; `reopen` requiere además `reason` (1–500 caracteres). El body admite opcionalmente `courseId`/`groupId` solo como referencias que deben coincidir con el contexto de ruta; para reabrir no se aceptan campos desconocidos. El helper valida origen y límite de 65 536 bytes. Respuestas usan `{ok:true,value,message}` o `{ok:false,code,message,issues}`, JSON `private, no-store` y `nosniff`. Mapeo: autorización 403, contexto inexistente/ajeno 404, revisión/idempotencia/estado cerrado o bloqueo 409, validación 422 y fallo inesperado 503 saneado. Páginas SSR workspace/history y los adapters GET están montados en development por PRs 281/282; no están desplegados en producción.
+El comando requiere `requestKey` UUID y `revision`; `reopen` requiere además `reason` (1–500 caracteres). El body admite opcionalmente `courseId`/`groupId` solo como referencias que deben coincidir con el contexto de ruta; para reabrir no se aceptan campos desconocidos. El helper valida origen y límite de 65 536 bytes. Respuestas usan `{ok:true,value,message}` o `{ok:false,code,message,issues}`, JSON `private, no-store` y `nosniff`. Mapeo: autorización 403, contexto inexistente/ajeno 404, revisión/idempotencia/estado cerrado o bloqueo 409, validación 422 y fallo inesperado 503 saneado. Páginas SSR workspace/history y adapters GET se integraron por PRs 281/282 y se liberaron mediante PR 286.
 
 Las descargas reciben IDs/role context desde el route adapter y sesión fresca de
 `Astro.locals`; versión debe ser entero positivo canónico. Requieren role
@@ -105,8 +106,8 @@ Los seis route modules implementan estos GET versionados:
 
 Cada módulo fija role requerido y artifact. Los paths están registrados en
 `PRIVATE_ROUTE_POLICIES` con patrones acotados por contexto; policy más loader
-revalidan rol y ownership. La verificación live focal pasó en QA; no se afirma
-release a producción.
+revalidan rol y ownership. PR 286 liberó estas rutas. La verificación live focal
+pasó en QA; el smoke productivo fue anónimo y no cubre una descarga autenticada.
 
 El CSV de planilla usa UTF-8 BOM, separador `;`, quoting/escaping y mitigación de
 formula injection incluyendo espacios/caracteres Unicode iniciales. Notas/pesos
@@ -122,8 +123,8 @@ sustituyen. Se reutilizan `pdf-lib`, `@pdf-lib/fontkit` y la fuente ya incluida;
 no se añadieron dependencias.
 
 PR 284 añadió tres E2E focales de descarga; el owner verificó seis GET/download
-paths reales en QA. La suite directa de handler/adapter no sustituye la prueba
-por navegador ni el gate combinado. El backend multi-ADMIN está integrado por PR
-283 y su UI por PR 285; `closureActorDependencies` forma parte del inventario de
-actividad usado por lifecycle. No se implementan certificados, firmas, QR,
-emisión o verificación de Fase 9.
+paths reales en QA. PR 286 cerró el gate integrado y liberó Fase 8; CI de PRs y
+el release se detallan en `TESTING.md`. El backend multi-ADMIN está integrado
+por PR 283 y su UI por PR 285; `closureActorDependencies` forma parte del
+inventario de actividad usado por lifecycle. No se implementan certificados,
+firmas, QR, emisión o verificación de Fase 9.

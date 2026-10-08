@@ -595,9 +595,9 @@ Antes de crear un componente:
 
 El ajuste compacto/responsive del panel y formulario de interesados quedó integrado mediante PRs 116 y 117 a `development`; ver el comportamiento y accesibilidad implementados en la sección «Registro público de interesados» arriba. Su verificación full anterior al módulo de instructores pasó 98/98 E2E. Este hito UX no cierra la gestión de cursos/instructores de Fase 4.
 
-## Correcciones administrativas aprobadas (implementadas en fuente; gate final pendiente)
+## Correcciones administrativas aprobadas (release PR 278)
 
-Los ajustes siguientes se implementaron en las ramas integradas PRs 258–264 y en el head de feedback/navegación `d057d2d`. Las verificaciones fueron focales por stage y no constituyen el gate combinado; límites en [`TESTING.md`](TESTING.md). Core/UI de cierre y exports se integraron por PRs 280–282; backend/UI multi-ADMIN por PRs 283 y 285. Fase 8 aún no está liberada.
+Los ajustes siguientes se implementaron en las ramas integradas PRs 258–264 y en el head de feedback/navegación `d057d2d`. Las verificaciones de los cambios F7 fueron focales por stage y no constituyen por sí solas el gate F8; ver [`TESTING.md`](TESTING.md). Core/UI cierre y exports se integraron por PRs 280–282; backend/UI multi-ADMIN por PRs 283/285. PR 286 liberó Fase 8 a producción.
 
 - **Edición inline compartida:** lápiz/guardar/cancelar por atributo, posición y tamaño estables; comunicar dirty/validación y mantener controles/iconos accesibles. Loading no debe sustituir el layout ni destruir el SVG/estado del control. Mostrar errores persistentes junto al campo y conflictos accionables; Sileo solo para feedback transitorio no duplicado.
 - **Instructor y perfil:** nombre como texto y correo de solo lectura sin decoración de input editable. El listado de cursos presenta datos personales primero y una explicación/bloqueo debajo junto a los cursos pertinentes. Centrar la tarjeta global del perfil y alinear Google en una fila propia.
@@ -622,11 +622,10 @@ inline. En estado cerrado, notas/asistencia se presentan readonly. SSR/POST y
 fallback HTML sin JS conservan requestKey/revision y drafts al resolver errores
 409/422; la UI no sustituye guards server-side.
 
-Los links por versión consumen adapters PDF/CSV en el mismo árbol de PRs 281/282.
-El owner reportó verificación focal de los seis GET/download paths en QA; no
-equivale a full release/gate F8. UI reportó 21 unit/137 assertions y 3 E2E
-first-pass, además de revisión manual de 12 capturas responsive/light-dark; ver
-[`TESTING.md`](TESTING.md).
+Los links por versión consumen adapters PDF/CSV integrados por PRs 281/282. El
+owner verificó seis GET/download paths live en QA. UI reportó 21 unit/137
+assertions y tres E2E first-pass, además de revisión manual de 12 capturas
+responsive/light-dark; el release completo y su gate están en [`TESTING.md`](TESTING.md).
 
 ## Cuentas de administradores (UI Fase 8, integrada en development)
 
@@ -646,5 +645,6 @@ con React, mantiene foco inicial/cancelación y retorno de foco. Los errores,
 pending, drafts no secretos y recarga son contextuales; al auto-desactivar o
 eliminar, el servidor termina la sesión redirigiendo a login. Tarjetas y
 acciones evitan overflow por emails/nombres largos. Pruebas UI focales y límites
-de responsive/teclado están en [`TESTING.md`](TESTING.md). El backend/UI se
-integraron a development por PRs 283/285; no se han liberado a producción.
+responsive/teclado están en [`TESTING.md`](TESTING.md). Backend/UI se integraron
+por PRs 283/285 y se liberaron por PR 286. No se hizo smoke autenticado ADMIN ni
+se crearon cuentas reales en producción durante el release.
