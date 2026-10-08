@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { spawnSync } from "node:child_process";
+import { assertComprehensiveExecution } from "./comprehensive-demo-execution";
 import { eq, inArray, or, sql } from "drizzle-orm";
 import { createDatabase } from "@/server/db/client";
 import * as s from "@/server/db/schema";
@@ -54,6 +55,7 @@ export interface ComprehensiveDemoOptions {
   apply: boolean;
   anchorDay?: string;
   now?: Date;
+  expectedPlanHash?: string;
   preview?: (plan: ComprehensiveDemoPlan, existing: boolean) => void;
 }
 
@@ -463,6 +465,11 @@ export async function runComprehensiveDemo(
     options.preview?.(plan, false);
     return { context: null, plan };
   });
+  if (
+    options.expectedPlanHash &&
+    fingerprint(initial.plan) !== options.expectedPlanHash
+  )
+    throw new Error("Reviewed plan changed before account provisioning");
   if (initial.context) return initial.context; // Never replay finance, grading or lifecycle after completion.
   const accounts = await provisionComprehensiveAccounts(
     db,
@@ -525,8 +532,12 @@ if (import.meta.main) {
   let connection: ReturnType<typeof createDatabase> | undefined;
   try {
     const args = parseComprehensiveArgs(process.argv.slice(2));
-    if (process.env.VERCEL || (process.env.CI && args.target !== "qa"))
-      throw new Error("Manual operator execution required");
+    assertComprehensiveExecution(
+      process.env,
+      args.protectedManual,
+      args.target,
+      args.project,
+    );
     const url = process.env.DEMO_DATABASE_URL ?? "";
     const api = process.env.DEMO_SUPABASE_URL ?? "";
     assertComprehensiveTarget(
