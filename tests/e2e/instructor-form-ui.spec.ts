@@ -21,32 +21,48 @@ test("admin can inline-edit only its persisted account name", async ({
     .click();
   const name = form.getByLabel("Nombre", { exact: true });
   const original = await name.inputValue();
+  const updatedName =
+    original === "Ada Admin editada"
+      ? "Ada Admin editada nuevamente"
+      : "Ada Admin editada";
   const staleRevision = await form
     .locator('input[name="revision"]')
     .inputValue();
-  await name.fill("Ada Admin editada");
+  await name.fill(updatedName);
   await form.getByRole("button", { name: /^Guardar / }).click();
-  await expect(form.locator("[data-inline-value]")).toHaveText(
-    "Ada Admin editada",
-  );
+  await expect(form.locator("[data-inline-value]")).toHaveText(updatedName);
   await page.reload();
-  await expect(form.locator("[data-inline-value]")).toHaveText(
-    "Ada Admin editada",
-  );
+  await expect(form.locator("[data-inline-value]")).toHaveText(updatedName);
   await form
     .getByRole("button", { name: "Editar nombre", exact: true })
     .click();
-  await form.getByLabel("Nombre", { exact: true }).fill("Cambio obsoleto");
+  const conflictingName = `${updatedName} en conflicto`;
+  await name.fill(conflictingName);
   await form.locator('input[name="revision"]').evaluate((input, value) => {
     (input as HTMLInputElement).value = value;
   }, staleRevision);
-  await form.getByRole("button", { name: /^Guardar / }).click();
-  await expect(form.locator("[data-form-error]")).toContainText(
-    "El perfil cambió. Recarga y revisa antes de guardar.",
+  const save = form.getByRole("button", { name: /^Guardar / });
+  await expect(save).toBeEnabled();
+  const conflictResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().includes("/app/perfil?edit=name"),
   );
-  await expect(form.locator("[data-inline-value]")).toHaveText(
-    "Ada Admin editada",
+  await save.click();
+  const response = await conflictResponse;
+  expect(response.status()).toBe(422);
+  await expect(response.json()).resolves.toMatchObject({
+    error: "La cuenta cambió. Recarga antes de continuar.",
+    fieldErrors: {},
+  });
+  const formError = form.locator("[data-form-error]");
+  await expect(formError).toHaveText(
+    "La cuenta cambió. Recarga antes de continuar.",
   );
+  await expect(formError).toBeFocused();
+  await expect(name).toHaveValue(conflictingName);
+  await expect(save).toBeEnabled();
+  await expect(form.locator("[data-inline-value]")).toHaveText(updatedName);
   await page.reload();
   await form
     .getByRole("button", { name: "Editar nombre", exact: true })
