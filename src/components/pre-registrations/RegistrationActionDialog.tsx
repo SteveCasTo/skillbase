@@ -145,7 +145,7 @@ export default function RegistrationActionDialog({
               disabled={pending}
               onClick={() => setOpen(false)}
             >
-              Cerrar
+              Volver
             </Button>
           </DialogFooter>
         )}
@@ -155,11 +155,11 @@ export default function RegistrationActionDialog({
             <Button
               type="button"
               variant="outline"
-              className="min-h-11 w-full"
+              className="h-auto min-h-11 w-full whitespace-normal"
               disabled={pending}
               onClick={() => setOpen(false)}
             >
-              Cancelar
+              Volver
             </Button>,
             cancelHost,
           )}

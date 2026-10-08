@@ -41,6 +41,14 @@ export const adminAccountActions: Record<
   },
 };
 
+export function adminAccountBlockedReason(
+  account: Pick<AdminAccountDto, "lifecycleBlockedReason">,
+): string | null {
+  return account.lifecycleBlockedReason === "last-active-admin"
+    ? "Debe quedar al menos un administrador activo."
+    : null;
+}
+
 export function adminCreateEligible(
   values: Readonly<Record<string, string>>,
 ): boolean {

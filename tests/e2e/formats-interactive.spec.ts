@@ -279,15 +279,13 @@ test("inline editing swaps icons in the same row, filters input and cancels with
     exact: true,
   });
   await expect(deleteButton).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Sí, eliminar formato" }),
-  ).toBeHidden();
+  await expect(page.locator("[data-action-dialog]")).toBeHidden();
   await deleteButton.focus();
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: "¿Eliminar formato?" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("No se puede deshacer");
-  await page.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await page.getByRole("button", { name: "Volver", exact: true }).click();
   await expect(deleteButton).toBeFocused();
   await expect(dialog).toBeHidden();
   const detailPath = new URL(page.url()).pathname;
@@ -310,7 +308,7 @@ test("inline editing swaps icons in the same row, filters input and cancels with
     });
   });
   await deleteButton.click();
-  await dialog.getByRole("button", { name: "Sí, eliminar formato" }).click();
+  await dialog.getByRole("button", { name: "Eliminar formato" }).click();
   await expect(dialog).toBeHidden();
   // Sileo keeps dismissed toasts in the DOM while they exit; only the live
   // loading toast represents this delete operation.
@@ -363,7 +361,7 @@ test("inline editing swaps icons in the same row, filters input and cancels with
   });
   expect(conflict.status()).toBe(303);
   await deleteButton.click();
-  await dialog.getByRole("button", { name: "Sí, eliminar formato" }).click();
+  await dialog.getByRole("button", { name: "Eliminar formato" }).click();
   await expect(page.locator("[data-action-error]")).toContainText(
     "Recarga y revisa",
   );
@@ -377,7 +375,7 @@ test("inline editing swaps icons in the same row, filters input and cancels with
     .click();
   await page
     .getByRole("dialog", { name: "¿Eliminar formato?" })
-    .getByRole("button", { name: "Sí, eliminar formato" })
+    .getByRole("button", { name: "Eliminar formato" })
     .click();
   await expect(page).toHaveURL(/\/app\/formatos$/);
   await expect(
@@ -441,7 +439,7 @@ test("used formats toggle availability in place and disable editors while inacti
   await page.getByRole("button", { name: "Desactivar formato" }).click();
   const dialog = page.getByRole("dialog", { name: "¿Desactivar formato?" });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Sí, desactivar formato" }).click();
+  await dialog.getByRole("button", { name: "Desactivar formato" }).click();
   await expect(page.locator("[data-format-status]")).toHaveText("Inactivo");
   await expect(
     page.getByRole("button", { name: "Activar formato" }),

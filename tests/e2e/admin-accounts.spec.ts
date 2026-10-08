@@ -2,6 +2,10 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
+import { and, eq, inArray } from "drizzle-orm";
+import { createDatabase } from "@/server/db/client";
+import * as schema from "@/server/db/schema";
+import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
 async function createAccount(page: Page) {
   const name = `Administrador sintético ${randomUUID()}`;
@@ -32,9 +36,15 @@ async function confirmAction(page: Page, label: string) {
   const dialog = page.getByRole("dialog", { name: label, exact: true });
   await expect(dialog).toBeVisible();
   await expect(
-    dialog.getByRole("button", { name: "Cancelar", exact: true }),
+    dialog.getByRole("button", { name: "Volver", exact: true }),
   ).toBeFocused();
-  await dialog.getByRole("button", { name: "Confirmar", exact: true }).click();
+  const action = dialog.getByRole("button", { name: label, exact: true });
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: label, exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await action.click();
 }
 async function loginPassword(page: Page, email: string, password: string) {
   await page.goto("/login");
@@ -95,6 +105,83 @@ test("ADMIN creates, independently renames and deletes an unused ADMIN from its 
   await expect(
     page.getByRole("link", { name: new RegExp(account.email, "u") }),
   ).toHaveCount(0);
+});
+
+test("the server's last-active ADMIN projection keeps delete and deactivate visible but disabled", async ({
+  context,
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await signInFixture(context, AUTH_FIXTURES.admin.email);
+  const account = await createAccount(page);
+  const targetId = account.endpoint.split("/").at(-1)!;
+  const database = createDatabase(getTestSupabaseEnvironment().databaseUrl);
+  const active = await database.db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .innerJoin(schema.userRoles, eq(schema.userRoles.userId, schema.users.id))
+    .where(
+      and(
+        eq(schema.users.status, "ACTIVE"),
+        eq(schema.userRoles.roleCode, "ADMIN"),
+      ),
+    );
+  const others = active.map(({ id }) => id).filter((id) => id !== targetId);
+  try {
+    await database.db
+      .update(schema.users)
+      .set({ status: "DISABLED" })
+      .where(inArray(schema.users.id, others));
+    await context.clearCookies();
+    await loginPassword(page, account.email, account.password);
+    await page.goto("/app/administradores");
+    await page
+      .getByRole("searchbox", { name: "Buscar por nombre o correo" })
+      .fill(account.email);
+    await page
+      .getByRole("link", {
+        name: `${account.name} ${account.email} Cuenta activa`,
+        exact: true,
+      })
+      .click();
+    const reason = "Debe quedar al menos un administrador activo.";
+    const remove = page.getByRole("button", {
+      name: `Eliminar administrador: ${reason}`,
+      exact: true,
+    });
+    await expect(remove).toBeVisible();
+    await expect(remove).toBeDisabled();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const form = page.getByRole("form", { name: "Editar nombre", exact: true });
+    await form
+      .getByRole("button", { name: "Editar nombre", exact: true })
+      .click();
+    await form
+      .getByLabel("Nombre", { exact: true })
+      .fill(`${account.name} usado`);
+    await form
+      .getByRole("button", { name: "Guardar nombre", exact: true })
+      .click();
+    const deactivate = page.getByRole("button", {
+      name: `Desactivar administrador: ${reason}`,
+      exact: true,
+    });
+    await expect(deactivate).toBeVisible();
+    await expect(deactivate).toBeDisabled();
+    await page.reload();
+    await expect(deactivate).toBeDisabled();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  } finally {
+    await database.db
+      .update(schema.users)
+      .set({ status: "ACTIVE" })
+      .where(inArray(schema.users.id, others));
+    await database.close();
+  }
 });
 
 test("used ADMIN self-deactivation ends its session and another equal ADMIN reactivates without changing credentials", async ({
