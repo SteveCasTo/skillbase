@@ -373,6 +373,15 @@ first-pass sin flakies, skips ni retries reportados. PR 284 run `37718702107`:
 412 unit/2608 assertions, 160 integration/1314 assertions y 139 E2E (74+65),
 first-pass sin fallos, skips, flakes ni retries reportados.
 
+El release-validation run `37720672015` posterior quedó **FAIL**: 138/139 E2E
+first-pass y el caso restante falló también en los dos retries automáticos. La
+reproducción controlada identificó agotamiento del límite correcto de login por
+red al combinar escenarios; un test-only fixture fix está en
+`fix/google-admin-recovery-isolation`. Su focused pass 9/9 y repetición
+Google-only 2/2 pasaron sin retries, pero no hay un nuevo full CI verde todavía.
+No se promovió a `master`, no se desplegó y no se aplicaron migrations 0021/0022
+a canónico/cloud.
+
 Las migraciones candidatas 0021/0022 se aplicaron solo a QA aislado (ledger
 temporal 21→22→23); Supabase canónico y cloud permanecen en ledger 21. El owner
 verificó seis descargas GET reales en QA; esto no equivale al gate combinado
