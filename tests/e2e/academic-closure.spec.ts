@@ -1,15 +1,124 @@
 import { expect, test, type Page } from "@playwright/test";
-import type { ClosureStateDto } from "@/domain/academic-closure/types";
+import { readFile } from "node:fs/promises";
+import { PDFDocument } from "pdf-lib";
+import { eq } from "drizzle-orm";
+import { users } from "@/server/db/schema";
+import type {
+  ClosureStateDto,
+  ClosureVersionDto,
+} from "@/domain/academic-closure/types";
 import type { ClosureLoadResult } from "@/server/academic-closure/loaders";
 import { createAttendanceFlowFixture } from "../fixtures/attendance-flow";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
 import { e2eSiteUrl } from "../../scripts/e2e-port";
+import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
 
 test.setTimeout(90_000);
 const headers = { Accept: "application/json", Origin: e2eSiteUrl() };
 const basePath = (course: string, group: string, instructor = false) =>
   `/app/${instructor ? "mis-cursos" : "cursos"}/${course}/grupos/${group}`;
+
+const documents = [
+  ["planilla.pdf", "Planilla PDF"],
+  ["planilla.csv", "Planilla CSV"],
+  ["informe.pdf", "Informe PDF"],
+] as const;
+async function exportParticipant(
+  fixture: Awaited<ReturnType<typeof createAttendanceFlowFixture>>,
+) {
+  const repository = createRegistrationRepository(fixture.database.db);
+  const detail = await repository.detail(
+    fixture.historyPaid.id,
+    fixture.adminId,
+  );
+  if (!detail) throw new Error("Own isolated participant unavailable");
+  const person = detail.registration.participant;
+  return repository.updateParticipant(
+    {
+      requestKey: crypto.randomUUID(),
+      participantId: person.id,
+      revision: person.revision,
+      participant: {
+        ci: person.ci,
+        firstName: "=María Ñúñez",
+        lastName: "Álvarez",
+        email: person.email,
+        phone: "+591 70000000",
+      },
+    },
+    fixture.adminId,
+  );
+}
+/** Actual anchors and browser downloads, followed by a cookie-authenticated GET
+ * to inspect headers. No renderer/helper injection or successful network mocks. */
+async function downloadOfficialDocuments(
+  page: Page,
+  path: string,
+  version: ClosureVersionDto,
+  privateCi: string,
+) {
+  let csv = "";
+  for (const [artifact, label] of documents) {
+    const url = `${path}/${version.version}/${artifact}`;
+    const link = page.getByRole("link", { name: label, exact: true });
+    await expect(link).toHaveAttribute("href", url);
+    const pending = page.waitForEvent("download");
+    await link.click();
+    const download = await pending;
+    expect(download.url()).toBe(new URL(url, e2eSiteUrl()).href);
+    expect(await download.failure()).toBeNull();
+    expect(download.suggestedFilename()).toBe(
+      `cierre-v${version.version}-${artifact}`,
+    );
+    const file = await download.path();
+    if (!file) throw new Error("Browser download missing");
+    const bytes = await readFile(file);
+    const response = await page.request.get(url);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["cache-control"]).toBe("private, no-store");
+    expect(response.headers()["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers()["content-disposition"]).toBe(
+      `attachment; filename="cierre-v${version.version}-${artifact}"`,
+    );
+    if (artifact === "planilla.csv") {
+      expect(response.headers()["content-type"]).toBe(
+        "text/csv; charset=utf-8",
+      );
+      expect([...bytes.subarray(0, 3)]).toEqual([239, 187, 191]);
+      csv = bytes.toString("utf8");
+      expect(csv).toContain('"\'=María Ñúñez"');
+      expect(csv).toContain('"Álvarez"');
+      expect(csv).toContain(version.actorName);
+      expect(csv).toContain(version.closedAt);
+      expect(csv).toContain(`"${version.report.minimumGrade.toFixed(2)}"`);
+      expect(csv).toContain('"80.00"');
+      if (version.report.access === "ADMIN") expect(csv).toContain(privateCi);
+      else {
+        expect(csv).not.toContain(privateCi);
+        expect(csv).not.toContain('"CI"');
+      }
+      expect(csv).not.toMatch(
+        /email|phone|balanceCents|Saldo informativo|70000000|@test.invalid/u,
+      );
+    } else {
+      expect(response.headers()["content-type"]).toBe("application/pdf");
+      expect(bytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+      const pdf = await PDFDocument.load(new Uint8Array(bytes), {
+        updateMetadata: false,
+      });
+      expect(pdf.getPageCount()).toBeGreaterThan(0);
+      expect(pdf.getAuthor()).toBe(version.actorName);
+      // PDF date strings preserve the frozen instant at their supported
+      // second precision; CSV retains the full ISO timestamp.
+      const pdfInstant = new Date(version.closedAt);
+      pdfInstant.setUTCMilliseconds(0);
+      expect(pdf.getCreationDate()).toEqual(pdfInstant);
+      expect(pdf.getModificationDate()).toEqual(pdfInstant);
+    }
+  }
+  return csv;
+}
 async function read(page: Page, path: string) {
   const response = await page.request.get(path, { headers });
   expect(response.status()).toBe(200);
@@ -103,6 +212,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
   const base = basePath(fixture.historyCourseId, fixture.historyGroupId),
     path = `${base}/cierre`;
   try {
+    const participant = await exportParticipant(fixture);
     await page.goto(path);
     await expect(
       page.getByRole("heading", { name: "Pendientes para cerrar" }),
@@ -140,6 +250,23 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     await expect(
       page.getByRole("link", { name: "Planilla PDF" }),
     ).toHaveAttribute("href", `${path}/1/planilla.pdf`);
+    const originalCsv = await downloadOfficialDocuments(
+      page,
+      path,
+      official,
+      participant.ci,
+    );
+    const anonymous = await context.browser()!.newContext();
+    try {
+      const denied = await anonymous.request.get(`${path}/1/planilla.pdf`, {
+        maxRedirects: 0,
+      });
+      expect(denied.status()).toBe(303);
+      expect(denied.headers()["location"]).toContain("/login");
+      expect(denied.headers()["content-type"]).not.toBe("application/pdf");
+    } finally {
+      await anonymous.close();
+    }
     await page.goto(`${base}/evaluaciones`);
     await expect(
       page.getByRole("button", { name: /Editar notas/ }),
@@ -194,6 +321,9 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     const history = await page.request.get(`${path}/1`, { headers });
     const historicLoad = await history.json();
     expect(historicLoad.data).toEqual(official);
+    expect(
+      await downloadOfficialDocuments(page, path, official, participant.ci),
+    ).toBe(originalCsv);
     await expect(
       page.getByRole("button", { name: /Cerrar grupo|Confirmar reapertura/ }),
     ).toHaveCount(0);
@@ -226,6 +356,7 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
   const admin = await adminContext.newPage();
   const adminPath = `${basePath(fixture.historyCourseId, fixture.historyGroupId)}/cierre`;
   try {
+    await exportParticipant(fixture);
     const prepared = await prepare(admin, fixture);
     const adminReport = (await read(admin, adminPath)).provisional!;
     expect(adminReport.access).toBe("ADMIN");
@@ -259,23 +390,71 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
     ).toBe(403);
     const wrongRoute = await page.request.get(adminPath);
     expect(wrongRoute.status()).toBe(403);
+    expect(
+      (await page.request.get(`${adminPath}/1/planilla.pdf`)).status(),
+    ).toBe(403);
     const foreign = await page.request.get(
       `${basePath(fixture.foreign!.courseId, fixture.foreign!.groupId, true)}/cierre`,
       { headers },
     );
     expect(foreign.status()).toBe(404);
-    await page.goto(`${path}/1`);
-    await expect(page.getByText(sensitive, { exact: false })).toHaveCount(0);
-    const history = await page.request.get(`${path}/1`, { headers });
-    expect(JSON.stringify(await history.json())).not.toMatch(
-      /balanceCents|"ci"|email|phone|participantType/u,
-    );
+    expect(
+      (
+        await page.request.get(
+          `${basePath(fixture.foreign!.courseId, fixture.foreign!.groupId, true)}/cierre/1/planilla.pdf`,
+          { headers },
+        )
+      ).status(),
+    ).toBe(404);
     await page.goto(
       `${prepared.base.replace("/cursos/", "/mis-cursos/")}/evaluaciones`,
     );
     await expect(
       page.getByRole("button", { name: /Editar notas/ }),
     ).toHaveCount(0);
+    // Historic links remain authorized after ADMIN reopens the same group.
+    expect(
+      (
+        await command(
+          admin,
+          adminPath,
+          "reopen",
+          current.revision,
+          "Verificación de documentos históricos",
+        )
+      ).status(),
+    ).toBe(200);
+    await page.goto(`${path}/1`);
+    await expect(page.getByText(sensitive, { exact: false })).toHaveCount(0);
+    const history = await page.request.get(`${path}/1`, { headers });
+    expect(JSON.stringify(await history.json())).not.toMatch(
+      /balanceCents|"ci"|email|phone|participantType/u,
+    );
+    await downloadOfficialDocuments(page, path, current.official!, sensitive);
+    expect(
+      (
+        await page.request.get(`${path}/999999/informe.pdf`, { headers })
+      ).status(),
+    ).toBe(404);
+    // Revoke only the fixture-owned internal actor in this verified ephemeral
+    // project. The existing browser session must not retain download permission.
+    await fixture.database.db
+      .update(users)
+      .set({ status: "DISABLED" })
+      .where(eq(users.id, fixture.instructorId));
+    try {
+      const revoked = await page.request.get(`${path}/1/informe.pdf`, {
+        maxRedirects: 0,
+      });
+      expect(revoked.status()).toBe(303);
+      expect(revoked.headers()["location"]).toContain("/unauthorized");
+      expect(revoked.headers()["content-type"]).not.toBe("application/pdf");
+    } finally {
+      await fixture.database.db
+        .update(users)
+        .set({ status: "ACTIVE" })
+        .where(eq(users.id, fixture.instructorId));
+    }
   } finally {
     const state = await read(admin, adminPath);
     if (state.status === "CLOSED")
@@ -304,6 +483,7 @@ test("HTML without JavaScript retains server validation and supports closing and
   const page = await context.newPage();
   const path = `${basePath(fixture.historyCourseId, fixture.historyGroupId)}/cierre`;
   try {
+    const participant = await exportParticipant(fixture);
     await prepare(page, fixture);
     await page.goto(path);
     await page.getByText("Cerrar grupo", { exact: true }).click();
@@ -313,6 +493,12 @@ test("HTML without JavaScript retains server validation and supports closing and
     await expect(
       page.getByRole("heading", { name: "Versión oficial 1" }),
     ).toBeVisible();
+    await downloadOfficialDocuments(
+      page,
+      path,
+      (await read(page, path)).official!,
+      participant.ci,
+    );
     await page.getByText("Reabrir grupo", { exact: true }).click();
     await page
       .getByRole("textbox", { name: "Motivo de reapertura (obligatorio)" })
