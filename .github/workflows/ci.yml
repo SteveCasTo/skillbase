@@ -40,7 +40,10 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
-      - run: bun run test:integration
+      - name: Run product integration once on its managed stack
+        run: bun run test:integration
+      - name: Run comprehensive demo integration once on its own managed stack
+        run: bun run test:integration:comprehensive-demo
 
   e2e:
     name: e2e (${{ matrix.shard }}/2)

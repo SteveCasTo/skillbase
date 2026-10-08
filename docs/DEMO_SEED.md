@@ -92,6 +92,18 @@ servidor del usuario ni usa su DB. `--target qa --project <ID_DEL_RUNNER>` solo
 admite el stack validado por `getTestSupabaseEnvironment`; no acepta una DB
 loopback cualquiera. No ejecutar el test Bun directamente contra desarrollo.
 
+CI ejecuta esta integración real como segundo paso obligatorio del **mismo job
+`integration`**: primero `bun run test:integration` (suite de producto, una vez),
+después `bun run test:integration:comprehensive-demo` (un caso focal, una vez).
+Cada runner crea y destruye su propio proyecto temporal; no se mueve el caso a
+`tests/integration` porque los snapshots/notas cerradas son inmutables y su
+dataset no debe contaminar el stack compartido de la suite del producto. No se
+repite la suite completa, no se añade otro job ni se debilita el agregador.
+El error de cualquiera de los pasos bloquea el job/agregador/deploy. El runner
+focal también falla si no puede limpiar su proyecto propio; imprime únicamente
+el ID/ruta exactos para recuperación acotada, sin keys. Los conteos de producto
+y del caso seed se reportan por separado, no como una corrida compartida.
+
 ### Producción: retenida hasta release y revisión del operador
 
 Después de integrar/liberar esta herramienta y todas las correcciones, comprobar
