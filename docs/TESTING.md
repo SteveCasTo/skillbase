@@ -671,3 +671,40 @@ El CI integrado final del PR 288, run `37818957648`, pasó al primer intento: **
 El test del runner ejecutó PLAN/APPLY/repetición sobre un Supabase temporal propio. Verificó preservación de **416 filas en 70 tablas** existentes y que la repetición idempotente agregara cero cambios. La carga de prueba dejó 8 cursos, 10 grupos, 26 preinscripciones y 25 participantes sintéticos, además de 4 instructores, 5 ADMIN, 3 versiones de cierre, una reapertura y una baja ADMIN completada mediante el lifecycle. Estos datos pertenecen al stack temporal del test y no al Supabase canónico/cloud.
 
 No se afirma una revisión visual manual con Playwright CLI/screenshot para este cierre. La validación reportada aquí es automatizada y contra comportamiento/persistencia; tampoco constituye smoke autenticado en producción. No se ha ejecutado PLAN/APPLY del runner en local canónico ni en producción; la próxima operación productiva requiere un checkout limpio del SHA exacto ya liberado y guards/approval descritos en [`DEMO_SEED.md`](DEMO_SEED.md). Fase 9 permanece sin iniciar.
+
+## Búsqueda de instructor y resultados académicos compactos (feature)
+
+La rama `fix/live-instructor-search-and-compact-results`, HEAD
+`6c5bba7bc3b5a06eb476e209d2827b2dd666f6b4` sobre base `a276e30`, modifica solo
+UI y pruebas de nueve archivos. No modifica API/DTO, permisos, reglas académicas,
+snapshot, esquema ni datos canónicos/cloud.
+
+- Tests unitarios focales: **5/5 PASS, 43 assertions** (presentation de
+  evaluaciones/cierre). Lint global y formatter de archivos cambiados PASS;
+  typecheck 0 errores/0 warnings/313 hints existentes; build de producción PASS.
+- E2E inicial en app aislada `4493`: **8/8 PASS**, cero retries. Una cohorte
+  posterior de tres escenarios pasó y cinco fallaron al ejecutarse mientras se
+  hacía build en el mismo worktree; los logs muestran errores de carga de islas
+  (`_jsxDEV`/import Vite), incluidos módulos sin cambios. No se modificó el
+  producto ni se ocultó esa ejecución. La revalidación serial recuperó el shell
+  original ya terminado: **8/8 PASS**, exit 0, intento único por caso y sin
+  retries; no se lanzó una corrida duplicada. Esto valida el conjunto focal, no
+  es un full E2E/release gate ni prueba la causa raíz del episodio concurrente.
+- Playwright CLI manual comprobó rutas HTTP reales y DTOs de rol autorizados,
+  incluyendo cierre oficial de un grupo con 3 componentes, resultados de 9
+  componentes, detalle, pendiente/cero, instructor con asignación y SSR sin JS.
+  Viewports: 320, 768 y 1280 px; sin overflow horizontal medido. La tarjeta usa
+  diálogo al hidratar y disclosure funcional sin JS. Valores de nota/componentes
+  alineados en desktop/edit/readonly; el modo instructor no expone CI, saldo,
+  categoría, correo ni teléfono. La verificación no usó mocks de respuesta,
+  renderer inyectado ni DB productiva.
+- Search E2E comprueba filtrado inmediato por nombre/correo, normalización
+  Unicode (acentos/case/espacios), foco estable, limpiar/restaurar, history/back,
+  sin Enter obligatorio para filtrar ni solicitudes adicionales por búsqueda;
+  el submit GET conserva fallback sin JavaScript.
+- Tras la revalidación y el smoke CLI, el stack propio quedó limpio: cero
+  containers/listeners en los puertos de app 4493/4495. No se detuvieron servicios
+  compartidos ni se tocaron datos/Auth de canónico, cloud o producción.
+
+La rama sigue siendo feature (no integrada/liberada); estos resultados no
+representan gate completo de Fase 9 ni revisan otros cambios en curso.
