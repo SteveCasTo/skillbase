@@ -177,10 +177,10 @@ el patrón de edición inline existente (lápiz/guardar/cancelar), no un formula
 modal extenso. Congelar el valor usado para cada documento. No copiar
 identidades de las imágenes fuente. Los roles/posiciones iniciales son:
 
-| Certificado | Izquierda | Centro | Derecha |
-| --- | --- | --- | --- |
-| Aprobación | Nombre instructor snapshot; cargo `INSTRUCTOR / DPTO. INFORMÁTICA-SISTEMAS` | `DIRECTOR ACADÉMICO / FCyT - UMSS` | `DECANO / FCyT - UMSS` |
-| Instructor | Jefe Departamento (nombre configurable); cargo `JEFE DEPARTAMENTO / INFORMÁTICA Y SISTEMAS` | `DIRECTOR ACADÉMICO / FCyT - UMSS` | `DECANO / FCyT - UMSS` |
+| Certificado | Izquierda                                                                                   | Centro                             | Derecha                |
+| ----------- | ------------------------------------------------------------------------------------------- | ---------------------------------- | ---------------------- |
+| Aprobación  | Nombre instructor snapshot; cargo `INSTRUCTOR / DPTO. INFORMÁTICA-SISTEMAS`                 | `DIRECTOR ACADÉMICO / FCyT - UMSS` | `DECANO / FCyT - UMSS` |
+| Instructor  | Jefe Departamento (nombre configurable); cargo `JEFE DEPARTAMENTO / INFORMÁTICA Y SISTEMAS` | `DIRECTOR ACADÉMICO / FCyT - UMSS` | `DECANO / FCyT - UMSS` |
 
 Los nombres de las posiciones configurables empiezan vacíos y bloquean la
 generación hasta que ADMIN los configure con nombres reales; en demo únicamente
