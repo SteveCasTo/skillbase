@@ -1,0 +1,8 @@
+---
+import CertificateDetailPage from "@/components/certificates/CertificateDetailPage.astro";
+import { prepareCertificateDetail } from "@/components/certificates/detail-route";
+const state = await prepareCertificateDetail(Astro, true);
+if (state instanceof Response) return state;
+---
+
+<CertificateDetailPage {...state} />

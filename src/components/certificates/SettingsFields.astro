@@ -1,0 +1,113 @@
+---
+import type { CertificateConfiguration } from "@/domain/certificates/types";
+import type { CertificateFeedback } from "./route";
+interface Props {
+  configuration: CertificateConfiguration;
+  feedback: CertificateFeedback;
+}
+const { configuration, feedback } = Astro.props;
+const positions = [
+  {
+    key: "departmentHead",
+    title: "Firma izquierda · Instructor",
+    description: "Jefatura del Departamento.",
+  },
+  {
+    key: "director",
+    title: "Firma central · Ambos certificados",
+    description: "Dirección académica.",
+  },
+  {
+    key: "dean",
+    title: "Firma derecha · Ambos certificados",
+    description: "Decanato.",
+  },
+] as const;
+---
+
+<div class="grid min-w-0 gap-6 lg:grid-cols-3">
+  {positions.map(({ key, title, description }) => (
+    <fieldset class="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-5">
+      <legend class="px-1 text-base font-semibold">{title}</legend>
+      <p class="text-sm text-muted-foreground">{description}</p>
+      {(
+        [
+          ["name", "Nombre completo (pendiente si está vacío)"],
+          ["role", "Cargo (obligatorio)"],
+          ["affiliation", "Afiliación (obligatoria)"],
+        ] as const
+      ).map(([field, label]) => {
+        const name = `${key}.${field}`;
+        return (
+          <div class="flex flex-col gap-2">
+            <label for={name} class="text-sm font-medium">
+              {label}
+            </label>
+            <input
+              id={name}
+              name={name}
+              value={feedback.values[name] ?? configuration[key][field]}
+              required={field !== "name"}
+              maxlength={500}
+              aria-invalid={Boolean(feedback.issues[name])}
+              aria-describedby={`${name}-error`}
+              class="min-h-11 w-full min-w-0 rounded-lg border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+            />
+            <p
+              id={`${name}-error`}
+              data-field-error={name}
+              class="text-sm text-destructive empty:hidden"
+            >
+              {feedback.issues[name]}
+            </p>
+          </div>
+        );
+      })}
+    </fieldset>
+  ))}
+</div>
+<fieldset class="mt-6 flex min-w-0 flex-col gap-4 border-t pt-6">
+  <legend class="text-lg font-semibold">
+    Firma izquierda · Certificado de aprobación
+  </legend>
+  <p class="text-sm text-muted-foreground">
+    El nombre corresponde automáticamente al instructor congelado en el cierre
+    oficial.
+  </p>
+  <div class="grid gap-4 sm:grid-cols-2">
+    {(
+      [
+        ["role", "Cargo (obligatorio)"],
+        ["affiliation", "Afiliación (obligatoria)"],
+      ] as const
+    ).map(([field, label]) => {
+      const name = `approvalInstructor.${field}`;
+      return (
+        <div class="flex flex-col gap-2">
+          <label for={name} class="text-sm font-medium">
+            {label}
+          </label>
+          <input
+            id={name}
+            name={name}
+            value={
+              feedback.values[name] ?? configuration.approvalInstructor[field]
+            }
+            required
+            maxlength={500}
+            aria-invalid={Boolean(feedback.issues[name])}
+            aria-describedby={`${name}-error`}
+            class="min-h-11 w-full min-w-0 rounded-lg border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+          />
+          <p
+            id={`${name}-error`}
+            data-field-error={name}
+            class="text-sm text-destructive empty:hidden"
+          >
+            {feedback.issues[name]}
+          </p>
+        </div>
+      );
+    })}
+  </div>
+</fieldset>

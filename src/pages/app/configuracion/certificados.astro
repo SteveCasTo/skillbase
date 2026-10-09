@@ -1,0 +1,91 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
+import SettingsFields from "@/components/certificates/SettingsFields.astro";
+import FormFeedback from "@/components/certificates/FormFeedback.astro";
+import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { requireInternalUser } from "@/server/auth/context";
+import { loadCertificateSettings } from "@/server/certificates/loaders";
+import {
+  certificateMutation,
+  certificateMethodNotAllowed,
+  emptyFeedback,
+  setCertificateHeaders,
+} from "@/components/certificates/route";
+setCertificateHeaders(Astro);
+void certificateMethodNotAllowed;
+if (!["GET", "POST"].includes(Astro.request.method))
+  return certificateMethodNotAllowed();
+const actor = requireInternalUser(Astro.locals);
+let load = await loadCertificateSettings({ actor });
+let feedback = emptyFeedback();
+if (Astro.request.method === "POST" && load.available) {
+  const result = await certificateMutation(
+    Astro,
+    "settings",
+    load.data.configuration,
+  );
+  if (result instanceof Response) return result;
+  feedback = result;
+  if (result.success) load = await loadCertificateSettings({ actor });
+}
+if (!load.available) Astro.response.status = load.status;
+---
+
+<PrivateLayout title="Configuración de certificados">
+  <CourseBreadcrumbs
+    current="Certificados"
+    parents={[
+      { label: "Resumen", href: "/app" },
+      { label: "Configuración", href: "/app/configuracion" },
+    ]}
+  />
+  <header class="mt-5 flex flex-col gap-3">
+    <h1 class="text-3xl font-semibold tracking-tight">
+      Configuración de certificados
+    </h1>
+    <p class="max-w-prose leading-7 text-muted-foreground">
+      Configura los nombres y cargos antes de generar. Puedes guardar ajustes
+      incompletos; los certificados ya preparados conservan sus datos.
+    </p>
+  </header>
+  {load.available ? (
+    <form
+      method="post"
+      action="/app/configuracion/certificados"
+      data-certificate-form
+      data-success-label="Configuración guardada."
+      class="mt-8 flex min-w-0 flex-col gap-6"
+    >
+      <input
+        type="hidden"
+        name="revision"
+        value={feedback.values.revision ?? String(load.data.revision)}
+      />
+      <SettingsFields configuration={load.data.configuration} {feedback} />
+      <p class="max-w-prose text-sm leading-6 text-muted-foreground">
+        {load.data.configuration.organization} · {load.data.configuration.city}.
+        Los datos institucionales y la plantilla se conservan según el formato
+        aprobado.
+      </p>
+      <FormFeedback {feedback} />
+      <div class="flex flex-wrap gap-3">
+        <button type="submit" class={buttonVariants({ className: "min-h-11" })}>
+          Guardar configuración
+        </button>
+        <a
+          href="/app/configuracion"
+          class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+        >
+          Volver
+        </a>
+      </div>
+    </form>
+  ) : (
+    <RegistrationPageError
+      message={load.unavailableReason}
+      retryHref="/app/configuracion/certificados"
+    />
+  )}
+</PrivateLayout>
