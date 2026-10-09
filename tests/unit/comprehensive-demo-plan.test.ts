@@ -5,6 +5,7 @@ import {
   parseComprehensiveArgs,
   assertComprehensiveTarget,
   assertComprehensiveRelease,
+  comprehensiveDemoVerificationOrigin,
 } from "../../scripts/comprehensive-demo-plan";
 import { validateEvaluationComponents } from "@/domain/evaluations/rules";
 import { PRODUCTION_PROJECT } from "../../scripts/financial-demo-plan";
@@ -70,6 +71,15 @@ test("production cannot run from an unreleased feature tree or a dirty/unapprove
     assertComprehensiveRelease("master", sha, "", "b".repeat(40)),
   ).toThrow();
   expect(() => assertComprehensiveRelease("master", sha, "", "")).toThrow();
+});
+
+test("certificate verification origin defaults to the local app and preserves production origin", () => {
+  expect(comprehensiveDemoVerificationOrigin("local")).toBe(
+    "http://127.0.0.1:4321",
+  );
+  expect(comprehensiveDemoVerificationOrigin("production")).toBe(
+    "https://skillbase-alpha.vercel.app",
+  );
 });
 
 test("CLI requires explicit destination; rejects resets, repeated flags and accidental production", () => {
