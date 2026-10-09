@@ -75,11 +75,13 @@ El job de despliegue está condicionado explícitamente al evento push en `maste
 La carga demo de producción es una operación separada mediante `production-demo.yml`, **solo workflow_dispatch en master** y environment `production`, no un paso de deploy. Reutiliza `MIGRATION_DATABASE_URL` sin leer/exportar su valor, una clave servidor existente cifrada `DEMO_SUPABASE_SERVICE_ROLE_KEY` y el actor existente `DEMO_ADMIN_ID`. PLAN por defecto precede a APPLY explícito; respeta concurrencia sin cancelación, guards de proyecto/actor/provenance y todos los datos anteriores. No crea secretos de DB nuevos ni rota passwords, y no publica endpoints de seed/exfiltración. Operación y prerrequisitos en `docs/FINANCIAL_DEMO.md`.
 
 El workflow separado `production-comprehensive-demo.yml` también es manual y
-`master`-only, pero dedicado a datos sintéticos F1–F8. Requiere environment
-protegido `production`, revisa CI/deployment del SHA y el hash PLAN aprobado,
-compara preservación por hashes server-side y exige APPLY/replay idempotente.
-No está en el DAG de deploy ni se ejecuta en CI ordinaria/Vercel. Contrato,
-secret-handling, operación y evidencia están en [`DEMO_SEED.md`](DEMO_SEED.md).
+`master`-only. Su modo base carga datos sintéticos F1–F8; la extensión F9 solo se
+activa mediante `include_certificates: true` explícito (default `false`). Requiere
+environment protegido `production`, revisa CI/deployment del SHA y el hash PLAN
+aprobado, compara preservación por hashes server-side y exige APPLY/replay
+idempotente. No está en el DAG de deploy ni se ejecuta en CI ordinaria/Vercel.
+Contrato, secret-handling, operación y evidencia están en
+[`DEMO_SEED.md`](DEMO_SEED.md).
 
 Las migraciones viven versionadas en Git.
 
@@ -454,3 +456,57 @@ Preservación por filas, baseline/ledger, settings y dataset están en
 [`DEMO_SEED.md`](DEMO_SEED.md). No se aplicó migración F9: los entornos canónicos
 y cloud siguen en ledger 23; la migración candidata de certificados se prueba
 aislada en ledger 24 y requiere el gate/release F9 normal.
+
+## Fase 9 integrada en development — release a master pendiente
+
+La fuente F9 se integró en `development` por PR 294 (CORE), PR 297 (UI) y PR 298
+(seed opt-in); PRs 295/296 (búsqueda/resultados y calendario) están también en la
+fuente combinada. El source `767ac8b7d5667f1a15df91c68ef2095dff1cd638` pasó CI
+`37987296020`, attempt 1: 463 unit/4,031 assertions, 177 integration/1,452,
+fixtures F8 1/897 y F9 1/1,142; 145 E2E (76+69), first-pass, sin fallos, flakes,
+retries o skips. Quality/build, cleanup y agregador PASS. Los runners focales F8
+y F9 corrieron una vez cada uno en stacks independientes; ver [`TESTING.md`](TESTING.md).
+
+Este resultado no es release. `master` permanece en `2789d55e93a97cc5344930e690e9feecc2cc10f5`,
+con ledger conocido 23. No se ha aplicado la migración de certificados ni se ha
+ejecutado el seed F9 en canónico/cloud. La captura productiva anterior del seed
+F1–F8 (72 tablas/899 filas originales; 1,850 filas al final de aquella operación)
+es histórica, no un inventario fresco. No declarar la salud actual de cloud ni
+usar esos conteos como baseline para una futura migración.
+
+La migración candidata `drizzle/0023_phase9_certificates.sql` corresponde a
+journal `idx: 23`, timestamp `1791500766703`, SHA-256
+`4c78ed1735b0cd3cb34d2bdc5f1f2c0d15b51dcc31568136839d706649489ee1`; ledger
+resultante 24. El deploy normal y protegido de `master` es la única vía de
+aplicación. El SQL es aditivo: crea tablas privadas con RLS/grants/triggers,
+configuración de certificados vacía (defaults en lectura, sin insertar una fila
+de configuración) y añade/valida únicamente el bucket privado
+`certificate-documents` sin sobrescribir un bucket existente. La operación de
+release debe comparar en el operador las filas completas/PK y el contexto de
+origen antes/después de la migración normal; esperar solo la entrada del ledger,
+objetos DDL y el bucket nuevo donde falte; preservar los datos preexistentes. Los
+conteos anteriores no sustituyen esa medición actual ni se deben inventar
+conteos para tablas nuevas.
+
+Documentación F9 acompaña el PR combinado de código hacia `master`; no crear un
+PR/merge de documentación aislado ni ejecutar de nuevo todas las suites locales
+solo por documentar. El flujo autorizado es: revisar el PR y su diff completo,
+esperar CI requerido sobre el HEAD combinado (sin fallos/retries/flakes/skips),
+merge protegido y pipeline normal de `master` (migración Drizzle y deploy Vercel
+solo tras los gates). Solo después de que el SHA exacto tenga CI completo
+first-pass y deployment `READY` puede el operador considerar el workflow manual
+`production-comprehensive-demo.yml` con `include_certificates: true`; su default
+permanece `false`. Primero PLAN read-only, revisión manual de plan/hash, después
+APPLY protegido explícito e idempotente. No ejecutar la extensión desde shell
+normal, CI ordinaria, Vercel o job de deploy. La ejecución, sus requisitos de
+configuración ausente/`[DEMO]`, actor, baseline/hash y protección de secretos se
+detalla en [`DEMO_SEED.md`](DEMO_SEED.md).
+
+La ausencia de una fila de configuración al migrar es intencional: `getSettings`
+proyecta defaults sin escribir. El operador no debe convertir defaults en una
+fila ni sobrescribir settings personalizados. La creación inicial de valores
+claramente `[DEMO]` solo corresponde a APPLY opt-in cuando se confirma ausencia;
+configuración existente incompatible bloquea la operación y requiere decisión
+ADMIN autorizada fuera de la demo. Los artefactos demo deben conservar el sello
+`[DEMO - SIN FIRMA INSTITUCIONAL]` en cada página: una revisión técnica no acredita
+firma física ni validez institucional.

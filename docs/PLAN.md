@@ -722,7 +722,7 @@ Migration 0020 se aplicó al Supabase local canónico y a cloud; los ledgers ver
 - [x] Aplicar migration 0020 local/canonical y cloud por el pipeline del release; validaciones locales/readonly cloud y límites de row-hash constan en `TESTING.md`/`DEPLOYMENT.md`.
 - [x] Liberar Fase 7 mediante PR 235; Vercel deployment `dpl_A9Av16T1DZvk19W1836VEuPimAGS` quedó READY para el SHA exacto de master y alias de producción.
 
-En el boundary histórico del release Fase 7, Fase 8 (cierre/planilla/reapertura) y Fase 9 (certificados) aún no estaban iniciadas. Fase 8 fue aprobada y evolucionó después a la implementación integrada en development que se describe abajo. Fase 9 tiene ahora trabajo parcial en los commits base de la rama feature local, con su UI pendiente de publicación e integración. No adelantar weighted-grade changes posteriores ni convertir el demo financiero en un seed de notas.
+En el boundary histórico del release Fase 7, Fase 8 (cierre/planilla/reapertura) y Fase 9 (certificados) aún no estaban iniciadas. Fase 8 fue aprobada y evolucionó después a la implementación integrada en development que se describe abajo. Fase 9 también se implementó después; su estado vigente está en la sección Fase 9 al final de este documento. No adelantar weighted-grade changes posteriores ni convertir el demo financiero en un seed de notas.
 
 ### Correcciones post-release Fase 7 (PR 278 liberado; milestone cerrado)
 
@@ -789,7 +789,7 @@ La migración normal de release llevó ledger canónico local y cloud de 21 a 23
 
 - Fase 8 se completó y liberó por PR 286; el CI rojo previo quedó corregido en fixtures E2E por PR 287 y el gate integrado pasó. No reabrir este milestone salvo un cambio de producto nuevo y aprobado.
 - Google OAuth real, recovery/entrega SMTP cloud y política de retención/anonymización no aprobada permanecen como temas separados; no bloquearon Fase 8.
-- Fase 9 tiene implementación parcial en la línea local de trabajo: el backend de certificados y sus plantillas PDF están en los commits base de esta feature, y la interfaz está en `feat/certificate-interface` (`a450987`). La rama UI no se ha publicado ni integrado en `development`; push, PR, gates y release siguen pendientes. Consultar el estado parcial abajo.
+- En el boundary de este registro histórico, Fase 9 tenía implementación parcial en la línea local: backend y renderer en commits base, UI aún en `feat/certificate-interface` (`a450987`). Ese estado quedó supersedido por la integración posterior en PRs 294–298; ver la sección Fase 9 vigente abajo. El release productivo continúa pendiente.
 - Las correcciones inline, atomic-row, participantes/preinscripción, roster/calendario, perfil, navegación y ajustes de tests F7 están liberadas mediante PR 278; los shards se integraron como PR 279. No volver a presentarlas como pendientes de diseño.
 - Reutilizar las suites existentes; no añadir E2E frágiles basadas en CSS/copy. QA UI manual con Playwright CLI en desktop/mobile, light/dark, tabla/lista, teclado, estados dirty/invalid/error y loading. Solo datos sintéticos aislados; ningún write de calificaciones a datasets canónicos.
 - Para releases de futuras fases, ejecutar formatter, lint, typecheck, unit, integration, E2E y build; registrar flakiness/resultados por separado y exigir checks remotos green. No aceptar retries silenciosos ni reruns que oculten fallos. La autorización de omitir una aprobación administrativa no omite CI ni altera branch protections.
@@ -830,9 +830,9 @@ El runner es aditivo/idempotente y sin reset general. Después del release se ap
 
 El workflow protegido ejecutó PLAN `37854318652` y APPLY `37854790028` sobre el proyecto cloud; hash del plan `2bb8db152ff4ce2a4088ee372c632c17767dd5928c6d2ac28db9655f2b5c09ab`. Baseline: 72 tablas/899 filas originales, preservadas por hashes SHA-256 completos de fila+PK; ledger 23 y settings N=3/mínimo de pago 25 sin cambios. Total 1,850 filas; replay cero cambios. Agregó 8 cursos, 10 grupos, 26 registros/25 participantes, 12 intereses, 4 instructores, 5 ADMIN demo (uno eliminado por lifecycle/Auth, tombstone/outbox completado), 3 versiones de cierre y 1 reapertura; siete GET públicos respondieron 200. No se cambiaron credenciales Auth originales ni se enviaron correos. Baseline local independiente: 70 tablas/2,906 filas originales preservadas; replay cero.
 
-El alcance funcional Fase 9 fue aprobado en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y ADR-028. El gate seed cloud/local está cerrado y la **implementación F9 está en progreso** en ramas de feature; el seed F1–F8 no incluyó certificados. Las decisiones de negocio sobre tipo, elegibilidad, privacidad, reapertura/reemplazo y verificación están resueltas; no se agrega número institucional ni boleta/valorado/condición financiera. Mantener inmutables los snapshots F8; no declarar F9 completada hasta integrar y validar código, esquema, tests, UI/PDF y gates de release.
+El alcance funcional Fase 9 fue aprobado en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y ADR-028. Su implementación se integró en `development` mediante PR 294 (CORE), PR 297 (UI) y PR 298 (extensión de seed F9); PR 295 (búsqueda/resultados) y PR 296 (calendario) también forman parte de la fuente combinada. El CI integrado de Fase 9 está registrado más abajo. El seed F1–F8 original no se reescribe ni se convierte en un seed F9; la extensión F9 es explícita y opt-in. Las decisiones de negocio sobre tipo, elegibilidad, privacidad, reapertura/reemplazo y verificación están resueltas; no se agrega número institucional ni boleta/valorado/condición financiera. Mantener inmutables los snapshots F8.
 
-El UI de certificados de `feat/certificate-interface` (`a450987`) está implementado localmente y pendiente de push/PR/integración; no altera el alcance de negocio aprobado. No considerar que el seed F1–F8 ni los gates recientes incluyan certificados.
+El UI que antes se documentaba en `feat/certificate-interface` (`a450987`) se integró a `development` con PR 297. La UI y el seed F9 son ahora parte de la implementación integrada; el candidato todavía no está liberado a `master` y no está disponible por este hecho en producción.
 
 ### Objetivos
 
@@ -849,19 +849,27 @@ Administración completa el cierre administrativo y académico.
 
 ## FASE 9 — CERTIFICADOS
 
-### Estado parcial — Fase 9 en progreso, interfaz en rama feature local
+### Implementación integrada en development — release pendiente
 
-El alcance de negocio está aprobado y el seed de datos F1–F8 quedó completado en local/cloud, pero no sembró certificados. Backend, schema candidato, renderer y UI F9 se trabajan en ramas de feature; eso no equivale a milestone integrado/completado. El UI de esta rama `feat/certificate-interface` (`a450987`) conecta las páginas Astro/React con las operaciones actuales de CORE, pero no se ha hecho push ni abierto PR y no está integrado en `development`.
+CORE (PR 294), UI (PR 297), extensión de seed opt-in (PR 298), búsqueda/resultados (PR 295) y calendario (PR 296) están integrados en `development`. Incluyen dominio/aplicación/repositorios, schema y migración candidata 0023, renderer PDF/QR, assets, rutas privadas ADMIN/INSTRUCTOR, configuración, ciclo de carga/revisión/emisión/revocación/reemplazo, descargas autenticadas, lookup/verificación pública y comparación local SHA-256. La integración de código no equivale a release: `master` continúa en `2789d55`, con ledger conocido 23; la migración 0023 de certificados no se ha aplicado a canónico/cloud y no hay captura nueva del estado actual de datos productivos.
 
-La rama UI incluye rutas privadas ADMIN e INSTRUCTOR, gestión/configuración, flujo de carga/revisión/emisión/revocación, descargas autenticadas, verificación pública y cálculo local de SHA-256. La interfaz no cambia reglas aprobadas ni autoriza generación desde versiones no vigentes, no revoca automáticamente al reabrir un grupo y no valida criptográficamente firmas manuscritas.
+La interfaz no cambia reglas aprobadas ni autoriza generación desde versiones no vigentes, no revoca automáticamente al reabrir un grupo y no valida criptográficamente firmas manuscritas. La demo F9, cuando se autorice después del release, usa documentos marcados `[DEMO - SIN FIRMA INSTITUCIONAL]`; no representa firmas físicas reales.
 
 - [x] Conectar la página ADMIN de certificados, los enlaces de grupo y los ajustes de certificados a los handlers existentes.
 - [x] Conectar el detalle readonly histórico de instructor y las descargas PDF privadas.
 - [x] Conectar página/formulario de verificación pública con proyección acotada y sin descarga anónima de PDF.
 - [x] Añadir cálculo SHA-256 en navegador para comparar un archivo elegido localmente, sin transmitir el archivo para ese cálculo.
-- [ ] Completar y cerrar los gates de integración, validación y release de Fase 9; la interfaz no los acredita por sí sola.
+- [x] Integrar CORE, UI y la extensión de demo F9 opt-in en `development`, con las suites unitarias, de integración y E2E correspondientes.
+- [ ] Liberar el HEAD combinado a `master` por el flujo normal de PR y CI protegido; aplicar la migración 0023 y desplegar solo después de que el CI requerido esté verde.
+- [ ] Tras el release y deployment READY del mismo SHA, revisar PLAN y autorizar por separado la operación F9 protegida si se desea poblar demos; no ejecutar automáticamente ni durante CI/deploy.
 
 Límites relevantes de la interfaz actual: no se inventan un instante público de emisión ni un enlace/ID de reemplazo ausentes del DTO; la verificación presenta la fecha nominal de finalización definida por el contrato. El índice global histórico de instructores no existe; la navegación disponible es por grupo y acceso directo autorizado. El archivo elegido para comparar SHA-256 no se transmite ni persiste. Los fixtures PDF sintéticos de QA no representan documentos institucionales firmados. Reglas aprobadas, seguridad y evidencia están en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md), [`CERTIFICATES.md`](CERTIFICATES.md), [`DESIGN.md`](DESIGN.md) y [`TESTING.md`](TESTING.md).
+
+#### Gate integrado F9 en development
+
+El source combinado `767ac8b7d5667f1a15df91c68ef2095dff1cd638` pasó CI `37987296020`, intento 1. Quality/build, cleanup y agregador terminaron PASS; unit: 463 tests / 4,031 assertions; integración: 177 / 1,452; integración focal F8 seed: 1 / 897; integración focal F9 seed: 1 / 1,142; E2E: 145 escenarios (76 + 69), todos first-pass, sin fallos, flakes, retries ni skips reportados. Los stacks de F8 seed, F9 seed, producto e integración/E2E fueron independientes; cada runner focal se ejecutó una sola vez y la suite combinada local no se duplicó. Ver [`TESTING.md`](TESTING.md) para evidencia y límites.
+
+La migración candidata `drizzle/0023_phase9_certificates.sql` corresponde a la entrada journal `idx: 23`, timestamp `1791500766703`, SHA-256 `4c78ed1735b0cd3cb34d2bdc5f1f2c0d15b51dcc31568136839d706649489ee1`; su aplicación normal llevaría el ledger de 23 a 24. En este boundary de documentación no se aplicó en el Supabase canónico ni cloud. `master` sigue en `2789d55`; la evidencia F8 de producción previa no es un inventario fresco ni acredita salud actual, aplicación F9, preservación post-migración F9 o firma institucional. No iniciar un release documental independiente: la documentación acompaña el PR de código combinado.
 
 ### Objetivos
 

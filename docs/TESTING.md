@@ -706,8 +706,10 @@ No se afirma una revisión visual manual con Playwright CLI/screenshot para el c
   migraciones F9.
 - La carga local canónica previa usó un baseline separado de 70 tablas/2,906
   filas originales y también preservó hashes/replay cero; no comparar tamaños de
-  baseline entre entornos. Fase 9 está en progreso en ramas de feature; no se
-  cuenta como implementada ni cubierta por estos gates.
+  baseline entre entornos. En este boundary Fase 9 estaba aún en ramas de
+  feature y no se contaba como implementada ni cubierta por esos gates; la
+  integración/gate combinado posterior está documentado en la sección actual al
+  final de este archivo.
 
 ### Pulido local de filtros y scroll del calendario (fuente `bf938d3`)
 
@@ -779,6 +781,18 @@ snapshot, esquema ni datos canónicos/cloud.
 Esta validación de PR 295 no representa gate completo de Fase 9 ni verifica otros
 cambios en curso.
 
-### Gate integrado más reciente de development
+### Gate CORE tras PR 294 (boundary histórico; supersedido por gate F9 combinado)
 
-Tras el merge CORE PR 294 (`de22705230b07538dfe4584e678fd35deb3d1ca2`), CI `37955046219` pasó en el primer intento: quality sin errores/warnings, **451 unit / 3,882 assertions**, **177 integration / 1,452 assertions**, test del seed **1/897 assertions** y **142 E2E** en dos shards (75 + 67). La verificación de preservación registró 75 tablas y 418 filas originales sin cambios tras replay. No se reportaron fallos, flakes, retries ni skips. Este gate de CORE/development no integra la UI de `feat/certificate-interface`, no acredita un gate de Fase 9 y no es release a producción. La migración 0023 corresponde al estado de development; la candidata 0024 solo se probó en QA aislado, sin aplicarse al Supabase canónico/cloud, que permanece en ledger 23. Producción sigue en `master` `2789d55`.
+Inmediatamente tras el merge CORE PR 294 (`de22705230b07538dfe4584e678fd35deb3d1ca2`), CI `37955046219` pasó en el primer intento: quality sin errores/warnings, **451 unit / 3,882 assertions**, **177 integration / 1,452 assertions**, test del seed **1/897 assertions** y **142 E2E** en dos shards (75 + 67). La verificación de preservación registró 75 tablas y 418 filas originales sin cambios tras replay. No se reportaron fallos, flakes, retries ni skips en ese run. Este fue el gate CORE previo a integrar UI/seed F9; no era el gate de release combinado ni release a producción. La migración candidata es `0023_phase9_certificates.sql` (journal `idx: 23`, ledger resultante 24), probada solo en QA aislada y no aplicada a canónico/cloud, que permanecen en ledger 23. En ese boundary, producción seguía en `master` `2789d55`.
+
+### Gate combinado Fase 9 en development
+
+Tras integrar CORE PR 294, UI PR 297, demo F9 PR 298 y UI de búsqueda/resultados/calendario de PRs 295/296, el source combinado `767ac8b7d5667f1a15df91c68ef2095dff1cd638` pasó CI `37987296020`, attempt 1. Quality/build, cleanup y agregador PASS; **463 unit / 4,031 assertions**, **177 integración / 1,452 assertions**, F8 seed focal **1/897**, F9 seed focal **1/1,142** y **145 E2E** en dos shards (76 + 69). Todos los E2E pasaron first-pass; cero fallos, flakes, retries o skips reportados.
+
+Los runners de integración de producto, F8 seed y F9 seed usaron stacks Supabase separados y cada fixture se ejecutó una vez; no se repitió la suite completa para presentar un total combinado. F8 conservó las 418 filas originales de 75 tablas; la prueba F9 preservó por hash sus 1,141 filas originales de 75 tablas. El replay F9 no hizo cambios; los ocho certificados y estados del dataset de prueba están descritos en [`DEMO_SEED.md`](DEMO_SEED.md). Es evidencia CI/QA sobre `development`, no migración cloud, release, smoke productivo ni inventario de filas actuales.
+
+La migración candidata `0023_phase9_certificates.sql` tiene SHA-256 `4c78ed1735b0cd3cb34d2bdc5f1f2c0d15b51dcc31568136839d706649489ee1` y timestamp `1791500766703` en `idx: 23`; ledger objetivo 24. No se ha aplicado a canónico/cloud. `master` continúa en `2789d55` y la evidencia productiva conocida es histórica; no se afirma salud actual, preservación F9 live o ejecución de demo F9 en producción.
+
+### Notas de cronología E2E que no se atribuyen como defectos resueltos
+
+El gate combinado anterior fue limpio, pero no cambia la causalidad de observaciones históricas. El caso de registro con SSR pendiente/interceptores de test fue acotado a su fixture/interceptor; la causa interna previa no se estableció. La temporización de cierre del toggle de teclado en público-interés y la readiness de `PageDown` en calendario tampoco tienen causa raíz confirmada. Una revisión controlada del planificador de días confirmó el montaje tardío del campo y persistencia/format esperado antes/después (2/2); no atribuir retroactivamente a ese cambio todos los fallos históricos de CI. No aumentar timeouts globales ni reclasificar fallos sin evidencia. El historial específico del calendario permanece arriba.

@@ -381,31 +381,41 @@ El boceto `Enrollment`/`Refund`/`PaymentReference` a continuación es histórico
 
 ### Certificate
 
-Entidad conceptual de Fase 9. El baseline `development` actual aún no incorpora
-su tabla; el schema/migration candidata `0023` se trabaja en una rama de feature
-y solo se prueba en el stack aislado ledger 24, no está aplicada en canónico/cloud
-(ledger 23). El contrato aprobado de elegibilidad, snapshot de impresión,
-artefactos y ciclo de vida está en
-[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md); esta lista no autoriza a
-inferir columnas/migraciones finales ni representa una tabla desplegada.
-El contrato exige preservar reaperturas/versiones históricas, relacionar
-reemplazos sin borrado y permitir como máximo un certificado activo por
-curso/tipo/destinatario; la estructura concreta e índices se definirán durante
-la implementación.
+Entidad implementada en `development` mediante `0023_phase9_certificates.sql`
+(entrada journal `idx: 23`, ledger resultante 24). La migración candidata está
+probada en stacks aislados, pero no aplicada a canónico/cloud; en este boundary
+`master` conserva ledger 23. El schema incluye ajustes singleton, certificados,
+eventos, receipts idempotentes y reservas/metadata de artefactos, todos con RLS.
+La tabla `certificates` conserva tipo/estado, destinatario, versión oficial F8,
+datos/procedencia congelados, actor, paths/hash de artefactos y vínculos de
+reemplazo; los índices/constraints limitan IDs públicos y un único certificado
+`issued` por curso/tipo/destinatario. Detalle normativo en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). El estado de release y
+evidencia QA están en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 
 - id
 - publicCredentialId
-- participantId
+- recipientId
 - courseId
 - groupId
+- versionId / version
 - type
-- status
+- state / revision
+- data / provenance
+- instructorId / createdBy
+- generatedAt
 - issuedAt
-- filePath
-- fileHash
 - revokedAt
-- revocationReason
-- replacedByCertificateId
+- reason
+- unsignedPath / signedPath / signedSha256
+- reviewed
+- replacementForId / replacedById
+
+Related tables: `certificate_settings` is a revisioned singleton whose default
+projection is read-only until an ADMIN explicitly saves it; `certificate_events`
+and `certificate_receipts` preserve append-only audit/idempotency evidence;
+`certificate_artifacts` records reserved/attached/cleanup states and exact file
+hashes. The private Storage bucket is `certificate-documents`.
 
 ### AuditEvent
 

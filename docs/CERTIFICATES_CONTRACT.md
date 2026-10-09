@@ -2,21 +2,20 @@
 
 ## Estado y límites
 
-El alcance de negocio de este contrato fue aprobado. **La Fase 9 todavía no está
-implementada**: no existen aún módulo, persistencia, rutas, renderer, uploads,
-QR ni verificación de certificados en el código de este checkout. La Fase 8 sí
-está integrada/liberada; esta especificación parte de su versión oficial
-inmutable. El orden de implementación y el bloqueo actual están en
-[`PLAN.md`](PLAN.md). Las reglas generales de ciclo de vida/privacidad se resumen
-en [`CERTIFICATES.md`](CERTIFICATES.md), y las decisiones aprobadas se registran
-en [`DECISIONS.md`](DECISIONS.md).
+El alcance de negocio de este contrato fue aprobado. La implementación de Fase 9
+(dominio/aplicación, persistencia, rutas, renderer PDF/QR, UI y extensión de demo)
+está integrada en `development` mediante PRs 294, 297 y 298; las mejoras UI de
+PRs 295/296 también están integradas. **Aún no está liberada a `master`**: la
+migración candidata `0023_phase9_certificates.sql` no se ha aplicado a canónico ni
+cloud y el demo F9 no se ha ejecutado allí. La fuente F8 oficial permanece
+inmutable. El estado de implementación/release está en [`PLAN.md`](PLAN.md); las
+reglas generales y decisiones se resumen en [`CERTIFICATES.md`](CERTIFICATES.md)
+y [`DECISIONS.md`](DECISIONS.md).
 
-No crear schema/migraciones, fixtures de certificados ni assets a partir de
-capturas en esta rama de documentación. El contrato es para una futura rama de
-implementación; la carga productiva F1–F8 descrita en `PLAN.md` no crea ni
-autoriza certificados demo. El baseline documental sigue siendo `c15a685`
-(2026-10-08); el estado operativo posterior citado en el plan no incorpora
-cambios de código a este worktree.
+El CI integrado y la QA focal de la extensión F9 están documentados en
+[`TESTING.md`](TESTING.md) y [`DEMO_SEED.md`](DEMO_SEED.md). Esta evidencia no
+equivale a migración cloud, release, disponibilidad de producción ni firmas
+institucionales físicas/digitales.
 
 ## Tipos y elegibilidad
 
@@ -272,17 +271,19 @@ certificado activo por curso/tipo/destinatario; el reemplazo marca el previo
 
 ## Implementación y límites de estado
 
-La autorización/gates del seed de datos F1–F8 local y cloud quedaron completados;
-la implementación F9 está en progreso en ramas de feature. Este contrato no
-declara implementados ni liberados los nuevos módulos/migraciones. Al integrar
-F9, persistir el ordinal ADMIN-editable del grupo por orden de creación dentro
-del curso, capturar sus correcciones antes de generar y congelar el valor; no
-derivarlo de sesiones. Ubicación/leyendas institucionales y assets deben usar el
-contenido y PNG fuente autorizados y guardarse con configuración/versión
-congelada.
+La implementación integrada incorpora schema y migración candidata 0023, cuya
+entrada journal es `idx: 23` y cuyo ledger resultante es 24. La migración tiene
+SHA-256 `4c78ed1735b0cd3cb34d2bdc5f1f2c0d15b51dcc31568136839d706649489ee1` y
+timestamp `1791500766703`. Todavía no se ha aplicado en el Supabase canónico/cloud;
+el límite actual conocido de `master` es ledger 23. El ordinal de grupo es
+ADMIN-editable antes de generar; sus ajustes, ubicación/leyendas institucionales,
+branding y assets autorizados se congelan en la configuración/procedencia del
+certificado. Los snapshots F8 no se modifican.
 
 No quedan abiertas decisiones de negocio sobre tipo/elegibilidad, finanzas,
 firmas, QR, exposición de la verificación, privacidad del PDF, reapertura,
-vigencia de emitidos ni reemplazo. Aún faltan integración/validación del código,
-schema, renderer, UI y gates de release. El seed F1–F8 no generó certificados ni
-autoriza datos de Fase 9.
+vigencia de emitidos ni reemplazo. La integración y el gate CI de `development`
+están completos; falta el release normal a `master`, aplicación de la migración,
+deployment y, opcionalmente, operación F9 de demo protegida. El seed F1–F8
+histórico no generó certificados; la extensión F9 requiere el flag opt-in y los
+gates protegidos descritos en [`DEMO_SEED.md`](DEMO_SEED.md).

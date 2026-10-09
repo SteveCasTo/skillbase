@@ -2,9 +2,9 @@
 
 ## Estado y alcance
 
-Este documento registró los acuerdos previos para una pasada de correcciones operativas sobre la aplicación liberada en Fase 8. Las correcciones y runner demo se integraron mediante PRs 289/288; PR 292 añadió el canal cloud protegido. La release actual de producción sigue en `master` `2789d55e93a97cc5344930e690e9feecc2cc10f5` (CI `37846141904`, Vercel `dpl4CZ READY`), y los seeds local/cloud F1–F8 se completaron por las operaciones aprobadas (ver [`DEMO_SEED.md`](DEMO_SEED.md)). El seguimiento UI de instructor/resultados descrito abajo se integró posteriormente a `development` mediante PR 295; no se atribuye un release a `master` en esta sección.
+Este documento registró los acuerdos previos para una pasada de correcciones operativas sobre la aplicación liberada en Fase 8. Las correcciones y runner demo se integraron mediante PRs 289/288; PR 292 añadió el canal cloud protegido. La release de producción registrada en este boundary sigue en `master` `2789d55e93a97cc5344930e690e9feecc2cc10f5` (CI `37846141904`, Vercel `dpl4CZ READY`), y los seeds local/cloud F1–F8 se completaron por las operaciones aprobadas (ver [`DEMO_SEED.md`](DEMO_SEED.md)). El seguimiento UI de instructor/resultados descrito abajo se integró posteriormente a `development` mediante PR 295; el conjunto F9 se integró después por PRs 294–298. Este contrato no acredita su release a `master`.
 
-Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Este contrato no la reabre. Fase 9 no se implementa aquí; su alcance fue aprobado posteriormente y se mantiene en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). Tras completar los seeds F1–F8 local/cloud, la implementación F9 está en progreso en ramas de feature.
+Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Este contrato no la reabre. Fase 9 no se implementa aquí; su alcance fue aprobado posteriormente y se mantiene en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). Tras completar los seeds F1–F8 local/cloud, la implementación F9 se integró después en `development`; el estado de release está en [`PLAN.md`](PLAN.md).
 
 ## Reglas transversales de interfaz
 
@@ -82,5 +82,6 @@ aprobadas. El owner aprobó después el alcance de certificados; la especificaci
 vigente es [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y la decisión
 ADR-028 en [`DECISIONS.md`](DECISIONS.md). No se deben usar como pendientes las
 preguntas históricas enumeradas en esta versión del contrato. Los seeds F1–F8
-local/cloud ya se completaron y Fase 9 está en progreso; su estado vigente está
-en [`PLAN.md`](PLAN.md)/[`DEMO_SEED.md`](DEMO_SEED.md).
+local/cloud ya se completaron y, al actualizar este contrato, Fase 9 estaba en
+progreso. Su estado vigente (implementación integrada en development, release
+pendiente) está en [`PLAN.md`](PLAN.md)/[`DEMO_SEED.md`](DEMO_SEED.md).

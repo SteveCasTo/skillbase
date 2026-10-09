@@ -811,7 +811,7 @@ asistencia y cambios de membresía.
 
 **Fecha:** 2026-10-08
 
-**Estado:** Accepted — alcance aprobado; implementación en progreso
+**Estado:** Accepted — alcance aprobado e implementación integrada en `development`; release pendiente
 
 ### Contexto
 
@@ -874,9 +874,11 @@ los detalles de almacenamiento/ordinal que corresponderán al diseño técnico.
   del formato, procedencia, operación, privacidad y dependencias de
   implementación.
 - La carga autorizada F1–F8 local/cloud ya pasó sus gates y está documentada en
-  `DEMO_SEED.md`. Implementación F9 está en progreso en ramas de feature; el
-  baseline `development` aún no contiene migración F9 aplicada a canónico/cloud.
-  Persistir ordinal ADMIN-editable de grupo y configuración/versiones de
-  plantilla/assets sin modificar historia F8.
-- La aprobación del alcance no equivale a implementación, schema, migración,
-  despliegue ni autorización de seed. Fase 9 sigue pendiente en `PLAN.md`.
+  `DEMO_SEED.md`. La implementación F9 y el seed opt-in están integrados en
+  `development`; el CI completo del source combinado pasó. Su migración todavía
+  no se ha aplicado a canónico/cloud. El release, deployment y la operación
+  protegida de demo siguen pendientes. Persistir ordinal ADMIN-editable y
+  configuración/versiones de plantilla/assets sin modificar historia F8.
+- La aprobación del alcance y la integración en `development` no equivalen a
+  release, despliegue ni ejecución de seed productivo. Ver el estado vigente en
+  `PLAN.md`; el seed F9 requiere el flag opt-in y gates/proceso protegidos.

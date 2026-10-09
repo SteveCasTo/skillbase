@@ -1,12 +1,14 @@
 # Demo integral F1–F8
 
-## Extensión F9 opt-in (WIP; ejecución real retenida)
+## Extensión F9 opt-in (integrada en development; ejecución canónica/cloud pendiente)
 
 El usuario autorizó datos ficticios de todas las secciones, incluidos certificados,
-en local/QA/producción. **La ejecución canónica y productiva queda retenida hasta
-el release F9 completo**, CI first-pass sin retries y deployment READY del mismo
-SHA. Las ejecuciones F1–F8 históricas de este documento no cambian ni se atribuyen
-a F9. Esta extensión no modifica dominio, schema, políticas, UI ni migraciones.
+en local/QA/producción. El soporte F9 está implementado e integrado en
+`development`; **la ejecución canónica y productiva queda retenida hasta el release
+F9 completo**, CI first-pass sin retries y deployment READY del mismo SHA. Las
+ejecuciones F1–F8 históricas de este documento no cambian ni se atribuyen a F9.
+La extensión implementada usa el modelo/renderer/operaciones reales del módulo y
+no añade una vía SQL que fabrique registros o artefactos de certificado.
 
 - `--include-certificates` selecciona exclusivamente la extensión sobre un
   manifiesto F8 propio ya completo; sin el flag el runner F1–F8 queda intacto.
@@ -88,10 +90,43 @@ existente, el deploy. No se añade job opcional ni `continue-on-error`, y CI no
 invoca flags/CLI del seed productivo. El workflow productivo manual y sus guards
 de actor/evento/master/SHA/deployment/hash PLAN permanecen intactos.
 
-El wiring tiene cobertura focal en `tests/unit/comprehensive-demo-ci.test.ts`;
-la ejecución remota del nuevo paso CI aún no está acreditada. La evidencia QA de
-lifecycle que sigue corresponde a la implementación previa, no a una repetición
-de la suite en este follow-up.
+El wiring tiene cobertura en `tests/unit/comprehensive-demo-ci.test.ts` y pasó en
+el CI integrado completo descrito a continuación. La evidencia focal antigua que
+sigue debajo se conserva como cronología previa, no se suma al gate combinado.
+
+#### Gate CI integrado de Fase 9 (development)
+
+El source combinado `767ac8b7d5667f1a15df91c68ef2095dff1cd638` pasó CI
+`37987296020`, attempt 1. Quality/build, cleanup y agregador PASS: 463 unit / 4,031
+assertions; integración de producto 177 / 1,452; fixture F8 1 / 897; fixture F9
+1 / 1,142; E2E 145 (shards 76 + 69). Todos los E2E fueron first-pass, sin fallos,
+flakes, retries ni skips. Producto, F8 seed y F9 seed se probaron una sola vez,
+cada fixture en su propio stack gestionado; no se duplicó la suite completa local.
+Esta evidencia es de `development`, no de `master` ni de producción. CI/plan y
+límites de release en [`PLAN.md`](PLAN.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
+La migración candidata `0023_phase9_certificates.sql` tiene journal `idx: 23`,
+timestamp `1791500766703` y SHA-256
+`4c78ed1735b0cd3cb34d2bdc5f1f2c0d15b51dcc31568136839d706649489ee1`; ledger
+resultante 24. No se ha aplicado a canónico ni cloud, cuyo último ledger
+documentado es 23.
+
+#### QA aislada de la extensión F9
+
+La validación focal del source F9 usó un stack Supabase temporal propio, con
+ledger 24. El manifest F8 original conservó 75 tablas/418 filas; el manifest F9
+partió de 75 tablas/1,141 filas y terminó preservando esos datos, más los cambios
+de la extensión. Se verificaron ocho certificados sintéticos: 2 `generated`, 2
+`awaiting_signature`, 2 `issued`, 1 `revoked` y 1 `replaced`; replay de APPLY
+produjo cero cambios. El F8 seed se ejecutó una sola vez en su stack propio y
+conservó su dataset original. Cleanup del runner terminó correctamente.
+
+Esta QA no es carga canónica/cloud ni firma institucional. Los PDFs sintéticos
+incluyen `[DEMO - SIN FIRMA INSTITUCIONAL]` visiblemente en cada página; el archivo
+subido para el lifecycle demuestra almacenamiento/hash de bytes de DEMO, no una
+firma manuscrita real, escaneo institucional o firma digital criptográfica. Los
+valores 418/75 y 1,141/75 pertenecen a fixtures aisladas de CI/QA, no al inventario
+actual de producción.
 
 Evidencia QA focal (2026-10-09, branch `feat/certificate-demo-extension`, base
 `de22705230b07538dfe4584e678fd35deb3d1ca2`): 13 unit PASS / 307 assertions en

@@ -4,10 +4,11 @@
 
 Definir el ciclo de vida de certificados digitales verificables.
 
-El alcance aprobado, elegibilidad, plantillas, fuentes congeladas, permisos y
-pendientes de implementación están detallados en
+El alcance aprobado, elegibilidad, plantillas, fuentes congeladas y permisos
+están detallados en
 [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). Este documento conserva
-los principios generales; no implica que el módulo Fase 9 ya exista.
+los principios generales. El módulo está integrado en `development`; esto no
+implica release a producción.
 
 ## PRINCIPIO
 
@@ -131,7 +132,7 @@ No asumir que una URL Storage pública equivale a validación.
 
 La ruta de verificación debe consultar el registro actual del certificado.
 
-## INTERFAZ IMPLEMENTADA (RAMA FEATURE LOCAL)
+## IMPLEMENTACIÓN INTEGRADA EN DEVELOPMENT
 
 La interfaz conectada al backend disponible en esta rama incluye:
 
@@ -141,7 +142,7 @@ La interfaz conectada al backend disponible en esta rama incluye:
 - Página pública `/certificados/[publicCredentialId]` y formulario de búsqueda en `/certificados`. La respuesta pública es una proyección mínima; no expone snapshots privados ni ofrece descarga anónima del PDF.
 - Verificación local opcional del archivo seleccionado: SHA-256 se calcula en el navegador, sobre el archivo local. El contenido no se transmite para calcular ese hash; no equivale a una firma digital ni demuestra por sí solo la identidad de quien lo presenta.
 
-Este estado acredita la interfaz en la rama local `feat/certificate-interface` (`a450987`), pendiente de push, PR, integración en `development` y gates correspondientes. No acredita disponibilidad en producción. Las capacidades ausentes del contrato backend (por ejemplo, índice global de historial de instructores o enlace público de reemplazo) no se simulan en la UI. Ver progreso y gates pendientes en [`PLAN.md`](PLAN.md) y la cobertura efectivamente ejecutada en [`TESTING.md`](TESTING.md).
+La UI de PR 297 y el backend de PR 294 están integrados en `development`; la integración se validó en el gate combinado descrito en [`TESTING.md`](TESTING.md). Esto no acredita disponibilidad en producción: `master` no contiene F9 y la migración candidata no se ha aplicado a cloud. Las capacidades ausentes del contrato backend (por ejemplo, índice global de historial de instructores o enlace público de reemplazo) no se simulan en la UI. Ver progreso/release en [`PLAN.md`](PLAN.md).
 
 La carga/revisión manual de un PDF no verifica criptográficamente una firma manuscrita. Los archivos sintéticos usados en QA solo prueban el ciclo técnico; no son certificados institucionales firmados ni evidencia de autoridad legal.
 

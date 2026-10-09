@@ -687,11 +687,11 @@ existente. El comportamiento y sus límites están en
 [`TESTING.md`](TESTING.md). PR 295 se integró en `development`; esto no acredita
 su release a `master`.
 
-## Certificados (interfaz en rama feature local)
+## Certificados (implementación integrada en development)
 
 - La navegación ADMIN enlaza gestión y ajustes de certificados; las vistas de curso/grupo dan acceso a la gestión del grupo. El detalle privado presenta las operaciones disponibles según el estado que entrega el servidor. No duplica reglas de elegibilidad, permisos ni transiciones en el cliente.
 - El instructor accede a certificados históricos propios en modo readonly, con descargas privadas autenticadas. No se inventa un índice global de historial que el loader no ofrece.
 - `/certificados` ofrece búsqueda y `/certificados/[publicCredentialId]` presenta el resultado público mínimo autorizado. La superficie pública no enlaza ni descarga PDFs privados.
 - La verificación opcional del archivo usa el picker del navegador y calcula SHA-256 localmente; se evita transmitir el archivo para ese cálculo. La UI no lo representa como validación de firma digital o de identidad del portador.
 - La carga/revisión del documento utiliza controles privados; errores de validación se presentan junto al formulario y permiten recuperación cuando el servidor lo permite. No afirmar que la carga valide la autenticidad de una firma manuscrita.
-- La UI se implementó con SSR y las convenciones responsive/teclado del design system. La revisión QA incluyó desktop/tablet/mobile y temas claro/oscuro; el alcance y límites de los tests concretos están en [`TESTING.md`](TESTING.md). El código está en `feat/certificate-interface` (`a450987`), pendiente de push/PR e integración a `development`; no está publicado en producción.
+- La UI SSR está integrada mediante PR 297 en `development`, junto al CORE de PR 294. La revisión QA y límites de ejecución están en [`TESTING.md`](TESTING.md); el gate combinado pasó en CI, pero F9 no está publicado en producción mientras el release a `master` siga pendiente.
