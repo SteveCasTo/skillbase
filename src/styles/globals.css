@@ -35,6 +35,8 @@
   --sidebar-accent-foreground: oklch(0.3353 0.0132 2.7676);
   --sidebar-border: oklch(0.9296 0.037 38.6868);
   --sidebar-ring: oklch(0.7357 0.1641 34.7091);
+  --scrollbar-thumb: var(--secondary-foreground);
+  --scrollbar-track: var(--background);
   --font-sans: "Montserrat", sans-serif;
   --font-serif: "Merriweather", serif;
   --font-mono: "Ubuntu Mono", monospace;
@@ -87,6 +89,7 @@
   --sidebar-accent-foreground: oklch(0.2569 0.0169 352.4042);
   --sidebar-border: oklch(0.3637 0.0203 342.2664);
   --sidebar-ring: oklch(0.7357 0.1641 34.7091);
+  --scrollbar-thumb: var(--primary);
 }
 
 @theme inline {
@@ -142,10 +145,12 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-color: inherit;
   }
 
   html {
     @apply scroll-smooth;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   }
 
   body {
@@ -155,6 +160,41 @@
   button,
   a {
     @apply focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2;
+  }
+}
+
+/* Fallback for WebKit versions without the standard scrollbar-color property. */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid var(--scrollbar-track);
+  border-radius: var(--radius);
+  background: var(--scrollbar-thumb);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(
+    in oklch,
+    var(--scrollbar-thumb) 80%,
+    var(--foreground)
+  );
+}
+
+@media (forced-colors: active) {
+  * {
+    scrollbar-color: auto !important;
+  }
+  ::-webkit-scrollbar,
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner,
+  ::-webkit-scrollbar-thumb,
+  ::-webkit-scrollbar-thumb:hover {
+    all: revert;
   }
 }
 

@@ -2,6 +2,16 @@ import type { AttendanceSessionDto } from "@/domain/attendance/types";
 
 export type SessionStateFilter = "ALL" | AttendanceSessionDto["status"];
 
+/** The last pressed toggle wins; deselecting it restores every session. */
+export function sessionStateFromToggleValues(
+  values: readonly string[],
+): SessionStateFilter {
+  const value = values.at(-1);
+  return value === "UPCOMING" || value === "COMPLETED" || value === "CANCELLED"
+    ? value
+    : "ALL";
+}
+
 /** Combine civil date and the authoritative DTO state; never infer completion. */
 export function filterSessionRows(
   rows: Iterable<{

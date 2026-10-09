@@ -15,7 +15,11 @@ import {
 import { getPrivateRoutePolicy } from "@/server/auth/route-policy";
 import type { AttendanceRepository } from "@/application/attendance/attendance-repository";
 import type { InternalUser } from "@/domain/auth/types";
-import { filterSessionRows } from "@/components/attendance/session-filter";
+import { civilDay } from "@/domain/attendance/rules";
+import {
+  filterSessionRows,
+  sessionStateFromToggleValues,
+} from "@/components/attendance/session-filter";
 import { prepareGroupParticipantsRoute } from "@/components/attendance/participants-route";
 const actor: InternalUser = {
   id: crypto.randomUUID(),
@@ -303,6 +307,44 @@ test("calendar dates show every authoritative status on that date, and status se
   expect(filterSessionRows(rows, "", "COMPLETED")).toBe(1);
   expect(rows.filter((row) => !row.hidden)).toEqual([rows[3]!]);
   expect(filterSessionRows(rows, "", "ALL")).toBe(4);
+});
+test("session state toggles allow no pressed filter and preserve authoritative ongoing rows", () => {
+  const rows = ["UPCOMING", "COMPLETED", "CANCELLED", "ONGOING"].map(
+    (sessionStatus) => ({
+      hidden: false,
+      dataset: { sessionDay: "2026-10-08", sessionStatus },
+    }),
+  );
+  for (const state of ["UPCOMING", "COMPLETED", "CANCELLED"] as const) {
+    const selected = sessionStateFromToggleValues([state]);
+    expect(selected).toBe(state);
+    expect(filterSessionRows(rows, "", selected)).toBe(1);
+    const cleared = sessionStateFromToggleValues([]);
+    expect(cleared).toBe("ALL");
+    expect(filterSessionRows(rows, "", cleared)).toBe(4);
+  }
+  expect(sessionStateFromToggleValues(["UPCOMING", "COMPLETED"])).toBe(
+    "COMPLETED",
+  );
+  expect(sessionStateFromToggleValues(["ALL"])).toBe("ALL");
+  expect(filterSessionRows(rows, "2026-10-09", "ALL")).toBe(0);
+  expect(filterSessionRows(rows, "2026-10-08", "ALL")).toBe(4);
+});
+test("session date filtering respects the Bolivia civil boundary without changing DTO statuses", () => {
+  const rows = ["2026-10-09T03:59:00.000Z", "2026-10-09T04:00:00.000Z"].map(
+    (startsAt) => ({
+      hidden: false,
+      dataset: {
+        sessionDay: civilDay(new Date(startsAt)),
+        sessionStatus: "UPCOMING",
+      },
+    }),
+  );
+  expect(filterSessionRows(rows, "2026-10-08", "ALL")).toBe(1);
+  expect(rows.filter((row) => !row.hidden)).toEqual([rows[0]!]);
+  expect(filterSessionRows(rows, "2026-10-09", "ALL")).toBe(1);
+  expect(rows.filter((row) => !row.hidden)).toEqual([rows[1]!]);
+  expect(filterSessionRows(rows, "", "UPCOMING")).toBe(2);
 });
 test("group participant pages reject the wrong role before accessing private data", async () => {
   const adminData = await prepareGroupParticipantsRoute({
