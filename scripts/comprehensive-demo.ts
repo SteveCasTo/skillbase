@@ -46,6 +46,7 @@ import {
 } from "./comprehensive-demo-plan";
 import { currentAnchor, fingerprint } from "./financial-demo-plan";
 import { getLocalSupabaseEnvironment } from "./supabase-local-env";
+import { runComprehensiveCertificates } from "./comprehensive-demo-certificates";
 
 const manifestId = comprehensiveDemoId("manifest");
 export interface ComprehensiveDemoOptions {
@@ -572,47 +573,73 @@ if (import.meta.main) {
     const key = process.env.DEMO_SUPABASE_SERVICE_ROLE_KEY;
     if (!key) throw new Error("Privileged Auth credential required");
     connection = createDatabase(url, { max: 1 });
-    await runComprehensiveDemo(connection.db, {
-      actorId: process.env.DEMO_ADMIN_ID ?? "",
-      auth: createClient(api, key, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      }),
-      password: process.env.DEMO_ACCOUNT_PASSWORD ?? "",
-      apply: args.apply,
-      ...(args.anchorDay ? { anchorDay: args.anchorDay } : {}),
-      preview(plan, existing) {
-        console.info(
-          JSON.stringify(
-            {
-              mode: args.apply ? "APPLY" : "PLAN",
-              target: args.target,
-              project: args.project,
-              owner: plan.owner,
-              existing,
-              anchorDay: plan.anchorDay,
-              formats: plan.formats.length,
-              instructors: 4,
-              adminsCreated: 5,
-              courses: plan.samples.map((x) => ({
-                id: x.course.id,
-                name: x.course.name,
-                status: x.course.status,
-                groups: x.groups.length,
-                components: x.components.length,
-                registrations: x.registrations.length,
-              })),
-              limit: plan.limit,
-              minimumPaymentPercent: plan.minimumPaymentPercent,
-              preservesExistingRows: true,
-              resetAllowed: false,
-              certificatesIncluded: false,
-            },
-            null,
-            2,
-          ),
-        );
-      },
-    });
+    if (args.includeCertificates) {
+      await runComprehensiveCertificates(connection.db, {
+        actorId: process.env.DEMO_ADMIN_ID ?? "",
+        auth: createClient(api, key, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        }),
+        apply: args.apply,
+        verificationOrigin:
+          args.target === "production"
+            ? "https://skillbase-alpha.vercel.app"
+            : "https://demo.invalid",
+        preview(plan) {
+          console.info(
+            JSON.stringify(
+              {
+                mode: args.apply ? "APPLY" : "PLAN",
+                ...plan,
+                planHash: fingerprint(plan),
+              },
+              null,
+              2,
+            ),
+          );
+        },
+      });
+    } else
+      await runComprehensiveDemo(connection.db, {
+        actorId: process.env.DEMO_ADMIN_ID ?? "",
+        auth: createClient(api, key, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        }),
+        password: process.env.DEMO_ACCOUNT_PASSWORD ?? "",
+        apply: args.apply,
+        ...(args.anchorDay ? { anchorDay: args.anchorDay } : {}),
+        preview(plan, existing) {
+          console.info(
+            JSON.stringify(
+              {
+                mode: args.apply ? "APPLY" : "PLAN",
+                target: args.target,
+                project: args.project,
+                owner: plan.owner,
+                existing,
+                anchorDay: plan.anchorDay,
+                formats: plan.formats.length,
+                instructors: 4,
+                adminsCreated: 5,
+                courses: plan.samples.map((x) => ({
+                  id: x.course.id,
+                  name: x.course.name,
+                  status: x.course.status,
+                  groups: x.groups.length,
+                  components: x.components.length,
+                  registrations: x.registrations.length,
+                })),
+                limit: plan.limit,
+                minimumPaymentPercent: plan.minimumPaymentPercent,
+                preservesExistingRows: true,
+                resetAllowed: false,
+                certificatesIncluded: false,
+              },
+              null,
+              2,
+            ),
+          );
+        },
+      });
     console.info(
       args.apply
         ? "Owned DEMO fixtures ready; no mail sent or existing credentials changed."
@@ -620,7 +647,9 @@ if (import.meta.main) {
     );
   } catch {
     console.error(
-      "Comprehensive demo refused or failed. Verify exact target/project, explicit production approval, schema through 0022, active ADMIN, password and owned fixture collisions. Internal DB/Auth details and credentials withheld. Do not reset, disable triggers or rotate existing accounts.",
+      process.argv.includes("--include-certificates")
+        ? "F9 DEMO blocked or failed. Require released source/schema 24, completed owned F8, latest closed versions and known DEMO ADMIN. Existing config must be complete, explicitly DEMO and compatible with phase9-v1; never overwrite it. Review partial owned reservations/receipts before recovery. Internal DB/Auth details withheld; no reset or migration repair."
+        : "Comprehensive demo refused or failed. Verify exact target/project, explicit production approval, schema through 0022, active ADMIN, password and owned fixture collisions. Internal DB/Auth details and credentials withheld. Do not reset, disable triggers or rotate existing accounts.",
     );
     process.exitCode = 1;
   } finally {

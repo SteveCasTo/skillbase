@@ -24,6 +24,7 @@
     "test:integration": "bun scripts/run-integration.ts",
     "test:integration:renew-demo": "bun scripts/test-renew-demo.ts",
     "test:integration:comprehensive-demo": "bun scripts/test-comprehensive-demo.ts",
+    "test:integration:comprehensive-certificates": "bun scripts/test-comprehensive-certificates.ts",
     "test:e2e": "bun scripts/run-e2e.ts",
     "test:all": "bun run test:unit && bun run test:integration && bun run test:e2e",
     "supabase:start": "supabase start --exclude realtime,imgproxy,studio,mailpit,edge-runtime,logflare,vector,supavisor,postgres-meta",

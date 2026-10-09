@@ -1,8 +1,10 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { writeFile } from "node:fs/promises";
 import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
 import { registerCourseInstructor } from "./instructor-helper";
+import { draftFieldsReady } from "../../src/components/courses/course-input-filter";
 
 const origin = e2eSiteUrl();
 const headers = { Origin: origin, Accept: "application/json" };
@@ -72,56 +74,296 @@ async function courseFixture(
   return { edit, path: `/app/cursos/${id}/grupos` };
 }
 
-test("initially unassigned draft edits preserve one null value and keep the disabled placeholder", async ({
-  page,
-  context,
-}) => {
-  const { edit } = await courseFixture(page, context, false, false);
-  await page.goto(edit);
-  const instructor = page.getByRole("combobox", {
-    name: "Instructor",
-    exact: true,
-  });
-  await expect(instructor).toHaveAttribute("id", "instructorId-select");
-  await instructor.click();
-  await expect(
-    page.getByRole("option", {
-      name: "Sin asignar (solo borrador)",
-      exact: true,
-    }),
-  ).toHaveAttribute("data-disabled", "");
-  await page.keyboard.press("Escape");
-  expect(
-    await page
-      .locator(".course-form")
-      .evaluate((form) =>
-        new FormData(form as HTMLFormElement).getAll("instructorId"),
+/** Read course controls only: no Auth, request headers or validity side effects. */
+async function courseSaveState(page: Page) {
+  const state = await page.getByLabel("Descripción").evaluate((field) => {
+    const form = (field as HTMLTextAreaElement).form!;
+    const baseline = JSON.parse(form.dataset.baseline ?? "{}") as Record<
+      string,
+      string
+    >;
+    const names = Object.keys(baseline);
+    const data = new FormData(form);
+    const current = Object.fromEntries(
+      names.map((name) => [name, data.getAll(name)]),
+    );
+    const controls = Array.from(form.elements).flatMap((control) => {
+      if (!(
+        control instanceof HTMLInputElement ||
+        control instanceof HTMLTextAreaElement ||
+        control instanceof HTMLSelectElement
+      ))
+        return [];
+      return [
+        {
+          name: control.name || control.id,
+          valid: control.validity.valid,
+          valueMissing: control.validity.valueMissing,
+          customError: control.validity.customError,
+          willValidate: control.willValidate,
+        },
+      ];
+    });
+    const submit = Array.from(form.elements).find(
+      (control) =>
+        control instanceof HTMLButtonElement && control.type === "submit",
+    ) as HTMLButtonElement;
+    return {
+      baseline,
+      current,
+      controls,
+      disabled: submit.disabled,
+      initialized: form.dataset.validationInitialized === "true",
+      pending: form.dataset.mutationPending === "true",
+      busy: form.getAttribute("aria-busy") === "true",
+      archived: form.dataset.archived === "true",
+      ready: names.every((name) => data.has(name)),
+      values: Object.fromEntries(
+        [...data.entries()].filter(
+          (entry): entry is [string, string] =>
+            typeof entry[1] === "string" &&
+            (names.includes(entry[0]) || entry[0] === "weekdays"),
+        ),
       ),
-  ).toEqual(["unassigned"]);
-  await page
-    .getByLabel("Descripción")
-    .fill("Metadata edited without assigning an instructor.");
-  await expect(
-    page.getByRole("button", { name: "Guardar cambios", exact: true }),
-  ).toBeEnabled();
-  const saved = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      new URL(response.url()).pathname === edit,
-  );
-  await page
-    .getByRole("button", { name: "Guardar cambios", exact: true })
-    .click();
-  expect((await saved).status()).toBe(200);
-  await page.reload();
-  await expect(page.getByLabel("Descripción")).toHaveValue(
-    "Metadata edited without assigning an instructor.",
-  );
-  await expect(instructor).toContainText("Sin asignar (solo borrador)");
-  await expect(
-    page.getByRole("button", { name: "Guardar cambios", exact: true }),
-  ).toBeDisabled();
-});
+    };
+  });
+  return {
+    ...state,
+    fieldsValid: draftFieldsReady(state.values),
+    htmlValid: state.controls.every(
+      (control) => !control.willValidate || control.valid,
+    ),
+    dirty: Object.entries(state.baseline).some(([name, value]) => {
+      const values = state.current[name] ?? [];
+      const normalize = (value: FormDataEntryValue | undefined) =>
+        name === "instructorId" && value === "unassigned"
+          ? ""
+          : String(value ?? "").replace(/\r\n?/g, "\n");
+      return values.length !== 1 || normalize(values[0]) !== normalize(value);
+    }),
+  };
+}
+
+const courseReadinessTest = test.extend({ trace: "retain-on-failure" });
+courseReadinessTest(
+  "initially unassigned draft edits preserve one null value and keep the disabled placeholder",
+  async ({ page, context }, testInfo) => {
+    const { edit } = await courseFixture(page, context, false, false);
+    const states: unknown[] = [];
+    const errors: string[] = [];
+    let saveRequests = 0;
+    const saveStatuses: number[] = [];
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        new URL(request.url()).pathname === edit
+      )
+        saveRequests++;
+    });
+    page.on("response", (response) => {
+      if (
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === edit
+      )
+        saveStatuses.push(response.status());
+    });
+    page.on("pageerror", (error) => {
+      // Record classifications only; arbitrary browser errors may contain URLs/tokens.
+      errors.push(/hydrat/i.test(error.message) ? "hydration" : error.name);
+    });
+    page.on("console", (message) => {
+      if (message.type() === "error")
+        errors.push(
+          /hydrat/i.test(message.text()) ? "hydration" : "console-error",
+        );
+    });
+    const capture = async (stage: string) => {
+      states.push({ stage, ...(await courseSaveState(page)) });
+    };
+    try {
+      await page.goto(edit);
+      const instructor = page.getByRole("combobox", {
+        name: "Instructor",
+        exact: true,
+      });
+      await expect(instructor).toHaveAttribute("id", "instructorId-select");
+      await instructor.click();
+      await expect(
+        page.getByRole("option", {
+          name: "Sin asignar (solo borrador)",
+          exact: true,
+        }),
+      ).toHaveAttribute("data-disabled", "");
+      await page.keyboard.press("Escape");
+      expect(
+        await page
+          .locator(".course-form")
+          .evaluate((form) =>
+            new FormData(form as HTMLFormElement).getAll("instructorId"),
+          ),
+      ).toEqual(["unassigned"]);
+      await capture("before-description-edit");
+      await page
+        .getByLabel("Descripción")
+        .fill("Metadata edited without assigning an instructor.");
+      await capture("after-description-edit");
+      await expect(
+        page.getByRole("button", { name: "Guardar cambios", exact: true }),
+      ).toBeEnabled();
+      const saved = page.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          new URL(response.url()).pathname === edit,
+      );
+      await page
+        .getByRole("button", { name: "Guardar cambios", exact: true })
+        .click();
+      expect((await saved).status()).toBe(200);
+      await page.reload();
+      await expect(page.getByLabel("Descripción")).toHaveValue(
+        "Metadata edited without assigning an instructor.",
+      );
+      await expect(instructor).toContainText("Sin asignar (solo borrador)");
+      await expect(
+        page.getByRole("button", { name: "Guardar cambios", exact: true }),
+      ).toBeDisabled();
+    } finally {
+      await capture("final").catch(() =>
+        states.push({ stage: "final", unavailable: true }),
+      );
+      const path = testInfo.outputPath("course-save-readiness.json");
+      await writeFile(
+        path,
+        JSON.stringify(
+          {
+            states,
+            errors,
+            saveRequests,
+            saveStatuses,
+            projectId: process.env.TEST_SUPABASE_PROJECT_ID,
+            workdir: process.env.TEST_SUPABASE_WORKDIR,
+          },
+          null,
+          2,
+        ),
+      );
+      await testInfo.attach("course-save-readiness", {
+        path,
+        contentType: "application/json",
+      });
+    }
+  },
+);
+
+courseReadinessTest(
+  "draft description save reconciles when course selectors mount after its planner",
+  async ({ page, context }, testInfo) => {
+    const { edit } = await courseFixture(page, context, false, false);
+    const selectors = deferred();
+    await page.route(
+      "**/src/components/courses/CourseSelect.tsx*",
+      async (route) => {
+        await selectors.promise;
+        await route.continue();
+      },
+    );
+    const states: unknown[] = [];
+    const errors: string[] = [];
+    const saveStatuses: number[] = [];
+    page.on("pageerror", (error) => errors.push(error.name));
+    page.on("console", (message) => {
+      if (message.type() === "error")
+        errors.push(
+          /hydrat/i.test(message.text()) ? "hydration" : "console-error",
+        );
+    });
+    page.on("response", (response) => {
+      if (
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === edit
+      )
+        saveStatuses.push(response.status());
+    });
+    try {
+      await page.goto(edit, { waitUntil: "domcontentloaded" });
+      await expect(
+        page.getByLabel("Inicio de clases (Bolivia)", { exact: true }),
+      ).toHaveValue("01/03/2027");
+      const beforeSelectors = await courseSaveState(page);
+      states.push({ stage: "planner-before-selectors", ...beforeSelectors });
+      expect(beforeSelectors.current.courseTypeId).toEqual([]);
+      expect(beforeSelectors.current.startsAt).toEqual([
+        beforeSelectors.baseline.startsAt,
+      ]);
+      selectors.release();
+      const instructor = page.getByRole("combobox", {
+        name: "Instructor",
+        exact: true,
+      });
+      await expect(instructor).toHaveAttribute("id", "instructorId-select");
+      await instructor.click();
+      await page.keyboard.press("Escape");
+      await page
+        .getByLabel("Descripción")
+        .fill("Description saved after deferred selector hydration.");
+      states.push({
+        stage: "description-edited",
+        ...(await courseSaveState(page)),
+      });
+      const save = page.getByRole("button", {
+        name: "Guardar cambios",
+        exact: true,
+      });
+      await expect(save).toBeEnabled();
+      const ready = await courseSaveState(page);
+      states.push({ stage: "ready-to-save", ...ready });
+      expect(ready).toMatchObject({
+        ready: true,
+        dirty: true,
+        fieldsValid: true,
+        htmlValid: true,
+        pending: false,
+        busy: false,
+      });
+      expect(ready.current.endsAt).toEqual([ready.baseline.endsAt]);
+      expect(ready.current.schedule).toEqual([ready.baseline.schedule]);
+      const response = page.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          new URL(response.url()).pathname === edit,
+      );
+      await save.click();
+      expect((await response).status()).toBe(200);
+      await page.reload();
+      await expect(page.getByLabel("Descripción")).toHaveValue(
+        "Description saved after deferred selector hydration.",
+      );
+      await expect(save).toBeDisabled();
+    } finally {
+      selectors.release();
+      states.push({ stage: "final", ...(await courseSaveState(page)) });
+      const path = testInfo.outputPath("deferred-course-selectors.json");
+      await writeFile(
+        path,
+        JSON.stringify(
+          {
+            states,
+            errors,
+            saveStatuses,
+            projectId: process.env.TEST_SUPABASE_PROJECT_ID,
+            workdir: process.env.TEST_SUPABASE_WORKDIR,
+          },
+          null,
+          2,
+        ),
+      );
+      await testInfo.attach("deferred-course-selectors", {
+        path,
+        contentType: "application/json",
+      });
+    }
+  },
+);
 
 test("publication without an assigned instructor shows its cause inline without a duplicate toast", async ({
   page,

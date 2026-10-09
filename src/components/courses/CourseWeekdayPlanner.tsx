@@ -48,7 +48,12 @@ export default function CourseWeekdayPlanner({
     sync();
     form.addEventListener("change", sync);
     form.addEventListener("course-form-change", sync);
+    // The format selector is a separate client-only island. Its initial native
+    // control can mount after this effect without emitting a change event.
+    const controls = new MutationObserver(sync);
+    controls.observe(form, { childList: true, subtree: true });
     return () => {
+      controls.disconnect();
       form.removeEventListener("change", sync);
       form.removeEventListener("course-form-change", sync);
     };
