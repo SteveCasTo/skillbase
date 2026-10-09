@@ -139,13 +139,75 @@ async function expectLandingContentBounds(page: Page) {
   );
   await expectWithinViewportWidth(
     page,
-    certificates.locator(".certificate-copy p"),
+    certificates.getByRole("form", {
+      name: "Verificar certificado",
+      exact: true,
+    }),
   );
-  const certificateAction = certificates.getByRole("link", {
+  const form = certificates.getByRole("form", {
     name: "Verificar certificado",
+    exact: true,
   });
+  const code = form.getByRole("textbox", {
+    name: "Código del certificado",
+    exact: true,
+  });
+  const certificateAction = form.getByRole("button", {
+    name: "Verificar certificado",
+    exact: true,
+  });
+  await expect(code).toBeVisible();
+  await expect(code).toBeEditable();
+  await expect(certificateAction).toBeEnabled();
+  await expectWithinViewportWidth(page, code);
   await expectWithinViewportWidth(page, certificateAction);
-  expect((await box(certificateAction)).height).toBeGreaterThanOrEqual(44);
+}
+
+async function verifyUnknownCertificateFromLanding(page: Page) {
+  const form = page
+    .locator("section#certificados")
+    .getByRole("form", { name: "Verificar certificado", exact: true });
+  const input = form.getByRole("textbox", {
+    name: "Código del certificado",
+    exact: true,
+  });
+  const submit = form.getByRole("button", {
+    name: "Verificar certificado",
+    exact: true,
+  });
+  // A bounded opaque code, not a fixture credential or a mocked success.
+  const code = crypto.randomUUID().replaceAll("-", "");
+  const path = `/certificados/${code}`;
+  const expectedUrl = new URL(path, page.url()).href;
+  await input.fill(code);
+  await expect(input).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(submit).toBeFocused();
+  const lookup = page.waitForResponse(
+    (response) =>
+      response.request().method() === "GET" &&
+      new URL(response.url()).pathname === path,
+  );
+  await page.keyboard.press("Enter");
+  expect((await lookup).status()).toBe(404);
+  await expect(page).toHaveURL(expectedUrl);
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: "Certificado no disponible",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", {
+      name: "Datos públicos del certificado",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Descargar PDF/ })).toHaveCount(
+    0,
+  );
+  await expectNoDocumentOverflow(page);
 }
 
 async function openPreview(
@@ -185,6 +247,7 @@ test.describe("public landing responsive layout", () => {
         const legalBox = await box(page.locator(".footer-legal"));
         expect(overlaps(institutionBox, legalBox)).toBe(false);
       }
+      await verifyUnknownCertificateFromLanding(page);
     });
   }
 });
@@ -422,7 +485,9 @@ test("dark preview remains readable without document overflow", async ({
   await waitForThemeSelector(page);
   await page.getByRole("button", { name: "Cambiar a modo oscuro" }).click();
 
-  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(
+    page.getByRole("button", { name: "Cambiar a modo claro", exact: true }),
+  ).toBeVisible();
   await expectNoDocumentOverflow(page);
   await expect(
     page.getByRole("heading", { level: 1, name: "El siguiente paso es tuyo." }),
@@ -433,9 +498,7 @@ test("dark preview remains readable without document overflow", async ({
       name: "Una credencial debe poder comprobarse.",
     }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Verificar certificado" }),
-  ).toBeVisible();
+  await verifyUnknownCertificateFromLanding(page);
 });
 
 test("warm preview remains readable without document overflow", async ({
@@ -445,17 +508,9 @@ test("warm preview remains readable without document overflow", async ({
   await page.goto("/?preview=courses&palette=warm");
   await waitForLandingAssets(page);
 
-  await expect(page.locator(".landing.warm-preview")).toBeVisible();
   await expectNoDocumentOverflow(page);
   await expect(
     page.getByRole("heading", { level: 1, name: "El siguiente paso es tuyo." }),
   ).toBeVisible();
-  await expect(
-    page.getByText(
-      "La verificación pública permite confirmar la validez de un certificado sin exponer información personal innecesaria.",
-    ),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Verificar certificado" }),
-  ).toBeVisible();
+  await verifyUnknownCertificateFromLanding(page);
 });

@@ -1,0 +1,8 @@
+---
+import GroupCertificatesPage from "@/components/certificates/GroupCertificatesPage.astro";
+import { prepareGroupCertificates } from "@/components/certificates/group-route";
+const state = await prepareGroupCertificates(Astro, false);
+if (state instanceof Response) return state;
+---
+
+<GroupCertificatesPage {...state} />

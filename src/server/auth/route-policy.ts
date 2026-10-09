@@ -18,6 +18,8 @@ export const PRIVATE_ROUTE_POLICIES = {
   "/app/preinscripciones/exportar": { access: "ROLES", roles: ["ADMIN"] },
   "/app/configuracion": { access: "ROLES", roles: ["ADMIN"] },
   "/app/configuracion/asistencia": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/configuracion/certificados": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/certificados": { access: "ROLES", roles: ["ADMIN"] },
   "/app/perfil": { access: "ACTIVE_USER" },
   "/app/perfil/contrasena": { access: "ACTIVE_USER" },
   "/app/instructores": { access: "ROLES", roles: ["ADMIN"] },
@@ -56,6 +58,33 @@ export function getPrivateRoutePolicy(
       normalizedPath as keyof typeof PRIVATE_ROUTE_POLICIES
     ] ?? null;
   if (exact) return exact;
+  const certificateUuid = String.raw`[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}`;
+  if (
+    new RegExp(
+      `^/app/certificados/${certificateUuid}(?:/(?:generado\\.pdf|firmado\\.pdf|cargar))?$`,
+      "iu",
+    ).test(normalizedPath)
+  )
+    return { access: "ROLES", roles: ["ADMIN"] };
+  if (
+    new RegExp(
+      `^/app/mis-certificados/${certificateUuid}(?:/(?:generado\\.pdf|firmado\\.pdf))?$`,
+      "iu",
+    ).test(normalizedPath)
+  )
+    return { access: "ROLES", roles: ["INSTRUCTOR"] };
+  if (
+    new RegExp(
+      `^/app/(cursos|mis-cursos)/${certificateUuid}/grupos/${certificateUuid}/certificados$`,
+      "iu",
+    ).test(normalizedPath)
+  )
+    return {
+      access: "ROLES",
+      roles: normalizedPath.startsWith("/app/mis-cursos/")
+        ? ["INSTRUCTOR"]
+        : ["ADMIN"],
+    };
   if (
     /^\/app\/administradores\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(
       normalizedPath,

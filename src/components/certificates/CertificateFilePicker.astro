@@ -1,0 +1,45 @@
+---
+import { FileUp } from "lucide-react";
+interface Props {
+  id: string;
+  title: string;
+  name?: string;
+  required?: boolean;
+  description?: string;
+  describedby?: string;
+}
+const {
+  id,
+  title,
+  name,
+  required = false,
+  description,
+  describedby,
+} = Astro.props;
+---
+
+<label
+  for={id}
+  class="flex min-w-0 cursor-pointer flex-col gap-2 rounded-xl border border-dashed bg-card p-5 hover:bg-secondary focus-within:ring-2 focus-within:ring-ring"
+>
+  <span class="flex items-center gap-2 font-medium">
+    <FileUp size={20} aria-hidden="true" />
+    {title}
+  </span>
+  <span class="text-sm text-muted-foreground">PDF · máximo 10 MiB</span>
+  {description && (
+    <span class="text-sm leading-6 text-muted-foreground">{description}</span>
+  )}
+  <input
+    {id}
+    {name}
+    type="file"
+    accept="application/pdf,.pdf"
+    {required}
+    aria-describedby={describedby}
+    class="sr-only"
+  />
+  <span data-file-name class="break-all text-sm">
+    Ningún archivo seleccionado
+  </span>
+</label>
