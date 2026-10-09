@@ -32,6 +32,11 @@ Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Es
 - Seleccionar una fecha restablece el estado a «Todas» y muestra todas las sesiones de esa fecha, sin filtrar por estado. Mientras haya una fecha seleccionada, «Todas» aparece como opción de estado.
 - Si hay una fecha seleccionada y se elige «Próximas», «Finalizadas» o «Canceladas», limpiar la fecha y filtrar ese estado en el calendario general.
 - Pulsar «Todas» limpia la fecha y deja el estado en «Todas»; muestra el listado total del calendario, sin restricción por fecha. Al quedar sin fecha, «Todas» deja de estar disponible como opción de estado.
+- Los filtros de estado se comportan como toggles independientes: activar uno aplica ese estado y volver a pulsar el mismo filtro lo desactiva y restaura todas las sesiones. No debe quedar un estado pulsado en esta vista sin filtro; la selección de fecha y «Todas» conservan exactamente las reglas anteriores.
+- La lista de sesiones y el calendario comparten el scroll natural del contenedor principal de la página; no debe aparecer un scroll vertical anidado en la lista. En desktop alto el calendario puede permanecer sticky; en viewports bajos/zoom debe volver al flujo natural para no atrapar filtros fuera de pantalla. En mobile/tablet el layout se adapta sin overflow horizontal.
+- La barra de desplazamiento global usa tokens semánticos para claro/oscuro, manteniendo las paletas específicas aprobadas para landing/catálogo público. En `forced-colors` se devuelve el control visual al sistema.
+
+Estas correcciones de calendario/scroll están implementadas en la rama fuente `fix/calendar-filter-scroll` (`bf938d3cacef70deb01ef32c6bd4fd80c2e72f97`). Esta anotación describe el comportamiento comprobado de esa fuente; no afirma integración a `development`, release a `master` ni despliegue.
 
 ## Evaluaciones y notas
 

@@ -657,17 +657,21 @@ los guardas/roles del servidor, SSR/POST y el sistema visual existente. El detal
 de interacción aprobado e implementado, incluidos defaults y estados responsive,
 está en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md). PR 289 está
 integrado en `development` y quedó incluido en releases posteriores a `master`.
-La revisión visual y release del seguimiento descrito abajo se limitan a su rama
-de feature; ver evidencia por ejecución en [`TESTING.md`](TESTING.md).
+La revisión visual y release de los seguimientos descritos abajo se limitan a sus
+ramas de feature; ver evidencia por ejecución en [`TESTING.md`](TESTING.md).
 
-### Seguimiento de búsqueda en vivo y resumen académico compacto (feature en curso)
+### Pulido posterior del filtro y scroll del calendario (fuente local)
 
-La rama `fix/live-instructor-search-and-compact-results` (`6c5bba7`) actualiza
-dos detalles de la pasada. La lista ADMIN de instructores filtra en vivo el
-conjunto completo que el loader ya autorizó SSR (nombre/correo normalizados), sin
-requests al tipear, sin debounce ni cambios de foco; el GET/submit sigue siendo
-el fallback sin JavaScript, con query e historial recuperables. Search ocupa el
-ancho disponible y anuncia un estado vacío contextual.
+La rama `fix/calendar-filter-scroll` (`bf938d3cacef70deb01ef32c6bd4fd80c2e72f97`) ajusta la interacción del calendario de sesiones: cada filtro de estado puede deseleccionarse para volver a mostrar el conjunto completo; seleccionar fecha, «Todas» y cambiar a un filtro específico mantienen las reglas existentes. La lista y los filtros utilizan un único scroll vertical principal, sin contenedor scrolleable anidado; el calendario es sticky solo en desktop con altura suficiente y vuelve al flujo normal en viewports bajos. Los tokens globales de scrollbar respetan light/dark, las paletas de landing/catálogo y `forced-colors`. La evidencia y sus límites están en [`TESTING.md`](TESTING.md).
+
+### Seguimiento de búsqueda en vivo y resumen académico compacto (PR 295)
+
+La rama `fix/live-instructor-search-and-compact-results` actualiza dos detalles
+de la pasada. La lista ADMIN de instructores filtra en vivo el conjunto completo
+que el loader ya autorizó SSR (nombre/correo normalizados), sin requests al
+tipear, sin debounce ni cambios de foco; el GET/submit sigue siendo el fallback
+sin JavaScript, con query e historial recuperables. La búsqueda ocupa el ancho
+disponible y anuncia un estado vacío contextual.
 
 Las filas de nota alinean identidad, componentes y resultado final mediante
 filas de valores compartidas, con reflow/wrapping para esquemas extensos. En el
@@ -675,9 +679,10 @@ cierre, **todos** los resultados usan una tarjeta compacta equivalente, sin
 umbral por número de componentes: muestra estado/resultado, nota y mínimo del
 reporte autorizado, progreso cuando aplica y agregado de asistencia. Toda la
 tarjeta abre el diálogo accesible del design system; SSR mantiene disclosure
-`<details>/<summary>`. No
-hay botón «Ver detalle», resultado provisional nuevo ni cálculo de negocio en la
-presentación. Se mantiene CI únicamente para ADMIN, finanzas fuera del resumen y
-detalle financiero solo en la proyección ADMIN existente. El comportamiento y
-sus límites de integración están en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md)
-y [`TESTING.md`](TESTING.md). La rama no equivale todavía a integración/release.
+`<details>/<summary>`. No hay botón «Ver detalle», resultado provisional nuevo
+ni cálculo de negocio en la presentación. Se mantiene CI únicamente para ADMIN,
+finanzas fuera del resumen y detalle financiero solo en la proyección ADMIN
+existente. El comportamiento y sus límites están en
+[`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md) y
+[`TESTING.md`](TESTING.md). El PR está publicado, pero esta rama no acredita
+integración ni release.
