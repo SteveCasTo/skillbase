@@ -166,13 +166,9 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
       password: "QA-only-fixture-password-123!",
     });
     if (signedIn.error) throw signedIn.error;
-    expect(
-      (
-        await db.execute(
-          sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
-        )
-      )[0]?.count,
-    ).toBe(23);
+    // The production snapshot validates the full ledger against the approved
+    // checkout journal and SQL hashes, not a hardcoded historical count.
+    const hashedOriginal = await captureDemoSnapshot(db);
     const originalBusinessCounts = {
       courses: (await db.select().from(s.courses)).length,
       registrations: (await db.select().from(s.preRegistrations)).length,
@@ -217,7 +213,6 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
     };
     expect(await runComprehensiveDemo(db, options)).toBeNull();
     expect(await snapshot()).toEqual(before);
-    const hashedOriginal = await captureDemoSnapshot(db);
     // A mismatched reviewed plan must stop BEFORE provisioning any identity.
     await expect(
       runComprehensiveDemo(db, {
