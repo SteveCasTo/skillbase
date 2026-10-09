@@ -655,7 +655,7 @@ Las métricas y ledger de las subsecciones siguientes documentan QA/CI por etapa
 - Evidencia técnica/hashes y metadata se conservaron en `C:/Users/Steve/AppData/Local/Temp/opencode/phase8-production-release-evidence/`; el snapshot protegido incluye resultados de comparación y no incorpora PII en esta documentación. El smoke fue anónimo, por lo que no se afirma Google OAuth real, recovery/SMTP cloud ni una operación autenticada ADMIN en producción.
 - Fase 8 quedó liberada dentro del alcance aprobado. En ese límite de release Fase 9 aún no estaba iniciada; su estado posterior se registra abajo.
 
-## Correcciones UI y demo integral — PRs 289/288 en development; release pendiente
+## Correcciones UI y demo integral — snapshot histórico PRs 289/288 en development
 
 Las correcciones UI del contrato [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md) se integraron mediante PR 289; el runner sintético integral F1–F8 se integró mediante PR 288. El head candidato de `development` es `53f171e10c6b5ac922d9f4c5760f788b9f7bdebe`. El release a `master`, deploy y carga productiva de demos aún no se han ejecutado. No hubo migración ni cambio de schema en estas entregas.
 
@@ -674,10 +674,111 @@ No se afirma una revisión visual manual con Playwright CLI/screenshot para este
 
 ## Interfaz de certificados — validación focal en la rama
 
-El commit local `a450987` conecta las páginas de certificados con el ciclo backend/PDF de los commits base. El source UI permanece en `feat/certificate-interface`, sin push/PR ni integración en `development`. Esta evidencia no es CI remoto, validación del full suite, ni release/deployment; tampoco se atribuye PASS a la CI del CORE más nuevo que aún está en curso.
+El commit local `a450987` conecta las páginas de certificados con el ciclo backend/PDF de los commits base. El source UI permanece en `feat/certificate-interface`, sin push/PR ni integración en `development`. Esta evidencia no es CI remoto, validación del full suite, ni release/deployment. El CI de development citado abajo corresponde a CORE y no incluye esta UI.
 
 - Calidad del source de interfaz: lint, format check, Astro typecheck (0 errores/0 warnings; 351 hints), build y `git diff --check` PASS.
 - Unit focal: 8 tests PASS / 40 assertions. E2E focal: 2/2 PASS, cero retries, sobre un proyecto Supabase temporal dedicado. El E2E cubrió generación/carga/revisión/emisión/revocación/reemplazo, descargas privadas, privacidad pública, comparación de hash, carreras de lectura/archivo y fallback sin JavaScript. No se volvió a ejecutar el full unit/integration/E2E de la suite del proyecto.
 - QA manual posterior con Playwright CLI ejercitó rutas reales sobre otro stack aislado: PDF inválido rechazado con 422 y valores conservados; upload válido 200; review 200 con aceptación explícita; emisión 200; instructor readonly y descarga privada 200; verificación pública sin enlaces PDF ni requests públicos de archivo. Se revisaron desktop/tablet/mobile (1440/768/390), light/dark y teclado. La secuencia manual no sustituye un E2E automatizado adicional después del pequeño refinamiento del picker/metadata.
 - Los archivos PDF usados eran fixtures sintéticos. Esta ejecución prueba manejo técnico y no valida firmas manuscritas, legitimidad institucional ni identidad del portador. El cálculo SHA-256 del archivo elegido se hace localmente en el navegador; no se transmiten sus bytes para esa función.
 - La aplicación no tocó migraciones ni datos del Supabase canónico/cloud. Los stacks temporales de QA fueron limpiados. No se realizó CI remoto ni smoke autenticado de producción; la interfaz no está acreditada como desplegada.
+
+No se afirma una revisión visual manual con Playwright CLI/screenshot para el cierre del seed. El snapshot de esa sección es previo al release; la evidencia posterior está abajo.
+
+### Release PR 292 y operación protegida F1–F8 (estado actual)
+
+- PR 292 liberó el workflow protegido `production-comprehensive-demo.yml` a
+  `master` `2789d55e93a97cc5344930e690e9feecc2cc10f5`; `development` es
+  `a276e30fab3526cc086fc3efbe03a42d08681ba9`. Vercel `dpl4CZ` quedó READY para
+  el SHA de master. El workflow seed se ejecutó manualmente aparte del deploy.
+- El gate master `37846141904` pasó en attempt 1: 429 unit/2,945 assertions,
+  162 integration/1,332 assertions, 1/894 assertions del caso comprehensive-demo
+  y 140/140 E2E (132 desktop + 8 mobile). No hubo fallos, retries, flakes ni
+  skips reportados en ese run; TypeScript 0 errores/0 warnings/313 hints.
+- La cronología conserva una flake anterior (run `378382`, un caso; causa raíz
+  desconocida). PR 293/run `37843958082` añadió diagnóstico/trace del primer
+  fallo; no es evidencia de un fix de aplicación. PR 292/run `37845044909` y el
+  gate de master final se reportan separadamente, no se suman entre sí.
+- PLAN `37854318652` y APPLY `37854790028` en cloud preservaron 72 tablas/899
+  filas originales por hashes server-side de fila completa+PK; ledger 23,
+  settings N=3 y mínimo de pago 25 quedaron intactos. El replay no produjo
+  cambios. Los conteos añadidos, 7 GETs públicos y resultados están en
+  [`DEMO_SEED.md`](DEMO_SEED.md). La carga F1–F8 no creó certificados ni
+  migraciones F9.
+- La carga local canónica previa usó un baseline separado de 70 tablas/2,906
+  filas originales y también preservó hashes/replay cero; no comparar tamaños de
+  baseline entre entornos. Fase 9 está en progreso en ramas de feature; no se
+  cuenta como implementada ni cubierta por estos gates.
+
+### Pulido local de filtros y scroll del calendario (fuente `bf938d3`)
+
+La rama `fix/calendar-filter-scroll` añade cobertura unitaria para la selección/deselección de filtros de estado, combinación con fechas y límite civil de Bolivia: **23 unit tests / 120 assertions PASS** en los tres archivos unitarios de asistencia. La cobertura E2E se ejecutó de forma aislada con retries deshabilitados: los dos casos existentes de asistencia/autorización pasaron juntos en una ejecución; el nuevo caso del calendario pasó en una ejecución posterior. Los resultados acreditan los tres escenarios por corridas separadas, **no** un E2E único 3/3 ni el full E2E.
+
+La revisión manual Playwright CLI verificó el calendario con doce sesiones en 320, 768 y 1280 px, toggle por teclado, selección de fecha y «Todas», scroll por rueda/touch/teclado, ausencia de overflow horizontal y un solo scroll vertical principal. También se inspeccionaron claro/oscuro, paletas públicas y `forced-colors`. Fue una verificación manual segmentada, no una corrida E2E adicional ni una revisión full del producto.
+
+Lint, format check, typecheck (0 errores/0 warnings/313 hints existentes), build de producción y `git diff --check` pasaron en el árbol final. La cronología E2E conserva un primer intento 0/3 por errores de hidratación tras builds/servidor concurrentes; la recuperación secuencial pasó 2/3 casos existentes, pero inicialmente falló la assertion geométrica de PageDown; otra ejecución focal pasó 2/3 y falló al dejar el foco en un enlace fuera de pantalla; el E2E nuevo también tuvo una ejecución focal 0/1 antes del pase final 1/1. Los resultados corregidos no borran esos intentos ni los cuentan como pases. Evidencia y ledger de intentos: `C:/Users/Steve/AppData/Local/Temp/opencode/calendar-scroll-evidence/attempt-ledger.md`.
+
+La fixture E2E usó únicamente el stack Supabase temporal aislado; no hubo escrituras en producción ni cambios de DB/schema/migraciones. Estos resultados pertenecen a la fuente local indicada y no acreditan CI remoto, integración, full gate, release ni despliegue.
+
+### PR 296 — CI actual y estado
+
+PR 296 se integró a `development` mediante merge
+`47def8735aba233d1802eb51b4c4acaab66e1a39`. CI `37951088066` pasó en el primer
+intento: 431 unit/2,985 assertions, 162 integration/1,332 assertions, demo focal
+1/894 y 141 E2E únicos (75 + 66), sin fallos, retries, flakes ni skips reportados
+en esa corrida. Esto no acredita release a `master` ni despliegue del calendario.
+
+La cronología conserva el run `3789921`, con una falla histórica de `PageDown`
+en viewport mobile 320 px donde no se observó movimiento vertical. No se conoce
+la causa raíz. La revisión manual posterior comprobó que `PageDown` mueve el
+contenido en 320/768/1280 px, pero no se afirma que esto demuestre o corrija la
+causa del fallo anterior; tampoco hay aserción CSS/geométrica que lo oculte. El
+diagnóstico read-only sigue separado del resultado verde del CI actual.
+
+## Búsqueda de instructor y resultados académicos compactos (PR 295)
+
+PR 295 se integró en `development` mediante merge
+`3323536deed04d18a1fa5fa547b23d3791349a94` (source `ae5999a`); esta evidencia no
+acredita release a `master`.
+
+La rama `fix/live-instructor-search-and-compact-results`, HEAD
+`6c5bba7bc3b5a06eb476e209d2827b2dd666f6b4` sobre base `a276e30`, modifica solo
+UI y pruebas de nueve archivos. No modifica API/DTO, permisos, reglas académicas,
+snapshot, esquema ni datos canónicos/cloud.
+
+- Tests unitarios focales: **5/5 PASS, 43 assertions** (presentación de
+  evaluaciones/cierre). Quality local reportado PASS.
+- E2E focal inicial en app aislada `4493`: **8/8 PASS**, cero retries. Durante
+  otra ejecución concurrente con un build, tres escenarios pasaron y cinco
+  fallaron con errores de carga de islas (`_jsxDEV`/import Vite), incluidos
+  módulos sin cambios. No se modificó el producto ni se ocultó esa ejecución.
+  La revalidación serial recuperó el shell original ya terminado: **8/8 PASS**,
+  exit 0, un intento por caso y sin retries; no se lanzó una corrida duplicada.
+  Esto valida el conjunto focal, no es un full E2E/release gate ni prueba la
+  causa raíz del episodio concurrente.
+- CI PR 295, run `37895589666`: **429 unit / 2,964 assertions**, **162
+  integration / 1,332 assertions**, test focal de seed **1/1 / 894 assertions**
+  y **140/140 E2E únicos** en dos shards (75 + 65). El run terminó en el primer
+  intento; no se reportaron fallos, flakes, retries ni skips. Es evidencia CI
+  para PR 295, no un full gate de Fase 9 ni un release/deploy.
+- Playwright CLI manual comprobó rutas HTTP reales y DTOs de rol autorizados,
+  incluyendo cierre oficial de un grupo con 3 componentes, resultados de 9
+  componentes, detalle, pendiente/cero, instructor con asignación y SSR sin JS.
+  Viewports: 320, 768 y 1280 px; sin overflow horizontal medido. La tarjeta usa
+  diálogo al hidratar y disclosure funcional sin JS. Valores de nota/componentes
+  alineados en desktop/edit/readonly; el modo instructor no expone CI, saldo,
+  categoría, correo ni teléfono. La verificación no usó mocks de respuesta,
+  renderer inyectado ni DB productiva.
+- Search E2E comprueba filtrado inmediato por nombre/correo, normalización
+  Unicode (acentos/case/espacios), foco estable, limpiar/restaurar, history/back,
+  sin Enter obligatorio para filtrar ni solicitudes adicionales por búsqueda;
+  el submit GET conserva fallback sin JavaScript.
+- El stack propio quedó limpio después de la revalidación y smoke CLI: cero
+  containers/listeners en los puertos de app 4493/4495. No se detuvieron servicios
+  compartidos ni se tocaron datos/Auth de canónico, cloud o producción.
+
+Esta validación de PR 295 no representa gate completo de Fase 9 ni verifica otros
+cambios en curso.
+
+### Gate integrado más reciente de development
+
+Tras el merge CORE PR 294 (`de22705230b07538dfe4584e678fd35deb3d1ca2`), CI `37955046219` pasó en el primer intento: quality sin errores/warnings, **451 unit / 3,882 assertions**, **177 integration / 1,452 assertions**, test del seed **1/897 assertions** y **142 E2E** en dos shards (75 + 67). La verificación de preservación registró 75 tablas y 418 filas originales sin cambios tras replay. No se reportaron fallos, flakes, retries ni skips. Este gate de CORE/development no integra la UI de `feat/certificate-interface`, no acredita un gate de Fase 9 y no es release a producción. La migración 0023 corresponde al estado de development; la candidata 0024 solo se probó en QA aislado, sin aplicarse al Supabase canónico/cloud, que permanece en ledger 23. Producción sigue en `master` `2789d55`.

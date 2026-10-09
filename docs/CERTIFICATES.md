@@ -4,6 +4,11 @@
 
 Definir el ciclo de vida de certificados digitales verificables.
 
+El alcance aprobado, elegibilidad, plantillas, fuentes congeladas, permisos y
+pendientes de implementación están detallados en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). Este documento conserva
+los principios generales; no implica que el módulo Fase 9 ya exista.
+
 ## PRINCIPIO
 
 La autenticidad no depende del QR.
@@ -50,10 +55,14 @@ Mostrar únicamente:
 - participante;
 - curso;
 - duración;
-- nivel cuando corresponda;
 - tipo de certificado;
 - fecha;
 - credential ID.
+
+La página pública incluye estado, titular, curso, horas nominales, fecha final,
+ID/URL y el hash oficial para comparación local de bytes. La allowlist concreta
+para Fase 9, que no incluye nivel no impreso en la plantilla, está en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md).
 
 No mostrar:
 
@@ -135,3 +144,11 @@ La interfaz conectada al backend disponible en esta rama incluye:
 Este estado acredita la interfaz en la rama local `feat/certificate-interface` (`a450987`), pendiente de push, PR, integración en `development` y gates correspondientes. No acredita disponibilidad en producción. Las capacidades ausentes del contrato backend (por ejemplo, índice global de historial de instructores o enlace público de reemplazo) no se simulan en la UI. Ver progreso y gates pendientes en [`PLAN.md`](PLAN.md) y la cobertura efectivamente ejecutada en [`TESTING.md`](TESTING.md).
 
 La carga/revisión manual de un PDF no verifica criptográficamente una firma manuscrita. Los archivos sintéticos usados en QA solo prueban el ciclo técnico; no son certificados institucionales firmados ni evidencia de autoridad legal.
+
+El alcance aprobado distingue certificado individual de aprobación y certificado
+de instructor. El PDF final/escaneado permanece privado y solo se descarga por
+operaciones autenticadas con autorización de rol/ownership; la reapertura no
+revoca certificados emitidos automáticamente. El artefacto autoritativo se limita
+a actores autorizados. Las reglas aprobadas de elegibilidad, snapshots, ciclo de
+vida, privacidad y verificación están en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md)
+y [`DECISIONS.md`](DECISIONS.md).

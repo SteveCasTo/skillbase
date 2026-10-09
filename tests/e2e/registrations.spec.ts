@@ -1,4 +1,10 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type BrowserContext,
+  type Page,
+  type Route,
+} from "@playwright/test";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
 import { registerCourseInstructor } from "./instructor-helper";
@@ -268,18 +274,27 @@ registrationTest.describe(() => {
       const detailRequest = new Promise<void>((resolve) => {
         detailRequested = resolve;
       });
-      await page.route("**/app/preinscripciones/*", async (route) => {
-        if (
-          route.request().method() === "GET" &&
-          /^\/app\/preinscripciones\/[0-9a-f-]+$/u.test(
-            new URL(route.request().url()).pathname,
-          )
-        ) {
+      let detailContinued!: () => void;
+      const detailContinuation = new Promise<void>((resolve) => {
+        detailContinued = resolve;
+      });
+      let detailIntercepted = false;
+      const detailRouteUrl = (url: URL) =>
+        url.origin === new URL(e2eSiteUrl()).origin &&
+        /^\/app\/preinscripciones\/[0-9a-f-]+$/u.test(url.pathname);
+      const holdDetail = async (route: Route) => {
+        if (route.request().method() === "GET") {
+          detailIntercepted = true;
           detailRequested();
           await pendingDetail;
         }
-        await route.continue();
-      });
+        try {
+          await route.continue();
+        } finally {
+          if (detailIntercepted) detailContinued();
+        }
+      };
+      await page.route(detailRouteUrl, holdDetail);
       try {
         await create.click();
         await detailRequest;
@@ -297,9 +312,10 @@ registrationTest.describe(() => {
           await expect(error).toHaveText("");
       } finally {
         releaseDetail();
+        if (detailIntercepted) await detailContinuation;
+        await page.unroute(detailRouteUrl, holdDetail);
       }
       await expect(page).toHaveURL(/\/app\/preinscripciones\/[0-9a-f-]+$/u);
-      await page.unroute("**/app/preinscripciones/*");
       await expect(
         page.getByRole("region", { name: "Resumen financiero" }),
       ).toContainText("Bs 74,50");
@@ -326,12 +342,21 @@ registrationTest.describe(() => {
       const receiptKey = await payment
         .locator('[name="requestKey"]')
         .inputValue();
-      const interrupted = "**/app/preinscripciones/*?operation=payment";
-      await page.route(interrupted, async (route) => {
-        expect((await route.fetch()).status()).toBe(200);
-        await route.abort("failed");
-        await page.unroute(interrupted);
-      });
+      const interrupted = (url: URL) =>
+        detailRouteUrl(url) && url.searchParams.get("operation") === "payment";
+      const interruptPayment = async (route: Route) => {
+        try {
+          if (route.request().method() !== "POST") {
+            await route.continue();
+            return;
+          }
+          expect((await route.fetch()).status()).toBe(200);
+          await route.abort("failed");
+        } finally {
+          await page.unroute(interrupted, interruptPayment);
+        }
+      };
+      await page.route(interrupted, interruptPayment);
       await payment.getByRole("button", { name: "Registrar abono" }).click();
       await expect(
         page.getByRole("button", {

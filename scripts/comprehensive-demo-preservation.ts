@@ -1,10 +1,14 @@
 import { sql } from "drizzle-orm";
 import type { RegistrationDatabase } from "@/server/db/repositories/registration-support";
 import { fingerprint } from "./financial-demo-plan";
+import {
+  assertApprovedDemoMigrationLedger,
+  type DemoMigrationLedgerRow,
+} from "./approved-demo-migration-ledger";
 
 export interface DemoSnapshot {
   tables: { name: string; rows: { keyHash: string; rowHash: string }[] }[];
-  ledger: { id: number; hash: string; createdAt: string }[];
+  ledger: DemoMigrationLedgerRow[];
 }
 /** Read-only, server-hashed evidence. Never fetch raw Auth credentials/session
  * rows into the runner, and never upload this per-row witness as an artifact. */
@@ -37,13 +41,10 @@ export async function captureDemoSnapshot(
       );
       tables.push({ name: `${table.schema}.${table.name}`, rows: [...rows] });
     }
-    const ledger = await tx.execute<DemoSnapshot["ledger"][number]>(
+    const ledger = await tx.execute<DemoMigrationLedgerRow>(
       sql`select id,hash,created_at::text as "createdAt" from drizzle.__drizzle_migrations order by id`,
     );
-    if (ledger.length !== 23)
-      throw new Error(
-        "Approved demo requires ledger 23; no migration performed",
-      );
+    assertApprovedDemoMigrationLedger(ledger);
     return { tables, ledger: [...ledger] };
   });
 }

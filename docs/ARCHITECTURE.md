@@ -377,6 +377,11 @@ Ejemplos:
 
 Toda ruta privada debe validar sesión y autorización server-side.
 
+Las rutas de certificados de esta lista son una arquitectura objetivo y todavía
+no están integradas en el baseline de `development`; Fase 9 está en progreso en
+ramas de feature. Contrato, permisos y flujo aprobados en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md).
+
 ## LÓGICA DE NEGOCIO
 
 Ejemplo de flujo incorrecto:
@@ -441,6 +446,10 @@ Certificado:
 - replaced
 
 La lista definitiva debe mantenerse en el modelo de datos.
+
+Los estados de certificado anteriores son una enumeración conceptual pendiente
+de implementación, no estados persistidos actualmente. Ver
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md).
 
 ## ERRORES
 
