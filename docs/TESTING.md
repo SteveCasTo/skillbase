@@ -696,3 +696,51 @@ No se afirma una revisión visual manual con Playwright CLI/screenshot para ese 
   filas originales y también preservó hashes/replay cero; no comparar tamaños de
   baseline entre entornos. Fase 9 está en progreso en ramas de feature; no se
   cuenta como implementada ni cubierta por estos gates.
+
+## Búsqueda de instructor y resultados académicos compactos (feature)
+
+La rama `fix/live-instructor-search-and-compact-results`, HEAD
+`6c5bba7bc3b5a06eb476e209d2827b2dd666f6b4` sobre base `a276e30`, modifica solo
+UI y pruebas de nueve archivos. No modifica API/DTO, permisos, reglas académicas,
+snapshot, esquema ni datos canónicos/cloud.
+
+- Tests unitarios focales: **5/5 PASS, 43 assertions** (presentation de
+  evaluaciones/cierre). Lint global y formatter de archivos cambiados PASS;
+  typecheck 0 errores/0 warnings/313 hints existentes; build de producción PASS.
+- E2E inicial en app aislada `4493`: **8/8 PASS**, cero retries. Una cohorte
+  posterior de tres escenarios pasó y cinco fallaron al ejecutarse mientras se
+  hacía build en el mismo worktree; los logs muestran errores de carga de islas
+  (`_jsxDEV`/import Vite), incluidos módulos sin cambios. No se modificó el
+  producto ni se ocultó esa ejecución. La revalidación serial recuperó el shell
+  original ya terminado: **8/8 PASS**, exit 0, intento único por caso y sin
+  retries; no se lanzó una corrida duplicada. Esto valida el conjunto focal, no
+  es un full E2E/release gate ni prueba la causa raíz del episodio concurrente.
+- Playwright CLI manual comprobó rutas HTTP reales y DTOs de rol autorizados,
+  incluyendo cierre oficial de un grupo con 3 componentes, resultados de 9
+  componentes, detalle, pendiente/cero, instructor con asignación y SSR sin JS.
+  Viewports: 320, 768 y 1280 px; sin overflow horizontal medido. La tarjeta usa
+  diálogo al hidratar y disclosure funcional sin JS. Valores de nota/componentes
+  alineados en desktop/edit/readonly; el modo instructor no expone CI, saldo,
+  categoría, correo ni teléfono. La verificación no usó mocks de respuesta,
+  renderer inyectado ni DB productiva.
+- Search E2E comprueba filtrado inmediato por nombre/correo, normalización
+  Unicode (acentos/case/espacios), foco estable, limpiar/restaurar, history/back,
+  sin Enter obligatorio para filtrar ni solicitudes adicionales por búsqueda;
+  el submit GET conserva fallback sin JavaScript.
+- Tras la revalidación y el smoke CLI, el stack propio quedó limpio: cero
+  containers/listeners en los puertos de app 4493/4495. No se detuvieron servicios
+  compartidos ni se tocaron datos/Auth de canónico, cloud o producción.
+
+La evidencia anterior describe el stage/feature de PR 295. PR 295 quedó integrado
+en `development`; su release a `master` no queda acreditado por esta corrida.
+Estos resultados no representan un gate completo de Fase 9 ni verifican otros
+cambios en curso.
+
+### PR 295 integrado en development
+
+El merge de PR 295 dejó `development` en `3323536deed04d18a1fa5fa547b23d3791349a94`
+(source `ae5999a`). CI `37895589666` pasó al primer intento: 429 unit/2,964
+assertions, 162 integration/1,332 assertions, el caso comprehensive-demo 1/894
+assertions y E2E 140/140 (132 desktop + 8 mobile), sin fallos, retries, flakes ni
+skips reportados. Este gate cubre búsqueda en vivo y tarjetas compactas; no es un
+release de Fase 9 ni evidencia de promoción a `master`.

@@ -87,26 +87,41 @@ test("ADMIN creates and edits a registered instructor with a semantic full-card 
   const search = page.getByRole("searchbox", {
     name: "Buscar por nombre o correo",
   });
-  await search.fill(
-    `  ${name.normalize("NFD").replace(/\p{M}/gu, "").toUpperCase()}   SINTETICO  `,
+  await expect(
+    page.getByRole("button", { name: "Buscar", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator("[data-instructor-search]")).toHaveAttribute(
+    "data-bound",
+    "true",
   );
-  await search.press("Enter");
+  let searchRequests = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/app/instructores")
+      searchRequests++;
+  });
+  await search.fill(
+    `\u00a0 ${name.normalize("NFD").replace(/\p{M}/gu, "").toUpperCase()} \u2003 SINTETICO  `,
+  );
   await expect(card).toBeVisible();
+  await expect(search).toBeFocused();
   await search.fill(email.toUpperCase());
-  await search.press("Enter");
   await expect(card).toBeVisible();
   await search.fill(`absent-${randomUUID()}`);
-  await search.press("Enter");
   await expect(card).toBeHidden();
   await expect(page.getByRole("status")).toBeVisible();
-  await search.fill(email);
-  await search.press("Enter");
+  await search.fill("");
   await expect(card).toBeVisible();
+  await search.fill(email);
+  await expect(card).toBeVisible();
+  expect(searchRequests).toBe(0);
   await card.focus();
   await page.keyboard.press("Enter");
   await expect(
     page.getByRole("heading", { name: "Editar instructor" }),
   ).toBeVisible();
+  await page.goBack();
+  await expect(search).toHaveValue(email);
+  await expect(card).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -245,6 +260,20 @@ test("instructor creation and validation work without JavaScript and never echo 
     await expect(
       page.getByText("Instructor guardado correctamente."),
     ).toBeVisible();
+    await page.goto("/app/instructores");
+    const search = page.getByRole("searchbox", {
+      name: "Buscar por nombre o correo",
+    });
+    await search.fill("SIN JAVASCRIPT SINTETICO");
+    await page.getByRole("button", { name: "Buscar", exact: true }).click();
+    await expect(
+      page.getByRole("link", { name: /Sin JavaScript Sintético/ }),
+    ).toBeVisible();
+    await search.fill(`absent-${randomUUID()}`);
+    await page.getByRole("button", { name: "Buscar", exact: true }).click();
+    await expect(
+      page.getByRole("link", { name: /Sin JavaScript Sintético/ }),
+    ).toHaveCount(0);
   } finally {
     await context.close();
   }
