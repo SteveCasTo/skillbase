@@ -4,6 +4,11 @@
 
 Definir el ciclo de vida de certificados digitales verificables.
 
+El alcance aprobado, elegibilidad, plantillas, fuentes congeladas, permisos y
+pendientes de implementación están detallados en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). Este documento conserva
+los principios generales; no implica que el módulo Fase 9 ya exista.
+
 ## PRINCIPIO
 
 La autenticidad no depende del QR.
@@ -50,10 +55,14 @@ Mostrar únicamente:
 - participante;
 - curso;
 - duración;
-- nivel cuando corresponda;
 - tipo de certificado;
 - fecha;
 - credential ID.
+
+La página pública incluye estado, titular, curso, horas nominales, fecha final,
+ID/URL y el hash oficial para comparación local de bytes. La allowlist concreta
+para Fase 9, que no incluye nivel no impreso en la plantilla, está en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md).
 
 No mostrar:
 
@@ -121,3 +130,9 @@ No se requiere integración API con LinkedIn para MVP.
 No asumir que una URL Storage pública equivale a validación.
 
 La ruta de verificación debe consultar el registro actual del certificado.
+
+El contrato aprobado distingue certificados individuales de aprobación y de
+instructor. El acceso público al PDF escaneado firmado y la política ante
+reapertura/re-cierre están resueltos: el archivo es privado y la reapertura no
+revoca automáticamente certificados emitidos. Ver reglas completas en el
+contrato; «artefacto autoritativo descargable» se limita a actores autorizados.

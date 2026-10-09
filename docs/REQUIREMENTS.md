@@ -384,9 +384,23 @@ Debe ser configurable.
 
 ## CERTIFICACIÓN
 
+El alcance aprobado de certificados de Fase 9 se especifica en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). Está aprobado, pero no
+implementado.
+
 ### RF-CER-001
 
-El sistema debe determinar elegibilidad según nota y asistencia.
+La aprobación estudiantil se emite solo a participantes `INSCRITO` de la
+versión oficial del cierre de grupo cuya decisión `academicallyPassed` sea
+verdadera (aprobación académica y elegibilidad por asistencia). No se admiten
+excepciones manuales. No depende de saldo/deuda ni de una boleta física. El
+certificado de instructor es independiente de las notas/asistencia estudiantil y
+se destina al instructor del snapshot de cierre. Ambos requieren el grupo
+cerrado en su última versión oficial. ADMIN gestiona generación,
+impresión/trámite de firmas manuales, carga del PDF final, emisión, revocación y
+reemplazo; INSTRUCTOR consulta y descarga de forma autenticada solo sus
+certificados/grupos según ownership histórico del snapshot, sin permiso de
+gestionar certificados.
 
 ### RF-CER-002
 
@@ -418,11 +432,32 @@ Debe permitir revocar.
 
 ### RF-CER-009
 
-Debe permitir descargar el PDF final cuando corresponda.
+Debe permitir descargar el PDF final únicamente a ADMIN e INSTRUCTOR autorizados
+server-side. El PDF firmado/escaneado y Storage son privados; no hay descarga
+anónima ni URL pública permanente.
 
 ### RF-CER-010
 
 Debe permitir utilizar URL e identificador como credencial para servicios externos como LinkedIn.
+
+El QR y `publicCredentialId` conducen a verificación pública del registro
+vigente; el identificador debe ser impredecible/no secuencial. La página pública
+no expone CI, contacto, notas, asistencia detallada ni finanzas. El acceso
+anónimo al PDF firmado está prohibido. La verificación permite comparar
+SHA-256 de un PDF seleccionado localmente en el navegador, sin upload. El QR no
+es firma digital; la firma manuscrita escaneada es atestación administrativa y
+copiar un certificado válido no deja de ser una copia.
+
+La plantilla autorizada incluye solo el contenido descrito en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md); no se agregan CI, nivel u
+otros campos no impresos en la referencia. Se congelan valores impresos y
+firmantes. El certificado de aprobación usa fechas nominales del curso; el de
+instructor, fechas/horario nominal del grupo. Ambos usan duración nominal de la
+revisión de formato. Estos valores se congelan separados de cierre, generación
+y emisión. Si el grupo se reabre, certificados ya emitidos no se revocan
+automáticamente; nuevas generaciones/emisiones requieren la última versión
+cerrada. Se conserva reemplazo/revocación explícita y como máximo un certificado
+activo por curso/tipo/destinatario.
 
 ## CIERRE
 
@@ -521,7 +556,10 @@ Protección de datos personales.
 - requisitos académicos adicionales a la política de ausencias consecutivas aprobada para Fase 6, si se acuerdan para fases posteriores;
 - cuándo se consolida el descuento de auxiliares;
 - lista definitiva de auxiliares beneficiarios;
-- tipos definitivos de certificado;
-- firmas requeridas;
-- datos obligatorios de boleta;
 - reportes administrativos exactos.
+
+Tipos de certificado, elegibilidad, firmantes requeridos/posiciones, carga de
+PDF firmado, no-dependencia financiera y exclusión de la boleta física ya están
+resueltos para Fase 9; ver el contrato enlazado. Las cargas autorizadas F1–F8
+local/cloud se completaron; la implementación F9 está en progreso y requiere aún
+integración/validación antes de marcarse completa.
