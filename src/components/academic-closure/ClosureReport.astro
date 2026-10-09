@@ -1,6 +1,6 @@
 ---
 import type { AuthorizedClosureReportDto } from "@/domain/academic-closure/types";
-import { ResultCards, VISIBLE_RESULT_COMPONENTS } from "./ResultCards";
+import { ResultCards } from "./ResultCards";
 interface Props {
   report: AuthorizedClosureReportDto;
 }
@@ -20,9 +20,7 @@ const { report } = Astro.props;
     <p class="text-sm text-muted-foreground">
       Este grupo no tiene participantes inscritos para evaluar.
     </p>
-  ) : report.scheme.components.length > VISIBLE_RESULT_COMPONENTS ? (
-    <ResultCards client:load {report} />
   ) : (
-    <ResultCards {report} />
+    <ResultCards client:load {report} />
   )}
 </section>
