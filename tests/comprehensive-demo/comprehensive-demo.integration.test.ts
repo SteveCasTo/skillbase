@@ -166,13 +166,9 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
       password: "QA-only-fixture-password-123!",
     });
     if (signedIn.error) throw signedIn.error;
-    expect(
-      (
-        await db.execute(
-          sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
-        )
-      )[0]?.count,
-    ).toBe(23);
+    // The production snapshot validates the full ledger against the approved
+    // checkout journal and SQL hashes, not a hardcoded historical count.
+    const hashedOriginal = await captureDemoSnapshot(db);
     const originalBusinessCounts = {
       courses: (await db.select().from(s.courses)).length,
       registrations: (await db.select().from(s.preRegistrations)).length,
@@ -185,28 +181,32 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
       const tables = await db.execute<{ schema: string; table: string }>(
         sql`select table_schema as schema, table_name as table from information_schema.tables where table_type='BASE TABLE' and table_schema in ('public','auth','storage','drizzle') order by table_schema, table_name`,
       );
-      const result = new Map<string, Set<string>>();
+      const result = new Map<string, string[]>();
       for (const table of tables) {
         const rows = await db.execute(
           sql`select to_jsonb(t) as row from ${sql.identifier(table.schema)}.${sql.identifier(table.table)} t`,
         );
         result.set(
           `${table.schema}.${table.table}`,
-          new Set(rows.map((r) => fingerprint(r.row))),
+          rows.map((r) => fingerprint(r.row)).sort(),
         );
       }
       return result;
     };
     const preserved = (
-      before: Map<string, Set<string>>,
-      after: Map<string, Set<string>>,
+      before: Map<string, string[]>,
+      after: Map<string, string[]>,
     ) => {
-      for (const [table, hashes] of before)
-        for (const hash of hashes)
-          expect(
-            after.get(table)?.has(hash),
-            `original row changed in ${table}`,
-          ).toBe(true);
+      for (const [table, hashes] of before) {
+        const remaining = new Map<string, number>();
+        for (const hash of after.get(table) ?? [])
+          remaining.set(hash, (remaining.get(hash) ?? 0) + 1);
+        for (const hash of hashes) {
+          const count = remaining.get(hash) ?? 0;
+          expect(count, `original row changed in ${table}`).toBeGreaterThan(0);
+          remaining.set(hash, count - 1);
+        }
+      }
     };
     const before = await snapshot();
     const options = {
@@ -217,7 +217,6 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
     };
     expect(await runComprehensiveDemo(db, options)).toBeNull();
     expect(await snapshot()).toEqual(before);
-    const hashedOriginal = await captureDemoSnapshot(db);
     // A mismatched reviewed plan must stop BEFORE provisioning any identity.
     await expect(
       runComprehensiveDemo(db, {
@@ -509,7 +508,7 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
         verification: "isolated comprehensive demo",
         originalTables: before.size,
         originalRowsPreserved: [...before.values()].reduce(
-          (n, rows) => n + rows.size,
+          (n, rows) => n + rows.length,
           0,
         ),
         newCourses: 8,
