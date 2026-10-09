@@ -37,6 +37,17 @@ export function GradeRow({
   initialError = "",
 }: Props) {
   const name = `${participant.firstName} ${participant.lastName}`;
+  const componentRows = Array.from(
+    { length: Math.ceil(components.length / 4) },
+    (_, index) => components.slice(index * 4, index * 4 + 4),
+  );
+  const columns = [
+    "",
+    "lg:grid-cols-1",
+    "lg:grid-cols-2",
+    "lg:grid-cols-3",
+    "lg:grid-cols-4",
+  ][Math.min(components.length, 4)];
   const baseline = () =>
     gradeDrafts(
       components.map(({ id }) => id),
@@ -124,7 +135,7 @@ export function GradeRow({
       ref={form}
       aria-label={`Notas de ${name}`}
       aria-busy={saving}
-      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)_auto]"
+      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 p-4 lg:grid-cols-[minmax(10rem,1fr)_minmax(0,3fr)_auto] lg:grid-rows-[auto_minmax(2.75rem,auto)_auto] lg:gap-y-1"
       onKeyDown={(event) => {
         if (event.key === "Escape" && drafts && !saving) {
           event.preventDefault();
@@ -185,8 +196,8 @@ export function GradeRow({
         }
       }}
     >
-      <div className="col-span-2 min-w-0 lg:col-span-1">
-        <h3 className="pt-2 text-sm font-semibold break-words">{name}</h3>
+      <div className="col-span-2 min-w-0 self-center lg:col-span-1 lg:row-start-2">
+        <h3 className="text-sm font-semibold break-words">{name}</h3>
         {participant.membershipStatus !== "INSCRITO" && (
           <p className="text-muted-foreground mt-1 text-sm">
             {membershipLabels[participant.membershipStatus]}
@@ -195,89 +206,102 @@ export function GradeRow({
       </div>
       <div
         className={cn(
-          "grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-x-3 gap-y-2 lg:col-span-1 lg:col-start-2 lg:row-start-1",
+          "grid min-w-0 gap-y-2 lg:contents",
           participant.result.status === "COMPLETE" && "col-span-2 row-start-3",
         )}
       >
-        {components.map((component, index) => {
-          const draft = drafts?.find(
-            (draft) => draft.componentId === component.id,
-          );
-          const grade = participant.grades.find(
-            (grade) => grade.componentId === component.id,
-          );
-          const id = `grade-${participant.registrationId}-${component.id}`;
-          const error = errors[component.id];
-          return (
-            <div key={component.id} className="flex min-w-0 flex-col gap-1">
-              <label
-                htmlFor={draft ? id : undefined}
-                className="text-muted-foreground text-xs font-medium break-words"
-              >
-                {component.name}
-                <span className="sr-only"> · {name}</span>
-              </label>
-              {draft && participant.canGrade ? (
-                <Input
-                  autoFocus={index === 0}
-                  id={id}
-                  inputMode="decimal"
-                  className="min-h-11 max-w-26 tabular-nums"
-                  value={draft.score}
-                  disabled={saving}
-                  aria-invalid={Boolean(error)}
-                  aria-describedby={error ? `${id}-error` : undefined}
-                  onChange={(event) => {
-                    setDrafts(
-                      (current) =>
-                        current?.map((item) =>
-                          item.componentId === component.id
-                            ? { ...item, score: event.target.value }
-                            : item,
-                        ) ?? null,
-                    );
-                    setErrors((current) => {
-                      const next = { ...current };
-                      delete next[component.id];
-                      return next;
-                    });
-                    setMessage("");
-                    transaction.current = null;
-                  }}
-                  onBlur={() => {
-                    const issue = changes.errors[component.id];
-                    if (issue)
-                      setErrors((current) => ({
-                        ...current,
-                        [component.id]: issue,
-                      }));
-                  }}
-                />
-              ) : (
-                <p className="flex min-h-11 max-w-26 items-center text-sm tabular-nums">
-                  {grade?.score == null ? (
-                    <span className="text-muted-foreground">Pendiente</span>
-                  ) : (
-                    gradeLabel(grade.score)
-                  )}
-                </p>
-              )}
-              {error && (
-                <p
-                  id={`${id}-error`}
-                  role="alert"
-                  className="text-destructive text-xs"
+        {componentRows.map((row, rowIndex) => (
+          <div
+            key={row[0]!.id}
+            className={cn(
+              "grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-x-3 gap-y-1 lg:col-start-2 lg:row-span-3 lg:grid-rows-subgrid",
+              columns,
+            )}
+          >
+            {row.map((component, index) => {
+              const draft = drafts?.find(
+                (draft) => draft.componentId === component.id,
+              );
+              const grade = participant.grades.find(
+                (grade) => grade.componentId === component.id,
+              );
+              const id = `grade-${participant.registrationId}-${component.id}`;
+              const error = errors[component.id];
+              return (
+                <div
+                  key={component.id}
+                  className="row-span-3 grid min-w-0 grid-rows-subgrid gap-y-1"
                 >
-                  {error}
-                </p>
-              )}
-            </div>
-          );
-        })}
+                  <label
+                    htmlFor={draft ? id : undefined}
+                    className="text-muted-foreground text-xs font-medium break-words"
+                  >
+                    {component.name}
+                    <span className="sr-only"> · {name}</span>
+                  </label>
+                  {draft && participant.canGrade ? (
+                    <Input
+                      autoFocus={rowIndex === 0 && index === 0}
+                      id={id}
+                      inputMode="decimal"
+                      className="min-h-11 max-w-26 self-center tabular-nums"
+                      value={draft.score}
+                      disabled={saving}
+                      aria-invalid={Boolean(error)}
+                      aria-describedby={error ? `${id}-error` : undefined}
+                      onChange={(event) => {
+                        setDrafts(
+                          (current) =>
+                            current?.map((item) =>
+                              item.componentId === component.id
+                                ? { ...item, score: event.target.value }
+                                : item,
+                            ) ?? null,
+                        );
+                        setErrors((current) => {
+                          const next = { ...current };
+                          delete next[component.id];
+                          return next;
+                        });
+                        setMessage("");
+                        transaction.current = null;
+                      }}
+                      onBlur={() => {
+                        const issue = changes.errors[component.id];
+                        if (issue)
+                          setErrors((current) => ({
+                            ...current,
+                            [component.id]: issue,
+                          }));
+                      }}
+                    />
+                  ) : (
+                    <p className="flex min-h-11 max-w-26 items-center text-sm tabular-nums">
+                      {grade?.score == null ? (
+                        <span className="text-muted-foreground">Pendiente</span>
+                      ) : (
+                        gradeLabel(grade.score)
+                      )}
+                    </p>
+                  )}
+                  {error && (
+                    <p
+                      id={`${id}-error`}
+                      role="alert"
+                      className="text-destructive text-xs"
+                    >
+                      {error}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
       <div
         className={cn(
-          "flex min-w-0 items-center gap-3 self-start lg:col-span-1 lg:col-start-3 lg:row-start-1 lg:justify-end lg:pt-5",
+          "flex min-w-0 items-center gap-3 self-start lg:col-span-1 lg:col-start-3 lg:row-start-2 lg:justify-end lg:self-center lg:pt-0",
           participant.result.status === "COMPLETE"
             ? "col-span-2 row-start-2 justify-between"
             : "justify-end pt-5",

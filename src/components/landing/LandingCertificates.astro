@@ -1,5 +1,6 @@
 ---
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import VerificationForm from "@/components/certificates/VerificationForm.astro";
 ---
 
 <section
@@ -19,8 +20,6 @@ import { ArrowRight, ShieldCheck } from "lucide-react";
       La verificación pública permite confirmar la validez de un certificado sin
       exponer información personal innecesaria.
     </p>
-    <a class="public-action certificate-action" href="/certificados">
-      Verificar certificado <ArrowRight aria-hidden="true" />
-    </a>
+    <VerificationForm landing />
   </div>
 </section>

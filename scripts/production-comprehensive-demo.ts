@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { sql } from "drizzle-orm";
 import { createDatabase } from "@/server/db/client";
 import { runComprehensiveDemo } from "./comprehensive-demo";
+import { runComprehensiveCertificates } from "./comprehensive-demo-certificates";
 import {
   assertComprehensiveTarget,
   assertComprehensiveRelease,
@@ -150,6 +151,12 @@ if (import.meta.main) {
       env.DEMO_APPROVED_RELEASE_SHA ?? "",
     );
     const mode = env.DEMO_OPERATOR_MODE ?? "";
+    const includeCertificates = env.DEMO_INCLUDE_CERTIFICATES === "true";
+    if (
+      env.DEMO_INCLUDE_CERTIFICATES &&
+      !["true", "false"].includes(env.DEMO_INCLUDE_CERTIFICATES)
+    )
+      throw new Error("Explicit certificate option required");
     if (mode !== "plan" && mode !== "apply")
       throw new Error("Explicit PLAN or APPLY required");
     stage = "release-proof";
@@ -184,13 +191,25 @@ if (import.meta.main) {
     );
     let planHash = "";
     let reviewedPlan: unknown;
-    await runComprehensiveDemo(connection.db, {
-      ...options,
-      preview(plan, existing) {
-        planHash = fingerprint(plan);
-        reviewedPlan = { plan, existing };
-      },
-    });
+    let certificatePlanHash = "";
+    let certificatePlan: unknown;
+    if (includeCertificates)
+      await runComprehensiveCertificates(connection.db, {
+        ...options,
+        verificationOrigin: "https://skillbase-alpha.vercel.app",
+        preview(plan) {
+          certificatePlanHash = fingerprint(plan);
+          certificatePlan = plan;
+        },
+      });
+    else
+      await runComprehensiveDemo(connection.db, {
+        ...options,
+        preview(plan, existing) {
+          planHash = fingerprint(plan);
+          reviewedPlan = { plan, existing };
+        },
+      });
     const afterPlan = await captureDemoSnapshot(connection.db);
     assertDemoNoChanges(before, afterPlan);
     // Binds the actual anchor/scenarios, actor, current settings, original rows,
@@ -202,6 +221,7 @@ if (import.meta.main) {
       plan: reviewedPlan,
       settings,
       baseline: before,
+      ...(includeCertificates ? { includeCertificates, certificatePlan } : {}),
     });
     assertReviewedPlan(mode, env.DEMO_REVIEWED_PLAN_SHA256 ?? "", approvalHash);
     const report: Record<string, unknown> = {
@@ -214,25 +234,41 @@ if (import.meta.main) {
       before: demoSnapshotSummary(before),
       plan: reviewedPlan,
       status: "PLAN_VERIFIED",
+      ...(includeCertificates ? { certificates: certificatePlan } : {}),
     };
     if (mode === "apply") {
       stage = "pre-apply-release-recheck";
       await releaseProof(env);
       assertDemoNoChanges(before, await captureDemoSnapshot(connection.db));
       stage = "first-apply";
-      await runComprehensiveDemo(connection.db, {
-        ...options,
-        apply: true,
-        expectedPlanHash: planHash,
-      });
+      if (includeCertificates)
+        await runComprehensiveCertificates(connection.db, {
+          ...options,
+          apply: true,
+          verificationOrigin: "https://skillbase-alpha.vercel.app",
+          expectedPlanHash: certificatePlanHash,
+        });
+      else
+        await runComprehensiveDemo(connection.db, {
+          ...options,
+          apply: true,
+          expectedPlanHash: planHash,
+        });
       const first = await captureDemoSnapshot(connection.db);
       assertDemoPreservation(before, first);
       stage = "repeat-apply";
-      await runComprehensiveDemo(connection.db, {
-        ...options,
-        apply: true,
-        expectedPlanHash: planHash,
-      });
+      if (includeCertificates)
+        await runComprehensiveCertificates(connection.db, {
+          ...options,
+          apply: true,
+          verificationOrigin: "https://skillbase-alpha.vercel.app",
+        });
+      else
+        await runComprehensiveDemo(connection.db, {
+          ...options,
+          apply: true,
+          expectedPlanHash: planHash,
+        });
       const repeated = await captureDemoSnapshot(connection.db);
       assertDemoPreservation(before, repeated);
       assertDemoNoChanges(first, repeated);

@@ -97,8 +97,10 @@ describe("private route policies and caching", () => {
       "/app",
       "/app/administradores",
       "/app/administradores/nuevo",
+      "/app/certificados",
       "/app/configuracion",
       "/app/configuracion/asistencia",
+      "/app/configuracion/certificados",
       "/app/cursos",
       "/app/cursos/imagen",
       "/app/cursos/nuevo",
@@ -158,6 +160,60 @@ describe("private route policies and caching", () => {
     ).toEqual({ access: "ROLES", roles: ["ADMIN"] });
     expect(getPrivateRoutePolicy("/app/cursos/not-an-id/editar")).toBeNull();
     expect(getPrivateRoutePolicy("/app/future")).toBeNull();
+  });
+
+  test("certificate routes require a session and the explicit ADMIN or INSTRUCTOR role", async () => {
+    const id = "10000000-0000-4000-8000-000000000001";
+    const adminPaths = [
+      "/app/certificados",
+      "/app/configuracion/certificados",
+      `/app/certificados/${id}`,
+      `/app/certificados/${id}/generado.pdf`,
+      `/app/certificados/${id}/firmado.pdf`,
+      `/app/certificados/${id}/cargar`,
+      `/app/cursos/${id}/grupos/${id}/certificados`,
+    ];
+    const instructorPaths = [
+      `/app/mis-certificados/${id}`,
+      `/app/mis-certificados/${id}/generado.pdf`,
+      `/app/mis-certificados/${id}/firmado.pdf`,
+      `/app/mis-cursos/${id}/grupos/${id}/certificados`,
+    ];
+    for (const [paths, allowedRole, deniedRole] of [
+      [adminPaths, "ADMIN", "INSTRUCTOR"],
+      [instructorPaths, "INSTRUCTOR", "ADMIN"],
+    ] as const) {
+      for (const path of paths) {
+        const policy = getPrivateRoutePolicy(path);
+        expect(policy).toEqual({ access: "ROLES", roles: [allowedRole] });
+        expect(getAuthRouteContext(path)).toBe("FULL");
+        expect(isSessionDependentPath(path)).toBe(true);
+        if (policy?.access !== "ROLES")
+          throw new Error("Expected certificate role policy");
+        expect(() =>
+          requireRoles({ ...activeUser, roles: [allowedRole] }, policy.roles),
+        ).not.toThrow();
+        expect(() =>
+          requireRoles({ ...activeUser, roles: [deniedRole] }, policy.roles),
+        ).toThrow(AuthorizationError);
+        expect(() =>
+          requireRoles({ ...activeUser, roles: [] }, policy.roles),
+        ).toThrow(AuthorizationError);
+      }
+    }
+    expect(
+      await rejectedValue(resolveActiveUser(repositoryWith(null), "anonymous")),
+    ).toMatchObject({ code: "NOT_INVITED" });
+    for (const path of [
+      `/app/mis-certificados/${id}/cargar`,
+      `/app/mis-certificados/${id}/emitir`,
+      `/app/certificados/${id}/eliminar`,
+      `/app/certificados/not-a-uuid/firmado.pdf`,
+      `/app/certificados/${id}/firmado.pdf/extra`,
+      `/app/mis-cursos/${id}/grupos/not-a-uuid/certificados`,
+    ])
+      expect(getPrivateRoutePolicy(path)).toBeNull();
+    expect(getAuthRouteContext(`/certificados/${"a".repeat(32)}`)).toBe("NONE");
   });
 
   test("marks session-dependent responses private and non-cacheable", () => {

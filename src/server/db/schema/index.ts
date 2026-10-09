@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+export * from "./certificates";
 import type { AttendanceCommandResult } from "@/domain/attendance/types";
 import type { EvaluationCommandResult } from "@/domain/evaluations/types";
 import {

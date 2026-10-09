@@ -130,6 +130,12 @@ try {
     </h1>
     <p class="mt-3 text-muted-foreground">Ajustes generales del sistema.</p>
   </header>
+  <a
+    href="/app/configuracion/certificados"
+    class="mt-5 inline-flex min-h-11 items-center rounded-lg border px-4 text-sm font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+  >
+    Configurar firmantes de certificados
+  </a>
   {(success || Astro.url.searchParams.get("success") === "attendance") && (
     <p
       role="status"

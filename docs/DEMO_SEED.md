@@ -1,5 +1,148 @@
 # Demo integral F1–F8
 
+## Extensión F9 opt-in (integrada en development; ejecución canónica/cloud pendiente)
+
+El usuario autorizó datos ficticios de todas las secciones, incluidos certificados,
+en local/QA/producción. El soporte F9 está implementado e integrado en
+`development`; **la ejecución canónica y productiva queda retenida hasta el release
+F9 completo**, CI first-pass sin retries y deployment READY del mismo SHA. Las
+ejecuciones F1–F8 históricas de este documento no cambian ni se atribuyen a F9.
+La extensión implementada usa el modelo/renderer/operaciones reales del módulo y
+no añade una vía SQL que fabrique registros o artefactos de certificado.
+
+- `--include-certificates` selecciona exclusivamente la extensión sobre un
+  manifiesto F8 propio ya completo; sin el flag el runner F1–F8 queda intacto.
+  El workflow manual protegido añade `include_certificates`, por defecto `false`.
+  No es un paso automático de CI/deploy ni un endpoint.
+- PLAN es read-only: comprueba ledger **24 exacto contra el journal y SQL de este
+  checkout**, configuración/ausencia, destinatarios oficiales, revisiones de
+  cierre/configuración, fuentes nominales y certificados actuales. Publica el
+  plan revisable; el controlador incorpora todo al hash aprobado junto con el
+  baseline, release y proyecto. Permanecen todos los gates protegidos anteriores.
+  Sin F8 completo o con schema incompatible bloquea, sin instalar migraciones.
+- Usa los dos grupos F8 actualmente cerrados y su última versión oficial, nunca
+  v1 del grupo re-cerrado. APPROVAL usa `certificateRecipients` del roster
+  congelado; INSTRUCTOR siempre usa la asignación del snapshot (que debe coincidir
+  con el curso DEMO actual). Solo nombres/curso explícitamente ficticios.
+- El ADMIN original solo autoriza el plan; todas las escrituras F9 usan el ADMIN
+  `comprehensive.v1.operator@example.test` propio, ACTIVE, con rol ADMIN y Auth
+  `seed_owner` comprobados. No inicia sesión, cambia roles, promueve ROOT ni usa
+  nombres/fotos personales de referencias.
+- `getSettings` devuelve defaults/revision 0 sin persistir. Solo ante ausencia
+  confirmada se llama `updateSettings(actor, 0, cfg)` con nombres `[DEMO]` y cargos,
+  venue/organización/branding literales de los defaults `phase9-v1`. La comprobación
+  de ausencia y creación usa el lock real de certificados y una transacción.
+  Una fila existente nunca se modifica: si faltan autoridades, no son `[DEMO]` o
+  la plantilla/branding no es compatible, PLAN bloquea. Completar ajustes mediante
+  el flujo ADMIN autorizado en un destino separado; nunca «reparar» config real
+  para acomodar la demo.
+- Namespace independiente `skillbase-comprehensive-certificates-v1`; dos marcadores
+  propios de plan/completado no modifican el manifiesto F8 ni sus filas originales.
+  Inputs se conservan en el marcador nuevo; claves UUID estables, receipts reales
+  y lecturas del estado actual recuperan avances sin regenerar/re-subir emitidos.
+  No hay SQL que fabrique certificados, snapshots, receipts o eventos de lifecycle.
+- Usa `ManageCertificates.generate(actorId, input)`, `uploadSigned`,
+  `repository.review/issue/revoke` y reemplazo con `replacementForId`+motivo.
+  Los estados generated/awaiting_signature/issued/revoked/replaced se distribuyen
+  entre pares curso/tipo/titular distintos; reemplazo conserva anterior y sucesor,
+  sin consumir el caso revocado. Renderer real y PNG originales con QR vectorial
+  offline; Carta horizontal APPROVAL/vertical INSTRUCTOR y fechas/mes de fin reales
+  nominales, no fecha de generación.
+- El archivo FINAL de fixture lleva texto visible en **cada página**
+  `[DEMO - SIN FIRMA INSTITUCIONAL]` estampado con pdf-lib. Revisión/emisión es
+  sintética: **no prueba firma física, escaneo institucional ni firma digital**.
+  No se dibujan firmas ni se presenta el unsigned original como scan firmado.
+  `SIGNED` es el purpose técnico requerido por el lifecycle; hash público es
+  SHA-256 de los bytes exactos del archivo DEMO subido, no un hash inventado.
+- Storage usa `new SupabaseCertificateStorage(clientDEMO)` y repositorio DB
+  explícito; no imports de servicios singleton ni fallback a env de la app.
+  El PDF sigue privado: DTO público no tiene demoFlag ni descarga SIGNED,
+  pero nombre/curso DEMO y archivo marcado evitan identidad real emitida.
+- Reintentar no borra reservas ni artefactos: una reserva abandonada/bloqueada
+  exige revisión del operador, no sleeps, claves aleatorias o reintentos ciegos.
+
+Comandos manuales (no ejecutados sobre canónico/cloud):
+
+```text
+bun scripts/comprehensive-demo.ts --target local --project local --include-certificates
+bun scripts/comprehensive-demo.ts --target local --project local --include-certificates --apply
+bun run test:integration:comprehensive-certificates
+```
+
+El último comando crea/destruye **su propio QA Supabase** con schema 24 normal y
+cleanup obligatorio. Cubre servicios reales, PLAN/hash rechazado sin writes,
+inicialización por ausencia, lifecycle de ambos tipos, reemplazo, hashes/privacidad,
+config existente incompleta bloqueada y preservación PK/SHA-256 de filas completas
+con multiplicidad en todas las tablas public/Auth/Storage/Drizzle. Primer APPLY
+preserva baseline F8 y Storage original; repetición exige cero cambios. La prueba
+unitaria verifica además el texto de sello en streams PDF, no solo metadata.
+No se despachó el workflow real ni se liberó F9 como parte de esta implementación.
+
+### Cobertura obligatoria en CI
+
+El mismo job requerido `integration` de `ci.yml` ejecuta incondicionalmente y una
+sola vez, en este orden: `bun run test:integration` (producto),
+`bun run test:integration:comprehensive-demo` (F8) y
+`bun run test:integration:comprehensive-certificates` (F9). Cada comando utiliza
+su propio stack gestionado; F9 mantiene `requireCleanup: true`. Un fallo de test
+o cleanup falla el job, bloquea el agregador `integration-e2e` y, por el gate
+existente, el deploy. No se añade job opcional ni `continue-on-error`, y CI no
+invoca flags/CLI del seed productivo. El workflow productivo manual y sus guards
+de actor/evento/master/SHA/deployment/hash PLAN permanecen intactos.
+
+El wiring tiene cobertura en `tests/unit/comprehensive-demo-ci.test.ts` y pasó en
+el CI integrado completo descrito a continuación. La evidencia focal antigua que
+sigue debajo se conserva como cronología previa, no se suma al gate combinado.
+
+#### Gate CI integrado de Fase 9 (development)
+
+El source combinado `767ac8b7d5667f1a15df91c68ef2095dff1cd638` pasó CI
+`37987296020`, attempt 1. Quality/build, cleanup y agregador PASS: 463 unit / 4,031
+assertions; integración de producto 177 / 1,452; fixture F8 1 / 897; fixture F9
+1 / 1,142; E2E 145 (shards 76 + 69). Todos los E2E fueron first-pass, sin fallos,
+flakes, retries ni skips. Producto, F8 seed y F9 seed se probaron una sola vez,
+cada fixture en su propio stack gestionado; no se duplicó la suite completa local.
+Esta evidencia es de `development`, no de `master` ni de producción. CI/plan y
+límites de release en [`PLAN.md`](PLAN.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
+La migración candidata `0023_phase9_certificates.sql` tiene journal `idx: 23`,
+timestamp `1791500766703` y SHA-256
+`4c78ed1735b0cd3cb34d2bdc5f1f2c0d15b51dcc31568136839d706649489ee1`; ledger
+resultante 24. No se ha aplicado a canónico ni cloud, cuyo último ledger
+documentado es 23.
+
+#### QA aislada de la extensión F9
+
+La validación focal del source F9 usó un stack Supabase temporal propio, con
+ledger 24. El manifest F8 original conservó 75 tablas/418 filas; el manifest F9
+partió de 75 tablas/1,141 filas y terminó preservando esos datos, más los cambios
+de la extensión. Se verificaron ocho certificados sintéticos: 2 `generated`, 2
+`awaiting_signature`, 2 `issued`, 1 `revoked` y 1 `replaced`; replay de APPLY
+produjo cero cambios. El F8 seed se ejecutó una sola vez en su stack propio y
+conservó su dataset original. Cleanup del runner terminó correctamente.
+
+Esta QA no es carga canónica/cloud ni firma institucional. Los PDFs sintéticos
+incluyen `[DEMO - SIN FIRMA INSTITUCIONAL]` visiblemente en cada página; el archivo
+subido para el lifecycle demuestra almacenamiento/hash de bytes de DEMO, no una
+firma manuscrita real, escaneo institucional o firma digital criptográfica. Los
+valores 418/75 y 1,141/75 pertenecen a fixtures aisladas de CI/QA, no al inventario
+actual de producción.
+
+Evidencia QA focal (2026-10-09, branch `feat/certificate-demo-extension`, base
+`de22705230b07538dfe4584e678fd35deb3d1ca2`): 13 unit PASS / 307 assertions en
+cuatro archivos; integración propia 1 PASS / 142 assertions. El proyecto temporal
+`skillbase_test_d7730d59a0132a7d` conservó **75 tablas / 1.141 filas originales**,
+ledger 24, y terminó con 1.276 filas. Se crearon 8 certificados: generated 2,
+awaiting_signature 2, issued 2, revoked 1, replaced 1; ambos tipos y el vínculo del
+sucesor se comprobaron. Una pérdida de acknowledgment inyectada **después** del
+issue real se recuperó sin cambiar sus bytes emitidos. APPLY repetido hizo cero
+cambios completos; una configuración custom posterior se preservó y una
+incompleta bloqueó sin writes. Cleanup normal del stack propio terminó con exit 0.
+Estos datos son exclusivamente QA, no evidencia de firma institucional ni release.
+Lint, formatter focal, diff check y build PASS; typecheck 0 errores / 0 warnings /
+351 hints. Logs de evidencia privados `certificate-demo-*-final*.log` bajo el
+directorio temporal aprobado de OpenCode, nunca en Git.
+
 ## Alcance y autorización
 
 La nueva autorización explícita del usuario permite datos ficticios de notas,
@@ -104,9 +247,9 @@ focal también falla si no puede limpiar su proyecto propio; imprime únicamente
 el ID/ruta exactos para recuperación acotada, sin keys. Los conteos de producto
 y del caso seed se reportan por separado, no como una corrida compartida.
 
-### Producción: retenida hasta release y revisión del operador
+### Producción: operación cloud protegida completada
 
-#### Canal protegido GitHub (nuevo; liberar antes de usar)
+#### Canal protegido GitHub
 
 `production-comprehensive-demo.yml` es exclusivamente `workflow_dispatch` en
 master y environment `production`, con permisos contents/actions read y la misma
@@ -133,10 +276,10 @@ concurrente legítima puede bloquear comparación, nunca se «repara» para pasa
 
 Solo el job protegido recibe `MIGRATION_DATABASE_URL`,
 `DEMO_SUPABASE_SERVICE_ROLE_KEY` y `VERCEL_TOKEN` existentes. Variables:
-`DEMO_ADMIN_ID`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`. Tras release, el operador
-aprovisionará `DEMO_ACCOUNT_PASSWORD` como secreto protected production desde el
-archivo privado de credenciales DEMO ya existente, sin poner su valor en comandos,
-logs, inputs ni Git. No hacerlo antes ni extraer secretos sensibles de Vercel.
+`DEMO_ADMIN_ID`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`. Antes de APPLY, el operador
+aprovisiona `DEMO_ACCOUNT_PASSWORD` como secreto protected production desde el
+archivo privado de credenciales DEMO, sin poner su valor en comandos, logs, inputs
+ni Git. No extraer secretos sensibles de Vercel.
 PLAN no requiere esa contraseña; solo APPLY la recibe. Las credenciales originales
 no cambian y no se envía correo. El canal protegido exige 20–128 caracteres; usar
 la contraseña criptográfica ya generada, no una contraseña débil nueva.
@@ -149,39 +292,15 @@ antes de reintento. La cola serializa ambos operadores demo, **no** el deploy
 existente: el owner debe evitar despliegues durante APPLY y cualquier cambio de
 master previo a escribir se rechaza en la comprobación inmediata.
 
-Esta implementación no ejecuta el workflow ni crea secretos o datos cloud.
-Validación focal del canal protegido: 15 tests / 385 assertions de contexto,
-release/CI/deployment, aprobación de PLAN, witness e inventario workflow; caso
-real aislado 1 PASS / 894 assertions, 70 tablas / 416 filas originales preservadas
-y repetición sin cambios. Incluye rechazo de hash de plan distinto **antes** de
-aprovisionar Auth y el nuevo witness server-side. Formatter, ESLint, TypeScript y
-diff checks y build pasan. No se repitió full unit/integration/E2E; el nuevo gate remoto de
-release sigue pendiente del owner. La prueba aislada completó su limpieza normal.
+La validación focal del canal protegido cubrió 15 tests/385 assertions; el caso
+real aislado pasó 1/1/894 assertions, preservó 70 tablas/416 filas originales y
+su repetición no hizo cambios. También se comprobó el rechazo de un hash de plan
+distinto antes de aprovisionar Auth. La ejecución cloud real se documenta abajo.
 
-Después de integrar/liberar esta herramienta y todas las correcciones, comprobar
-CI full verde y deployment READY para el SHA exacto. Preparar un checkout
-**limpio de master** de ese SHA, y establecer `DEMO_APPROVED_RELEASE_SHA` a ese
-commit público **solo después** de revisar la evidencia del release. El runner
-comprueba branch, HEAD y ausencia de cambios; esta variable es una declaración
-del operador, no una consulta automática de GitHub CI/Vercel.
-
-```text
-bun run db:seed:comprehensive-demo --target production --project fvzxqlezdrlzykyoevub --allow-production
-bun run db:seed:comprehensive-demo --target production --project fvzxqlezdrlzykyoevub --allow-production --apply
-```
-
-El guard reutiliza la identidad cloud estricta del runner financiero: URL API
-exacta, host/usuario/puerto/path de PostgreSQL directo o pooler compatibles con el
-proyecto nombrado. Producción sin aprobación explícita, un feature worktree,
-checkout sucio o SHA no aprobado se rechaza **antes de conectar**. Vercel y CI
-ordinario están prohibidos; no se modifica el workflow productivo existente.
-
-Antes del APPLY: snapshot privado completo de filas originales y ledger, inventario
-Auth/roles/perfiles/sesiones/Storage/settings, revisión de colisiones y plan.
-Después: verificar todas las filas originales por keys/hashes, conteos nuevos y
-las pantallas/descargas bajo roles autorizados; repetir el mismo APPLY y comprobar
-cero cambios. Guardar evidencia fuera del repositorio y sin secretos. Ninguno de
-estos comandos productivos se ejecuta por esta implementación ni por sus tests.
+El workflow queda sujeto a los guards descritos: master exacto y limpio, gate y
+deployment del SHA aprobados, hash del plan revisado, snapshot pre/post y APPLY
+protegido. No usar la CLI de producción desde una shell ordinaria, Vercel o CI
+ordinario; el canal soportado es el workflow manual protegido.
 
 ## Atomicidad, reintentos y límites
 
@@ -253,26 +372,53 @@ vacío. Esto acredita QA, no una carga o verificación en producción.
 
 Evidencia privada de salida en `comprehensive-seed-*.log` bajo el directorio
 aprobado temporal de OpenCode; no contiene valores de credenciales. La validación
-remota del runner está registrada debajo; ninguna carga real en canónico o cloud
-se ha ejecutado.
+remota del runner está registrada debajo. En ese boundary previo a producción no
+se había ejecutado carga en canónico ni cloud; el estado posterior se registra
+abajo.
 
-### Estado integrado en development (PR 288; release productivo pendiente)
+### Release y ejecución canónica posterior
 
-El runner se integró en `development` mediante PR 288, junto con las correcciones
-UI de PR 289 (`development` `53f171e10c6b5ac922d9f4c5760f788b9f7bdebe`). El CI
-integrado del candidato (`37818957648`) pasó first-pass: 424 unit/2,866
-assertions, 162 integration/1,332 assertions, el caso focal del seed 1/1/890
-assertions en stack temporal independiente y E2E 140/140 (132 desktop + 8
-mobile). Formatter, lint, build y typecheck (0 errores/0 warnings/312 hints)
-PASS; sin retries, flakes ni skips reportados. El test focal preservó 416 filas
-en 70 tablas, añadió 8 cursos, 10 grupos, 26 preinscripciones/25 participantes,
-4 instructores y 5 ADMIN ficticios, además de 3 versiones de cierre, una
-reapertura y una baja ADMIN completada. La repetición del APPLY agregó cero
-cambios. Toda esta evidencia corresponde a la base temporal del test, no a datos
-canónicos o productivos.
+El runner se integró mediante PR 288; correcciones UI por PR 289 y canal
+protegido mediante PR 292. El source de `master` quedó en
+`2789d55e93a97cc5344930e690e9feecc2cc10f5`, alineado con `development`
+`a276e30fab3526cc086fc3efbe03a42d08681ba9`; Vercel `dpl4CZ` quedó `READY` para
+ese mismo código. El release CI `37846141904` pasó en primer intento: 429 unit
+/ 2,945 assertions, 162 integration / 1,332 assertions, demo seed 1/1 / 894
+assertions y E2E 140/140 (132 desktop, 8 mobile); cero fallos, retries, flakes
+o skips; TypeScript 0 errores/0 warnings/313 hints. PR 292/run `37845044909`
+integra la preparación del workflow; PR 293/run `37843958082` añadió diagnóstico
+de primera falla, sin atribuir un fix de aplicación. La observación anterior de
+flake en `378382` conserva causa raíz desconocida y scope de un caso.
 
-La carga local canónica y la de producción siguen sin ejecutar. Para producción,
-el proceso documentado arriba exige release CI/deploy aprobado, checkout limpio
-del SHA exacto de `master`, `DEMO_APPROVED_RELEASE_SHA` revisado por el operador,
-PLAN y después APPLY explícito. No se rota ninguna credencial Auth existente ni
-se envía correo. La Fase 9 no se incluye ni se siembra.
+El owner ejecutó PLAN/APPLY en local canónico desde checkout limpio de
+`master` `4e067311`, después del gate de release. Ledger quedó en 23. La
+comparación previa/posterior conservó hashes de 2,906 filas originales en 70
+tablas; reejecutar APPLY produjo cero cambios. Se añadieron 8 cursos, 10 grupos,
+26 registros/25 participantes, 4 instructores, 5 ADMIN demo, 3 versiones de
+cierre, 1 reapertura y 1 baja ADMIN unused con outbox completado. Se preservaron
+las credenciales Auth existentes y las notas, finanzas y auditoría de usuarios
+originales; no se usaron identidades reales como fixtures.
+
+Cloud PLAN `37854318652` y APPLY `37854790028` se ejecutaron exitosamente a través
+del workflow protegido para `fvzxqlezdrlzykyoevub`, en source liberado
+`2789d55e93a97cc5344930e690e9feecc2cc10f5`. El hash aprobado del plan fue
+`2bb8db152ff4ce2a4088ee372c632c17767dd5928c6d2ac28db9655f2b5c09ab`. Se verificó
+N=3 y mínimo de primer pago=25; el seed no alteró estos settings ni usó un bypass.
+
+El snapshot pre-APPLY midió 72 tablas y 899 filas originales. El workflow comparó
+hashes SHA-256 server-side de filas completas identificadas por PK; todo el
+baseline se preservó, ledger continuó en 23 y el total quedó en 1,850 filas. El
+APPLY de repetición terminó con cero cambios. Se agregaron 8 cursos, 10 grupos,
+26 registros/25 participantes, 12 intereses, 4 instructores y 5 ADMIN demo; el
+ciclo de la cuenta ADMIN unused terminó con Auth eliminado y tombstone/outbox
+completado. Se crearon 3 versiones de cierre y 1 reapertura. Siete GET públicos
+respondieron 200. No se tocaron credenciales Auth originales ni se enviaron
+correos. La credencial de la cuenta ADMIN demo se mantuvo únicamente en archivo
+privado fuera del repositorio; no registrar su valor en ningún artefacto.
+
+La carga local anterior permanece como ejecución independiente: baseline 70
+tablas/2,906 filas originales, preservadas por hash y APPLY repetido con cero
+cambios. No comparar el tamaño local con cloud ni tratarlo como el baseline de la
+ejecución protegida. Ambas operaciones son F1–F8: no generaron certificados,
+QR, firmas ni nuevas tablas de Fase 9; ledger/canónico/cloud sigue en 23 hasta el
+release futuro aprobado de F9.

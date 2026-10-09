@@ -2,9 +2,9 @@
 
 ## Estado y alcance
 
-Este documento registró los acuerdos previos para una pasada de correcciones operativas sobre la aplicación liberada en Fase 8. La implementación de correcciones y el runner de demo integral se integraron en `development` mediante PRs 289 y 288, respectivamente. El contrato describe el alcance acordado, no acredita un release a `master`: el release de todas las correcciones sigue pendiente hasta completar su flujo de promoción. La carga de demos productivos solo podrá ocurrir después de ese release y requiere seguir los guards y la operación explícita descritos en [`DEMO_SEED.md`](DEMO_SEED.md).
+Este documento registró los acuerdos previos para una pasada de correcciones operativas sobre la aplicación liberada en Fase 8. Las correcciones y runner demo se integraron mediante PRs 289/288; PR 292 añadió el canal cloud protegido. La release de producción registrada en este boundary sigue en `master` `2789d55e93a97cc5344930e690e9feecc2cc10f5` (CI `37846141904`, Vercel `dpl4CZ READY`), y los seeds local/cloud F1–F8 se completaron por las operaciones aprobadas (ver [`DEMO_SEED.md`](DEMO_SEED.md)). El seguimiento UI de instructor/resultados descrito abajo se integró posteriormente a `development` mediante PR 295; el conjunto F9 se integró después por PRs 294–298. Este contrato no acredita su release a `master`.
 
-Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Este contrato no la reabre. La Fase 9 no se implementa aquí; sus decisiones pendientes se enumeran al final y no se deben asumir por anticipado.
+Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Este contrato no la reabre. Fase 9 no se implementa aquí; su alcance fue aprobado posteriormente y se mantiene en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). Tras completar los seeds F1–F8 local/cloud, la implementación F9 se integró después en `development`; el estado de release está en [`PLAN.md`](PLAN.md).
 
 ## Reglas transversales de interfaz
 
@@ -22,7 +22,7 @@ Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Es
 - Alta de ADMIN: el campo de contraseña inicial ocupa exactamente una mitad de la grilla en desktop, compartiendo fila con nombre/correo según el layout existente; no fijar un ancho en píxeles. En mobile, apilar de forma usable.
 - Perfil de ADMIN: nombre con ancho mínimo de media grilla y posibilidad de ocupar el ancho completo según el layout; retirar el ancho hardcodeado. Eliminar la sección duplicada «Perfil personal» sin retirar el campo de nombre que efectivamente permite editar el ADMIN.
 - Lifecycle de ADMIN: si la cuenta objetivo es el último ADMIN activo, la acción de desactivar/eliminar se muestra deshabilitada y claramente visible. El guard de servidor y su serialización/concurrencia se mantienen intactos; el estado visual es orientación, no autorización. Si el DTO no expone actualmente la elegibilidad, proyectar el dato necesario sin aflojar el guard ni revelar información ajena.
-- Búsqueda de instructores: usar todo el ancho disponible, con adaptación responsive.
+- Búsqueda de instructores: usar todo el ancho disponible, con adaptación responsive. Filtrar inmediatamente en cliente la lista completa SSR ya autorizada, por nombre y correo con la normalización compartida (acentos/case/espacios); no lanzar búsquedas de red, debounce ni estados de carga ficticios por cada tecla. Mantener el filtro SSR mediante GET y un submit visible solo sin JavaScript. Limpiar restaura todos los perfiles y “sin resultados” es contextual; conservar consulta/navegación del navegador sin mover el foco ni ampliar la autorización.
 
 ## Confirmaciones y navegación de sesiones
 
@@ -32,11 +32,17 @@ Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Es
 - Seleccionar una fecha restablece el estado a «Todas» y muestra todas las sesiones de esa fecha, sin filtrar por estado. Mientras haya una fecha seleccionada, «Todas» aparece como opción de estado.
 - Si hay una fecha seleccionada y se elige «Próximas», «Finalizadas» o «Canceladas», limpiar la fecha y filtrar ese estado en el calendario general.
 - Pulsar «Todas» limpia la fecha y deja el estado en «Todas»; muestra el listado total del calendario, sin restricción por fecha. Al quedar sin fecha, «Todas» deja de estar disponible como opción de estado.
+- Los filtros de estado se comportan como toggles independientes: activar uno aplica ese estado y volver a pulsar el mismo filtro lo desactiva y restaura todas las sesiones. No debe quedar un estado pulsado en esta vista sin filtro; la selección de fecha y «Todas» conservan exactamente las reglas anteriores.
+- La lista de sesiones y el calendario comparten el scroll natural del contenedor principal de la página; no debe aparecer un scroll vertical anidado en la lista. En desktop alto el calendario puede permanecer sticky; en viewports bajos/zoom debe volver al flujo natural para no atrapar filtros fuera de pantalla. En mobile/tablet el layout se adapta sin overflow horizontal.
+- La barra de desplazamiento global usa tokens semánticos para claro/oscuro, manteniendo las paletas específicas aprobadas para landing/catálogo público. En `forced-colors` se devuelve el control visual al sistema.
+
+Estas correcciones de calendario/scroll están implementadas en la rama fuente `fix/calendar-filter-scroll` (`bf938d3cacef70deb01ef32c6bd4fd80c2e72f97`). Esta anotación describe el comportamiento comprobado de esa fuente; no afirma integración a `development`, release a `master` ni despliegue.
 
 ## Evaluaciones y notas
 
 - Presentar la nota final alineada horizontalmente con las notas de componentes y su lápiz de edición; quitar la etiqueta redundante «PENDIENTE» debajo del lápiz. Mantener los indicadores de pendiente existentes en el resto de la UI.
 - Colocar la búsqueda de participantes en su propia fila de ancho completo. Quitar el texto «Resultados provisionales».
+- Identidad y controles de nota final/editorial comparten una fila de valores estable frente a los nombres de componente; alinear etiqueta arriba y valor/editor debajo. Con muchos componentes agrupar hasta cuatro por fila y permitir wrapping sin overflow, también en SSR/fallback sin JS. Mantener la semántica y distinción observable entre cero completo y nota pendiente.
 - No modificar reglas de cálculo, esquema, escritura atómica por fila, estados pendientes, historial ni freeze de Fase 7.
 
 ## Asistencia
@@ -52,12 +58,11 @@ Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Es
 
 ## Resultados académicos
 
-- Ajustar la presentación de resultados para adaptarse a la cantidad de componentes, siguiendo el sistema visual actual, sin un tema o estilo nuevo.
-- Con pocos componentes, mostrar nombres de componentes, resumen, resultado final, estado y asistencia sin duplicar los mismos datos en bloques de resumen y detalle.
-- Hasta 6 componentes, presentar los datos de forma compacta y legible en la vista. Para 7 o más, recomendación: resumen compacto y una tarjeta de resumen completa, clicable en toda su superficie, que abra un diálogo de detalle accesible y responsive. Esta división por cantidad es una guía aprobada de presentación, no una regla de cálculo.
-- La tarjeta completa debe tener semántica y teclado de control accionable; el diálogo debe tener nombre, foco, cierre accesible y contenido usable en mobile. No añadir un botón «Ver detalles» redundante si la tarjeta completa ya abre el detalle.
-- Preservar la visibilidad de los componentes donde corresponda y no duplicar la nota/estado/asistencia entre vistas más de lo necesario.
-- Mantener privacidad financiera de INSTRUCTOR; los nuevos resúmenes y detalles no deben proyectar saldo, pagos o datos financieros.
+- **Criterio vigente (supersede el umbral anterior de 6/7 componentes):** todos los grupos/tamaños de esquema presentan siempre la misma tarjeta compacta de resumen por participante. No expandir inline algunas tarjetas según el número de componentes.
+- El resumen muestra nombre; CI solo para ADMIN; estado; nota final y nota mínima del reporte autorizado (sin recalcularlas ni crear un resultado provisional en cliente); progreso solo si existen componentes; y agregado de asistencia/elegibilidad/racha máxima. No duplicar estos bloques dentro del propio resumen; el detalle puede repetir lo mínimo necesario para mantener contexto y agregar el desglose por componente/asistencia.
+- Toda la tarjeta es un control accionable con teclado; activa el diálogo del design system con el detalle autorizado de componentes/notas, resultado y asistencia. No añadir CTA secundario «Ver detalle». Para SSR/sin JavaScript conservar un `<details>/<summary>` funcional con el detalle; la hidratación mejora esa interacción al diálogo.
+- El instructor nunca ve CI, categoría, contacto ni datos financieros en resumen/detalle. El resumen no muestra finanzas; el saldo continúa informativo y ADMIN-only dentro del detalle autorizado existente. La UI consume la proyección por rol actual y no cambia DTOs, permisos, decisiones de aprobación/asistencia, cero/pendiente, cierre inmutable ni elegibilidad de certificados.
+- Seguir el sistema visual existente y mantener la presentación usable en mobile, con textos/valores largos sin truncado y foco/cierre/retorno de foco accesibles.
 
 ## Datos sintéticos de QA y demos
 
@@ -70,17 +75,13 @@ El usuario autorizó explícitamente cargar datos **completamente ficticios** en
 - La QA de datos productivos solo se ejecuta **después** de que todas las correcciones estén integradas a `master` mediante el release aprobado. No sembrar Fase 9 antes de su implementación/autorización. Las cinco tablas Fase 8 estaban vacías en el snapshot de release; cualquier demo académico posterior es carga nueva autorizada, no parte del release anterior.
 - Separar evidencia de fixtures y de datos preexistentes. Antes/después registrar conteos/identificadores y preservación de filas no demo; no publicar credenciales ni información personal real.
 
-## Fase 9: decisiones futuras, no aprobadas aquí
+## Fase 9: alcance aprobado posteriormente
 
-Certificados sigue pendiente. Antes de implementar, llevar al owner preguntas, no respuestas asumidas, al menos sobre:
-
-- Tipos de certificados y qué resultado/circunstancia habilita cada tipo.
-- Firmas requeridas, autoridad que firma, en qué etapa, y si la firma es condición de emisión/publicación o un estado posterior.
-- Número institucional/serie: formato, autoridad asignadora, unicidad, momento de asignación y tratamiento de reemplazos/revocaciones.
-- Elegibilidad: qué estados/notas/asistencia se congelan y cómo aplicar políticas vigentes sin recalcular versiones históricas.
-- Fuente oficial del certificado frente a versiones de cierre: si se emite desde un snapshot/version específica de cierre, cómo se resuelve un grupo reabierto y qué ocurre con certificados anteriores.
-- Saldo financiero: si es dato informativo o condición de elegibilidad/emisión. La regla de Fase 8 de no bloquear cierre por saldo no decide por sí sola la política de certificado.
-- Datos requeridos de boleta/valorado y si pertenecen al certificado o solo al proceso administrativo.
-- Reemplazo, revocación y verificación pública: autoridad, estados, auditoría, privacidad/exposición, credential ID/QR/URL y reglas de PDF firmado/hash.
-
-Registrar las respuestas aprobadas en los documentos de requisitos/decisiones/certificados apropiados antes de implementar. Este inventario no añade requerimientos ni presume opciones.
+Al redactar este contrato de correcciones, Fase 9 seguía sin decisiones
+aprobadas. El owner aprobó después el alcance de certificados; la especificación
+vigente es [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y la decisión
+ADR-028 en [`DECISIONS.md`](DECISIONS.md). No se deben usar como pendientes las
+preguntas históricas enumeradas en esta versión del contrato. Los seeds F1–F8
+local/cloud ya se completaron y, al actualizar este contrato, Fase 9 estaba en
+progreso. Su estado vigente (implementación integrada en development, release
+pendiente) está en [`PLAN.md`](PLAN.md)/[`DEMO_SEED.md`](DEMO_SEED.md).

@@ -44,6 +44,8 @@ jobs:
         run: bun run test:integration
       - name: Run comprehensive demo integration once on its own managed stack
         run: bun run test:integration:comprehensive-demo
+      - name: Run comprehensive certificate demo integration once on its own managed stack
+        run: bun run test:integration:comprehensive-certificates
 
   e2e:
     name: e2e (${{ matrix.shard }}/2)

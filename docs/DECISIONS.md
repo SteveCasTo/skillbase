@@ -745,7 +745,7 @@ El job `integration-e2e` secuencial del master CI `37670004492` duró 12m10s: Ch
 
 **Fecha:** 2026-10-07
 
-**Estado:** Implementado en backend de feature; integración/release pendientes
+**Estado:** Implementado e integrado; liberado mediante PR 286 (detalles históricos en las consecuencias de esta decisión)
 
 ### Contexto
 
@@ -804,3 +804,81 @@ asistencia y cambios de membresía.
   disponible. No es el milestone completo de Fase 8. Ver contrato/evidencia en
   [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y
   [`TESTING.md`](TESTING.md).
+
+---
+
+## ADR-028 — CONTRATO APROBADO DE CERTIFICADOS DE FASE 9
+
+**Fecha:** 2026-10-08
+
+**Estado:** Accepted — alcance aprobado e implementación integrada en `development`; release pendiente
+
+### Contexto
+
+Fase 8 proporciona versiones oficiales inmutables de cierre por grupo. El
+alcance previo de certificados enumeraba tareas generales pero dejaba sin
+decidir los tipos, elegibilidad, fuente oficial, firmantes, formato institucional
+y si el trámite dependía de finanzas. Se fijaron esos límites antes de
+implementar y se separó el alcance acordado del bloqueo operativo F1–F8 y de
+los detalles de almacenamiento/ordinal que corresponderán al diseño técnico.
+
+### Decisión
+
+- Emitir dos tipos por grupo y versión oficial actual: aprobación para cada
+  roster `INSCRITO` cuyo `academicallyPassed` congelado sea verdadero, y
+  certificado del instructor del snapshot de cierre, independiente de los
+  resultados de estudiantes. Ambos requieren que el grupo esté cerrado en su
+  última versión oficial; no se admiten borradores/provisionales ni versiones
+  antiguas para generación/emisión.
+- No admitir excepciones manuales a aprobación, ni saldo/deuda como condición;
+  la boleta/valorado física y participación futura quedan fuera del alcance.
+- ADMIN realiza generación, impresión/trámite de firmas manuscritas, carga del
+  PDF final, emisión, revocación y reemplazo. Instructor consulta únicamente
+  sus grupos en modo lectura y no ejecuta operaciones de certificación.
+- Reconstruir en tamaño Carta y con el contenido, logos, firmas y orden
+  institucional descritos en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md).
+  QR e ID público discretos en anverso; no añadir campos de negocio. Congelar
+  todas las fuentes impresas/configuración y hashes de assets.
+- Ante reapertura bloquear nuevas generaciones/emisiones; obsoletizar borradores
+  antiguos. Certificados ya emitidos no se revocan automáticamente y siguen
+  válidos hasta acción explícita ADMIN. Al reemplazar, conservar vínculo e
+  historial y permitir como máximo uno activo por tipo/curso/destinatario.
+- Mantener PDF firmado y Storage privados; descarga solo autenticada ADMIN o
+  INSTRUCTOR con ownership comprobado desde el snapshot. La página pública solo
+  expone allowlist y permite comparar SHA-256 localmente en el navegador, sin
+  upload. QR/URL no son firma digital; la firma manuscrita escaneada es una
+  atestación administrativa y los archivos copiados no dejan de ser copias.
+- No alterar snapshots Fase 8 para completar metadata: obtener datos nominales
+  de curso/revisión/grupo y congelarlos al generar. No publicar CI/contacto,
+  notas, asistencia parcial ni finanzas.
+
+### Alternativas consideradas
+
+- Certificado de participación/asistencia además de aprobación: no aprobado;
+  queda fuera del alcance actual.
+- Elegibilidad por notas sin asistencia, excepción ADMIN o gate de saldo:
+  rechazado a favor de la decisión académica `academicallyPassed` congelada y
+  la independencia financiera.
+- Un solo certificado de curso o vincular el certificado del instructor a
+  resultados del roster: rechazado; son dos destinatarios/tipos distintos.
+- Hacer pública la descarga del PDF firmado: rechazado por privacidad; el
+  verificador comprueba el registro público y su hash, no sirve el archivo.
+- Invalidar automáticamente certificados emitidos al reabrir: rechazado; la
+  validez continúa hasta revocación/reemplazo explícito.
+- Considerar QR o Storage URL como autoridad o firma criptográfica: rechazado;
+  la autoridad es el registro actual y el hash es comparación de bytes.
+
+### Consecuencias
+
+- [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) es el detalle normativo
+  del formato, procedencia, operación, privacidad y dependencias de
+  implementación.
+- La carga autorizada F1–F8 local/cloud ya pasó sus gates y está documentada en
+  `DEMO_SEED.md`. La implementación F9 y el seed opt-in están integrados en
+  `development`; el CI completo del source combinado pasó. Su migración todavía
+  no se ha aplicado a canónico/cloud. El release, deployment y la operación
+  protegida de demo siguen pendientes. Persistir ordinal ADMIN-editable y
+  configuración/versiones de plantilla/assets sin modificar historia F8.
+- La aprobación del alcance y la integración en `development` no equivalen a
+  release, despliegue ni ejecución de seed productivo. Ver el estado vigente en
+  `PLAN.md`; el seed F9 requiere el flag opt-in y gates/proceso protegidos.

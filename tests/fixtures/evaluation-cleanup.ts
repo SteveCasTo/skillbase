@@ -5,4 +5,4 @@ import { sql } from "drizzle-orm";
  * checks referencing FKs even when the child tables are already empty.
  * This is not a production/demo reset allowlist.
  */
-export const evaluationFixtureTables = sql`academic_group_reopenings, academic_closure_receipts, academic_closure_versions, academic_group_states, evaluation_grades, evaluation_results, evaluation_components, evaluation_schemes, evaluation_command_receipts`;
+export const evaluationFixtureTables = sql`certificate_artifacts, certificate_events, certificate_receipts, certificates, academic_group_reopenings, academic_closure_receipts, academic_closure_versions, academic_group_states, evaluation_grades, evaluation_results, evaluation_components, evaluation_schemes, evaluation_command_receipts`;

@@ -6,6 +6,7 @@ import {
   Layers3,
   UsersRound,
   Settings,
+  FileBadge,
 } from "lucide-react";
 
 interface Props {
@@ -161,11 +162,26 @@ const registrationActive = currentPath.startsWith("/app/preinscripciones");
           class="private-nav-link"
           title="Configuración"
           aria-current={
-            currentPath === "/app/configuracion" ? "page" : undefined
+            currentPath.startsWith("/app/configuracion") ? "page" : undefined
           }
         >
           <Settings size={19} aria-hidden="true" />
           <span class="private-label">Configuración</span>
+        </a>
+      </li>
+    )}
+    {isAdmin && (
+      <li>
+        <a
+          href="/app/certificados"
+          class="private-nav-link"
+          title="Certificados"
+          aria-current={
+            currentPath.startsWith("/app/certificados") ? "page" : undefined
+          }
+        >
+          <FileBadge size={19} aria-hidden="true" />
+          <span class="private-label">Certificados</span>
         </a>
       </li>
     )}

@@ -649,13 +649,49 @@ responsive/teclado están en [`TESTING.md`](TESTING.md). Backend/UI se integraro
 por PRs 283/285 y se liberaron por PR 286. No se hizo smoke autenticado ADMIN ni
 se crearon cuentas reales en producción durante el release.
 
-## Correcciones UI posteriores a Fase 8 (PR 289, integradas en development)
+## Correcciones UI posteriores a Fase 8 (PR 289, release posterior)
 
 La pasada correctiva ajusta confirmaciones, búsqueda/perfiles ADMIN e instructores,
 calendario, notas, asistencia y presentación adaptable de resultados, conservando
 los guardas/roles del servidor, SSR/POST y el sistema visual existente. El detalle
 de interacción aprobado e implementado, incluidos defaults y estados responsive,
 está en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md). PR 289 está
-integrado en `development`; su release a `master` sigue pendiente. No se afirma
-una revisión visual manual con Playwright/screenshot para este bloque; ver la
-evidencia automatizada y sus límites en [`TESTING.md`](TESTING.md).
+integrado en `development` y quedó incluido en releases posteriores a `master`.
+La revisión visual y release de los seguimientos descritos abajo se limitan a sus
+ramas de feature; ver evidencia por ejecución en [`TESTING.md`](TESTING.md).
+
+### Pulido posterior del filtro y scroll del calendario (PR 296, integrado en development)
+
+La rama `fix/calendar-filter-scroll` (`bf938d3cacef70deb01ef32c6bd4fd80c2e72f97`) ajusta la interacción del calendario de sesiones: cada filtro de estado puede deseleccionarse para volver a mostrar el conjunto completo; seleccionar fecha, «Todas» y cambiar a un filtro específico mantienen las reglas existentes. La lista y los filtros utilizan un único scroll vertical principal, sin contenedor scrolleable anidado; el calendario es sticky solo en desktop con altura suficiente y vuelve al flujo normal en viewports bajos. Los tokens globales de scrollbar respetan light/dark, las paletas de landing/catálogo y `forced-colors`. La evidencia y sus límites están en [`TESTING.md`](TESTING.md).
+
+### Seguimiento de búsqueda en vivo y resumen académico compacto (PR 295)
+
+La rama `fix/live-instructor-search-and-compact-results` actualiza dos detalles
+de la pasada. La lista ADMIN de instructores filtra en vivo el conjunto completo
+que el loader ya autorizó SSR (nombre/correo normalizados), sin requests al
+tipear, sin debounce ni cambios de foco; el GET/submit sigue siendo el fallback
+sin JavaScript, con query e historial recuperables. La búsqueda ocupa el ancho
+disponible y anuncia un estado vacío contextual.
+
+Las filas de nota alinean identidad, componentes y resultado final mediante
+filas de valores compartidas, con reflow/wrapping para esquemas extensos. En el
+cierre, **todos** los resultados usan una tarjeta compacta equivalente, sin
+umbral por número de componentes: muestra estado/resultado, nota y mínimo del
+reporte autorizado, progreso cuando aplica y agregado de asistencia. Toda la
+tarjeta abre el diálogo accesible del design system; SSR mantiene disclosure
+`<details>/<summary>`. No hay botón «Ver detalle», resultado provisional nuevo
+ni cálculo de negocio en la presentación. Se mantiene CI únicamente para ADMIN,
+finanzas fuera del resumen y detalle financiero solo en la proyección ADMIN
+existente. El comportamiento y sus límites están en
+[`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md) y
+[`TESTING.md`](TESTING.md). PR 295 se integró en `development`; esto no acredita
+su release a `master`.
+
+## Certificados (implementación integrada en development)
+
+- La navegación ADMIN enlaza gestión y ajustes de certificados; las vistas de curso/grupo dan acceso a la gestión del grupo. El detalle privado presenta las operaciones disponibles según el estado que entrega el servidor. No duplica reglas de elegibilidad, permisos ni transiciones en el cliente.
+- El instructor accede a certificados históricos propios en modo readonly, con descargas privadas autenticadas. No se inventa un índice global de historial que el loader no ofrece.
+- `/certificados` ofrece búsqueda y `/certificados/[publicCredentialId]` presenta el resultado público mínimo autorizado. La superficie pública no enlaza ni descarga PDFs privados.
+- La verificación opcional del archivo usa el picker del navegador y calcula SHA-256 localmente; se evita transmitir el archivo para ese cálculo. La UI no lo representa como validación de firma digital o de identidad del portador.
+- La carga/revisión del documento utiliza controles privados; errores de validación se presentan junto al formulario y permiten recuperación cuando el servidor lo permite. No afirmar que la carga valide la autenticidad de una firma manuscrita.
+- La UI SSR está integrada mediante PR 297 en `development`, junto al CORE de PR 294. La revisión QA y límites de ejecución están en [`TESTING.md`](TESTING.md); el gate combinado pasó en CI, pero F9 no está publicado en producción mientras el release a `master` siga pendiente.

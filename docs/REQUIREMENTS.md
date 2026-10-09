@@ -343,7 +343,7 @@ El usuario aprobó cierre por grupo, snapshots/informes y gestión multi-ADMIN. 
 - Guardar varias notas cambiadas de una fila es atómico. La UI puede editar celdas individualmente. Nota vacía es pendiente; no convierte a cero ni autoriza borrar una nota existente.
 - Las cuentas ADMIN tienen permisos iguales; no hay `ROOT` ni privilegio especial del primer usuario. ADMIN activo puede aprovisionar otra cuenta server-side y fijar contraseña inicial mediante Supabase Auth privilegiado. El secreto no se persiste ni registra en DTO/logs/auditoría y no se fuerza cambio en primer login. Nombre editable con revisión, correo readonly. El backend expone una acción aplicable: eliminar si nunca tuvo actividad como actor/dependencia; si hay uso, desactivar/reactivar conservando UUID e historial; baja pendiente se reintenta sobre la misma identidad. Mantener al menos un ADMIN activo; auto-baja no se prohíbe en general si queda otro ADMIN. No agregar perfil/rol INSTRUCTOR ni cambiar roles incidentalmente. Backend/UI integrados por PRs 283/285 y liberados por PR 286; durante el release no se crearon cuentas nuevas reales ni se hizo smoke ADMIN autenticado en producción.
 
-Fase 8 está liberada en production por PR 286 y las migraciones 0021/0022 avanzaron canónico/cloud a ledger 23. La comparación de preservación, tablas F8 vacías y los límites del smoke anónimo están en [`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md). Google OAuth real, recovery y entrega SMTP/cloud continúan pendientes por separado; Fase 9 no está iniciada. Contratos en [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
+Fase 8 está liberada en production por PR 286 y las migraciones 0021/0022 avanzaron canónico/cloud a ledger 23. La comparación de preservación, tablas F8 vacías y los límites del smoke anónimo están en [`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md). Google OAuth real, recovery y entrega SMTP/cloud continúan pendientes por separado. Fase 9 se integró después en `development`; no estaba iniciada en el boundary histórico del release F8. Contratos en [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md) y [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
 
 ## EVALUACIÓN
 
@@ -384,9 +384,23 @@ Debe ser configurable.
 
 ## CERTIFICACIÓN
 
+El alcance aprobado de certificados de Fase 9 se especifica en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). Está aprobado e
+implementado en `development`; el release productivo aún está pendiente.
+
 ### RF-CER-001
 
-El sistema debe determinar elegibilidad según nota y asistencia.
+La aprobación estudiantil se emite solo a participantes `INSCRITO` de la
+versión oficial del cierre de grupo cuya decisión `academicallyPassed` sea
+verdadera (aprobación académica y elegibilidad por asistencia). No se admiten
+excepciones manuales. No depende de saldo/deuda ni de una boleta física. El
+certificado de instructor es independiente de las notas/asistencia estudiantil y
+se destina al instructor del snapshot de cierre. Ambos requieren el grupo
+cerrado en su última versión oficial. ADMIN gestiona generación,
+impresión/trámite de firmas manuales, carga del PDF final, emisión, revocación y
+reemplazo; INSTRUCTOR consulta y descarga de forma autenticada solo sus
+certificados/grupos según ownership histórico del snapshot, sin permiso de
+gestionar certificados.
 
 ### RF-CER-002
 
@@ -418,11 +432,32 @@ Debe permitir revocar.
 
 ### RF-CER-009
 
-Debe permitir descargar el PDF final cuando corresponda.
+Debe permitir descargar el PDF final únicamente a ADMIN e INSTRUCTOR autorizados
+server-side. El PDF firmado/escaneado y Storage son privados; no hay descarga
+anónima ni URL pública permanente.
 
 ### RF-CER-010
 
 Debe permitir utilizar URL e identificador como credencial para servicios externos como LinkedIn.
+
+El QR y `publicCredentialId` conducen a verificación pública del registro
+vigente; el identificador debe ser impredecible/no secuencial. La página pública
+no expone CI, contacto, notas, asistencia detallada ni finanzas. El acceso
+anónimo al PDF firmado está prohibido. La verificación permite comparar
+SHA-256 de un PDF seleccionado localmente en el navegador, sin upload. El QR no
+es firma digital; la firma manuscrita escaneada es atestación administrativa y
+copiar un certificado válido no deja de ser una copia.
+
+La plantilla autorizada incluye solo el contenido descrito en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md); no se agregan CI, nivel u
+otros campos no impresos en la referencia. Se congelan valores impresos y
+firmantes. El certificado de aprobación usa fechas nominales del curso; el de
+instructor, fechas/horario nominal del grupo. Ambos usan duración nominal de la
+revisión de formato. Estos valores se congelan separados de cierre, generación
+y emisión. Si el grupo se reabre, certificados ya emitidos no se revocan
+automáticamente; nuevas generaciones/emisiones requieren la última versión
+cerrada. Se conserva reemplazo/revocación explícita y como máximo un certificado
+activo por curso/tipo/destinatario.
 
 ## CIERRE
 
@@ -521,7 +556,11 @@ Protección de datos personales.
 - requisitos académicos adicionales a la política de ausencias consecutivas aprobada para Fase 6, si se acuerdan para fases posteriores;
 - cuándo se consolida el descuento de auxiliares;
 - lista definitiva de auxiliares beneficiarios;
-- tipos definitivos de certificado;
-- firmas requeridas;
-- datos obligatorios de boleta;
 - reportes administrativos exactos.
+
+Tipos de certificado, elegibilidad, firmantes requeridos/posiciones, carga de
+PDF firmado, no-dependencia financiera y exclusión de la boleta física ya están
+resueltos para Fase 9; ver el contrato enlazado. Las cargas autorizadas F1–F8
+local/cloud se completaron y la implementación F9 se integró y pasó su CI
+combinado en `development`. El release a `master`, aplicación de migración y
+despliegue siguen pendientes; no se afirma operación F9 en producción.

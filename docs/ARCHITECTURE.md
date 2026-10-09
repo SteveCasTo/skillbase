@@ -359,7 +359,7 @@ Ejemplos:
 - `/`
 - `/cursos`
 - `/cursos/[slug]`
-- `/certificados/[code]`
+- `/certificados/[publicCredentialId]`
 - `/login`
 
 El registro de interesados de Fase 3 se accede desde el detalle existente `/cursos/[slug]`; no se define una ruta pública independiente `/preinscripcion/[slug]`. La preinscripción presencial/pagada pertenece a Fase 5.
@@ -374,8 +374,17 @@ Ejemplos:
 - `/app/asistencia`
 - `/app/evaluaciones`
 - `/app/certificados`
+- `/app/configuracion/certificados`
+- `/app/mis-certificados/[certificateId]`
 
 Toda ruta privada debe validar sesión y autorización server-side.
+
+Las rutas de certificados están integradas en `development`: administración y
+configuración privadas, páginas de grupo ADMIN/INSTRUCTOR, detalle readonly del
+instructor, descargas autenticadas y verificación pública. La migración candidata
+no se ha aplicado a `master`/cloud; no implica release. Contrato, permisos y
+límites de estado en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y
+[`PLAN.md`](PLAN.md).
 
 ## LÓGICA DE NEGOCIO
 
@@ -441,6 +450,10 @@ Certificado:
 - replaced
 
 La lista definitiva debe mantenerse en el modelo de datos.
+
+Los estados de certificado anteriores son una enumeración conceptual pendiente
+de implementación, no estados persistidos actualmente. Ver
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md).
 
 ## ERRORES
 

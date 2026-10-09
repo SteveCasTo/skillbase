@@ -65,6 +65,7 @@ export function parseComprehensiveArgs(args: readonly string[]) {
     "--apply",
     "--allow-production",
     "--protected-manual",
+    "--include-certificates",
   ]);
   const allowed = new Set([...switches, "--target", "--project", "--anchor"]);
   for (let i = 0; i < args.length; i++) {
@@ -84,6 +85,7 @@ export function parseComprehensiveArgs(args: readonly string[]) {
     apply: values.has("--apply"),
     allowProduction: values.has("--allow-production"),
     protectedManual: values.has("--protected-manual"),
+    includeCertificates: values.has("--include-certificates"),
     anchorDay: values.get("--anchor"),
   };
 }

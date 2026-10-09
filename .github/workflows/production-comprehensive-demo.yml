@@ -9,6 +9,11 @@ on:
         default: plan
         type: choice
         options: [plan, apply]
+      include_certificates:
+        description: "Explicit F9 extension only; requires completed F8 demo and released schema 24"
+        required: true
+        default: false
+        type: boolean
       approved_release_sha:
         description: "Exact current master SHA with first-pass full CI and READY production deployment"
         required: true
@@ -57,6 +62,7 @@ jobs:
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
           DEMO_OPERATOR_MODE: ${{ inputs.mode }}
+          DEMO_INCLUDE_CERTIFICATES: ${{ inputs.include_certificates }}
           DEMO_PROJECT_REF: ${{ inputs.project_ref }}
           DEMO_APPROVED_RELEASE_SHA: ${{ inputs.approved_release_sha }}
           DEMO_RELEASE_CI_RUN_ID: ${{ inputs.release_ci_run_id }}

@@ -13,6 +13,10 @@ import {
 } from "../fixtures/interest-course-calendar";
 import { signInFixture } from "./auth-helper";
 import { registerCourseInstructor } from "./instructor-helper";
+import { and, eq } from "drizzle-orm";
+import { createDatabase } from "@/server/db/client";
+import { interestRegistrations } from "@/server/db/schema";
+import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
 const successMessage =
   "Gracias por tu interés. Esta solicitud no reserva una plaza ni confirma una inscripción.";
@@ -261,6 +265,46 @@ test("contact entered before interest hydration remains valid after choosing a g
   expect(values.get("email")).toBe(email);
   expect(values.getAll("preferredGroupId")).toEqual([groupId]);
   await expect(page.locator(".interest-success")).toContainText(successMessage);
+});
+
+test("focused native preference survives hydration until blur, then enhances with the same UUID", async ({
+  page,
+  context,
+}) => {
+  let release!: () => void;
+  const hydration = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/PublicInterestForm.tsx*", async (route) => {
+    await hydration;
+    await route.continue();
+  });
+  const { groupId } = await publicCourse(page, context, { group: true });
+  const form = page.getByRole("form", { name: submitName });
+  const group = form.getByRole("combobox", {
+    name: "Preferencia de grupo (opcional)",
+  });
+  try {
+    await expect(form).not.toHaveAttribute("novalidate");
+    await expect(group).toHaveJSProperty("tagName", "SELECT");
+    await group.focus();
+    await expect(group).toBeFocused();
+    await group.selectOption(groupId!);
+    release();
+    await expect(form).toHaveAttribute("novalidate", "");
+    await expect(group).toHaveJSProperty("tagName", "SELECT");
+    await expect(group).toBeFocused();
+    await expect(group).toHaveValue(groupId!);
+    await form.getByLabel("Nombre", { exact: true }).focus();
+    await expect(group).toHaveJSProperty("tagName", "BUTTON");
+    await expect(group).toContainText("Lunes a viernes, 18:00–19:30");
+    await expect(form.locator('input[name="preferredGroupId"]')).toHaveValue(
+      groupId!,
+    );
+  } finally {
+    release();
+    await page.unroute("**/PublicInterestForm.tsx*");
+  }
 });
 
 test("contact entered between hydration effect and its first frame enables submit", async ({
@@ -558,56 +602,269 @@ test("pending is local, network failures preserve contact and can retry without 
   await expect(page.locator(".interest-success")).toContainText(successMessage);
 });
 
-test("mobile, tablet and desktop keep readable controls, keyboard access and both public themes", async ({
-  page,
-  context,
-}) => {
-  await publicCourse(page, context, { group: true });
-  const form = page.getByRole("form", { name: submitName });
-  await expect(form).toHaveAttribute("novalidate", "");
-  for (const width of [320, 390, 768, 1024, 1440]) {
-    await page.setViewportSize({ width, height: 900 });
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
-      ),
-    ).toBe(true);
-    const formBounds = await form.boundingBox();
-    const submitBounds = await form
-      .getByRole("button", { name: submitName })
-      .boundingBox();
-    expect(
-      Math.abs(formBounds!.width - submitBounds!.width),
-    ).toBeLessThanOrEqual(1);
-    await form.getByLabel("Nombre", { exact: true }).focus();
-    await page.keyboard.press("Tab");
-    await expect(form.getByLabel("Apellidos", { exact: true })).toBeFocused();
-    const group = form.getByRole("combobox", {
-      name: "Preferencia de grupo (opcional)",
+// Only this scenario manages its trace, starting after authenticated setup.
+// Network snapshots stay off to exclude cookies, request/response bodies and
+// Auth callback URLs. Bounded semantic diagnostics supplement the action trace.
+const keyboardTest = test.extend({ trace: "off" });
+
+keyboardTest(
+  "mobile, tablet and desktop keep readable controls, keyboard access and both public themes",
+  async ({ page, context }, testInfo) => {
+    const { path, courseId, groupId } = await publicCourse(page, context, {
+      group: true,
     });
-    await group.focus();
-    await page.keyboard.press("ArrowDown");
-    await expect(page.getByRole("listbox")).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(group).toBeFocused();
-    expect(
-      (await form.getByLabel("Email", { exact: true }).boundingBox())!.height,
-    ).toBeGreaterThanOrEqual(44);
-    for (const dark of [false, true]) {
-      await page.evaluate(
-        (enabled) => document.documentElement.classList.toggle("dark", enabled),
-        dark,
+    await context.tracing.start({
+      screenshots: true,
+      snapshots: false,
+      sources: false,
+    });
+    const diagnostics = await page.evaluateHandle(() => {
+      const describe = (element: Element | null) =>
+        element
+          ? {
+              tag: element.tagName,
+              role: element.getAttribute("role"),
+              // Only known form IDs; never include contact values or arbitrary text.
+              id: element.id.startsWith("interest-")
+                ? element.id.slice(0, 64)
+                : null,
+              expanded: element.getAttribute("aria-expanded"),
+              state: element.getAttribute("data-state"),
+            }
+          : null;
+      const events: Array<{
+        type: string;
+        key: string | null;
+        width: number;
+        target: ReturnType<typeof describe>;
+        active: ReturnType<typeof describe>;
+        expanded: string | null;
+        listboxes: number;
+      }> = [];
+      const record = (event: Event) => {
+        const key = event instanceof KeyboardEvent ? event.key : null;
+        if (
+          key &&
+          ![
+            "Tab",
+            "ArrowDown",
+            "ArrowUp",
+            "Enter",
+            "Escape",
+            "Home",
+            "End",
+          ].includes(key)
+        )
+          return;
+        events.push({
+          type: event.type,
+          key,
+          width: window.innerWidth,
+          target: describe(
+            event.target instanceof Element ? event.target : null,
+          ),
+          active: describe(document.activeElement),
+          expanded:
+            document
+              .querySelector("#interest-preferredGroupId")
+              ?.getAttribute("aria-expanded") ?? null,
+          listboxes: document.querySelectorAll('[role="listbox"]').length,
+        });
+        if (events.length > 80) events.shift();
+      };
+      const types = ["focusin", "focusout", "keydown", "keyup"];
+      types.forEach((type) => document.addEventListener(type, record, true));
+      return {
+        snapshot: () => ({
+          path: location.pathname,
+          width: window.innerWidth,
+          active: describe(document.activeElement),
+          control: describe(
+            document.querySelector("#interest-preferredGroupId"),
+          ),
+          listboxes: document.querySelectorAll('[role="listbox"]').length,
+          events,
+        }),
+        dispose: () =>
+          types.forEach((type) =>
+            document.removeEventListener(type, record, true),
+          ),
+      };
+    });
+    let failed = false;
+    try {
+      const form = page.getByRole("form", {
+        name: submitName,
+        includeHidden: true,
+      });
+      await expect(form).toHaveAttribute("novalidate", "");
+      const group = form.getByRole("combobox", {
+        name: "Preferencia de grupo (opcional)",
+        // The open modal popup aria-hides its trigger. Keep inspecting its
+        // expanded state without changing the app's accessibility contract.
+        includeHidden: true,
+      });
+      const listbox = page.getByRole("listbox", { includeHidden: true });
+      // novalidate alone does not distinguish a preserved focused SSR select from
+      // the enhanced control. This scenario must exercise the Radix button/portal.
+      await expect(group).toHaveJSProperty("tagName", "BUTTON");
+      await expect(group).toBeEnabled();
+      await expect(group).toContainText("Sin preferencia");
+      for (const width of [320, 390, 768, 1024, 1440]) {
+        // Focus restoration alone is not the closure contract. Observe both
+        // closed states before resizing or sending another opening key.
+        await expect(listbox).toHaveCount(0);
+        await expect(group).toHaveAttribute("aria-expanded", "false");
+        await page.setViewportSize({ width, height: 900 });
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+          ),
+        ).toBe(true);
+        const formBounds = await form.boundingBox();
+        const submitBounds = await form
+          .getByRole("button", { name: submitName })
+          .boundingBox();
+        expect(
+          Math.abs(formBounds!.width - submitBounds!.width),
+        ).toBeLessThanOrEqual(1);
+        const firstName = form.getByLabel("Nombre", { exact: true });
+        await firstName.focus();
+        await expect(firstName).toBeFocused();
+        await firstName.press("Tab");
+        await expect(
+          form.getByLabel("Apellidos", { exact: true }),
+        ).toBeFocused();
+        await expect(group).toBeEnabled();
+        await group.focus();
+        await expect(group).toBeFocused();
+        await group.press("ArrowDown");
+        await expect(group).toHaveAttribute("aria-expanded", "true");
+        await expect(listbox).toBeVisible();
+        const noPreference = listbox.getByRole("option", {
+          name: "Sin preferencia",
+          exact: true,
+        });
+        await expect(noPreference).toBeFocused();
+        await noPreference.press("Escape");
+        await expect(listbox).toHaveCount(0);
+        await expect(group).toHaveAttribute("aria-expanded", "false");
+        await expect(group).toBeFocused();
+        expect(
+          (await form.getByLabel("Email", { exact: true }).boundingBox())!
+            .height,
+        ).toBeGreaterThanOrEqual(44);
+        for (const dark of [false, true]) {
+          await page.evaluate(
+            (enabled) =>
+              document.documentElement.classList.toggle("dark", enabled),
+            dark,
+          );
+          const colors = await form
+            .getByLabel("Email", { exact: true })
+            .evaluate((input) => ({
+              color: getComputedStyle(input).color,
+              background: getComputedStyle(input.closest(".public-interest")!)
+                .getPropertyValue("--paper")
+                .trim(),
+            }));
+          expect(colors.background).toBe(dark ? "#0d1d28" : "#fff");
+          expect(colors.color).not.toBe("rgba(0, 0, 0, 0)");
+        }
+      }
+      // Reopen after the last resize and choose an eligible fixture by keyboard,
+      // rather than treating an open popup as proof that selection/submission works.
+      await group.focus();
+      await expect(group).toBeFocused();
+      await group.press("ArrowDown");
+      await expect(group).toHaveAttribute("aria-expanded", "true");
+      await expect(listbox).toBeVisible();
+      const noPreference = listbox.getByRole("option", {
+        name: "Sin preferencia",
+        exact: true,
+      });
+      await expect(noPreference).toBeFocused();
+      await noPreference.press("ArrowDown");
+      const eligible = listbox.getByRole("option", {
+        name: "Lunes a viernes, 18:00–19:30",
+        exact: true,
+      });
+      await expect(eligible).toBeFocused();
+      await expect(eligible).not.toHaveAttribute("aria-disabled", "true");
+      await eligible.press("Enter");
+      await expect(listbox).toHaveCount(0);
+      await expect(group).toHaveAttribute("aria-expanded", "false");
+      await expect(group).toBeFocused();
+      await expect(group).toContainText("Lunes a viernes, 18:00–19:30");
+      await expect(form.locator('input[name="preferredGroupId"]')).toHaveValue(
+        groupId!,
       );
-      const colors = await form
-        .getByLabel("Email", { exact: true })
-        .evaluate((input) => ({
-          color: getComputedStyle(input).color,
-          background: getComputedStyle(input.closest(".public-interest")!)
-            .getPropertyValue("--paper")
-            .trim(),
-        }));
-      expect(colors.background).toBe(dark ? "#0d1d28" : "#fff");
-      expect(colors.color).not.toBe("rgba(0, 0, 0, 0)");
+      const { email } = await fillContact(page);
+      const posted = page.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          new URL(response.url()).pathname === path,
+      );
+      await submitNativeInterest(form);
+      const response = await posted;
+      expect(response.status()).toBe(200);
+      expect(
+        new URLSearchParams(response.request().postData() ?? "").getAll(
+          "preferredGroupId",
+        ),
+      ).toEqual([groupId]);
+      expect(await response.json()).toEqual({
+        ok: true,
+        message: successMessage,
+      });
+      await expect(page.locator(".interest-success")).toContainText(
+        successMessage,
+      );
+      await expect(page.locator(".interest-success")).toBeFocused();
+      const database = createDatabase(getTestSupabaseEnvironment().databaseUrl);
+      try {
+        const persisted = await database.db
+          .select({
+            preferredGroupId: interestRegistrations.preferredGroupId,
+            status: interestRegistrations.status,
+          })
+          .from(interestRegistrations)
+          .where(
+            and(
+              eq(interestRegistrations.courseId, courseId),
+              eq(interestRegistrations.email, email),
+            ),
+          );
+        expect(persisted).toEqual([
+          { preferredGroupId: groupId, status: "ACTIVE" },
+        ]);
+      } finally {
+        await database.close();
+      }
+    } catch (error) {
+      failed = true;
+      await testInfo.attach("public-preference-control-events", {
+        body: Buffer.from(
+          JSON.stringify({
+            retry: testInfo.retry,
+            ...(await diagnostics.evaluate((value) => value.snapshot())),
+          }),
+        ),
+        contentType: "application/json",
+      });
+      throw error;
+    } finally {
+      await diagnostics.evaluate((value) => value.dispose());
+      await diagnostics.dispose();
+      const tracePath = testInfo.outputPath(
+        "public-preference-keyboard-trace.zip",
+      );
+      await context.tracing.stop(failed ? { path: tracePath } : undefined);
+      if (failed)
+        await testInfo.attach("public-preference-keyboard-trace", {
+          path: tracePath,
+          contentType: "application/zip",
+        });
     }
-  }
-});
+  },
+);
