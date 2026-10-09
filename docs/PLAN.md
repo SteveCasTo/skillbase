@@ -722,7 +722,7 @@ Migration 0020 se aplicó al Supabase local canónico y a cloud; los ledgers ver
 - [x] Aplicar migration 0020 local/canonical y cloud por el pipeline del release; validaciones locales/readonly cloud y límites de row-hash constan en `TESTING.md`/`DEPLOYMENT.md`.
 - [x] Liberar Fase 7 mediante PR 235; Vercel deployment `dpl_A9Av16T1DZvk19W1836VEuPimAGS` quedó READY para el SHA exacto de master y alias de producción.
 
-En el boundary histórico del release Fase 7, Fase 8 (cierre/planilla/reapertura) y Fase 9 (certificados) aún no estaban iniciadas. Fase 8 fue aprobada y evolucionó después a la implementación integrada en development que se describe abajo; Fase 9 sigue sin iniciar. No adelantar weighted-grade changes posteriores ni convertir el demo financiero en un seed de notas.
+En el boundary histórico del release Fase 7, Fase 8 (cierre/planilla/reapertura) y Fase 9 (certificados) aún no estaban iniciadas. Fase 8 fue aprobada y evolucionó después a la implementación integrada en development que se describe abajo. Fase 9 tiene ahora trabajo parcial en los commits base de la rama feature local, con su UI pendiente de publicación e integración. No adelantar weighted-grade changes posteriores ni convertir el demo financiero en un seed de notas.
 
 ### Correcciones post-release Fase 7 (PR 278 liberado; milestone cerrado)
 
@@ -789,7 +789,7 @@ La migración normal de release llevó ledger canónico local y cloud de 21 a 23
 
 - Fase 8 se completó y liberó por PR 286; el CI rojo previo quedó corregido en fixtures E2E por PR 287 y el gate integrado pasó. No reabrir este milestone salvo un cambio de producto nuevo y aprobado.
 - Google OAuth real, recovery/entrega SMTP cloud y política de retención/anonymización no aprobada permanecen como temas separados; no bloquearon Fase 8.
-- Fase 9 (certificados/QR/firma) no está iniciada y requiere alcance/decisiones aprobadas antes de implementarse.
+- Fase 9 tiene implementación parcial en la línea local de trabajo: el backend de certificados y sus plantillas PDF están en los commits base de esta feature, y la interfaz está en `feat/certificate-interface` (`a450987`). La rama UI no se ha publicado ni integrado en `development`; push, PR, gates y release siguen pendientes. Consultar el estado parcial abajo.
 - Las correcciones inline, atomic-row, participantes/preinscripción, roster/calendario, perfil, navegación y ajustes de tests F7 están liberadas mediante PR 278; los shards se integraron como PR 279. No volver a presentarlas como pendientes de diseño.
 - Reutilizar las suites existentes; no añadir E2E frágiles basadas en CSS/copy. QA UI manual con Playwright CLI en desktop/mobile, light/dark, tabla/lista, teclado, estados dirty/invalid/error y loading. Solo datos sintéticos aislados; ningún write de calificaciones a datasets canónicos.
 - Para releases de futuras fases, ejecutar formatter, lint, typecheck, unit, integration, E2E y build; registrar flakiness/resultados por separado y exigir checks remotos green. No aceptar retries silenciosos ni reruns que oculten fallos. La autorización de omitir una aprobación administrativa no omite CI ni altera branch protections.
@@ -828,7 +828,7 @@ El contrato aprobado está en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONT
 
 El runner permite QA con datos enteramente ficticios y de forma aditiva/idempotente, preservando datos preexistentes; no tiene reset general. La carga productiva está expresamente autorizada **solo después** del release completo, con aprobación del SHA exacto y PLAN/APPLY separados, usando guards/provenance y snapshot de preservación según [`DEMO_SEED.md`](DEMO_SEED.md). No se ha ejecutado una carga nueva en el Supabase canónico o producción.
 
-Fase 9 continúa pendiente e independiente. Antes de iniciarla, acordar los tipos de certificado, firmas/autoridad, número institucional, elegibilidad y relación con snapshots de cierre, saldos, boleta/valorado y reemplazo/revocación/verificación pública. El contrato UI enumera estas preguntas como pendientes, no como reglas aprobadas.
+La interfaz Fase 9 está implementada en la rama local `feat/certificate-interface`, pendiente de publicación e integración. Aún deben acordarse los tipos de certificado, firma/autoridad, número institucional, elegibilidad y relación con snapshots de cierre, saldos, boleta/valorado y reemplazo/verificación pública. La UI se conectó al contrato backend existente sin resolver ni aprobar estas preguntas por cuenta propia. No tratar este trabajo como aprobación de nuevas reglas ni como release.
 
 ### Objetivos
 
@@ -844,6 +844,18 @@ Fase 9 continúa pendiente e independiente. Antes de iniciarla, acordar los tipo
 Administración completa el cierre administrativo y académico.
 
 ## FASE 9 — CERTIFICADOS
+
+### Estado parcial — interfaz en rama feature local
+
+El ciclo backend/PDF se implementó en los commits base de esta línea de trabajo y `feat/certificate-interface` (`a450987`) conecta las superficies Astro/React a sus operaciones actuales. La UI existe únicamente en esta rama local: no se ha hecho push ni abierto PR, y no está integrada en `development`. La rama contiene rutas privadas ADMIN e INSTRUCTOR, gestión y configuración, flujo de carga/revisión/emisión/revocación, descargas autenticadas, verificación pública y cálculo local de SHA-256. No se ha declarado aquí cierre del milestone ni release de producción.
+
+- [x] Conectar la página ADMIN de certificados, los enlaces de grupo y los ajustes de certificados a los handlers existentes.
+- [x] Conectar el detalle readonly histórico de instructor y las descargas PDF privadas.
+- [x] Conectar página/formulario de verificación pública con proyección acotada y sin descarga anónima de PDF.
+- [x] Añadir cálculo SHA-256 en navegador para comparar un archivo elegido localmente, sin transmitir el archivo para ese cálculo.
+- [ ] Completar y cerrar el gate de Fase 9, incluidos los pendientes de contrato, integración y release; la interfaz no acredita por sí sola estos gates.
+
+Límites relevantes: la interfaz no fabrica fecha de emisión ni URL/ID de reemplazo que el contrato no provee; no existe un índice global de historial de certificados del instructor, por lo que se usan destinos de grupo y acceso directo autorizado. La carga de un archivo no valida criptográficamente firmas manuscritas. Los fixtures PDF sintéticos de QA no representan documentos institucionales firmados. Detalles de interfaz, seguridad y evidencia están en [`CERTIFICATES.md`](CERTIFICATES.md), [`DESIGN.md`](DESIGN.md) y [`TESTING.md`](TESTING.md).
 
 ### Objetivos
 

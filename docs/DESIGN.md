@@ -659,3 +659,12 @@ está en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md). PR 289 est�
 integrado en `development`; su release a `master` sigue pendiente. No se afirma
 una revisión visual manual con Playwright/screenshot para este bloque; ver la
 evidencia automatizada y sus límites en [`TESTING.md`](TESTING.md).
+
+## Certificados (interfaz en rama feature local)
+
+- La navegación ADMIN enlaza gestión y ajustes de certificados; las vistas de curso/grupo dan acceso a la gestión del grupo. El detalle privado presenta las operaciones disponibles según el estado que entrega el servidor. No duplica reglas de elegibilidad, permisos ni transiciones en el cliente.
+- El instructor accede a certificados históricos propios en modo readonly, con descargas privadas autenticadas. No se inventa un índice global de historial que el loader no ofrece.
+- `/certificados` ofrece búsqueda y `/certificados/[publicCredentialId]` presenta el resultado público mínimo autorizado. La superficie pública no enlaza ni descarga PDFs privados.
+- La verificación opcional del archivo usa el picker del navegador y calcula SHA-256 localmente; se evita transmitir el archivo para ese cálculo. La UI no lo representa como validación de firma digital o de identidad del portador.
+- La carga/revisión del documento utiliza controles privados; errores de validación se presentan junto al formulario y permiten recuperación cuando el servidor lo permite. No afirmar que la carga valide la autenticidad de una firma manuscrita.
+- La UI se implementó con SSR y las convenciones responsive/teclado del design system. La revisión QA incluyó desktop/tablet/mobile y temas claro/oscuro; el alcance y límites de los tests concretos están en [`TESTING.md`](TESTING.md). El código está en `feat/certificate-interface` (`a450987`), pendiente de push/PR e integración a `development`; no está publicado en producción.
