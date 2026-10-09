@@ -64,7 +64,7 @@ Comandos manuales (no ejecutados sobre canónico/cloud):
 ```text
 bun scripts/comprehensive-demo.ts --target local --project local --include-certificates
 bun scripts/comprehensive-demo.ts --target local --project local --include-certificates --apply
-bun scripts/test-comprehensive-certificates.ts
+bun run test:integration:comprehensive-certificates
 ```
 
 El último comando crea/destruye **su propio QA Supabase** con schema 24 normal y
@@ -75,6 +75,23 @@ con multiplicidad en todas las tablas public/Auth/Storage/Drizzle. Primer APPLY
 preserva baseline F8 y Storage original; repetición exige cero cambios. La prueba
 unitaria verifica además el texto de sello en streams PDF, no solo metadata.
 No se despachó el workflow real ni se liberó F9 como parte de esta implementación.
+
+### Cobertura obligatoria en CI
+
+El mismo job requerido `integration` de `ci.yml` ejecuta incondicionalmente y una
+sola vez, en este orden: `bun run test:integration` (producto),
+`bun run test:integration:comprehensive-demo` (F8) y
+`bun run test:integration:comprehensive-certificates` (F9). Cada comando utiliza
+su propio stack gestionado; F9 mantiene `requireCleanup: true`. Un fallo de test
+o cleanup falla el job, bloquea el agregador `integration-e2e` y, por el gate
+existente, el deploy. No se añade job opcional ni `continue-on-error`, y CI no
+invoca flags/CLI del seed productivo. El workflow productivo manual y sus guards
+de actor/evento/master/SHA/deployment/hash PLAN permanecen intactos.
+
+El wiring tiene cobertura focal en `tests/unit/comprehensive-demo-ci.test.ts`;
+la ejecución remota del nuevo paso CI aún no está acreditada. La evidencia QA de
+lifecycle que sigue corresponde a la implementación previa, no a una repetición
+de la suite en este follow-up.
 
 Evidencia QA focal (2026-10-09, branch `feat/certificate-demo-extension`, base
 `de22705230b07538dfe4584e678fd35deb3d1ca2`): 13 unit PASS / 307 assertions en
