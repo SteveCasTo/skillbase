@@ -681,3 +681,44 @@ La revisión manual Playwright CLI verificó el calendario con doce sesiones en 
 Lint, format check, typecheck (0 errores/0 warnings/313 hints existentes), build de producción y `git diff --check` pasaron en el árbol final. La cronología E2E conserva un primer intento 0/3 por errores de hidratación tras builds/servidor concurrentes; la recuperación secuencial pasó 2/3 casos existentes, pero inicialmente falló la assertion geométrica de PageDown; otra ejecución focal pasó 2/3 y falló al dejar el foco en un enlace fuera de pantalla; el E2E nuevo también tuvo una ejecución focal 0/1 antes del pase final 1/1. Los resultados corregidos no borran esos intentos ni los cuentan como pases. Evidencia y ledger de intentos: `C:/Users/Steve/AppData/Local/Temp/opencode/calendar-scroll-evidence/attempt-ledger.md`.
 
 La fixture E2E usó únicamente el stack Supabase temporal aislado; no hubo escrituras en producción ni cambios de DB/schema/migraciones. Estos resultados pertenecen a la fuente local indicada y no acreditan CI remoto, integración, full gate, release ni despliegue.
+
+## Búsqueda de instructor y resultados académicos compactos (PR 295)
+
+La rama `fix/live-instructor-search-and-compact-results`, HEAD
+`6c5bba7bc3b5a06eb476e209d2827b2dd666f6b4` sobre base `a276e30`, modifica solo
+UI y pruebas de nueve archivos. No modifica API/DTO, permisos, reglas académicas,
+snapshot, esquema ni datos canónicos/cloud.
+
+- Tests unitarios focales: **5/5 PASS, 43 assertions** (presentación de
+  evaluaciones/cierre). Quality local reportado PASS.
+- E2E focal inicial en app aislada `4493`: **8/8 PASS**, cero retries. Durante
+  otra ejecución concurrente con un build, tres escenarios pasaron y cinco
+  fallaron con errores de carga de islas (`_jsxDEV`/import Vite), incluidos
+  módulos sin cambios. No se modificó el producto ni se ocultó esa ejecución.
+  La revalidación serial recuperó el shell original ya terminado: **8/8 PASS**,
+  exit 0, un intento por caso y sin retries; no se lanzó una corrida duplicada.
+  Esto valida el conjunto focal, no es un full E2E/release gate ni prueba la
+  causa raíz del episodio concurrente.
+- CI PR 295, run `37895589666`: **429 unit / 2,964 assertions**, **162
+  integration / 1,332 assertions**, test focal de seed **1/1 / 894 assertions**
+  y **140/140 E2E únicos** en dos shards (75 + 65). El run terminó en el primer
+  intento; no se reportaron fallos, flakes, retries ni skips. Es evidencia CI
+  para PR 295, no un full gate de Fase 9 ni un release/deploy.
+- Playwright CLI manual comprobó rutas HTTP reales y DTOs de rol autorizados,
+  incluyendo cierre oficial de un grupo con 3 componentes, resultados de 9
+  componentes, detalle, pendiente/cero, instructor con asignación y SSR sin JS.
+  Viewports: 320, 768 y 1280 px; sin overflow horizontal medido. La tarjeta usa
+  diálogo al hidratar y disclosure funcional sin JS. Valores de nota/componentes
+  alineados en desktop/edit/readonly; el modo instructor no expone CI, saldo,
+  categoría, correo ni teléfono. La verificación no usó mocks de respuesta,
+  renderer inyectado ni DB productiva.
+- Search E2E comprueba filtrado inmediato por nombre/correo, normalización
+  Unicode (acentos/case/espacios), foco estable, limpiar/restaurar, history/back,
+  sin Enter obligatorio para filtrar ni solicitudes adicionales por búsqueda;
+  el submit GET conserva fallback sin JavaScript.
+- El stack propio quedó limpio después de la revalidación y smoke CLI: cero
+  containers/listeners en los puertos de app 4493/4495. No se detuvieron servicios
+  compartidos ni se tocaron datos/Auth de canónico, cloud o producción.
+
+PR 295 está publicado; esta evidencia no acredita su integración/release. No es
+un gate completo de Fase 9 ni revisa otros cambios en curso.

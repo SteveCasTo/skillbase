@@ -1,9 +1,6 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import {
-  ResultCards,
-  VISIBLE_RESULT_COMPONENTS,
-} from "@/components/academic-closure/ResultCards";
+import { ResultCards } from "@/components/academic-closure/ResultCards";
 import { privateClosureReport } from "@/server/academic-closure/projection";
 import { closureExportFixture } from "../fixtures/academic-closure-export";
 
@@ -38,15 +35,17 @@ function report(count: number) {
   };
   return value;
 }
-test("academic result cards expose six grades directly and use expandable SSR details from seven", () => {
-  expect(VISIBLE_RESULT_COMPONENTS).toBe(6);
-  const direct = renderToStaticMarkup(<ResultCards report={report(6)} />);
-  expect(direct).toContain("Nota 6");
-  expect(direct).not.toContain("<details");
-  const detailed = renderToStaticMarkup(<ResultCards report={report(7)} />);
-  expect(detailed).toContain("<details");
-  expect(detailed).toContain("7/7");
-  expect(detailed).toContain("Nota 7");
+test("academic result cards always provide a compact expandable summary with complete SSR notes", () => {
+  for (const count of [1, 6, 7, 9]) {
+    const html = renderToStaticMarkup(<ResultCards report={report(count)} />);
+    expect(html).toContain("<details");
+    const summary = html.split("</summary>")[0]!;
+    expect(summary).toContain(`${count} de ${count} notas calificadas`);
+    expect(summary).not.toContain(`Nota ${count}`);
+    expect(summary).not.toContain("Saldo informativo");
+    expect(summary).not.toContain("Ver detalle");
+    expect(html).toContain(`Nota ${count}`);
+  }
 });
 test("academic result cards retain zero grades but never turn incomplete finals or missing components into zero", () => {
   const value = report(8);
@@ -60,8 +59,8 @@ test("academic result cards retain zero grades but never turn incomplete finals 
     missingComponentIds: ["component-7"],
   };
   const html = renderToStaticMarkup(<ResultCards report={value} />);
-  expect(html).toContain("7/8");
-  expect(html).toContain("Resultado pendiente");
+  expect(html).toContain("7 de 8 notas calificadas");
+  expect(html).toContain("Nota final pendiente");
   expect(html).toContain("Pendiente");
   expect(html).toContain("0,00");
   expect(html).not.toContain("Decisión provisional");
@@ -76,6 +75,7 @@ test("academic result card role projections preserve ADMIN identity and exclude 
   );
   expect(admin).toContain("001234QA");
   expect(admin).toContain("Saldo informativo");
+  expect(admin.split("</summary>")[0]).not.toContain("Saldo informativo");
   const instructor = renderToStaticMarkup(
     <ResultCards report={privateClosureReport(value, false)} />,
   );

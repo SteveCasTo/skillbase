@@ -37,6 +37,17 @@ const rows = attemptedComponents ?? data?.scheme.components ?? [];
 const fields = rows.length
   ? rows
   : [{ id: crypto.randomUUID(), name: "", type: "THEORY", weight: "" }];
+const fallbackComponentRows = Array.from(
+  { length: Math.ceil((data?.scheme.components.length ?? 0) / 4) },
+  (_, index) => data!.scheme.components.slice(index * 4, index * 4 + 4),
+);
+const fallbackColumns = [
+  "",
+  "lg:grid-cols-1",
+  "lg:grid-cols-2",
+  "lg:grid-cols-3",
+  "lg:grid-cols-4",
+][Math.min(data?.scheme.components.length ?? 0, 4)];
 ---
 
 <PrivateLayout title="Evaluaciones">
@@ -151,9 +162,9 @@ const fields = rows.length
                   <ul class="min-w-0 divide-y rounded-xl border bg-card">
                     {data.participants.map((participant) => (
                       <li class="min-w-0">
-                        <article class="flex min-w-0 flex-col gap-3 p-4">
-                          <header class="grid gap-3 lg:grid-cols-2">
-                            <div>
+                        <article class="grid min-w-0 gap-3 p-4 lg:grid-cols-[minmax(10rem,1fr)_minmax(0,3fr)_auto] lg:grid-rows-[auto_minmax(2.75rem,auto)_auto_auto] lg:gap-x-3 lg:gap-y-1">
+                          <header class="grid gap-3 lg:contents">
+                            <div class="min-w-0 lg:col-start-1 lg:row-start-2 lg:self-center">
                               <h3 class="break-words font-semibold">
                                 {participant.firstName} {participant.lastName}
                               </h3>
@@ -167,127 +178,149 @@ const fields = rows.length
                                 </p>
                               )}
                             </div>
-                            <EvaluationResult result={participant.result} />
+                            {participant.result.status === "COMPLETE" && (
+                              <div class="lg:col-start-3 lg:row-start-2 lg:self-center">
+                                <EvaluationResult result={participant.result} />
+                              </div>
+                            )}
                           </header>
-                          <div class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                            {data.scheme.components.map((component) => {
-                              const grade = participant.grades.find(
-                                (grade) => grade.componentId === component.id,
-                              );
-                              const attempted =
-                                attemptedGrade?.registrationId ===
-                                  participant.registrationId &&
-                                attemptedGrade.componentId === component.id
-                                  ? attemptedGrade
-                                  : null;
-                              const id = `fallback-${participant.registrationId}-${component.id}`;
-                              return participant.canGrade ? (
-                                <form
-                                  method="post"
-                                  action={Astro.url.pathname}
-                                  aria-label={`${component.name} · ${participant.firstName} ${participant.lastName}`}
-                                  class="flex flex-col gap-2"
-                                >
-                                  <input
-                                    type="hidden"
-                                    name="registrationId"
-                                    value={participant.registrationId}
-                                  />
-                                  <input
-                                    type="hidden"
-                                    name="componentId"
-                                    value={component.id}
-                                  />
-                                  <input
-                                    type="hidden"
-                                    name="schemeRevision"
-                                    value={
-                                      attempted?.schemeRevision ??
-                                      data.scheme.revision
-                                    }
-                                  />
-                                  <input
-                                    type="hidden"
-                                    name="gradeRevision"
-                                    value={
-                                      attempted?.gradeRevision ??
-                                      grade?.revision ??
-                                      0
-                                    }
-                                  />
-                                  <input
-                                    type="hidden"
-                                    name="requestKey"
-                                    value={
-                                      attempted?.requestKey ??
-                                      crypto.randomUUID()
-                                    }
-                                  />
-                                  <label for={id} class="text-sm font-medium">
-                                    {component.name} · {participant.firstName}{" "}
-                                    {participant.lastName}
-                                  </label>
-                                  <input
-                                    id={id}
-                                    name="score"
-                                    inputmode="decimal"
-                                    required
-                                    value={
-                                      attempted?.score ?? grade?.score ?? ""
-                                    }
-                                    class="min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
-                                    aria-invalid={Boolean(
-                                      attempted && issues.score,
-                                    )}
-                                    aria-describedby={
-                                      attempted && message
-                                        ? `${id}-error`
-                                        : grade?.score == null
-                                          ? `${id}-help`
-                                          : undefined
-                                    }
-                                  />
-                                  {grade?.score == null && (
-                                    <p
-                                      id={`${id}-help`}
-                                      class="text-sm text-muted-foreground"
+                          <div class="grid min-w-0 gap-4 lg:contents">
+                            {fallbackComponentRows.map((row) => (
+                              <div
+                                class:list={[
+                                  "grid min-w-0 gap-x-3 gap-y-1 sm:grid-cols-2 lg:col-start-2 lg:row-span-4 lg:grid-rows-subgrid",
+                                  fallbackColumns,
+                                ]}
+                              >
+                                {row.map((component) => {
+                                  const grade = participant.grades.find(
+                                    (grade) =>
+                                      grade.componentId === component.id,
+                                  );
+                                  const attempted =
+                                    attemptedGrade?.registrationId ===
+                                      participant.registrationId &&
+                                    attemptedGrade.componentId === component.id
+                                      ? attemptedGrade
+                                      : null;
+                                  const id = `fallback-${participant.registrationId}-${component.id}`;
+                                  return participant.canGrade ? (
+                                    <form
+                                      method="post"
+                                      action={Astro.url.pathname}
+                                      aria-label={`${component.name} · ${participant.firstName} ${participant.lastName}`}
+                                      class="row-span-4 grid min-w-0 grid-rows-subgrid gap-y-1"
                                     >
-                                      Pendiente
-                                    </p>
-                                  )}
-                                  {attempted && message && (
-                                    <p
-                                      id={`${id}-error`}
-                                      role="alert"
-                                      class="text-sm text-destructive"
-                                    >
-                                      {issues.score ?? message}
-                                    </p>
-                                  )}
-                                  <button
-                                    type="submit"
-                                    class={buttonVariants({
-                                      variant: "outline",
-                                      className: "min-h-11",
-                                    })}
-                                  >
-                                    Guardar nota
-                                  </button>
-                                </form>
-                              ) : (
-                                <div class="flex flex-col gap-2">
-                                  <p class="text-sm font-medium">
-                                    {component.name}
-                                  </p>
-                                  <p class="text-sm tabular-nums">
-                                    {grade?.score === null ||
-                                    grade?.score === undefined
-                                      ? "Pendiente"
-                                      : gradeLabel(grade.score)}
-                                  </p>
-                                </div>
-                              );
-                            })}
+                                      <input
+                                        type="hidden"
+                                        name="registrationId"
+                                        value={participant.registrationId}
+                                      />
+                                      <input
+                                        type="hidden"
+                                        name="componentId"
+                                        value={component.id}
+                                      />
+                                      <input
+                                        type="hidden"
+                                        name="schemeRevision"
+                                        value={
+                                          attempted?.schemeRevision ??
+                                          data.scheme.revision
+                                        }
+                                      />
+                                      <input
+                                        type="hidden"
+                                        name="gradeRevision"
+                                        value={
+                                          attempted?.gradeRevision ??
+                                          grade?.revision ??
+                                          0
+                                        }
+                                      />
+                                      <input
+                                        type="hidden"
+                                        name="requestKey"
+                                        value={
+                                          attempted?.requestKey ??
+                                          crypto.randomUUID()
+                                        }
+                                      />
+                                      <label
+                                        for={id}
+                                        class="row-start-1 text-xs font-medium text-muted-foreground"
+                                      >
+                                        {component.name}
+                                        <span class="sr-only">
+                                          {" "}
+                                          · {participant.firstName}{" "}
+                                          {participant.lastName}
+                                        </span>
+                                      </label>
+                                      <input
+                                        id={id}
+                                        name="score"
+                                        inputmode="decimal"
+                                        required
+                                        value={
+                                          attempted?.score ?? grade?.score ?? ""
+                                        }
+                                        class="row-start-2 min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+                                        aria-invalid={Boolean(
+                                          attempted && issues.score,
+                                        )}
+                                        aria-describedby={
+                                          attempted && message
+                                            ? `${id}-error`
+                                            : grade?.score == null
+                                              ? `${id}-help`
+                                              : undefined
+                                        }
+                                      />
+                                      {grade?.score == null &&
+                                        !(attempted && message) && (
+                                          <p
+                                            id={`${id}-help`}
+                                            class="row-start-3 text-sm text-muted-foreground"
+                                          >
+                                            Pendiente
+                                          </p>
+                                        )}
+                                      {attempted && message && (
+                                        <p
+                                          id={`${id}-error`}
+                                          role="alert"
+                                          class="row-start-3 text-sm text-destructive"
+                                        >
+                                          {issues.score ?? message}
+                                        </p>
+                                      )}
+                                      <button
+                                        type="submit"
+                                        class={buttonVariants({
+                                          variant: "outline",
+                                          className: "row-start-4 min-h-11",
+                                        })}
+                                      >
+                                        Guardar nota
+                                      </button>
+                                    </form>
+                                  ) : (
+                                    <div class="row-span-4 grid min-w-0 grid-rows-subgrid gap-y-1">
+                                      <p class="row-start-1 text-xs font-medium text-muted-foreground">
+                                        {component.name}
+                                      </p>
+                                      <p class="row-start-2 flex min-h-11 items-center text-sm tabular-nums">
+                                        {grade?.score === null ||
+                                        grade?.score === undefined
+                                          ? "Pendiente"
+                                          : gradeLabel(grade.score)}
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
                           </div>
                         </article>
                       </li>
