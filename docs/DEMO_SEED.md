@@ -1,5 +1,96 @@
 # Demo integral F1–F8
 
+## Extensión F9 opt-in (WIP; ejecución real retenida)
+
+El usuario autorizó datos ficticios de todas las secciones, incluidos certificados,
+en local/QA/producción. **La ejecución canónica y productiva queda retenida hasta
+el release F9 completo**, CI first-pass sin retries y deployment READY del mismo
+SHA. Las ejecuciones F1–F8 históricas de este documento no cambian ni se atribuyen
+a F9. Esta extensión no modifica dominio, schema, políticas, UI ni migraciones.
+
+- `--include-certificates` selecciona exclusivamente la extensión sobre un
+  manifiesto F8 propio ya completo; sin el flag el runner F1–F8 queda intacto.
+  El workflow manual protegido añade `include_certificates`, por defecto `false`.
+  No es un paso automático de CI/deploy ni un endpoint.
+- PLAN es read-only: comprueba ledger **24 exacto contra el journal y SQL de este
+  checkout**, configuración/ausencia, destinatarios oficiales, revisiones de
+  cierre/configuración, fuentes nominales y certificados actuales. Publica el
+  plan revisable; el controlador incorpora todo al hash aprobado junto con el
+  baseline, release y proyecto. Permanecen todos los gates protegidos anteriores.
+  Sin F8 completo o con schema incompatible bloquea, sin instalar migraciones.
+- Usa los dos grupos F8 actualmente cerrados y su última versión oficial, nunca
+  v1 del grupo re-cerrado. APPROVAL usa `certificateRecipients` del roster
+  congelado; INSTRUCTOR siempre usa la asignación del snapshot (que debe coincidir
+  con el curso DEMO actual). Solo nombres/curso explícitamente ficticios.
+- El ADMIN original solo autoriza el plan; todas las escrituras F9 usan el ADMIN
+  `comprehensive.v1.operator@example.test` propio, ACTIVE, con rol ADMIN y Auth
+  `seed_owner` comprobados. No inicia sesión, cambia roles, promueve ROOT ni usa
+  nombres/fotos personales de referencias.
+- `getSettings` devuelve defaults/revision 0 sin persistir. Solo ante ausencia
+  confirmada se llama `updateSettings(actor, 0, cfg)` con nombres `[DEMO]` y cargos,
+  venue/organización/branding literales de los defaults `phase9-v1`. La comprobación
+  de ausencia y creación usa el lock real de certificados y una transacción.
+  Una fila existente nunca se modifica: si faltan autoridades, no son `[DEMO]` o
+  la plantilla/branding no es compatible, PLAN bloquea. Completar ajustes mediante
+  el flujo ADMIN autorizado en un destino separado; nunca «reparar» config real
+  para acomodar la demo.
+- Namespace independiente `skillbase-comprehensive-certificates-v1`; dos marcadores
+  propios de plan/completado no modifican el manifiesto F8 ni sus filas originales.
+  Inputs se conservan en el marcador nuevo; claves UUID estables, receipts reales
+  y lecturas del estado actual recuperan avances sin regenerar/re-subir emitidos.
+  No hay SQL que fabrique certificados, snapshots, receipts o eventos de lifecycle.
+- Usa `ManageCertificates.generate(actorId, input)`, `uploadSigned`,
+  `repository.review/issue/revoke` y reemplazo con `replacementForId`+motivo.
+  Los estados generated/awaiting_signature/issued/revoked/replaced se distribuyen
+  entre pares curso/tipo/titular distintos; reemplazo conserva anterior y sucesor,
+  sin consumir el caso revocado. Renderer real y PNG originales con QR vectorial
+  offline; Carta horizontal APPROVAL/vertical INSTRUCTOR y fechas/mes de fin reales
+  nominales, no fecha de generación.
+- El archivo FINAL de fixture lleva texto visible en **cada página**
+  `[DEMO - SIN FIRMA INSTITUCIONAL]` estampado con pdf-lib. Revisión/emisión es
+  sintética: **no prueba firma física, escaneo institucional ni firma digital**.
+  No se dibujan firmas ni se presenta el unsigned original como scan firmado.
+  `SIGNED` es el purpose técnico requerido por el lifecycle; hash público es
+  SHA-256 de los bytes exactos del archivo DEMO subido, no un hash inventado.
+- Storage usa `new SupabaseCertificateStorage(clientDEMO)` y repositorio DB
+  explícito; no imports de servicios singleton ni fallback a env de la app.
+  El PDF sigue privado: DTO público no tiene demoFlag ni descarga SIGNED,
+  pero nombre/curso DEMO y archivo marcado evitan identidad real emitida.
+- Reintentar no borra reservas ni artefactos: una reserva abandonada/bloqueada
+  exige revisión del operador, no sleeps, claves aleatorias o reintentos ciegos.
+
+Comandos manuales (no ejecutados sobre canónico/cloud):
+
+```text
+bun scripts/comprehensive-demo.ts --target local --project local --include-certificates
+bun scripts/comprehensive-demo.ts --target local --project local --include-certificates --apply
+bun scripts/test-comprehensive-certificates.ts
+```
+
+El último comando crea/destruye **su propio QA Supabase** con schema 24 normal y
+cleanup obligatorio. Cubre servicios reales, PLAN/hash rechazado sin writes,
+inicialización por ausencia, lifecycle de ambos tipos, reemplazo, hashes/privacidad,
+config existente incompleta bloqueada y preservación PK/SHA-256 de filas completas
+con multiplicidad en todas las tablas public/Auth/Storage/Drizzle. Primer APPLY
+preserva baseline F8 y Storage original; repetición exige cero cambios. La prueba
+unitaria verifica además el texto de sello en streams PDF, no solo metadata.
+No se despachó el workflow real ni se liberó F9 como parte de esta implementación.
+
+Evidencia QA focal (2026-10-09, branch `feat/certificate-demo-extension`, base
+`de22705230b07538dfe4584e678fd35deb3d1ca2`): 13 unit PASS / 307 assertions en
+cuatro archivos; integración propia 1 PASS / 142 assertions. El proyecto temporal
+`skillbase_test_d7730d59a0132a7d` conservó **75 tablas / 1.141 filas originales**,
+ledger 24, y terminó con 1.276 filas. Se crearon 8 certificados: generated 2,
+awaiting_signature 2, issued 2, revoked 1, replaced 1; ambos tipos y el vínculo del
+sucesor se comprobaron. Una pérdida de acknowledgment inyectada **después** del
+issue real se recuperó sin cambiar sus bytes emitidos. APPLY repetido hizo cero
+cambios completos; una configuración custom posterior se preservó y una
+incompleta bloqueó sin writes. Cleanup normal del stack propio terminó con exit 0.
+Estos datos son exclusivamente QA, no evidencia de firma institucional ni release.
+Lint, formatter focal, diff check y build PASS; typecheck 0 errores / 0 warnings /
+351 hints. Logs de evidencia privados `certificate-demo-*-final*.log` bajo el
+directorio temporal aprobado de OpenCode, nunca en Git.
+
 ## Alcance y autorización
 
 La nueva autorización explícita del usuario permite datos ficticios de notas,
