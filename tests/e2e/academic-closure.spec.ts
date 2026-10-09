@@ -227,6 +227,25 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     ).toHaveCount(0);
     await prepare(page, fixture);
     await page.goto(path);
+    const resultCard = page.getByRole("button", {
+      name: "Ver resultados de =María Ñúñez Álvarez",
+      exact: true,
+    });
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard).not.toContainText("Saldo informativo");
+    await resultCard.focus();
+    await page.keyboard.press("Space");
+    const resultDetail = page.getByRole("dialog", {
+      name: "=María Ñúñez Álvarez",
+      exact: true,
+    });
+    await expect(resultDetail).toBeVisible();
+    await expect(resultDetail).toContainText(participant.ci);
+    await expect(resultDetail).toContainText("Componente 6");
+    await resultDetail
+      .getByRole("button", { name: "Cerrar", exact: true })
+      .click();
+    await expect(resultCard).toBeFocused();
     await page
       .getByRole("button", { name: "Cerrar grupo", exact: true })
       .click();
@@ -375,7 +394,7 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
       name: "Ver resultados de =María Ñúñez Álvarez",
       exact: true,
     });
-    await expect(card).toContainText("8/8 componentes calificados");
+    await expect(card).toContainText("8 de 8 notas calificadas");
     await card.focus();
     await page.keyboard.press("Enter");
     const detail = page.getByRole("dialog", {
