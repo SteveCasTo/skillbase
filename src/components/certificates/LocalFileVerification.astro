@@ -1,0 +1,130 @@
+---
+import CertificateFilePicker from "./CertificateFilePicker.astro";
+interface Props {
+  officialHash: string;
+  state: "issued" | "revoked" | "replaced";
+}
+const { officialHash, state } = Astro.props;
+---
+
+<section
+  class="flex min-w-0 flex-col gap-4 border-t pt-6"
+  aria-labelledby="local-file-title"
+  data-local-verification
+  data-official-hash={officialHash}
+  data-certificate-state={state}
+>
+  <h2 id="local-file-title" class="text-xl font-semibold">
+    Comprobar tu archivo
+  </h2>
+  <p class="max-w-prose text-sm leading-6 text-muted-foreground">
+    Compara el PDF firmado en tu dispositivo. El archivo no se sube ni se
+    guarda. Una coincidencia confirma los mismos bytes, no la identidad de quien
+    lo presenta.
+  </p>
+  <div data-local-controls hidden>
+    <CertificateFilePicker
+      id="local-pdf"
+      title="Seleccionar PDF firmado"
+      describedby="local-result"
+    />
+    <button
+      type="button"
+      data-local-reset
+      class="mt-3 min-h-11 rounded-lg border px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring"
+    >
+      Limpiar archivo
+    </button>
+  </div>
+  <p
+    id="local-result"
+    role="status"
+    aria-label="Resultado de comparación local"
+    aria-live="polite"
+    aria-atomic="true"
+    class="text-sm leading-6"
+  ></p>
+  <output
+    data-local-hash
+    hidden
+    class="break-all font-mono text-xs"
+    aria-label="SHA-256 del archivo seleccionado"
+  ></output>
+  <noscript>
+    <p class="text-sm">
+      Activa JavaScript para comparar el archivo localmente. El estado del
+      registro mostrado arriba no requiere JavaScript.
+    </p>
+  </noscript>
+</section>
+<script>
+  import { hashComparison, localPdfSha256 } from "./local-hash";
+  const root = document.querySelector<HTMLElement>("[data-local-verification]");
+  const input = root?.querySelector<HTMLInputElement>("#local-pdf");
+  const result = root?.querySelector<HTMLElement>("#local-result");
+  const output = root?.querySelector<HTMLOutputElement>("[data-local-hash]");
+  const controls = root?.querySelector<HTMLElement>("[data-local-controls]");
+  if (root && input && result && output && controls) {
+    let latest = 0;
+    if (window.crypto?.subtle) controls.hidden = false;
+    else
+      result.textContent =
+        "La comparación local requiere un navegador compatible y una conexión segura.";
+    const clear = () => {
+      latest += 1;
+      input.value = "";
+      const filename = root.querySelector<HTMLElement>("[data-file-name]");
+      if (filename) filename.textContent = "Ningún archivo seleccionado";
+      result.textContent = "";
+      output.textContent = "";
+      output.hidden = true;
+      root.removeAttribute("aria-busy");
+    };
+    root.querySelector("[data-local-reset]")?.addEventListener("click", () => {
+      clear();
+      input.focus();
+    });
+    input.addEventListener("change", async () => {
+      const token = ++latest;
+      const file = input.files?.[0];
+      const filename = root.querySelector<HTMLElement>("[data-file-name]");
+      if (filename)
+        filename.textContent = file
+          ? file.name.slice(0, 200)
+          : "Ningún archivo seleccionado";
+      output.hidden = true;
+      output.textContent = "";
+      result.textContent = "";
+      if (!file) {
+        root.removeAttribute("aria-busy");
+        return;
+      }
+      root.setAttribute("aria-busy", "true");
+      result.textContent = "Calculando SHA-256 en tu dispositivo…";
+      try {
+        const hash = await localPdfSha256(file);
+        if (token !== latest) return;
+        output.textContent = hash;
+        output.hidden = false;
+        result.textContent = hashComparison(
+          hash,
+          root.dataset.officialHash ?? "",
+          root.dataset.certificateState ?? "",
+        );
+      } catch (error) {
+        if (token !== latest) return;
+        result.textContent =
+          error instanceof Error
+            ? error.message
+            : "No se pudo leer el archivo. Selecciónalo de nuevo.";
+      } finally {
+        if (token === latest) root.removeAttribute("aria-busy");
+      }
+    });
+  }
+</script>
+<style>
+  h2 {
+    font-family: var(--font-sans);
+  }
+</style>

@@ -1,0 +1,170 @@
+---
+import type { CertificateType } from "@/domain/certificates/types";
+import RegistrationSelect from "@/components/pre-registrations/RegistrationSelect";
+import { buttonVariants } from "@/components/ui/button";
+import FormFeedback from "./FormFeedback.astro";
+import type { CertificateFeedback } from "./route";
+import { certificateTypeLabel } from "./presentation";
+interface Props {
+  path: string;
+  type: CertificateType;
+  versionId: string;
+  version: number;
+  closureRevision: number;
+  configurationRevision: number;
+  recipients: readonly { id: string; name: string }[];
+  blocked: string;
+  feedback: CertificateFeedback;
+  replacement?: { id: string; recipientName: string } | undefined;
+}
+const {
+  path,
+  type,
+  versionId,
+  version,
+  closureRevision,
+  configurationRevision,
+  recipients,
+  blocked,
+  feedback,
+  replacement,
+} = Astro.props;
+const prefix = type.toLowerCase();
+const active = feedback.values.type === type;
+const values = active ? feedback.values : {};
+---
+
+<form
+  method="post"
+  action={path}
+  data-certificate-form
+  data-success-label={
+    replacement
+      ? "Reemplazo preparado; el anterior conserva su estado hasta emitir el nuevo."
+      : "PDF preparado."
+  }
+  data-pending-label="Preparando PDF…"
+  class="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-5 sm:p-6"
+  aria-label={certificateTypeLabel[type]}
+>
+  <h3 class="text-lg font-semibold">{certificateTypeLabel[type]}</h3>
+  <p class="text-sm text-muted-foreground">
+    Versión oficial {version} · {recipients.length}{" "}
+    {type === "INSTRUCTOR"
+      ? "instructor del cierre"
+      : "participantes elegibles"}
+  </p>
+  <input type="hidden" name="type" value={type} />
+  <input
+    type="hidden"
+    name="requestKey"
+    value={values.requestKey ?? crypto.randomUUID()}
+  />
+  <input type="hidden" name="versionId" value={values.versionId ?? versionId} />
+  <input
+    type="hidden"
+    name="closureRevision"
+    value={values.closureRevision ?? String(closureRevision)}
+  />
+  <input
+    type="hidden"
+    name="configurationRevision"
+    value={values.configurationRevision ?? String(configurationRevision)}
+  />
+  {replacement && (
+    <>
+      <input type="hidden" name="replacementForId" value={replacement.id} />
+      <p class="text-sm leading-6">
+        Reemplazo de {replacement.recipientName}. Selecciona el mismo titular;
+        el servidor comprobará la relación antes de preparar el nuevo documento.
+      </p>
+    </>
+  )}
+  <RegistrationSelect
+    client:load
+    id={`${prefix}-recipient`}
+    name="recipientId"
+    label={replacement ? "Titular del reemplazo" : "Destinatario"}
+    value={values.recipientId ?? ""}
+    required={Boolean(replacement)}
+    placeholder={
+      replacement
+        ? "Selecciona el titular"
+        : "Todos los destinatarios elegibles"
+    }
+    options={recipients.map((person) => ({
+      value: person.id,
+      label: person.name,
+    }))}
+    error={active ? feedback.issues.recipientId : undefined}
+  />
+  <div class="flex flex-col gap-2">
+    <label for={`${prefix}-group-number`} class="text-sm font-medium">
+      Número de grupo (opcional)
+    </label>
+    <input
+      id={`${prefix}-group-number`}
+      name="groupNumber"
+      type="number"
+      min="1"
+      max="9999"
+      step="1"
+      value={values.groupNumber ?? ""}
+      placeholder="Automático"
+      class="min-h-11 w-full rounded-lg border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+      aria-describedby={`${prefix}-ordinal-help ${prefix}-ordinal-error`}
+    />
+    <p id={`${prefix}-ordinal-help`} class="text-sm text-muted-foreground">
+      Si lo dejas vacío, se usa el ordinal del grupo calculado por el sistema.
+    </p>
+    <p
+      id={`${prefix}-ordinal-error`}
+      data-field-error="groupNumber"
+      class="text-sm text-destructive empty:hidden"
+    >
+      {active ? feedback.issues.groupNumber : ""}
+    </p>
+  </div>
+  {replacement && (
+    <div class="flex flex-col gap-2">
+      <label for={`${prefix}-reason`} class="text-sm font-medium">
+        Motivo de reemplazo (obligatorio)
+      </label>
+      <textarea
+        id={`${prefix}-reason`}
+        name="reason"
+        required
+        maxlength={500}
+        class="min-h-24 w-full rounded-lg border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+        aria-describedby={`${prefix}-reason-error`}
+      >{values.reason ?? ""}</textarea>
+      <p
+        id={`${prefix}-reason-error`}
+        data-field-error="reason"
+        class="text-sm text-destructive empty:hidden"
+      >
+        {feedback.issues.reason}
+      </p>
+    </div>
+  )}
+  {blocked && (
+    <p class="text-sm leading-6 text-muted-foreground">
+      {blocked}{" "}
+      <a
+        href="/app/configuracion/certificados"
+        class="underline underline-offset-4"
+      >
+        Revisar configuración
+      </a>
+    </p>
+  )}
+  <FormFeedback feedback={active ? feedback : undefined} />
+  <button
+    type="submit"
+    disabled={Boolean(blocked) || !recipients.length}
+    data-certificate-blocked={String(Boolean(blocked) || !recipients.length)}
+    class={buttonVariants({ className: "min-h-11 self-start" })}
+  >
+    {replacement ? "Preparar reemplazo" : "Generar PDF"}
+  </button>
+</form>

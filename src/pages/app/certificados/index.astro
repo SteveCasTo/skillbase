@@ -1,0 +1,101 @@
+---
+import { listAdminCourses } from "@/application/courses/manage-courses";
+import { listGroups } from "@/application/groups/manage-groups";
+import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+import type { Group } from "@/domain/groups/types";
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
+import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { requireInternalUser } from "@/server/auth/context";
+import { getDatabase } from "@/server/db/client";
+import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
+import { DrizzleGroupRepository } from "@/server/db/repositories/group-repository";
+import {
+  certificateMethodNotAllowed,
+  setCertificateHeaders,
+} from "@/components/certificates/route";
+setCertificateHeaders(Astro);
+void certificateMethodNotAllowed;
+if (Astro.request.method !== "GET") return certificateMethodNotAllowed("GET");
+const actor = requireInternalUser(Astro.locals);
+let courses: { id: string; name: string; groups: readonly Group[] }[] = [];
+let error = false;
+try {
+  const database = getDatabase();
+  const source = await listAdminCourses(
+    new DrizzleCourseRepository(database),
+    actor,
+  );
+  const groupRepository = new DrizzleGroupRepository(database);
+  for (const course of source)
+    courses.push({
+      id: course.id,
+      name: course.name,
+      groups: await listGroups(groupRepository, actor, course.id),
+    });
+} catch {
+  error = true;
+  Astro.response.status = 503;
+}
+---
+
+<PrivateLayout title="Certificados">
+  <CourseBreadcrumbs
+    current="Certificados"
+    parents={[{ label: "Resumen", href: "/app" }]}
+  />
+  <header class="mt-5 flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight">Certificados</h1>
+      <p class="mt-3 leading-7 text-muted-foreground">
+        Selecciona el grupo para preparar y gestionar sus certificados.
+      </p>
+    </div>
+    <a
+      href="/app/configuracion/certificados"
+      class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+    >
+      Configurar firmantes
+    </a>
+  </header>
+  {error ? (
+    <RegistrationPageError
+      message="No se pudieron cargar los grupos. Intenta de nuevo."
+      retryHref="/app/certificados"
+    />
+  ) : !courses.length ? (
+    <p role="status" class="mt-8 rounded-xl border border-dashed p-6">
+      Todavía no hay cursos. La certificación comienza con el cierre oficial de
+      un grupo.
+    </p>
+  ) : (
+    <ul class="mt-8 flex min-w-0 flex-col gap-6">
+      {courses.map((course) => (
+        <li class="min-w-0">
+          <h2 class="break-words text-xl font-semibold">{course.name}</h2>
+          {!course.groups.length ? (
+            <p class="mt-3 text-sm text-muted-foreground">
+              Este curso todavía no tiene grupos.
+            </p>
+          ) : (
+            <ul class="mt-3 grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {course.groups.map((group) => (
+                <li class="min-w-0">
+                  <a
+                    href={`/app/cursos/${course.id}/grupos/${group.id}/certificados`}
+                    class="flex min-h-16 items-center rounded-xl border bg-card p-4 text-sm font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    Grupo ·{" "}
+                    {instantToBoliviaCivil(group.startsAt).slice(11, 16)} a{" "}
+                    {instantToBoliviaCivil(group.endsAt).slice(11, 16)}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
+  )}
+</PrivateLayout>

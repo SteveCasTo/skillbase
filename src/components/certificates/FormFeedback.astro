@@ -1,0 +1,178 @@
+---
+import type { CertificateFeedback } from "./route";
+interface Props {
+  feedback?: CertificateFeedback | undefined;
+}
+const { feedback } = Astro.props;
+---
+
+<p
+  data-certificate-error
+  tabindex="-1"
+  role="alert"
+  class="text-sm leading-6 text-destructive empty:hidden focus-visible:outline-2 focus-visible:outline-ring"
+>
+  {feedback && !feedback.success ? feedback.message : ""}
+</p>
+<p data-certificate-success role="status" class="text-sm empty:hidden">
+  {feedback?.success ? feedback.message : ""}
+</p>
+<script>
+  import { navigate } from "astro:transitions/client";
+  import { notifications } from "@/lib/notifications";
+  import { localPdfError } from "./local-hash";
+  let controller: AbortController | undefined;
+  function enhanceCertificateForms() {
+    controller?.abort();
+    controller = new AbortController();
+    const signal = controller.signal;
+    document
+      .querySelectorAll<HTMLFormElement>("[data-certificate-form]")
+      .forEach((form) => {
+        let pending = false;
+        let requestKey =
+          form.querySelector<HTMLInputElement>('[name="requestKey"]')?.value ??
+          crypto.randomUUID();
+        const message = form.querySelector<HTMLElement>(
+          "[data-certificate-error]",
+        );
+        const file = form.querySelector<HTMLInputElement>('input[type="file"]');
+        const submit = form.querySelector<HTMLButtonElement>(
+          'button[type="submit"]',
+        );
+        const blocked = submit?.dataset.certificateBlocked === "true";
+        const confirmation = form.querySelector<HTMLInputElement>(
+          "[data-review-confirmation]",
+        );
+        const sync = () => {
+          if (submit)
+            submit.disabled =
+              blocked ||
+              pending ||
+              (Boolean(confirmation) && !confirmation?.checked) ||
+              (Boolean(file) && !file?.files?.length);
+        };
+        if (confirmation)
+          confirmation.addEventListener("change", sync, {
+            signal,
+          });
+        file?.addEventListener(
+          "change",
+          () => {
+            const selected = file.files?.[0];
+            const filename =
+              form.querySelector<HTMLElement>("[data-file-name]");
+            if (filename)
+              filename.textContent = selected
+                ? selected.name.slice(0, 200)
+                : "Ningún archivo seleccionado";
+            const error = selected ? localPdfError(selected) : "";
+            file.setCustomValidity(error);
+            if (message) message.textContent = error;
+            sync();
+          },
+          { signal },
+        );
+        sync();
+        form.addEventListener(
+          "submit",
+          async (event) => {
+            event.preventDefault();
+            if (pending || !form.reportValidity()) return;
+            const formData = new FormData(form);
+            // Review confirmation is a local affordance, not an invented API field.
+            pending = true;
+            sync();
+            form.setAttribute("aria-busy", "true");
+            if (message) message.textContent = "";
+            form
+              .querySelectorAll<HTMLElement>("[data-field-error]")
+              .forEach((node) => (node.textContent = ""));
+            form
+              .querySelectorAll<HTMLElement>('[aria-invalid="true"]')
+              .forEach((node) => node.removeAttribute("aria-invalid"));
+            notifications.loading({
+              id: requestKey,
+              title: form.dataset.pendingLabel ?? "Confirmando operación…",
+            });
+            try {
+              const response = await fetch(form.action, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { Accept: "application/json" },
+                body: file
+                  ? formData
+                  : new URLSearchParams(
+                      [...formData].flatMap(([name, value]) =>
+                        typeof value === "string" ? [[name, value]] : [],
+                      ),
+                    ),
+              });
+              const result: unknown = await response.json();
+              if (!result || typeof result !== "object" || !("ok" in result))
+                throw new Error("Invalid response");
+              if (response.ok && result.ok === true) {
+                notifications.success({
+                  id: requestKey,
+                  title: form.dataset.successLabel ?? "Operación confirmada.",
+                });
+                await navigate(location.pathname, { history: "replace" });
+                return;
+              }
+              notifications.dismiss(requestKey);
+              const text =
+                "message" in result && typeof result.message === "string"
+                  ? result.message
+                  : "No se pudo confirmar la operación. Reintenta.";
+              if (message) {
+                message.textContent = text;
+                message.focus({ preventScroll: true });
+              }
+              if (
+                "issues" in result &&
+                result.issues &&
+                typeof result.issues === "object"
+              ) {
+                for (const [name, error] of Object.entries(result.issues)) {
+                  const field = [...form.elements].find(
+                    (element) =>
+                      element instanceof HTMLElement &&
+                      element.getAttribute("name") === name,
+                  );
+                  if (field instanceof HTMLElement)
+                    field.setAttribute("aria-invalid", "true");
+                  const target = [
+                    ...form.querySelectorAll<HTMLElement>("[data-field-error]"),
+                  ].find((element) => element.dataset.fieldError === name);
+                  if (target && typeof error === "string")
+                    target.textContent = error;
+                }
+              }
+              if (response.status === 409) {
+                requestKey = crypto.randomUUID();
+                const keyField = form.querySelector<HTMLInputElement>(
+                  '[name="requestKey"]',
+                );
+                if (keyField) keyField.value = requestKey;
+              }
+            } catch {
+              notifications.dismiss(requestKey);
+              if (message) {
+                message.textContent =
+                  "No se pudo confirmar la operación. Conservamos tus datos; reintenta la misma solicitud.";
+                message.focus({ preventScroll: true });
+              }
+            } finally {
+              pending = false;
+              form.removeAttribute("aria-busy");
+              sync();
+            }
+          },
+          { signal },
+        );
+      });
+  }
+  document.addEventListener("astro:before-swap", () => controller?.abort());
+  document.addEventListener("astro:page-load", enhanceCertificateForms);
+  enhanceCertificateForms();
+</script>

@@ -131,8 +131,24 @@ No asumir que una URL Storage pública equivale a validación.
 
 La ruta de verificación debe consultar el registro actual del certificado.
 
-El contrato aprobado distingue certificados individuales de aprobación y de
-instructor. El acceso público al PDF escaneado firmado y la política ante
-reapertura/re-cierre están resueltos: el archivo es privado y la reapertura no
-revoca automáticamente certificados emitidos. Ver reglas completas en el
-contrato; «artefacto autoritativo descargable» se limita a actores autorizados.
+## INTERFAZ IMPLEMENTADA (RAMA FEATURE LOCAL)
+
+La interfaz conectada al backend disponible en esta rama incluye:
+
+- Administración de certificados en `/app/certificados`, ajustes en `/app/configuracion/certificados` y acceso a certificados del grupo desde las vistas ADMIN e INSTRUCTOR.
+- Detalle privado ADMIN y detalle histórico readonly del instructor en `/app/mis-certificados/[certificateId]`; descargas PDF privadas usan rutas autenticadas.
+- Generación, revisión/carga del archivo firmado, emisión y revocación mediante las operaciones server-side existentes. Los formularios SSR conservan los errores y valores recuperables; la autorización y las transiciones las decide el servidor.
+- Página pública `/certificados/[publicCredentialId]` y formulario de búsqueda en `/certificados`. La respuesta pública es una proyección mínima; no expone snapshots privados ni ofrece descarga anónima del PDF.
+- Verificación local opcional del archivo seleccionado: SHA-256 se calcula en el navegador, sobre el archivo local. El contenido no se transmite para calcular ese hash; no equivale a una firma digital ni demuestra por sí solo la identidad de quien lo presenta.
+
+Este estado acredita la interfaz en la rama local `feat/certificate-interface` (`a450987`), pendiente de push, PR, integración en `development` y gates correspondientes. No acredita disponibilidad en producción. Las capacidades ausentes del contrato backend (por ejemplo, índice global de historial de instructores o enlace público de reemplazo) no se simulan en la UI. Ver progreso y gates pendientes en [`PLAN.md`](PLAN.md) y la cobertura efectivamente ejecutada en [`TESTING.md`](TESTING.md).
+
+La carga/revisión manual de un PDF no verifica criptográficamente una firma manuscrita. Los archivos sintéticos usados en QA solo prueban el ciclo técnico; no son certificados institucionales firmados ni evidencia de autoridad legal.
+
+El alcance aprobado distingue certificado individual de aprobación y certificado
+de instructor. El PDF final/escaneado permanece privado y solo se descarga por
+operaciones autenticadas con autorización de rol/ownership; la reapertura no
+revoca certificados emitidos automáticamente. El artefacto autoritativo se limita
+a actores autorizados. Las reglas aprobadas de elegibilidad, snapshots, ciclo de
+vida, privacidad y verificación están en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md)
+y [`DECISIONS.md`](DECISIONS.md).

@@ -660,7 +660,7 @@ integrado en `development` y quedó incluido en releases posteriores a `master`.
 La revisión visual y release de los seguimientos descritos abajo se limitan a sus
 ramas de feature; ver evidencia por ejecución en [`TESTING.md`](TESTING.md).
 
-### Pulido posterior del filtro y scroll del calendario (fuente local)
+### Pulido posterior del filtro y scroll del calendario (PR 296, integrado en development)
 
 La rama `fix/calendar-filter-scroll` (`bf938d3cacef70deb01ef32c6bd4fd80c2e72f97`) ajusta la interacción del calendario de sesiones: cada filtro de estado puede deseleccionarse para volver a mostrar el conjunto completo; seleccionar fecha, «Todas» y cambiar a un filtro específico mantienen las reglas existentes. La lista y los filtros utilizan un único scroll vertical principal, sin contenedor scrolleable anidado; el calendario es sticky solo en desktop con altura suficiente y vuelve al flujo normal en viewports bajos. Los tokens globales de scrollbar respetan light/dark, las paletas de landing/catálogo y `forced-colors`. La evidencia y sus límites están en [`TESTING.md`](TESTING.md).
 
@@ -684,5 +684,14 @@ ni cálculo de negocio en la presentación. Se mantiene CI únicamente para ADMI
 finanzas fuera del resumen y detalle financiero solo en la proyección ADMIN
 existente. El comportamiento y sus límites están en
 [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md) y
-[`TESTING.md`](TESTING.md). El PR está publicado, pero esta rama no acredita
-integración ni release.
+[`TESTING.md`](TESTING.md). PR 295 se integró en `development`; esto no acredita
+su release a `master`.
+
+## Certificados (interfaz en rama feature local)
+
+- La navegación ADMIN enlaza gestión y ajustes de certificados; las vistas de curso/grupo dan acceso a la gestión del grupo. El detalle privado presenta las operaciones disponibles según el estado que entrega el servidor. No duplica reglas de elegibilidad, permisos ni transiciones en el cliente.
+- El instructor accede a certificados históricos propios en modo readonly, con descargas privadas autenticadas. No se inventa un índice global de historial que el loader no ofrece.
+- `/certificados` ofrece búsqueda y `/certificados/[publicCredentialId]` presenta el resultado público mínimo autorizado. La superficie pública no enlaza ni descarga PDFs privados.
+- La verificación opcional del archivo usa el picker del navegador y calcula SHA-256 localmente; se evita transmitir el archivo para ese cálculo. La UI no lo representa como validación de firma digital o de identidad del portador.
+- La carga/revisión del documento utiliza controles privados; errores de validación se presentan junto al formulario y permiten recuperación cuando el servidor lo permite. No afirmar que la carga valide la autenticidad de una firma manuscrita.
+- La UI se implementó con SSR y las convenciones responsive/teclado del design system. La revisión QA incluyó desktop/tablet/mobile y temas claro/oscuro; el alcance y límites de los tests concretos están en [`TESTING.md`](TESTING.md). El código está en `feat/certificate-interface` (`a450987`), pendiente de push/PR e integración a `development`; no está publicado en producción.
