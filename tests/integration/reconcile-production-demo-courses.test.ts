@@ -1,6 +1,11 @@
 import { afterAll, expect, test } from "bun:test";
 import postgres from "postgres";
-import { resolve } from "node:path";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
+import {
+  assertCurrentMigrationLedger,
+  applicationMigrationsFolder,
+  readMigrationLedger,
+} from "../fixtures/migration-ledger";
 
 import { createDatabase } from "@/server/db/client";
 import {
@@ -32,19 +37,6 @@ await admin.unsafe(`CREATE DATABASE ${name}`);
 const connection = new URL(stackUrl);
 connection.pathname = `/${name}`;
 const url = connection.toString();
-const migration = Bun.spawnSync(
-  [process.execPath, "x", "drizzle-kit", "migrate"],
-  {
-    cwd: resolve(import.meta.dir, "../.."),
-    env: { ...process.env, DATABASE_URL: url, MIGRATION_DATABASE_URL: url },
-    stdout: "pipe",
-    stderr: "pipe",
-  },
-);
-if (migration.exitCode !== 0)
-  throw new Error(
-    `Isolated test database migration failed: ${migration.stderr.toString()}`,
-  );
 const database = createDatabase(url);
 const client = postgres(url, { prepare: false, max: 1 });
 const now = new Date("2026-09-28T12:00:00Z");
@@ -56,12 +48,46 @@ afterAll(async () => {
   await admin.end();
 });
 
+// CREATE DATABASE does not inherit Supabase's provider-owned Storage schema.
+// Supply only the external DDL surface consumed by application migrations in
+// this named disposable database. This is not a Storage/Auth emulator; real
+// private-bucket/API behavior is covered against the managed Supabase stack.
+await client.unsafe(`
+  CREATE SCHEMA storage;
+  CREATE TABLE storage.buckets (
+    id text PRIMARY KEY, name text NOT NULL, public boolean NOT NULL DEFAULT false,
+    file_size_limit bigint, allowed_mime_types text[]
+  );
+  CREATE TABLE storage.objects (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    bucket_id text REFERENCES storage.buckets(id)
+  );
+  ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+`);
+// Use the real Drizzle migrator, which preserves the underlying PostgreSQL
+// error rather than losing a CLI stdout-only diagnostic in an empty stderr.
+await migrate(database.db, { migrationsFolder: applicationMigrationsFolder });
+await assertCurrentMigrationLedger(database.db);
+const migratedLedger = await readMigrationLedger(database.db);
+await migrate(database.db, { migrationsFolder: applicationMigrationsFolder });
+expect(await readMigrationLedger(database.db)).toEqual(migratedLedger);
+
 async function snapshot() {
   const rows = await client.unsafe(SNAPSHOT_SQL);
   return parseSnapshotOutput(JSON.stringify([{ snapshot: rows[0]?.snapshot }]));
 }
 
 test("actual generated SQL applies atomically to five editorial courses, then rejects a stale snapshot", async () => {
+  const bucket =
+    await client`select public, file_size_limit::text as size, allowed_mime_types from storage.buckets where id = 'certificate-documents'`;
+  expect(bucket[0]).toEqual({
+    public: false,
+    size: "10485760",
+    allowed_mime_types: ["application/pdf"],
+  });
+  const policy =
+    await client`select polpermissive from pg_policy where polrelid = 'storage.objects'::regclass and polname = 'certificate_objects_server_only'`;
+  expect(policy[0]?.polpermissive).toBe(false);
   const [format] = await database.db
     .insert(courseTypes)
     .values({ name: `Production SQL fixture ${crypto.randomUUID()}` })

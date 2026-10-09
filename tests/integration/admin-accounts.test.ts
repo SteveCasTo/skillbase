@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
+import { assertCurrentMigrationLedger } from "../fixtures/migration-ledger";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -228,15 +229,12 @@ test("list and detail project last-active lifecycle block without replacing acti
     }),
   ).rejects.toBe(rollback);
 });
-test("schema RLS, all Data API grants revoked, restrictive evidence, QA ledger23", async () => {
+test("schema RLS, all Data API grants revoked, restrictive evidence, current migration ledger", async () => {
   const rows = await db.db.execute<{ rls: boolean; grants: boolean }>(
     sql`select relrowsecurity as rls, has_table_privilege('anon', oid, 'SELECT,INSERT,UPDATE,DELETE') or has_table_privilege('authenticated', oid, 'SELECT,INSERT,UPDATE,DELETE') or has_table_privilege('service_role', oid, 'SELECT,INSERT,UPDATE,DELETE') as grants from pg_class where oid='public.admin_account_deletions'::regclass`,
   );
   expect(rows[0]).toEqual({ rls: true, grants: false });
-  const ledger = await db.db.execute<{ count: number }>(
-    sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
-  );
-  expect(ledger[0]?.count).toBe(23);
+  await assertCurrentMigrationLedger(db.db);
   const journal = JSON.parse(
     readFileSync("drizzle/meta/_journal.json", "utf8"),
   ) as { entries: { tag: string; when: number }[] };

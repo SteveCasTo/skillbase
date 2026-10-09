@@ -655,7 +655,7 @@ Las métricas y ledger de las subsecciones siguientes documentan QA/CI por etapa
 - Evidencia técnica/hashes y metadata se conservaron en `C:/Users/Steve/AppData/Local/Temp/opencode/phase8-production-release-evidence/`; el snapshot protegido incluye resultados de comparación y no incorpora PII en esta documentación. El smoke fue anónimo, por lo que no se afirma Google OAuth real, recovery/SMTP cloud ni una operación autenticada ADMIN en producción.
 - Fase 8 queda liberada dentro del alcance aprobado. Fase 9 (certificados/QR/firma) no está iniciada.
 
-## Correcciones UI y demo integral — PRs 289/288 en development; release pendiente
+## Correcciones UI y demo integral — snapshot histórico PRs 289/288 en development
 
 Las correcciones UI del contrato [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md) se integraron mediante PR 289; el runner sintético integral F1–F8 se integró mediante PR 288. El head candidato de `development` es `53f171e10c6b5ac922d9f4c5760f788b9f7bdebe`. El release a `master`, deploy y carga productiva de demos aún no se han ejecutado. No hubo migración ni cambio de schema en estas entregas.
 
@@ -670,7 +670,32 @@ El CI integrado final del PR 288, run `37818957648`, pasó al primer intento: **
 
 El test del runner ejecutó PLAN/APPLY/repetición sobre un Supabase temporal propio. Verificó preservación de **416 filas en 70 tablas** existentes y que la repetición idempotente agregara cero cambios. La carga de prueba dejó 8 cursos, 10 grupos, 26 preinscripciones y 25 participantes sintéticos, además de 4 instructores, 5 ADMIN, 3 versiones de cierre, una reapertura y una baja ADMIN completada mediante el lifecycle. Estos datos pertenecen al stack temporal del test y no al Supabase canónico/cloud.
 
-No se afirma una revisión visual manual con Playwright CLI/screenshot para este cierre. La validación reportada aquí es automatizada y contra comportamiento/persistencia; tampoco constituye smoke autenticado en producción. No se ha ejecutado PLAN/APPLY del runner en local canónico ni en producción; la próxima operación productiva requiere un checkout limpio del SHA exacto ya liberado y guards/approval descritos en [`DEMO_SEED.md`](DEMO_SEED.md). Fase 9 permanece sin iniciar.
+No se afirma una revisión visual manual con Playwright CLI/screenshot para ese cierre. El snapshot de esta sección es previo al release; la evidencia posterior está abajo. Fase 9 continúa como implementación separada.
+
+### Release PR 292 y operación protegida F1–F8 (estado actual)
+
+- PR 292 liberó el workflow protegido `production-comprehensive-demo.yml` a
+  `master` `2789d55e93a97cc5344930e690e9feecc2cc10f5`; `development` es
+  `a276e30fab3526cc086fc3efbe03a42d08681ba9`. Vercel `dpl4CZ` quedó READY para
+  el SHA de master. El workflow seed se ejecutó manualmente aparte del deploy.
+- El gate master `37846141904` pasó en attempt 1: 429 unit/2,945 assertions,
+  162 integration/1,332 assertions, 1/894 assertions del caso comprehensive-demo
+  y 140/140 E2E (132 desktop + 8 mobile). No hubo fallos, retries, flakes ni
+  skips reportados en ese run; TypeScript 0 errores/0 warnings/313 hints.
+- La cronología conserva una flake anterior (run `378382`, un caso; causa raíz
+  desconocida). PR 293/run `37843958082` añadió diagnóstico/trace del primer
+  fallo; no es evidencia de un fix de aplicación. PR 292/run `37845044909` y el
+  gate de master final se reportan separadamente, no se suman entre sí.
+- PLAN `37854318652` y APPLY `37854790028` en cloud preservaron 72 tablas/899
+  filas originales por hashes server-side de fila completa+PK; ledger 23,
+  settings N=3 y mínimo de pago 25 quedaron intactos. El replay no produjo
+  cambios. Los conteos añadidos, 7 GETs públicos y resultados están en
+  [`DEMO_SEED.md`](DEMO_SEED.md). La carga F1–F8 no creó certificados ni
+  migraciones F9.
+- La carga local canónica previa usó un baseline separado de 70 tablas/2,906
+  filas originales y también preservó hashes/replay cero; no comparar tamaños de
+  baseline entre entornos. Fase 9 está en progreso en ramas de feature; no se
+  cuenta como implementada ni cubierta por estos gates.
 
 ### Pulido local de filtros y scroll del calendario (fuente `bf938d3`)
 
@@ -682,7 +707,26 @@ Lint, format check, typecheck (0 errores/0 warnings/313 hints existentes), build
 
 La fixture E2E usó únicamente el stack Supabase temporal aislado; no hubo escrituras en producción ni cambios de DB/schema/migraciones. Estos resultados pertenecen a la fuente local indicada y no acreditan CI remoto, integración, full gate, release ni despliegue.
 
+### PR 296 — CI actual y estado
+
+PR 296 se integró a `development` mediante merge
+`47def8735aba233d1802eb51b4c4acaab66e1a39`. CI `37951088066` pasó en el primer
+intento: 431 unit/2,985 assertions, 162 integration/1,332 assertions, demo focal
+1/894 y 141 E2E únicos (75 + 66), sin fallos, retries, flakes ni skips reportados
+en esa corrida. Esto no acredita release a `master` ni despliegue del calendario.
+
+La cronología conserva el run `3789921`, con una falla histórica de `PageDown`
+en viewport mobile 320 px donde no se observó movimiento vertical. No se conoce
+la causa raíz. La revisión manual posterior comprobó que `PageDown` mueve el
+contenido en 320/768/1280 px, pero no se afirma que esto demuestre o corrija la
+causa del fallo anterior; tampoco hay aserción CSS/geométrica que lo oculte. El
+diagnóstico read-only sigue separado del resultado verde del CI actual.
+
 ## Búsqueda de instructor y resultados académicos compactos (PR 295)
+
+PR 295 se integró en `development` mediante merge
+`3323536deed04d18a1fa5fa547b23d3791349a94` (source `ae5999a`); esta evidencia no
+acredita release a `master`.
 
 La rama `fix/live-instructor-search-and-compact-results`, HEAD
 `6c5bba7bc3b5a06eb476e209d2827b2dd666f6b4` sobre base `a276e30`, modifica solo
@@ -720,5 +764,5 @@ snapshot, esquema ni datos canónicos/cloud.
   containers/listeners en los puertos de app 4493/4495. No se detuvieron servicios
   compartidos ni se tocaron datos/Auth de canónico, cloud o producción.
 
-PR 295 está publicado; esta evidencia no acredita su integración/release. No es
-un gate completo de Fase 9 ni revisa otros cambios en curso.
+Esta validación de PR 295 no representa gate completo de Fase 9 ni verifica otros
+cambios en curso.

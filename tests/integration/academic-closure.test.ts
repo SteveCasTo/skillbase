@@ -1,4 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
+import { assertCurrentMigrationLedger } from "../fixtures/migration-ledger";
 import { and, eq, sql } from "drizzle-orm";
 import { createDatabase } from "@/server/db/client";
 import * as s from "@/server/db/schema";
@@ -793,10 +794,7 @@ test("academic closure private HTTP and database guards preserve snapshots and d
   );
   expect(functions).toHaveLength(2);
   expect(functions.every((r) => !r.granted)).toBe(true);
-  const ledger = await db.execute<{ count: string }>(
-    sql`select count(*)::text as count from drizzle.__drizzle_migrations`,
-  );
-  expect(ledger[0]!.count).toBe("23");
+  await assertCurrentMigrationLedger(db);
   // Revoked current roles also deny loader access despite a stale ADMIN DTO.
   await db
     .delete(s.userRoles)

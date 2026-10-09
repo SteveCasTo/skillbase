@@ -822,13 +822,15 @@ Instructor configura evaluación y el sistema calcula resultados finales.
 
 Fase 8 se completó y liberó mediante PR 286 a `master` `68c918119f2ec094ba7cc63b217efd2448480505`. CI `37727200394` y Vercel `READY`; las migraciones 0021/0022 avanzaron canónico/cloud a ledger 23. La comparación pre/post confirmó preservación local/cloud; las cinco tablas F8 estaban vacías en la verificación. Fase 9 no ha iniciado. Evidencia: [`ACADEMIC_CLOSURE_CONTRACT.md`](ACADEMIC_CLOSURE_CONTRACT.md), [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md), [`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-### Correcciones UI y runner de demo integral (integrados en development; release pendiente)
+### Correcciones UI y runner de demo integral (release y datos local/cloud completados)
 
-El contrato aprobado está en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md). Las correcciones UI se integraron mediante PR 289 y el runner de demo integral mediante PR 288; ambos están en `development` (`53f171e`). El CI integrado del candidato pasó, pero no se ha liberado a `master`: mantener el release de todo el bloque como paso único posterior y no confundir la integración en `development` con producción. No hubo migración ni cambio de schema.
+El contrato de correcciones está en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md). Correcciones UI y runner se liberaron en `4e067311`; después PR 292 liberó el canal cloud protegido y dejó `master`/producción en `2789d55e93a97cc5344930e690e9feecc2cc10f5`, alineado con `development` `a276e30fab3526cc086fc3efbe03a42d08681ba9`, Vercel `dpl4CZ READY`. CI `37846141904` pasó en attempt 1: 429 unit/2,945 assertions, 162 integration/1,332 assertions, comprehensive-demo 1/894 y E2E 140/140; cero fallos/retries/flakes/skips, TypeScript 0/0/313 hints. La cronología/diagnóstico conservan el fallo previo de un caso E2E y su causa raíz desconocida; no se atribuye un fix de aplicación. No hubo cambio de schema en estos releases.
 
-El runner permite QA con datos enteramente ficticios y de forma aditiva/idempotente, preservando datos preexistentes; no tiene reset general. La carga productiva está expresamente autorizada **solo después** del release completo, con aprobación del SHA exacto y PLAN/APPLY separados, usando guards/provenance y snapshot de preservación según [`DEMO_SEED.md`](DEMO_SEED.md). No se ha ejecutado una carga nueva en el Supabase canónico o producción.
+El runner es aditivo/idempotente y sin reset general. Después del release se aplicó al entorno canónico local desde checkout limpio de `master` `4e067311`: ledger 23; 70 tablas y 2,906 filas originales preservadas por hash; el APPLY repetido agregó cero cambios. Se añadieron 8 cursos, 10 grupos, 26 registros/25 participantes, 4 instructores, 5 ADMIN demo, 3 versiones de cierre, 1 reapertura y 1 baja ADMIN unused con outbox completado. No se alteraron credenciales existentes ni datos personales/notas/asistencia/finanzas/auditoría de usuarios originales.
 
-Fase 9 continúa pendiente e independiente. Antes de iniciarla, acordar los tipos de certificado, firmas/autoridad, número institucional, elegibilidad y relación con snapshots de cierre, saldos, boleta/valorado y reemplazo/revocación/verificación pública. El contrato UI enumera estas preguntas como pendientes, no como reglas aprobadas.
+El workflow protegido ejecutó PLAN `37854318652` y APPLY `37854790028` sobre el proyecto cloud; hash del plan `2bb8db152ff4ce2a4088ee372c632c17767dd5928c6d2ac28db9655f2b5c09ab`. Baseline: 72 tablas/899 filas originales, preservadas por hashes SHA-256 completos de fila+PK; ledger 23 y settings N=3/mínimo de pago 25 sin cambios. Total 1,850 filas; replay cero cambios. Agregó 8 cursos, 10 grupos, 26 registros/25 participantes, 12 intereses, 4 instructores, 5 ADMIN demo (uno eliminado por lifecycle/Auth, tombstone/outbox completado), 3 versiones de cierre y 1 reapertura; siete GET públicos respondieron 200. No se cambiaron credenciales Auth originales ni se enviaron correos. Baseline local independiente: 70 tablas/2,906 filas originales preservadas; replay cero.
+
+El alcance funcional Fase 9 fue aprobado en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y ADR-028. El gate seed cloud/local está cerrado y la **implementación F9 está en progreso** en ramas de feature; el seed F1–F8 no incluyó certificados. Las decisiones de negocio sobre tipo, elegibilidad, privacidad, reapertura/reemplazo y verificación están resueltas; no se agrega número institucional ni boleta/valorado/condición financiera. Mantener inmutables los snapshots F8; no declarar F9 completada hasta integrar y validar código, esquema, tests, UI/PDF y gates de release.
 
 ### Objetivos
 
@@ -844,6 +846,12 @@ Fase 9 continúa pendiente e independiente. Antes de iniciarla, acordar los tipo
 Administración completa el cierre administrativo y académico.
 
 ## FASE 9 — CERTIFICADOS
+
+Estado: **en progreso**; alcance aprobado y seeds de datos F1–F8 completados en
+local/cloud. Backend, schema candidato, UI y renderer se trabajan en ramas de
+feature y todavía no equivalen a milestone integrado/completado. No sembrar
+certificados. La especificación vigente está en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y ADR-028.
 
 ### Objetivos
 

@@ -2,9 +2,9 @@
 
 ## Estado y alcance
 
-Este documento registró los acuerdos previos para una pasada de correcciones operativas sobre la aplicación liberada en Fase 8. Las correcciones y runner demo se integraron en `development` mediante PRs 289/288 y luego se liberaron, junto con el canal cloud protegido, a `master` `2789d55e93a97cc5344930e690e9feecc2cc10f5` (Vercel `dpl4CZ READY`). Esta rama añade un seguimiento UI de instructor/resultados que aún no se integra ni libera. El seed productivo F1–F8 y sus guards/operación constan en [`DEMO_SEED.md`](DEMO_SEED.md).
+Este documento registró los acuerdos previos para una pasada de correcciones operativas sobre la aplicación liberada en Fase 8. Las correcciones y runner demo se integraron mediante PRs 289/288; PR 292 añadió el canal cloud protegido. La release actual de producción sigue en `master` `2789d55e93a97cc5344930e690e9feecc2cc10f5` (CI `37846141904`, Vercel `dpl4CZ READY`), y los seeds local/cloud F1–F8 se completaron por las operaciones aprobadas (ver [`DEMO_SEED.md`](DEMO_SEED.md)). El seguimiento UI de instructor/resultados descrito abajo se integró posteriormente a `development` mediante PR 295; no se atribuye un release a `master` en esta sección.
 
-Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Este contrato no la reabre. La Fase 9 no se implementa aquí; sus decisiones pendientes se enumeran al final y no se deben asumir por anticipado.
+Fase 8 permanece cerrada según el estado registrado en [`PLAN.md`](PLAN.md). Este contrato no la reabre. Fase 9 no se implementa aquí; su alcance fue aprobado posteriormente y se mantiene en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). Tras completar los seeds F1–F8 local/cloud, la implementación F9 está en progreso en ramas de feature.
 
 ## Reglas transversales de interfaz
 
@@ -75,17 +75,12 @@ El usuario autorizó explícitamente cargar datos **completamente ficticios** en
 - La QA de datos productivos solo se ejecuta **después** de que todas las correcciones estén integradas a `master` mediante el release aprobado. No sembrar Fase 9 antes de su implementación/autorización. Las cinco tablas Fase 8 estaban vacías en el snapshot de release; cualquier demo académico posterior es carga nueva autorizada, no parte del release anterior.
 - Separar evidencia de fixtures y de datos preexistentes. Antes/después registrar conteos/identificadores y preservación de filas no demo; no publicar credenciales ni información personal real.
 
-## Fase 9: decisiones futuras, no aprobadas aquí
+## Fase 9: alcance aprobado posteriormente
 
-Certificados sigue pendiente. Antes de implementar, llevar al owner preguntas, no respuestas asumidas, al menos sobre:
-
-- Tipos de certificados y qué resultado/circunstancia habilita cada tipo.
-- Firmas requeridas, autoridad que firma, en qué etapa, y si la firma es condición de emisión/publicación o un estado posterior.
-- Número institucional/serie: formato, autoridad asignadora, unicidad, momento de asignación y tratamiento de reemplazos/revocaciones.
-- Elegibilidad: qué estados/notas/asistencia se congelan y cómo aplicar políticas vigentes sin recalcular versiones históricas.
-- Fuente oficial del certificado frente a versiones de cierre: si se emite desde un snapshot/version específica de cierre, cómo se resuelve un grupo reabierto y qué ocurre con certificados anteriores.
-- Saldo financiero: si es dato informativo o condición de elegibilidad/emisión. La regla de Fase 8 de no bloquear cierre por saldo no decide por sí sola la política de certificado.
-- Datos requeridos de boleta/valorado y si pertenecen al certificado o solo al proceso administrativo.
-- Reemplazo, revocación y verificación pública: autoridad, estados, auditoría, privacidad/exposición, credential ID/QR/URL y reglas de PDF firmado/hash.
-
-Registrar las respuestas aprobadas en los documentos de requisitos/decisiones/certificados apropiados antes de implementar. Este inventario no añade requerimientos ni presume opciones.
+Al redactar este contrato de correcciones, Fase 9 seguía sin decisiones
+aprobadas. El owner aprobó después el alcance de certificados; la especificación
+vigente es [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y la decisión
+ADR-028 en [`DECISIONS.md`](DECISIONS.md). No se deben usar como pendientes las
+preguntas históricas enumeradas en esta versión del contrato. Los seeds F1–F8
+local/cloud ya se completaron y Fase 9 está en progreso; su estado vigente está
+en [`PLAN.md`](PLAN.md)/[`DEMO_SEED.md`](DEMO_SEED.md).
