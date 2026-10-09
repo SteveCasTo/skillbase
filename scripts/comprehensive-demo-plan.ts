@@ -13,6 +13,11 @@ import {
 import { getTestSupabaseEnvironment } from "./supabase-local-env";
 
 export const COMPREHENSIVE_DEMO_OWNER = "skillbase-comprehensive-demo-v1";
+export function comprehensiveDemoVerificationOrigin(target: string): string {
+  return target === "production"
+    ? "https://skillbase-alpha.vercel.app"
+    : "http://127.0.0.1:4321";
+}
 export function assertComprehensiveRelease(
   branch: string,
   head: string,

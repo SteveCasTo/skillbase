@@ -40,6 +40,7 @@ import {
   comprehensiveDemoPlan,
   assertComprehensiveTarget,
   assertComprehensiveRelease,
+  comprehensiveDemoVerificationOrigin,
   parseComprehensiveArgs,
   type ComprehensiveDemoPlan,
   type ComprehensiveDemoContext,
@@ -580,10 +581,7 @@ if (import.meta.main) {
           auth: { persistSession: false, autoRefreshToken: false },
         }),
         apply: args.apply,
-        verificationOrigin:
-          args.target === "production"
-            ? "https://skillbase-alpha.vercel.app"
-            : "https://demo.invalid",
+        verificationOrigin: comprehensiveDemoVerificationOrigin(args.target),
         preview(plan) {
           console.info(
             JSON.stringify(
