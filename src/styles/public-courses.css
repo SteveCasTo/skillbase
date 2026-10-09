@@ -1,8 +1,11 @@
 html:has(.public-courses) {
-  scrollbar-color: #176ba0 #fff;
+  --scrollbar-thumb: #176ba0;
+  --scrollbar-track: #fff;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 html.dark:has(.public-courses) {
-  scrollbar-color: #66b9e5 #0d1d28;
+  --scrollbar-thumb: #66b9e5;
+  --scrollbar-track: #0d1d28;
 }
 
 @scope (.public-courses) {

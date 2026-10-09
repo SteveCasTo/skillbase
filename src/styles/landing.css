@@ -1,6 +1,8 @@
 html:has(.landing) {
   --landing-scrollbar-thumb: #176ba0;
   --landing-scrollbar-track: #ffffff;
+  --scrollbar-thumb: var(--landing-scrollbar-thumb);
+  --scrollbar-track: var(--landing-scrollbar-track);
   scroll-behavior: smooth;
   scrollbar-color: var(--landing-scrollbar-thumb) var(--landing-scrollbar-track);
 }

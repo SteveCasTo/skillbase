@@ -289,13 +289,13 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
       .getByRole("link")
       .filter({ has: page.getByText("Feriado", { exact: true }) });
     await expect(
-      page.getByRole("radio", { name: "Próximas", exact: true }),
-    ).toBeChecked();
+      page.getByRole("button", { name: "Próximas", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
     await expect(
-      page.getByRole("radio", { name: "Todas", exact: true }),
+      page.getByRole("button", { name: "Todas", exact: true }),
     ).toHaveCount(0);
     await expect(
-      page.getByRole("radio", { name: "En curso", exact: true }),
+      page.getByRole("button", { name: "En curso", exact: true }),
     ).toHaveCount(0);
     await page.getByText("Canceladas", { exact: true }).click();
     await expect(original).toBeVisible();
@@ -312,12 +312,12 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     await calendarDay.focus();
     await page.keyboard.press("Enter");
     await expect(
-      page.getByRole("radio", { name: "Todas", exact: true }),
-    ).toBeChecked();
+      page.getByRole("button", { name: "Todas", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
     await expect(original).toBeVisible();
     await page.getByText("Próximas", { exact: true }).click();
     await expect(
-      page.getByRole("radio", { name: "Todas", exact: true }),
+      page.getByRole("button", { name: "Todas", exact: true }),
     ).toHaveCount(0);
     await expect(original).not.toBeVisible();
     await expect(
@@ -329,9 +329,30 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     await calendarDay.click();
     await page.getByText("Todas", { exact: true }).click();
     await expect(
-      page.getByRole("radio", { name: "Todas", exact: true }),
+      page.getByRole("button", { name: "Todas", exact: true }),
     ).toHaveCount(0);
     await expect(original).toBeVisible();
+    const stateFilters = page.getByRole("group", {
+      name: "Estado de la sesión",
+      exact: true,
+    });
+    for (const label of ["Próximas", "Finalizadas", "Canceladas"]) {
+      const toggle = stateFilters.getByRole("button", {
+        name: label,
+        exact: true,
+      });
+      await toggle.click();
+      await expect(toggle).toHaveAttribute("aria-pressed", "true");
+      await toggle.press("Space");
+      await expect(toggle).toBeFocused();
+      await expect(stateFilters.locator('[aria-pressed="true"]')).toHaveCount(
+        0,
+      );
+      await expect(original).toBeVisible();
+      await expect(
+        page.locator("[data-session-day]:not([hidden])"),
+      ).toHaveCount(recovered.group.sessions.length);
+    }
   } finally {
     await fixture.close();
   }
