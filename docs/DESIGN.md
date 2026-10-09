@@ -659,3 +659,7 @@ está en [`UI_CORRECTIONS_CONTRACT.md`](UI_CORRECTIONS_CONTRACT.md). PR 289 est�
 integrado en `development`; su release a `master` sigue pendiente. No se afirma
 una revisión visual manual con Playwright/screenshot para este bloque; ver la
 evidencia automatizada y sus límites en [`TESTING.md`](TESTING.md).
+
+### Pulido posterior del filtro y scroll del calendario (fuente local)
+
+La rama `fix/calendar-filter-scroll` (`bf938d3cacef70deb01ef32c6bd4fd80c2e72f97`) ajusta la interacción del calendario de sesiones: cada filtro de estado puede deseleccionarse para volver a mostrar el conjunto completo; seleccionar fecha, «Todas» y cambiar a un filtro específico mantienen las reglas existentes. La lista y los filtros utilizan un único scroll vertical principal, sin contenedor scrolleable anidado; el calendario es sticky solo en desktop con altura suficiente y vuelve al flujo normal en viewports bajos. Los tokens globales de scrollbar respetan light/dark, las paletas de landing/catálogo y `forced-colors`. La evidencia es local a esta rama y no supone integración ni release; resultados y límites están en [`TESTING.md`](TESTING.md).
