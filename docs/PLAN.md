@@ -117,7 +117,7 @@ Fase 1 completada y verificada en local, CI y cloud. El primer administrador pue
 
 ## FASE 2 — CURSOS Y EXPERIENCIA PÚBLICA
 
-La fase se divide en dos entregas consecutivas. La capa visual de la landing se puede validar de forma aislada sobre el contrato público actual y previews sintéticos, pero el catálogo, el detalle y el cierre completo de Fase 2B siguen bloqueados hasta cerrar y verificar completamente el gate de Fase 2A.
+Esta sección conserva las decisiones y resultados de implementación originales. La landing, el catálogo y el detalle se implementaron después; sin embargo, no se debe inferir que el gate independiente de Fase 2B quedó cerrado a partir de las casillas antiguas. Su evidencia posterior y el límite histórico están anotados en la sección de estado y en [`TESTING.md`](TESTING.md).
 
 ### Decisiones de alcance
 
@@ -218,7 +218,7 @@ Un administrador crea, edita, configura, publica, retira y archiva cursos. Los c
 
 #### Estado 2A
 
-El estado previo del repositorio registraba el alcance original de gestión de cursos como completado. Esta revisión no revalida ese cierre histórico ni verifica un nuevo despliegue en Supabase/Vercel o un nuevo resultado de CI. El refactor de formatos y revisiones, que antes estaba pendiente, ya está implementado localmente; el cierre del gate ampliado de Fase 2B sigue pendiente de validación final.
+El estado previo del repositorio registraba el alcance original de gestión de cursos como completado. La implementación y las validaciones locales citadas en esta fase son registros históricos, no un resultado nuevo de CI ni evidencia suficiente para declarar cerrado el gate independiente de 2B. El refactor de formatos y revisiones quedó implementado y después entró en el source desplegado; el gate original de 2B no se cierra retroactivamente sin evidencia específica.
 
 #### Refactor implementado — gate previo al cierre de Fase 2B
 
@@ -303,7 +303,7 @@ Construir una experiencia pública distintiva que presente la propuesta del sist
 - [x] Cargar `web-design-guidelines` para la auditoría final de UI.
 - [x] Repetir screenshots y pruebas después de las correcciones.
 
-La dirección **Cartelera editorial** fue seleccionada el 2026-09-18 mediante una comparación visual con Catálogo visual modular y Agenda de convocatorias. La landing conserva la composición responsive y sus previews sintéticos. El refactor de formatos y el upload/storage administrativo de artwork ya están implementados; el cierre del gate funcional y su verificación remota siguen pendientes.
+La dirección **Cartelera editorial** fue seleccionada el 2026-09-18 mediante una comparación visual con Catálogo visual modular y Agenda de convocatorias. La landing conserva la composición responsive y sus previews sintéticos. El refactor de formatos y el upload/storage administrativo de artwork ya están implementados. Las comprobaciones abajo describen el avance de implementación, no cierran por sí mismas el gate histórico de Fase 2B.
 
 #### Estado actual de la cartelera
 
@@ -321,9 +321,9 @@ La dirección **Cartelera editorial** fue seleccionada el 2026-09-18 mediante un
 - [x] Implementar acceso público sin sesión, navegación a cursos publicados, ocultación de otros estados y 404 uniforme.
 - [x] Añadir cobertura E2E de catálogo/detalle, estados públicos y regresiones responsive/teclado.
 - [x] Implementar títulos, metadata y proyección de contenido público.
-- [x] Ejecutar y verificar el conjunto local de lint, typecheck, unit (41), integration (15), E2E (42) y build; los archivos propios pasan Prettier. El comando global de formatter incluye `.tmp-phase2b/` ajena a este cambio y sigue avisando por sus archivos sin seguimiento.
-- [ ] Verificar CI remoto, despliegue/migraciones de cloud y realizar la revisión final del gate de Fase 2B.
-- [x] Sincronizar documentación de implementación; la revisión final del gate sigue pendiente.
+- [x] Registrar la validación local histórica de lint, typecheck, unit (41), integration (15), E2E (42) y build; los archivos propios pasaron Prettier. El comando global de formatter incluía `.tmp-phase2b/` ajena a ese cambio. Esta evidencia no debe presentarse como nueva ni como corrida E2E global sin fallos.
+- [ ] El gate remoto/cloud y la revisión final de Fase 2B no se acreditaron con una verificación independiente en el registro original. La disponibilidad posterior de catálogo/detalle y sus comprobaciones de producción se describen en el release de Fase 3 (PR 113) en [`TESTING.md`](TESTING.md), y el source actual pasó después el CI del release F9 indicado más abajo. Esto respalda la disponibilidad y regresión de rutas actuales, pero no reconstruye ni oculta los fallos/flakiness históricos ni equivale a cerrar el gate 2B original.
+- [ ] Completar la auditoría documental de trazabilidad del cierre original si la adopción requiere evidencia formal específica de cada criterio. No bloquea el trabajo funcional F10 cuando las rutas actuales y los requisitos aprobados sean confirmados.
 
 #### Navegación privada
 
@@ -352,7 +352,7 @@ La experiencia privada existente está implementada y validada localmente. PR 10
 - [x] Verificar responsive y teclado mediante cobertura E2E colectiva: full rerun 81/82 más prueba dirigida 4/4 de `public-courses`; no se afirma full 82/82.
 - [x] Completar implementación, validación local e integración de PR 104 a `development`; no implica promoción a `master`, gates remotos/cloud ni cierre de Fase 3.
 
-Los pendientes remotos de Fase 2 (CI, despliegue/migraciones cloud y revisión final del gate de Fase 2B) siguen pendientes según su registro anterior. Este avance no los revalida ni declara cerrado ese gate.
+En el boundary histórico de esta nota estaban pendientes CI, cloud y el cierre final de Fase 2B; PR 113 liberó después Fase 3 y verificó landing/catálogo/detalle en producción, y el source F9 final pasó su CI de release. Esta evidencia posterior no borra fallos históricos ni se atribuye al trabajo anterior. Mantener la reserva del gate Fase 2B hasta que la auditoría de trazabilidad determine si existe evidencia independiente suficiente.
 
 ## FASE 3 — REGISTRO DE INTERESADOS (SIN PAGO)
 
@@ -709,7 +709,7 @@ Las correcciones C1/C2/C3 quedaron liberadas mediante PR 228. Cancelación/repro
 
 CI de master PR 235 (`37573738321`) pasó 343 unit, 139 integration y full E2E 132/132, sin flakes reportados.
 
-El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PR 230 integró dominio, aplicación, repositorio Drizzle, loader/HTTP helpers y migration 0020; PR 232 integró cuatro páginas Astro ADMIN/INSTRUCTOR de curso/grupo y los componentes de esquema/notas, historial y roster. PR 235 liberó Fase 7 a `master` como `4afa4858c8279282a8d26ab4adfa7769e249432d` el 2026-10-07. Fase 7 queda cerrada dentro de su alcance; Fase 8 y Fase 9 siguen pendientes.
+El contrato aprobado se mantiene en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PR 230 integró dominio, aplicación, repositorio Drizzle, loader/HTTP helpers y migration 0020; PR 232 integró cuatro páginas Astro ADMIN/INSTRUCTOR de curso/grupo y los componentes de esquema/notas, historial y roster. PR 235 liberó Fase 7 a `master` como `4afa4858c8279282a8d26ab4adfa7769e249432d` el 2026-10-07. En ese boundary, Fase 7 quedaba cerrada y Fases 8/9 seguían pendientes; ambas se completaron/liberaron después según sus secciones posteriores.
 
 Migration 0020 se aplicó al Supabase local canónico y a cloud; los ledgers verificados quedaron en 21. La operación local preservó datos previos e idempotencia; la verificación cloud fue de solo lectura posterior y no incluyó comparación de hashes pre/post de todas las filas. El inventario cloud, la discrepancia histórica de marcas de instructor y sus límites están en [`DEPLOYMENT.md`](DEPLOYMENT.md). No se añadió seed de evaluaciones; las cinco tablas nuevas quedaron vacías y el demo financiero no contiene notas.
 
@@ -740,7 +740,7 @@ PR 279 validó provisioning Linux, outcomes de los 134 tests, aislamiento por ru
 
 ## FASE 8 — alcance aprobado, implementación y release (2026-10-08)
 
-El usuario aprobó un bloque acotado de correcciones administrativas y el alcance inicial de Fase 8, incluida la gestión multi-ADMIN con permisos iguales. Core de cierre, exports, UI/policy de cierre, backend/UI multi-ADMIN y el aislamiento test-only del fixture Google-only se integraron mediante PRs 280–287. Fase 8 se liberó a producción por PR 286 como `68c918119f2ec094ba7cc63b217efd2448480505`; el pipeline, integridad de datos y smoke anónimo constan abajo y en [`TESTING.md`](TESTING.md)/[`DEPLOYMENT.md`](DEPLOYMENT.md). Fase 9 (certificados) sigue sin iniciar.
+El usuario aprobó un bloque acotado de correcciones administrativas y el alcance inicial de Fase 8, incluida la gestión multi-ADMIN con permisos iguales. Core de cierre, exports, UI/policy de cierre, backend/UI multi-ADMIN y el aislamiento test-only del fixture Google-only se integraron mediante PRs 280–287. Fase 8 se liberó a producción por PR 286 como `68c918119f2ec094ba7cc63b217efd2448480505`; el pipeline, integridad de datos y smoke anónimo constan abajo y en [`TESTING.md`](TESTING.md)/[`DEPLOYMENT.md`](DEPLOYMENT.md). En ese boundary Fase 9 aún no estaba iniciada; su integración y release posteriores se registran en la sección vigente.
 
 ### Orden de entrega y reglas de trabajo
 
@@ -789,7 +789,7 @@ La migración normal de release llevó ledger canónico local y cloud de 21 a 23
 
 - Fase 8 se completó y liberó por PR 286; el CI rojo previo quedó corregido en fixtures E2E por PR 287 y el gate integrado pasó. No reabrir este milestone salvo un cambio de producto nuevo y aprobado.
 - Google OAuth real, recovery/entrega SMTP cloud y política de retención/anonymización no aprobada permanecen como temas separados; no bloquearon Fase 8.
-- En el boundary de este registro histórico, Fase 9 tenía implementación parcial en la línea local: backend y renderer en commits base, UI aún en `feat/certificate-interface` (`a450987`). Ese estado quedó supersedido por la integración posterior en PRs 294–298; ver la sección Fase 9 vigente abajo. El release productivo continúa pendiente.
+- En el boundary histórico de este registro, Fase 9 tenía implementación parcial en la línea local. Ese estado quedó supersedido por la integración de PRs 294–298 y release de PRs 299/301, cuyo estado vigente se registra en la sección Fase 9.
 - Las correcciones inline, atomic-row, participantes/preinscripción, roster/calendario, perfil, navegación y ajustes de tests F7 están liberadas mediante PR 278; los shards se integraron como PR 279. No volver a presentarlas como pendientes de diseño.
 - Reutilizar las suites existentes; no añadir E2E frágiles basadas en CSS/copy. QA UI manual con Playwright CLI en desktop/mobile, light/dark, tabla/lista, teclado, estados dirty/invalid/error y loading. Solo datos sintéticos aislados; ningún write de calificaciones a datasets canónicos.
 - Para releases de futuras fases, ejecutar formatter, lint, typecheck, unit, integration, E2E y build; registrar flakiness/resultados por separado y exigir checks remotos green. No aceptar retries silenciosos ni reruns que oculten fallos. La autorización de omitir una aprobación administrativa no omite CI ni altera branch protections.
@@ -832,7 +832,7 @@ El workflow protegido ejecutó PLAN `37854318652` y APPLY `37854790028` sobre el
 
 El alcance funcional Fase 9 fue aprobado en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y ADR-028. Su implementación se integró en `development` mediante PR 294 (CORE), PR 297 (UI) y PR 298 (extensión de seed F9); PR 295 (búsqueda/resultados) y PR 296 (calendario) también forman parte de la fuente combinada. El CI integrado de Fase 9 está registrado más abajo. El seed F1–F8 original no se reescribe ni se convierte en un seed F9; la extensión F9 es explícita y opt-in. Las decisiones de negocio sobre tipo, elegibilidad, privacidad, reapertura/reemplazo y verificación están resueltas; no se agrega número institucional ni boleta/valorado/condición financiera. Mantener inmutables los snapshots F8.
 
-El UI que antes se documentaba en `feat/certificate-interface` (`a450987`) se integró a `development` con PR 297. La UI y el seed F9 son ahora parte de la implementación integrada; el candidato todavía no está liberado a `master` y no está disponible por este hecho en producción.
+En el boundary previo al release, el UI que antes se documentaba en `feat/certificate-interface` (`a450987`) acababa de integrarse en `development` por PR 297; la UI y el seed F9 quedaron después liberados por PR 299/301. Esta nota es histórica y está supersedida por el estado post-release de Fase 9 abajo.
 
 ### Objetivos
 
@@ -849,27 +849,31 @@ Administración completa el cierre administrativo y académico.
 
 ## FASE 9 — CERTIFICADOS
 
-### Implementación integrada en development — release pendiente
+### Implementación y release de Fase 9
 
-CORE (PR 294), UI (PR 297), extensión de seed opt-in (PR 298), búsqueda/resultados (PR 295) y calendario (PR 296) están integrados en `development`. Incluyen dominio/aplicación/repositorios, schema y migración candidata 0023, renderer PDF/QR, assets, rutas privadas ADMIN/INSTRUCTOR, configuración, ciclo de carga/revisión/emisión/revocación/reemplazo, descargas autenticadas, lookup/verificación pública y comparación local SHA-256. La integración de código no equivale a release: `master` continúa en `2789d55`, con ledger conocido 23; la migración 0023 de certificados no se ha aplicado a canónico/cloud y no hay captura nueva del estado actual de datos productivos.
+CORE (PR 294), UI (PR 297), extensión de seed opt-in (PR 298), búsqueda/resultados (PR 295) y calendario (PR 296) se liberaron por PR 299 a `master`; PR 300 y su fix de origen local se integraron en PR 301. `master` quedó en `dc55620df325c69dfce0b3661527a1049e392fe5`. La migración 0023 se aplicó y Vercel terminó `READY`; la operación cloud de demo protegida se ejecutó aparte. El release F9 y su evidencia sintética están documentados en [`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-La interfaz no cambia reglas aprobadas ni autoriza generación desde versiones no vigentes, no revoca automáticamente al reabrir un grupo y no valida criptográficamente firmas manuscritas. La demo F9, cuando se autorice después del release, usa documentos marcados `[DEMO - SIN FIRMA INSTITUCIONAL]`; no representa firmas físicas reales.
+La interfaz no cambia reglas aprobadas ni autoriza generación desde versiones no vigentes, no revoca automáticamente al reabrir un grupo y no valida criptográficamente firmas manuscritas. La demo F9 protegida ya ejecutada usa documentos marcados `[DEMO - SIN FIRMA INSTITUCIONAL]`; no representa firmas físicas reales.
 
 - [x] Conectar la página ADMIN de certificados, los enlaces de grupo y los ajustes de certificados a los handlers existentes.
 - [x] Conectar el detalle readonly histórico de instructor y las descargas PDF privadas.
 - [x] Conectar página/formulario de verificación pública con proyección acotada y sin descarga anónima de PDF.
 - [x] Añadir cálculo SHA-256 en navegador para comparar un archivo elegido localmente, sin transmitir el archivo para ese cálculo.
 - [x] Integrar CORE, UI y la extensión de demo F9 opt-in en `development`, con las suites unitarias, de integración y E2E correspondientes.
-- [ ] Liberar el HEAD combinado a `master` por el flujo normal de PR y CI protegido; aplicar la migración 0023 y desplegar solo después de que el CI requerido esté verde.
-- [ ] Tras el release y deployment READY del mismo SHA, revisar PLAN y autorizar por separado la operación F9 protegida si se desea poblar demos; no ejecutar automáticamente ni durante CI/deploy.
+- [x] Liberar el HEAD combinado a `master` por el flujo normal de PR y CI protegido; aplicar la migración 0023 y desplegar tras superar el CI requerido.
+- [x] Ejecutar por separado la operación F9 protegida en cloud tras release y deployment READY; la operación no forma parte de CI/deploy.
+- [x] Reconstruir la instancia Supabase local canónica con reset expresamente autorizado por el usuario, dado el origen/hash no identificados del ledger anterior (0003/0005/0008); reaplicar el source completo hasta ledger 24. Los datos previos quedaron reemplazados, no preservados. El demo validado y los límites están en [`TESTING.md`](TESTING.md).
+- [x] Preparar el proyecto aislado `skillbase_demo_f9_clean_20261009` (API 60421, DB 60422) como fallback; su app permanece pausada y no es la instancia del demo principal.
+- [ ] Verificar login real con cuenta interna preaprovisionada y autorizada. La identidad previa vinculada a Google se eliminó durante el reset local autorizado; no crear ni elevar un ADMIN por conveniencia. El usuario/operador debe coordinar la invitación/cuenta de prueba y OAuth antes de declarar login end-to-end completo.
+- [x] El operador reportó pausar la app previa durante la operación local e iniciar de nuevo Bun en `127.0.0.1:4321`; no se capturó el PID del proceso Bun y no se afirma quién posee hoy el puerto. La instancia Supabase local reconstruida usa API 54321/DB 55322; el ajuste de puerto es local y no constituye un cambio de código/release. No modificar `source.env` ni volver a conectar al proyecto fallback por error.
 
 Límites relevantes de la interfaz actual: no se inventan un instante público de emisión ni un enlace/ID de reemplazo ausentes del DTO; la verificación presenta la fecha nominal de finalización definida por el contrato. El índice global histórico de instructores no existe; la navegación disponible es por grupo y acceso directo autorizado. El archivo elegido para comparar SHA-256 no se transmite ni persiste. Los fixtures PDF sintéticos de QA no representan documentos institucionales firmados. Reglas aprobadas, seguridad y evidencia están en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md), [`CERTIFICATES.md`](CERTIFICATES.md), [`DESIGN.md`](DESIGN.md) y [`TESTING.md`](TESTING.md).
 
 #### Gate integrado F9 en development
 
-El source combinado `767ac8b7d5667f1a15df91c68ef2095dff1cd638` pasó CI `37987296020`, intento 1. Quality/build, cleanup y agregador terminaron PASS; unit: 463 tests / 4,031 assertions; integración: 177 / 1,452; integración focal F8 seed: 1 / 897; integración focal F9 seed: 1 / 1,142; E2E: 145 escenarios (76 + 69), todos first-pass, sin fallos, flakes, retries ni skips reportados. Los stacks de F8 seed, F9 seed, producto e integración/E2E fueron independientes; cada runner focal se ejecutó una sola vez y la suite combinada local no se duplicó. Ver [`TESTING.md`](TESTING.md) para evidencia y límites.
+CI integrado de PR 298 (`37987296020`) pasó first-pass: 463 unit/4,031 assertions, 177 integration/1,452, seed F8 1/897, seed F9 1/142 y 145 E2E (76+69). Para PR 299, el CI del PR fue `37990141523` y el CI del source liberado a `master` fue `37992346935` (runs distintos); el gate master reportó los resultados combinados registrados en [`TESTING.md`](TESTING.md). El fix final de PR 301 (`dc55620df325c69dfce0b3661527a1049e392fe5`) pasó sus gates; CI `37996321902` reportó 464 unit/4,033 assertions, 177 integration/1,452, F8 seed 1/897, F9 seed 1/142, 145 E2E (76+69), quality/build y typecheck 0 errores/0 warnings (354 hints), todo first-pass. Los CI de release `37994666141`, `37995487281` y `37996321902` terminaron en intento 1. No se ocultan resultados de intentos anteriores o fallos históricos del historial E2E; esta sección afirma solo los resultados de estos runs. Detalle y límites cloud están en [`TESTING.md`](TESTING.md).
 
-La migración candidata `drizzle/0023_phase9_certificates.sql` corresponde a la entrada journal `idx: 23`, timestamp `1791500766703`, SHA-256 `4c78ed1735b0cd3cb34d2bdc5f1f2c0d15b51dcc31568136839d706649489ee1`; su aplicación normal llevaría el ledger de 23 a 24. En este boundary de documentación no se aplicó en el Supabase canónico ni cloud. `master` sigue en `2789d55`; la evidencia F8 de producción previa no es un inventario fresco ni acredita salud actual, aplicación F9, preservación post-migración F9 o firma institucional. No iniciar un release documental independiente: la documentación acompaña el PR de código combinado.
+La migración `drizzle/0023_phase9_certificates.sql` corresponde a journal `idx: 23`, timestamp `1791500766703`, SHA-256 `4c78ed1735b0cd3cb34d2bdc5f1f2c0d15b51dcc31568136839d706649489ee1`; se aplicó normalmente y el ledger cloud avanzó de 23 a 24. Para el estado operativo y los límites de verificación posteriores al release, consultar [`DEPLOYMENT.md`](DEPLOYMENT.md) y [`TESTING.md`](TESTING.md). Los documentos describen la demo F9 como sintética; no acredita firmas físicas ni uso institucional real.
 
 ### Objetivos
 
@@ -888,24 +892,99 @@ La migración candidata `drizzle/0023_phase9_certificates.sql` corresponde a la 
 
 Un tercero puede verificar un certificado real mediante una URL pública.
 
-## FASE 10 — REPORTES, HARDENING Y CALIDAD
+## FASE 10 — CIERRE FUNCIONAL Y CALIDAD
 
-### Objetivos
+La fase se separa en 10A (cierre funcional) y 10B (calidad integral). Los tests
+unitarios, de integración y E2E siguen acompañando a cada cambio funcional de
+10A; 10B agrega la revisión/regresión global y no posterga la cobertura hasta el
+final. En esta actualización documental no se inicia implementación ni cambio de
+UI.
 
-- Reportes requeridos.
-- Auditoría.
-- Revisión de seguridad.
-- Revisión de accesibilidad.
-- Revisión responsive.
-- Performance.
-- Estados vacíos y loading.
-- Validación completa de archivos.
-- Limpieza de deuda técnica.
-- Pruebas de regresión.
+### FASE 10A — CIERRE FUNCIONAL
+
+#### Estado y auditoría de alcance
+
+10A está autorizada como siguiente etapa, pero no iniciada por este trabajo
+documental. Antes de implementar funcionalidades, auditar los requisitos
+aprobados de F0–F9 contra el source liberado, tests/evidencia y estado productivo.
+Para cada flujo, distinguir: **implementado y evidenciado**, **implementado sin
+verificación suficiente**, **parcial/defecto funcional**, **no probado** y
+**requisito/alcance no aprobado**. Citar evidencia actual por fuente; no marcar
+fase completa únicamente por checks históricos, ni convertir un supuesto en un
+requisito.
+
+| Tema          | Estado verificable ahora                                                                                                                                                                                                                                                                                                                         | Tratamiento en 10A                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| F0–F8         | Implementación/releases se registran por fase en este plan y sus referencias; esta revisión documental no repite sus gates ni certifica todos los criterios de forma independiente.                                                                                                                                                              | Trazar los requisitos aprobados y la evidencia vigente, no marcar cierres por herencia.                  |
+| Fase 2B       | El gate separado no tiene un cierre independiente acreditado aquí. PR 113 reportó CI `36828194127` (integration 65/65, E2E 96/96) y smoke productivo de landing, catálogo/detalle 200; F9 CI posterior también da evidencia de regresión. Esto no borra el histórico 81/82 más prueba dirigida 4/4 ni cierra retroactivamente todo el checklist. | Auditoría documental no bloqueante de criterios/evidencia faltantes; sin falsificar el estado histórico. |
+| F9 cloud      | Release/master, migración y seed protegido ejecutados; límites de hash PDF privado y firma se mantienen.                                                                                                                                                                                                                                         | No modificar UI/funcionalidad F9 sin indicación explícita posterior del usuario.                         |
+| Demo local F9 | Dataset reconstruido verificado; Google OAuth solo alcanzó redirect/página del proveedor, sin consentimiento/callback/sesión completa. Recovery E2E no reportado.                                                                                                                                                                                | Completar aceptación real OAuth y recovery local/producción con coordinación del usuario.                |
+| Reportes      | Concepto, actores y contenido no aprobados; requisito abierto, no funcionalidad autorizada.                                                                                                                                                                                                                                                      | Seguimiento aparte; no bloquea los flujos ya aprobados ni 10A.                                           |
+| Evidencia     | Algunos checks de cierres antiguos (incluidos F2B 325–326) describen boundaries históricos, no ejecuciones actuales.                                                                                                                                                                                                                             | Mantener referencias y límites; no marcar como nuevos resultados ni esconder fallos previos.             |
+
+La reserva histórica del gate original de Fase 2B (checks 325–326 y resultados
+E2E descritos arriba) se mantiene explícita: releases posteriores respaldan
+disponibilidad/regresión de catálogo y detalle, pero no borran fallos históricos
+ni demuestran retroactivamente cada criterio de ese gate.
+
+#### Trabajo funcional aprobado
+
+- [ ] Completar una matriz requisito → flujo/source → tests → evidencia actual y
+      resolver gaps funcionales de requisitos que ya estén aprobados. Cada corrección
+      funcional agrega o actualiza tests relevantes y conserva autorización,
+      persistencia, ownership y recuperación según su requisito.
+- [ ] Ejecutar aceptación end-to-end de Google OAuth real y recovery de Auth en
+      ambiente local y producción, coordinando con el usuario las cuentas legítimas,
+      invitaciones/roles, autorización OAuth y correo de prueba. No automatizar
+      consentimiento ni acceder al perfil real del usuario. No crear/elevar ADMIN
+      por conveniencia, no usar un flujo falso como evidencia E2E y no resetear datos
+      de producción. Ningún envío real se hace sin coordinación/autorización expresa.
+- [ ] Antes de implementar cualquier reporte, aclarar su objetivo, usuarios/roles,
+      tipos de consulta, campos/datos, filtros y formato. La nota de [`REQUIREMENTS.md`](REQUIREMENTS.md)
+      presenta solo una propuesta de conversación no aprobada: consultas/resúmenes
+      operativos sobre información existente, quizá listados/subtotales/filtros y
+      exportación opcional. No inferir dashboards, analytics, CSV/PDF, nuevos
+      permisos o un módulo; preferir reutilizar pantallas actuales si satisfacen la
+      necesidad. La definición del reporte es seguimiento no bloqueante mientras no
+      sea solicitada/aprobada.
+- [ ] No iniciar correcciones/rediseño funcional o visual de F9 a partir de una
+      valoración general de la UI. Quedan en espera de indicación posterior del
+      usuario sobre secciones y problemas concretos; no forman ahora un backlog
+      aprobado ni bloquean 10A.
+
+#### Gate 10A
+
+Cerrar 10A cuando los flujos críticos de requisitos aprobados estén trazados y
+funcionalmente verificados, los gaps aprobados se corrijan con cobertura
+pertinente o se difieran con aprobación explícita, y la aceptación OAuth/recovery
+local y producción se complete con coordinación real. Los reportes no definidos
+y las correcciones F9 no indicadas no son criterios de aceptación inventados.
+Esta etapa no declara que cada fase histórica tenga un gate original reconstruido
+si falta evidencia independiente.
+
+### FASE 10B — CALIDAD INTEGRAL
+
+Inicia después del gate funcional 10A. Incluye revisión global de seguridad y
+trust boundaries, accesibilidad, responsive, performance, estados loading/empty/
+error/success, validaciones de archivos contra requisitos reales, deuda técnica y
+regresión del sistema. No amplía por sí sola el alcance funcional ni añade
+validaciones/políticas de archivos arbitrarias.
+
+- [ ] Revisar seguridad, privacidad, permisos server-side y trust boundaries en
+      el source completo, incluyendo carga/descarga de archivos.
+- [ ] Auditar accesibilidad de teclado/semántica/foco, comportamiento responsive
+      y rendimiento de flujos relevantes.
+- [ ] Verificar estados vacíos, loading, éxito/error y recuperación en recorridos
+      críticos, sin sustituir pruebas de comportamiento por revisión visual.
+- [ ] Ejecutar regresión global de formatter, lint, typecheck, unit, integration,
+      E2E y build; exigir CI requerido first-pass antes de un release candidate,
+      registrar fallos/retries/flakiness sin ocultarlos y conservar la evidencia.
 
 ### Resultado demostrable
 
-Release candidate listo para adopción.
+Release candidate con flujos funcionales aprobados cerrados (10A) y revisión
+integral de calidad/regresión terminada (10B), con evidencia trazable y límites
+de verificación explícitos.
 
 ## REGLA DE AVANCE
 
