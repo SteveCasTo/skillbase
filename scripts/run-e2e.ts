@@ -2,6 +2,7 @@ import { assertE2ePortAvailable, runWithTestStack } from "./test-stack";
 import { resolve } from "node:path";
 
 const started = Date.now();
+process.env.E2E_TEST_CLOCK_CONTROL = "1";
 await assertE2ePortAvailable();
 const exitCode = await runWithTestStack([
   process.execPath,
