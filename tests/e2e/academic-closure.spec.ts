@@ -213,10 +213,11 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
   context,
 }) => {
   const fixture = await createAttendanceFlowFixture("2020-05-04");
-  await signInFixture(context, AUTH_FIXTURES.admin.email);
   const base = basePath(fixture.historyCourseId, fixture.historyGroupId),
     path = `${base}/cierre`;
   try {
+    await context.clock.setFixedTime(fixture.now);
+    await signInFixture(context, AUTH_FIXTURES.admin.email);
     const participant = await exportParticipant(fixture);
     await page.goto(path);
     await expect(
@@ -282,6 +283,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     );
     const anonymous = await context.browser()!.newContext();
     try {
+      await anonymous.clock.setFixedTime(fixture.now);
       const denied = await anonymous.request.get(`${path}/1/planilla.pdf`, {
         maxRedirects: 0,
       });
@@ -352,20 +354,23 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
       page.getByRole("button", { name: /Cerrar grupo|Confirmar reapertura/ }),
     ).toHaveCount(0);
   } finally {
-    const state = await read(page, path);
-    if (state.status === "CLOSED")
-      expect(
-        (
-          await command(
-            page,
-            path,
-            "reopen",
-            state.revision,
-            "Limpieza de fixture aislado",
-          )
-        ).status(),
-      ).toBe(200);
-    await fixture.close();
+    try {
+      const state = await read(page, path);
+      if (state.status === "CLOSED")
+        expect(
+          (
+            await command(
+              page,
+              path,
+              "reopen",
+              state.revision,
+              "Limpieza de fixture aislado",
+            )
+          ).status(),
+        ).toBe(200);
+    } finally {
+      await fixture.close();
+    }
   }
 });
 
@@ -375,11 +380,17 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
   browser,
 }) => {
   const fixture = await createAttendanceFlowFixture("2020-05-04", true);
-  const adminContext = await browser.newContext();
-  await signInFixture(adminContext, AUTH_FIXTURES.admin.email);
-  const admin = await adminContext.newPage();
+  let adminContext: Awaited<ReturnType<typeof browser.newContext>> | undefined;
+  let admin!: Page;
+  let adminReady = false;
   const adminPath = `${basePath(fixture.historyCourseId, fixture.historyGroupId)}/cierre`;
   try {
+    await context.clock.setFixedTime(fixture.now);
+    adminContext = await browser.newContext();
+    await adminContext.clock.setFixedTime(fixture.now);
+    await signInFixture(adminContext, AUTH_FIXTURES.admin.email);
+    admin = await adminContext.newPage();
+    adminReady = true;
     await exportParticipant(fixture);
     const prepared = await prepare(admin, fixture, 8);
     const adminReport = (await read(admin, adminPath)).provisional!;
@@ -498,21 +509,29 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
         .where(eq(users.id, fixture.instructorId));
     }
   } finally {
-    const state = await read(admin, adminPath);
-    if (state.status === "CLOSED")
-      expect(
-        (
-          await command(
-            admin,
-            adminPath,
-            "reopen",
-            state.revision,
-            "Limpieza de fixture aislado",
-          )
-        ).status(),
-      ).toBe(200);
-    await adminContext.close();
-    await fixture.close();
+    try {
+      if (adminContext && adminReady) {
+        const state = await read(admin, adminPath);
+        if (state.status === "CLOSED")
+          expect(
+            (
+              await command(
+                admin,
+                adminPath,
+                "reopen",
+                state.revision,
+                "Limpieza de fixture aislado",
+              )
+            ).status(),
+          ).toBe(200);
+      }
+    } finally {
+      try {
+        await adminContext?.close();
+      } finally {
+        await fixture.close();
+      }
+    }
   }
 });
 
@@ -520,11 +539,14 @@ test("HTML without JavaScript retains server validation and supports closing and
   browser,
 }) => {
   const fixture = await createAttendanceFlowFixture("2020-05-04");
-  const context = await browser.newContext({ javaScriptEnabled: false });
-  await signInFixture(context, AUTH_FIXTURES.admin.email);
-  const page = await context.newPage();
+  let context: Awaited<ReturnType<typeof browser.newContext>> | undefined;
+  let page!: Page;
   const path = `${basePath(fixture.historyCourseId, fixture.historyGroupId)}/cierre`;
   try {
+    context = await browser.newContext({ javaScriptEnabled: false });
+    await context.clock.setFixedTime(fixture.now);
+    await signInFixture(context, AUTH_FIXTURES.admin.email);
+    page = await context.newPage();
     const participant = await exportParticipant(fixture);
     await prepare(page, fixture);
     await page.goto(path);
@@ -580,20 +602,26 @@ test("HTML without JavaScript retains server validation and supports closing and
       ).status(),
     ).toBe(404);
   } finally {
-    const state = await read(page, path);
-    if (state.status === "CLOSED")
-      expect(
-        (
-          await command(
-            page,
-            path,
-            "reopen",
-            state.revision,
-            "Limpieza de fixture aislado",
-          )
-        ).status(),
-      ).toBe(200);
-    await context.close();
-    await fixture.close();
+    try {
+      const state = await read(page, path);
+      if (state.status === "CLOSED")
+        expect(
+          (
+            await command(
+              page,
+              path,
+              "reopen",
+              state.revision,
+              "Limpieza de fixture aislado",
+            )
+          ).status(),
+        ).toBe(200);
+    } finally {
+      try {
+        await context?.close();
+      } finally {
+        await fixture.close();
+      }
+    }
   }
 });
