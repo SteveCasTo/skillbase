@@ -46,26 +46,51 @@ export async function createAttendanceFlowFixture(
   const groupsToCancel: { id: string; updatedAt: Date }[] = [];
   const groups = new DrizzleGroupRepository(db);
   let closed = false;
+  let databaseClosed = false;
   async function cleanup() {
     // Archive first so a partially-created course is not exposed as an offer;
-    // cancel its tracked groups through the repository to release reservations.
-    for (const id of courseIds)
-      await db
-        .update(schema.courses)
-        .set({ status: "ARCHIVED" })
-        .where(eq(schema.courses.id, id));
-    for (const group of groupsToCancel)
-      await groups.cancel(group.id, admin!.id, group.updatedAt);
+    // cancel every tracked group through the repository to release reservations.
+    const failures: unknown[] = [];
+    for (const id of courseIds) {
+      try {
+        await db
+          .update(schema.courses)
+          .set({ status: "ARCHIVED" })
+          .where(eq(schema.courses.id, id));
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    for (const group of groupsToCancel) {
+      try {
+        await groups.cancel(group.id, admin!.id, group.updatedAt);
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (failures.length)
+      throw new AggregateError(failures, "Attendance fixture cleanup failed");
   }
   async function close() {
     if (closed) return;
-    closed = true;
+    const failures: unknown[] = [];
     try {
       await cleanup();
-    } finally {
-      await database.close();
-      testHooks.afterDatabaseClosed?.();
+    } catch (error) {
+      failures.push(error);
     }
+    if (!databaseClosed) {
+      try {
+        await database.close();
+        databaseClosed = true;
+        testHooks.afterDatabaseClosed?.();
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (failures.length)
+      throw new AggregateError(failures, "Attendance fixture close failed");
+    closed = true;
   }
   try {
     const clock = new Date("2020-01-01T12:00:00.000Z");
