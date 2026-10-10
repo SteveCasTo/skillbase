@@ -944,16 +944,16 @@ implementación; preferir reutilizar superficies existentes cuando proceda.
 ### Verificación y cierre
 
 - [ ] Completar auditoría/correcciones de feedback Sileo transversal conforme al
-  bloque aprobado, incluida la sección de login.
+      bloque aprobado, incluida la sección de login.
 - [ ] Medir y registrar baseline Lighthouse reproducible de landing; después
-  aplicar optimizaciones respaldadas por medición, incluyendo WebP solo si no
-  reduce perceptiblemente la calidad.
+      aplicar optimizaciones respaldadas por medición, incluyendo WebP solo si no
+      reduce perceptiblemente la calidad.
 - [ ] Completar auditoría de seguridad y entregar reporte de hallazgos, sin
-  aplicar remediaciones bajo esta autorización.
+      aplicar remediaciones bajo esta autorización.
 - [ ] Coordinar y realizar la verificación de Google OAuth real y recovery ya
-  pendientes, sin declarar éxito hasta tener evidencia del flujo completo.
+      pendientes, sin declarar éxito hasta tener evidencia del flujo completo.
 - [ ] Mantener el rediseño específico F9 en espera; el trabajo transversal de
-  Sileo sí incluye F9.
+      Sileo sí incluye F9.
 
 El cierre de Fase 10 requiere evidencia de los bloques aprobados y sus límites.
 No requiere implementar las propuestas funcionales pendientes ni corregir
