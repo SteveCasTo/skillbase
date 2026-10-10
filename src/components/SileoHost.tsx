@@ -10,22 +10,41 @@ import {
 import { currentTheme, type Theme } from "@/lib/theme";
 
 const toastOptions = { fill: "var(--card)" };
+const noticeFocusReturn = new WeakMap<HTMLElement, HTMLElement>();
+
+function dismissNotice(toast: HTMLElement) {
+  if (toast.dataset.state === "loading") return;
+  const id = toast.dataset.sileoId;
+  if (id) {
+    notifications.dismiss(id);
+    const previous = noticeFocusReturn.get(toast);
+    if (toast.contains(document.activeElement) && previous?.isConnected)
+      previous.focus({ preventScroll: true });
+  }
+}
 
 export function SileoHost() {
   const [theme, setTheme] = useState<Theme>("system");
   const [mounted, setMounted] = useState(false);
-  const [modal, setModal] = useState<HTMLDialogElement | null>(null);
+  const [modal, setModal] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     // A native modal is in the browser top layer; no z-index can place a body
     // toast above it, and body siblings become inert. Portal the single host
     // into the active modal so pending feedback remains visible and focusable.
     const syncModal = () =>
-      setModal(document.querySelector<HTMLDialogElement>("dialog:modal"));
+      setModal(
+        [
+          ...document.querySelectorAll<HTMLElement>(
+            'dialog:modal, [data-slot="dialog-content"][data-state="open"]',
+          ),
+        ].at(-1) ?? null,
+      );
     const observer = new MutationObserver(syncModal);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["open"],
+      attributeFilter: ["open", "data-state"],
+      childList: true,
       subtree: true,
     });
     document.addEventListener("astro:after-swap", syncModal);
@@ -41,8 +60,8 @@ export function SileoHost() {
   }, [mounted]);
 
   useEffect(() => {
-    // Sileo 0.1.5 supports pointer swipes but its toast button has no keyboard
-    // activation. Limit dismissal to a focused notice, never steal dialog Escape.
+    // The patched notice is a focusable group containing an optional CTA.
+    // Limit dismissal to that group, never steal CTA activation or dialog Escape.
     const dismissFocusedNotices = (event: KeyboardEvent) => {
       if (event.key !== "Escape" && event.key !== "Enter" && event.key !== " ")
         return;
@@ -52,7 +71,7 @@ export function SileoHost() {
       )
         return;
       event.preventDefault();
-      notifications.clear();
+      dismissNotice(event.target);
     };
     // The vendor expands descriptions and pauses expiry on hover only. Give
     // keyboard focus the same reading time/expansion, including older notices.
@@ -65,6 +84,11 @@ export function SileoHost() {
         toast.contains(event.relatedTarget)
       )
         return;
+      if (
+        event.type === "focusin" &&
+        event.relatedTarget instanceof HTMLElement
+      )
+        noticeFocusReturn.set(toast, event.relatedTarget);
       toast.dispatchEvent(
         new MouseEvent(event.type === "focusin" ? "mouseover" : "mouseout", {
           bubbles: true,
@@ -79,7 +103,7 @@ export function SileoHost() {
       )
         return;
       const toast = event.target.closest<HTMLElement>("[data-sileo-toast]");
-      if (toast && toast.dataset.state !== "loading") notifications.clear();
+      if (toast) dismissNotice(toast);
     };
     document.addEventListener("keydown", dismissFocusedNotices);
     document.addEventListener("focusin", focusNotice);

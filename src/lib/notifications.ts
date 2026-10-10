@@ -61,7 +61,8 @@ export type NotificationPromiseOptions<T> = Omit<
 
 function withId(
   options: NotificationOptions,
-  state: "success" | "error" | "warning" | "info" | "loading" = "info",
+  state:
+    "success" | "error" | "warning" | "info" | "loading" | "action" = "info",
 ): RuntimeNotificationOptions & Required<Pick<SileoOptions, "position">> {
   const titles = {
     success: "Operación completada",
@@ -69,6 +70,7 @@ function withId(
     warning: "Revisa esta información",
     info: "Información",
     loading: "Procesando…",
+    action: "Acción disponible",
   };
   // The vendor pill measures a single-line title, which can exceed the mobile
   // viewport. Put lengthy messages in its wrapping, automatically expanded body.
@@ -98,6 +100,8 @@ export const notifications = {
   info: (options: NotificationOptions) => sileo.info(withId(options, "info")),
   warning: (options: NotificationOptions) =>
     sileo.warning(withId(options, "warning")),
+  action: (options: NotificationOptions) =>
+    sileo.action(withId(options, "action")),
   loading: (options: NotificationOptions) =>
     sileo.show({
       ...withId(options, "loading"),
@@ -120,6 +124,21 @@ export const notifications = {
       ...rest,
       position: rest.position ?? loading.position,
       loading,
+      ...(rest.action
+        ? {
+            action: (value: T) =>
+              withId(
+                {
+                  position: rest.position ?? loading.position,
+                  ...(typeof rest.action === "function"
+                    ? rest.action(value)
+                    : rest.action),
+                  id: loading.id,
+                },
+                "action",
+              ),
+          }
+        : {}),
       success: (value: T) =>
         withId(
           {
