@@ -4,7 +4,8 @@
 
 Measured on 2026-10-10 UTC from `origin/development` base
 `f388327`, in the isolated `perf/landing-and-runtime-quality` worktree.
-No production requests, database changes, seeds, resets or stack restarts.
+The performance audit made no production requests, persistent database changes,
+seeds, resets or stack restarts.
 The existing application and local services were left running.
 
 - Official Lighthouse CLI **13.5.0**, installed ephemerally with `npx --yes lighthouse`.
@@ -166,3 +167,46 @@ were observed. Visual inspection confirmed preserved composition and artwork.
 - Managed integration/full E2E were not rerun locally: this image-only change
   makes no database/contract changes, and the canonical application port remains
   occupied by the existing application. Required remote CI is still a separate gate.
+
+## Existing E2E expectation correction
+
+CI run `38019669343` for PR 328 / `8c7d34b` failed six existing responsive
+viewport cases (320/390/667/768/1024/1440 px). The hero was loaded from the approved
+static AVIF variant, but `expectModernHeroArtDirection` still required the old
+`/_image` endpoint and its `f=avif|webp` query parameter. Those two transport
+expectations no longer describe the deliberately changed implementation.
+
+Only that existing helper in `tests/e2e/landing-responsive.spec.ts` was adjusted:
+strictly accept Cota Activa responsive AVIF/WebP filenames under the development
+`/@fs/.../assets/plates/optimized/` or production fingerprinted `/_astro/` path.
+The existing source-type checks and current-source membership in the appropriate
+mobile/desktop media group remain intact. The helper additionally requires
+successful decode, complete/nonzero intrinsic dimensions, the original mobile or
+desktop aspect ratio, decorative empty alt, eager loading and high fetch priority.
+It does not accept arbitrary image URLs or a visually broken successful request.
+
+No test case/spec/suite was added, skipped or removed; no retry, timeout, fixture,
+theme, notification or runtime-source change was made. This corrects obsolete
+implementation-specific expectations rather than concealing an image defect.
+Original Lighthouse evidence above remains unchanged because shipped code did
+not change during this correction.
+
+Focused verification ran once with the managed isolated test stack:
+
+```powershell
+$env:E2E_SERVER_PORT='4335'
+bun run test:e2e tests/e2e/landing-responsive.spec.ts --project=chromium
+```
+
+Result: **19/19 PASS**, including all six previously failing viewport cases,
+52.7 seconds, no retries. The runner created/migrated/seeded and cleaned its own
+temporary fixture stack; it did not use or reset the existing local database or
+application on 4321. Its startup log included Vite `transport was disconnected`
+messages, recorded rather than suppressed; all test cases nevertheless passed.
+This does not imply that all server logs were error-free or that a full E2E run
+passed. Evidence: `perf-evidence/landing-e2e-correction.log` outside Git.
+
+ESLint, touched-file Prettier, `git diff --check` and Astro typecheck passed again
+(0 errors, 0 warnings, 354 hints). Build/Lighthouse were not redundantly rerun for
+this test/documentation-only correction. The failed remote run remains historical
+evidence; the next push must still satisfy required remote CI before integration.
