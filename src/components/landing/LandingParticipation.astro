@@ -1,20 +1,11 @@
 ---
-import { getImage } from "astro:assets";
-
-import kantutaParticipation from "../../../assets/plates/kantuta-participation.png";
+import kantutaParticipation from "../../../assets/plates/optimized/kantuta-participation-1536.webp";
+import fallback from "../../../assets/plates/optimized/kantuta-participation-900.webp";
 import { responsiveSourceSet } from "./responsive-images";
 
 const widths = [280, 420, 640, 900, 1200, 1536] as const;
-const [avif, webp] = await Promise.all([
-  responsiveSourceSet(kantutaParticipation, widths, "avif", 52),
-  responsiveSourceSet(kantutaParticipation, widths, "webp", 82),
-]);
-const fallback = await getImage({
-  src: kantutaParticipation,
-  width: 900,
-  format: "webp",
-  quality: 82,
-});
+const avif = responsiveSourceSet(kantutaParticipation, widths, "avif");
+const webp = responsiveSourceSet(kantutaParticipation, widths, "webp");
 ---
 
 <section
