@@ -457,22 +457,21 @@ Preservación por filas, baseline/ledger, settings y dataset están en
 y cloud siguen en ledger 23; la migración candidata de certificados se prueba
 aislada en ledger 24 y requiere el gate/release F9 normal.
 
-## Fase 9 integrada en development — release a master pendiente
+## Gate combinado Fase 9 en development y boundary previo al release (histórico)
 
 La fuente F9 se integró en `development` por PR 294 (CORE), PR 297 (UI) y PR 298
 (seed opt-in); PRs 295/296 (búsqueda/resultados y calendario) están también en la
 fuente combinada. El source `767ac8b7d5667f1a15df91c68ef2095dff1cd638` pasó CI
 `37987296020`, attempt 1: 463 unit/4,031 assertions, 177 integration/1,452,
-fixtures F8 1/897 y F9 1/1,142; 145 E2E (76+69), first-pass, sin fallos, flakes,
+fixtures F8 1/897 y F9 1/142; 145 E2E (76+69), first-pass, sin fallos, flakes,
 retries o skips. Quality/build, cleanup y agregador PASS. Los runners focales F8
 y F9 corrieron una vez cada uno en stacks independientes; ver [`TESTING.md`](TESTING.md).
 
-Este resultado no es release. `master` permanece en `2789d55e93a97cc5344930e690e9feecc2cc10f5`,
-con ledger conocido 23. No se ha aplicado la migración de certificados ni se ha
-ejecutado el seed F9 en canónico/cloud. La captura productiva anterior del seed
-F1–F8 (72 tablas/899 filas originales; 1,850 filas al final de aquella operación)
-es histórica, no un inventario fresco. No declarar la salud actual de cloud ni
-usar esos conteos como baseline para una futura migración.
+Este gate de `development` es histórico y no representa el estado actual del
+release. El release final quedó en `dc55620df325c69dfce0b3661527a1049e392fe5`;
+la migración cloud y la operación protegida de demo están completadas abajo.
+
+La migración `drizzle/0023_phase9_certificates.sql` se aplicó en el release; la evidencia actual de ledger, preservación y demo sigue en esta sección. La descripción previa de candidata que sigue a continuación es histórica, no el estado vigente.
 
 La migración candidata `drizzle/0023_phase9_certificates.sql` corresponde a
 journal `idx: 23`, timestamp `1791500766703`, SHA-256
@@ -510,3 +509,56 @@ configuración existente incompatible bloquea la operación y requiere decisión
 ADMIN autorizada fuera de la demo. Los artefactos demo deben conservar el sello
 `[DEMO - SIN FIRMA INSTITUCIONAL]` en cada página: una revisión técnica no acredita
 firma física ni validez institucional.
+
+### Estado post-release (2026-10-09)
+
+El release vigente es `dc55620df325c69dfce0b3661527a1049e392fe5` (PR 301, tras PR
+299/300). Los CI `37994666141`, `37995487281` y `37996321902` pasaron en intento 1;
+Vercel `dpl_5HdL4F6exULUBmnBgPfq6sGjjW8S` está `READY` en
+`https://skillbase-alpha.vercel.app`. La migración 0023 quedó aplicada, ledger 24. La comparación pre/post de la migración cloud preservó por hashes completos
+las 1,850 filas originales de 72 tablas. El PLAN del demo F9 partió luego del
+baseline post-migración de 77 tablas/1,852 filas; APPLY preservó todos esos
+hashes y dejó 1,987 filas totales.
+
+La demo F9 cloud terminó mediante PLAN `37993861130` y APPLY `37994003423`; el
+rerun no modificó el dataset. Hay ocho registros de demo (2 generados, 2 en
+revisión, 2 emitidos, 1 revocado, 1 reemplazado). Sus páginas públicas responden
+200 y un PDF privado anónimo responde 303. Se verificó el hash de metadatos
+públicos; no se descargaron bytes privados para cotejar el hash del archivo.
+Esto no acredita firma manuscrita o validez institucional. Evidencia: carpeta
+`phase9-production-release-evidence/` (summary, logs `fix-origin-*` y outputs
+privados del workflow F9; evidencia de operador, no documentación versionada).
+
+La verificación local de migración sin reset que preservó 3,878 filas en 75
+tablas corresponde al estado previo y fue supersedida por un reset/reconstrucción
+que el usuario autorizó expresamente para recuperar migraciones locales con
+historial/hash no identificados (incluidas 0003/0005/0008). La reconstrucción
+aplicó el source completo hasta ledger 24; **no se afirma preservación** de las
+filas de la base anterior, que fueron reemplazadas. El demo reconstruido contiene
+8 cursos, 10 grupos, 25 participantes, 26 registros, 12 intereses y 8
+certificados. Las ocho páginas públicas responden 200; seis PDFs privados
+finales se verificaron con bytes SHA-256 y sello DEMO. La verificación no equivale
+a firma institucional.
+
+El Supabase canónico local reconstruido usa API `localhost:54321` y DB
+`localhost:55322`; `source.env` y secretos no se documentan. El operador reportó
+pausar el proceso que entonces identificó como PID 8204; es un dato histórico y
+no identifica al propietario actual del puerto. El nuevo `bun run dev` se
+relanzó en `http://127.0.0.1:4321`, pero no se capturó el PID del proceso Bun.
+La ruta de login responde HTTP 200, pero
+eso no demuestra autenticación completa. El entorno paralelo
+`skillbase_demo_f9_clean_20261009` (API `localhost:60421`, DB `60422`) se conserva
+como fallback y su app está pausada; no confundirlo con la base canónica local
+reconstruida ni con la demo cloud.
+
+La autenticación real local sigue abierta: el inicio del flujo devolvió 302 con
+callback `http://127.0.0.1:54321/auth/v1/callback` y la página de Google cargó
+200 sin error de redirect observado, pero no se completaron consentimiento,
+callback PKCE ni sesión autenticada. El usuario vinculado anteriormente a Google
+se perdió con el reset autorizado; una cuenta de prueba debe preaprovisionarse
+con invitación/rol legítimos, sin asignar ADMIN por defecto. Verificación manual
+de Google y recovery end-to-end local/cloud se coordinan con el usuario en Fase
+10A; no se hicieron envíos nuevos de correo como parte de esta actualización
+documental. El handoff de credenciales está en
+`Temp/opencode/skillbase-demo-access/original-local-f9-credentials.json`, ACL
+privada; no copiar secretos a Git/documentación.

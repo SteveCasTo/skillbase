@@ -385,8 +385,9 @@ Debe ser configurable.
 ## CERTIFICACIÓN
 
 El alcance aprobado de certificados de Fase 9 se especifica en
-[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). Está aprobado e
-implementado en `development`; el release productivo aún está pendiente.
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). Está implementado y
+liberado en producción; su operación de demo y límites de verificación se
+documentan en [`DEPLOYMENT.md`](DEPLOYMENT.md) y [`TESTING.md`](TESTING.md).
 
 ### RF-CER-001
 
@@ -556,11 +557,21 @@ Protección de datos personales.
 - requisitos académicos adicionales a la política de ausencias consecutivas aprobada para Fase 6, si se acuerdan para fases posteriores;
 - cuándo se consolida el descuento de auxiliares;
 - lista definitiva de auxiliares beneficiarios;
-- reportes administrativos exactos.
+- consultas/reportes administrativos aún por definir. Las siguientes son
+  propuestas de conversación, no requisitos aprobados ni autorización para
+  implementar: listas de participantes por grupo (solicitadas como necesarias,
+  pero con contenido y comportamiento por precisar); resumen por curso
+  (tentativo); vista general de pagos pendientes en laboratorio (tentativa); y
+  consulta de certificados por curso/grupo, con filtros por concretar. No se ha
+  aprobado formato de reporte/exportación, usuarios/roles adicionales ni un
+  módulo nuevo. Antes de implementar, aclarar objetivo, audiencia, datos, campos,
+  filtros y presentación; preferir reutilizar pantallas existentes cuando
+  satisfagan la necesidad.
 
 Tipos de certificado, elegibilidad, firmantes requeridos/posiciones, carga de
-PDF firmado, no-dependencia financiera y exclusión de la boleta física ya están
-resueltos para Fase 9; ver el contrato enlazado. Las cargas autorizadas F1–F8
-local/cloud se completaron y la implementación F9 se integró y pasó su CI
-combinado en `development`. El release a `master`, aplicación de migración y
-despliegue siguen pendientes; no se afirma operación F9 en producción.
+PDF firmado, no-dependencia financiera y exclusión de la boleta física están
+resueltos en el alcance aprobado de Fase 9; ver el contrato enlazado. F9 fue
+liberada a producción y su demo sintética cloud/local tiene resultados y límites
+documentados. La verificación pendiente de Auth y la definición de
+consultas/reportes están reflejadas en Fase 10 de [`PLAN.md`](PLAN.md); no añaden
+nuevas reglas de negocio a este documento.

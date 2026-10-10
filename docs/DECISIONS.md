@@ -811,7 +811,7 @@ asistencia y cambios de membresía.
 
 **Fecha:** 2026-10-08
 
-**Estado:** Accepted — alcance aprobado e implementación integrada en `development`; release pendiente
+**Estado:** Accepted — alcance aprobado, implementado y liberado a producción (PR 299/301)
 
 ### Contexto
 
@@ -873,12 +873,13 @@ los detalles de almacenamiento/ordinal que corresponderán al diseño técnico.
 - [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) es el detalle normativo
   del formato, procedencia, operación, privacidad y dependencias de
   implementación.
-- La carga autorizada F1–F8 local/cloud ya pasó sus gates y está documentada en
-  `DEMO_SEED.md`. La implementación F9 y el seed opt-in están integrados en
-  `development`; el CI completo del source combinado pasó. Su migración todavía
-  no se ha aplicado a canónico/cloud. El release, deployment y la operación
-  protegida de demo siguen pendientes. Persistir ordinal ADMIN-editable y
-  configuración/versiones de plantilla/assets sin modificar historia F8.
-- La aprobación del alcance y la integración en `development` no equivalen a
-  release, despliegue ni ejecución de seed productivo. Ver el estado vigente en
-  `PLAN.md`; el seed F9 requiere el flag opt-in y gates/proceso protegidos.
+- La carga autorizada F1–F8 local/cloud pasó los gates registrados en
+  `DEMO_SEED.md`. F9 se liberó mediante PR 299 y PR 301 como
+  `dc55620df325c69dfce0b3661527a1049e392fe5`; la migración se aplicó a cloud y
+  la operación protegida de demo se ejecutó separadamente. La fuente F8 y sus
+  snapshots no se modificaron. Evidencia y límites actuales están en
+  `PLAN.md`, `TESTING.md` y `DEPLOYMENT.md`.
+- El seed F9 conserva su carácter opt-in y sus gates/protecciones para
+  ejecuciones futuras. El release/demo sintético no prueba firma institucional,
+  ni cotejo de bytes privados cloud; esas limitaciones no modifican la decisión
+  de negocio aceptada.
