@@ -1,25 +1,25 @@
 ---
-import { getImage } from "astro:assets";
 import { ArrowRight } from "lucide-react";
 
-import cotaActivaDesktop from "../../../assets/plates/cota-activa-desktop.png";
-import cotaActivaMobile from "../../../assets/plates/cota-activa-mobile.png";
+import cotaActivaDesktop from "../../../assets/plates/optimized/cota-activa-desktop-1672.webp";
+import cotaActivaMobile from "../../../assets/plates/optimized/cota-activa-mobile-1198.webp";
 import { responsiveSourceSet } from "./responsive-images";
 
 const mobileWidths = [320, 480, 640, 960, 1198] as const;
 const desktopWidths = [640, 960, 1280, 1672] as const;
-const [mobileAvif, mobileWebp, desktopAvif, desktopWebp] = await Promise.all([
-  responsiveSourceSet(cotaActivaMobile, mobileWidths, "avif", 52),
-  responsiveSourceSet(cotaActivaMobile, mobileWidths, "webp", 82),
-  responsiveSourceSet(cotaActivaDesktop, desktopWidths, "avif", 52),
-  responsiveSourceSet(cotaActivaDesktop, desktopWidths, "webp", 82),
-]);
-const fallback = await getImage({
-  src: cotaActivaDesktop,
-  width: cotaActivaDesktop.width,
-  format: "webp",
-  quality: 82,
-});
+const mobileAvif = responsiveSourceSet(cotaActivaMobile, mobileWidths, "avif");
+const mobileWebp = responsiveSourceSet(cotaActivaMobile, mobileWidths, "webp");
+const desktopAvif = responsiveSourceSet(
+  cotaActivaDesktop,
+  desktopWidths,
+  "avif",
+);
+const desktopWebp = responsiveSourceSet(
+  cotaActivaDesktop,
+  desktopWidths,
+  "webp",
+);
+const fallback = cotaActivaDesktop;
 ---
 
 <section class="hero" aria-labelledby="hero-title">
