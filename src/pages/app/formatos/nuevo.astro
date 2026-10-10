@@ -305,14 +305,9 @@ const fields = [
                     );
                   await navigate("/app/formatos");
                 } catch (failure) {
-                  if (error) {
-                    error.textContent =
-                      failure instanceof Error
-                        ? failure.message
-                        : "No se pudo crear el formato.";
-                    error.hidden = false;
-                    error.focus();
-                  }
+                  form
+                    .querySelector<HTMLElement>('[aria-invalid="true"]')
+                    ?.focus();
                   throw failure;
                 } finally {
                   pending = false;
@@ -323,6 +318,8 @@ const fields = [
               {
                 loading: { title: "Creando formato…" },
                 success: { title: "Formato creado." },
+                isFieldFailure: () =>
+                  Boolean(form.querySelector("[data-async-error]")),
               },
             ).catch(() => {});
           });

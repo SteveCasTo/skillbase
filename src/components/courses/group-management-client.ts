@@ -293,8 +293,10 @@ function initializeGroupManagement() {
     message: string,
     recover?: () => Promise<void>,
     focus = true,
+    id?: string,
   ) => {
-    error.replaceChildren(document.createTextNode(message));
+    notifications.error({ ...(id ? { id } : {}), title: message });
+    error.replaceChildren();
     if (recover) {
       const button = document.createElement("button");
       button.type = "button";
@@ -319,9 +321,12 @@ function initializeGroupManagement() {
       });
       error.append(button);
     }
-    error.hidden = false;
+    error.hidden = !recover;
     error.tabIndex = -1;
-    if (focus) error.focus({ preventScroll: true });
+    if (focus)
+      error
+        .querySelector<HTMLButtonElement>("button")
+        ?.focus({ preventScroll: true });
   };
   const refresh = async (id: string) => {
     const key = id || "create";
@@ -607,14 +612,15 @@ function initializeGroupManagement() {
               }),
             )
             .catch((failure: unknown) => {
-              // Persistent field/recovery feedback owns errors: no duplicate toast.
-              notifications.dismiss(notificationId);
-              if (!invalidField)
+              if (invalidField) notifications.dismiss(notificationId);
+              else
                 showError(
                   failure instanceof Error
                     ? failure.message
                     : "No se pudo completar la acción. Reintenta o consulta los datos actuales.",
                   () => refresh(id),
+                  false,
+                  notificationId,
                 );
             })
             .finally(() => {

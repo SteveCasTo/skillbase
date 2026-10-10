@@ -1,0 +1,73 @@
+<script>
+  import { notifications } from "@/lib/notifications";
+
+  function initializeDownloads() {
+    document
+      .querySelectorAll<HTMLAnchorElement>("[data-feedback-download]")
+      .forEach((link) => {
+        if (link.dataset.downloadBound) return;
+        link.dataset.downloadBound = "true";
+        link.addEventListener("click", async (event) => {
+          // Preserve modified clicks and the no-JS href fallback.
+          if (
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+          )
+            return;
+          event.preventDefault();
+          if (link.dataset.pending) return;
+          link.dataset.pending = "true";
+          link.setAttribute("aria-disabled", "true");
+          link.setAttribute("aria-busy", "true");
+          try {
+            await notifications.promise(
+              async () => {
+                const response = await fetch(link.href, {
+                  credentials: "same-origin",
+                });
+                if (!response.ok || response.redirected)
+                  throw new Error(
+                    "La descarga no está disponible. Comprueba tu sesión y reintenta.",
+                  );
+                const type = response.headers.get("content-type") ?? "";
+                const filename = response.headers
+                  .get("content-disposition")
+                  ?.match(/filename="([^"\\/]+)"/u)?.[1];
+                if (!filename || !/^(application\/pdf|text\/csv)/u.test(type))
+                  throw new Error(
+                    "No se pudo confirmar el documento. Reintenta la descarga.",
+                  );
+                const url = URL.createObjectURL(await response.blob());
+                const download = document.createElement("a");
+                download.href = url;
+                download.download = filename;
+                download.click();
+                window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+              },
+              {
+                loading: { title: "Preparando descarga…" },
+                success: { title: "Descarga preparada." },
+                error: (failure: unknown) => ({
+                  title:
+                    failure instanceof Error
+                      ? failure.message
+                      : "No se pudo descargar el documento. Reintenta.",
+                }),
+              },
+            );
+          } catch {
+            // The promise reports failure; keep the original link available for retry.
+          } finally {
+            delete link.dataset.pending;
+            link.removeAttribute("aria-disabled");
+            link.removeAttribute("aria-busy");
+          }
+        });
+      });
+  }
+  initializeDownloads();
+  document.addEventListener("astro:page-load", initializeDownloads);
+</script>

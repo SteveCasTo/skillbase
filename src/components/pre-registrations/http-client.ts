@@ -447,9 +447,11 @@ function bindFilters() {
       history.replaceState(history.state, "", url);
       initializeRegistrationHttp();
     } catch {
-      if (token === generation && error)
-        error.textContent =
-          "No se pudo actualizar la lista. Conservamos los filtros; reintenta.";
+      if (token === generation)
+        notifications.error({
+          title:
+            "No se pudo actualizar la lista. Conservamos los filtros; reintenta.",
+        });
     } finally {
       if (token === generation) {
         region?.removeAttribute("aria-busy");
@@ -514,15 +516,12 @@ function bindExports() {
             const inline = document.querySelector<HTMLElement>(
               "[data-registration-page-error]",
             );
-            if (inline) {
-              inline.textContent = message;
-              notifications.dismiss(id);
-            } else
-              notifications.warning({
-                id,
-                title: "Exportación no disponible",
-                description: message,
-              });
+            if (inline) inline.textContent = "";
+            notifications.warning({
+              id,
+              title: "Exportación no disponible",
+              description: message,
+            });
             return;
           }
           const filename = response.headers
@@ -542,15 +541,12 @@ function bindExports() {
           const inline = document.querySelector<HTMLElement>(
             "[data-registration-page-error]",
           );
-          if (inline) {
-            inline.textContent = message;
-            notifications.dismiss(id);
-          } else
-            notifications.error({
-              id,
-              title: "Sin descarga",
-              description: message,
-            });
+          if (inline) inline.textContent = "";
+          notifications.error({
+            id,
+            title: "Sin descarga",
+            description: message,
+          });
         } finally {
           delete link.dataset.pending;
           link.removeAttribute("aria-disabled");

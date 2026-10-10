@@ -359,9 +359,13 @@ registrationTest.describe(() => {
       await page.route(interrupted, interruptPayment);
       await payment.getByRole("button", { name: "Registrar abono" }).click();
       await expect(
-        page.getByRole("button", {
-          name: /Sin confirmación.*Reintenta sin cambiar los datos/u,
-        }),
+        page
+          .locator(
+            '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+          )
+          .filter({
+            hasText: /Sin confirmación.*reintenta sin cambiar los datos/iu,
+          }),
       ).toBeVisible();
       await expect(payment.getByLabel("Importe (Bs)")).toHaveValue("0.01");
       await expect(payment.locator('[name="requestKey"]')).toHaveValue(

@@ -78,6 +78,7 @@ export default function PublicInterestForm({
   const nativeSelectRef = useRef<HTMLSelectElement>(null);
   const groupTriggerRef = useRef<HTMLButtonElement>(null);
   const submitting = useRef(false);
+  const notificationId = useRef<string | undefined>(undefined);
   const [hydrated, setHydrated] = useState(false);
   const [requiredValid, setRequiredValid] = useState(false);
   const [enhancedSelect, setEnhancedSelect] = useState(false);
@@ -100,7 +101,6 @@ export default function PublicInterestForm({
     hydrated &&
     !closed &&
     result?.ok === false &&
-    result.code === "SERVICE_UNAVAILABLE" &&
     Object.keys(issues).length === 0;
   const unavailablePreference =
     preferredGroupId !== "" &&
@@ -172,8 +172,16 @@ export default function PublicInterestForm({
 
   useEffect(() => {
     if (!transientFailure || result?.ok !== false) return;
-    notifications.error({
-      title: "No pudimos registrar tu interés",
+    const notify =
+      result.code === "RATE_LIMITED"
+        ? notifications.warning
+        : notifications.error;
+    notify({
+      ...(notificationId.current ? { id: notificationId.current } : {}),
+      title:
+        result.code === "RATE_LIMITED"
+          ? "Espera antes de reintentar"
+          : "No pudimos registrar tu interés",
       description: result.message,
     });
   }, [result, transientFailure]);
@@ -184,10 +192,13 @@ export default function PublicInterestForm({
         document.querySelector<HTMLAnchorElement>(".interest-anchor");
       if (anchor) anchor.hidden = true;
     }
+    if (closed && notificationId.current)
+      notifications.dismiss(notificationId.current);
     if (succeeded) {
       // A transient notification must never turn an accepted request into an error.
       try {
         notifications.success({
+          ...(notificationId.current ? { id: notificationId.current } : {}),
           title: "Gracias por tu interés",
           duration: 6000,
         });
@@ -233,6 +244,11 @@ export default function PublicInterestForm({
       if (typeof value === "string") body.append(key, value);
     });
     submitting.current = true;
+    notificationId.current = crypto.randomUUID();
+    notifications.loading({
+      id: notificationId.current,
+      title: "Registrando tu interés…",
+    });
     setPending(true);
     setResult(undefined);
     try {
@@ -256,6 +272,8 @@ export default function PublicInterestForm({
         setPreferredGroupId("");
       }
       setResult(payload);
+      if (!payload.ok && Object.keys(payload.issues).length)
+        notifications.dismiss(notificationId.current);
       shouldFocusResult.current = true;
     } catch {
       setResult({
@@ -490,6 +508,11 @@ export default function PublicInterestForm({
         )}
         {pending ? "Enviando…" : "Dejar mis datos de interés"}
       </Button>
+      {hydrated && result?.ok === false && result.code === "RATE_LIMITED" && (
+        <p className="text-muted-foreground text-sm" role="status">
+          Conservamos tus datos para que puedas reintentar más tarde.
+        </p>
+      )}
       <p className="sr-only" role="status">
         {pending ? "Enviando tus datos de interés." : ""}
       </p>

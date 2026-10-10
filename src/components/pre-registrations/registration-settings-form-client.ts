@@ -305,11 +305,11 @@ function enhance(form: HTMLFormElement): void {
             input.setAttribute("aria-invalid", String(Boolean(error)));
         }
         const hasFieldErrors = fields.some((name) => requestError.fields[name]);
-        if (hasFieldErrors || formError) notifications.dismiss(toastId);
+        if (hasFieldErrors) notifications.dismiss(toastId);
         else notifications.error({ id: toastId, title: requestError.message });
         if (formError) {
-          formError.textContent = hasFieldErrors ? "" : requestError.message;
-          formError.hidden = hasFieldErrors;
+          formError.textContent = "";
+          formError.hidden = true;
         }
         const firstInvalid = fields
           .map((name) => form.elements.namedItem(name))

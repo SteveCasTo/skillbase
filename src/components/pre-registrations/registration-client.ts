@@ -118,14 +118,8 @@ export function bindRegistrationMutation<T>(
         const hasFieldIssues = [
           ...form.querySelectorAll<HTMLElement>("[data-field-error]"),
         ].some((error) => Boolean(fieldIssues[error.dataset.fieldError ?? ""]));
-        showFormIssues(
-          form,
-          hasFieldIssues
-            ? result.issues
-            : { ...result.issues, form: result.message },
-        );
-        if (hasFieldIssues || form.querySelector("[data-inline-field]"))
-          notifications.dismiss(toastId);
+        showFormIssues(form, { ...result.issues, form: "" });
+        if (hasFieldIssues) notifications.dismiss(toastId);
         else {
           const alert = form.querySelector<HTMLElement>("[data-form-error]");
           if (alert) alert.textContent = "";
@@ -137,22 +131,13 @@ export function bindRegistrationMutation<T>(
         }
       }
     } catch {
-      showFormIssues(form, {
-        form: "No se pudo confirmar el registro. Conservamos tus datos; reintenta para comprobar el mismo movimiento.",
+      showFormIssues(form, {});
+      notifications.error({
+        id: toastId,
+        title: "Sin confirmación",
+        description:
+          "Conservamos tus cambios; reintenta sin cambiar los datos para comprobar la misma operación.",
       });
-      const alert = form.querySelector<HTMLElement>("[data-form-error]");
-      if (alert && form.querySelector("[data-inline-field]")) {
-        alert.textContent =
-          "No se pudo confirmar el guardado. Conservamos tus cambios; reintenta sin cambiar los datos.";
-        notifications.dismiss(toastId);
-      } else {
-        if (alert) alert.textContent = "";
-        notifications.error({
-          id: toastId,
-          title: "Sin confirmación",
-          description: "Reintenta sin cambiar los datos.",
-        });
-      }
     } finally {
       state.finish();
       delete form.dataset.pending;
