@@ -4,12 +4,12 @@
 
 El alcance de negocio de este contrato fue aprobado. La implementación de Fase 9
 (dominio/aplicación, persistencia, rutas, renderer PDF/QR, UI y extensión de demo)
-está integrada en `development` mediante PRs 294, 297 y 298; las mejoras UI de
-PRs 295/296 también están integradas. **Aún no está liberada a `master`**: la
-migración candidata `0023_phase9_certificates.sql` no se ha aplicado a canónico ni
-cloud y el demo F9 no se ha ejecutado allí. La fuente F8 oficial permanece
-inmutable. El estado de implementación/release está en [`PLAN.md`](PLAN.md); las
-reglas generales y decisiones se resumen en [`CERTIFICATES.md`](CERTIFICATES.md)
+se liberó a `master` por PR 299 y la corrección de origen del seed por PR 301;
+source final `dc55620df325c69dfce0b3661527a1049e392fe5`. La migración 0023 está
+aplicada a cloud y el demo sintético se ejecutó allí por workflow protegido. La
+fuente oficial F8 permanece inmutable. Evidencia y límites del release están en
+[`PLAN.md`](PLAN.md), [`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md);
+las reglas generales y decisiones se resumen en [`CERTIFICATES.md`](CERTIFICATES.md)
 y [`DECISIONS.md`](DECISIONS.md).
 
 El CI integrado y la QA focal de la extensión F9 están documentados en
@@ -271,19 +271,23 @@ certificado activo por curso/tipo/destinatario; el reemplazo marca el previo
 
 ## Implementación y límites de estado
 
-La implementación integrada incorpora schema y migración candidata 0023, cuya
-entrada journal es `idx: 23` y cuyo ledger resultante es 24. La migración tiene
-SHA-256 `4c78ed1735b0cd3cb34d2bdc5f1f2c0d15b51dcc31568136839d706649489ee1` y
-timestamp `1791500766703`. Todavía no se ha aplicado en el Supabase canónico/cloud;
-el límite actual conocido de `master` es ledger 23. El ordinal de grupo es
+La migración 0023 (journal `idx: 23`, SHA-256
+`4c78ed1735b0cd3cb34d2bdc5f1f2c0d15b51dcc31568136839d706649489ee1`, timestamp
+`1791500766703`) se aplicó a cloud y el ledger quedó en 24. El ordinal de grupo es
 ADMIN-editable antes de generar; sus ajustes, ubicación/leyendas institucionales,
 branding y assets autorizados se congelan en la configuración/procedencia del
 certificado. Los snapshots F8 no se modifican.
 
-No quedan abiertas decisiones de negocio sobre tipo/elegibilidad, finanzas,
-firmas, QR, exposición de la verificación, privacidad del PDF, reapertura,
-vigencia de emitidos ni reemplazo. La integración y el gate CI de `development`
-están completos; falta el release normal a `master`, aplicación de la migración,
-deployment y, opcionalmente, operación F9 de demo protegida. El seed F1–F8
-histórico no generó certificados; la extensión F9 requiere el flag opt-in y los
-gates protegidos descritos en [`DEMO_SEED.md`](DEMO_SEED.md).
+No quedan abiertas decisiones de negocio dentro del contrato aprobado sobre
+tipo/elegibilidad, finanzas, firmantes, QR, exposición de la verificación,
+privacidad del PDF, reapertura, vigencia de emitidos ni reemplazo. La migración,
+release y demo cloud protegida están completados. Evidencia cloud: ocho páginas
+públicas devolvieron 200, el acceso anónimo al PDF privado devolvió 303 y
+coincidieron hashes de metadata pública; no se descargaron bytes privados para
+un cotejo independiente del PDF cloud. No se afirma firma física ni validez
+institucional. En la demo local post-reset se verificaron ocho páginas públicas
+y los bytes/hash SHA-256 más sello DEMO de seis PDFs finales privados; el estado
+de login autenticado sigue pendiente. Las correcciones UI/funcionales de F9 no
+constituyen un alcance aprobado por defecto: quedan en espera hasta que el
+usuario indique posteriormente qué secciones/defectos desea corregir. La
+operación protegida de seed se rige por [`DEMO_SEED.md`](DEMO_SEED.md).

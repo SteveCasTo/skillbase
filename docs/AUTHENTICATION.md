@@ -104,10 +104,10 @@ El parámetro de retorno permite solo rutas relativas locales. El siguiente dest
 
 - Site URL: `http://127.0.0.1:4321`.
 - Redirect permitido exacto: `http://127.0.0.1:4321/auth/callback`.
-- Callback que debe registrarse en Google para Supabase local: `http://127.0.0.1:55321/auth/v1/callback`.
+- Callback que debe registrarse en Google para la configuración versionada de Supabase local: `http://127.0.0.1:55321/auth/v1/callback`.
 - Client ID y secret de Google se leen desde variables ignoradas por Git declaradas en `.env.example`.
 
-Al cambiar los puertos locales, el callback anterior `http://127.0.0.1:54321/auth/v1/callback` se sustituye por el de arriba. La allowlist/credencial de Google en consola requiere actualización manual; no se afirma que ya se haya autorizado el nuevo callback ni que Google OAuth real se haya probado. Site URL y redirect de la aplicación web continúan en `127.0.0.1:4321`.
+La configuración versionada en el source base de esta documentación conserva API local `55321`. Durante la operación local F9 se autorizó un ajuste solo local a API `54321`; en ese runtime el callback esperado es `http://127.0.0.1:54321/auth/v1/callback`. La app mantiene Site URL/redirect `127.0.0.1:4321`. El inicio de OAuth local devolvió HTTP 302 hacia ese callback y la página de Google cargó HTTP 200 sin error de redirect observado; no se completaron consentimiento real, callback PKCE ni sesión. Esta observación parcial no demuestra login OAuth end-to-end ni modifica el source/release. Antes de una prueba real, el usuario/operador debe coordinar cuenta, invitación, autorización de callback y sesión; no se otorgan roles por defecto.
 
 Los fixtures locales crean usuarios de Auth confirmados mediante Admin API y obtienen sesiones E2E controladas; Google real no es dependencia de la suite general.
 
@@ -119,7 +119,7 @@ Las rutas privadas tienen políticas fail-closed: `/app` y `/app/perfil` permite
 
 El proyecto `SkillBase` está enlazado con referencia `fvzxqlezdrlzykyoevub`. Google OAuth, Site URL y el callback `https://skillbase-alpha.vercel.app/auth/callback` están configurados. El primer administrador permanece como invitación `INVITED` hasta completar su primer acceso Google, momento en que se vinculará su UUID Auth y pasará a `ACTIVE`.
 
-El flujo cloud fue verificado manualmente desde Vercel hasta Google y de regreso a `/app`. El primer administrador quedó vinculado a su identidad Auth, en estado `ACTIVE` y con rol `ADMIN`.
+El flujo cloud fue verificado manualmente en un boundary histórico desde Vercel hasta Google y de regreso a `/app`. El primer administrador quedó vinculado a su identidad Auth, en estado `ACTIVE` y con rol `ADMIN`. Esa evidencia histórica se conserva, pero no sustituye la aceptación OAuth/recovery local y de producción end-to-end que queda en Fase 10A.
 
 ## AUTENTICACIÓN DUAL (Fase 4 liberada mediante PR 126)
 
@@ -131,7 +131,7 @@ La plantilla `supabase/templates/recovery.html` está en español, explica una �
 
 La configuración SMTP local está integrada en `development` mediante `supabase/config.toml`/plantilla y referencias privadas; el `.env` ignorado del checkout canónico contiene secretos, nunca versionados. Las suites aisladas eliminan el transporte SMTP externo y sus variables antes de arrancar, y copian únicamente las plantillas públicas. No necesitan credenciales de Gmail ni envían correo real.
 
-La configuración SMTP cloud está comprobada por lectura de Admin API, pero la identidad destinataria autorizada no existe en Auth cloud; no se creó otra cuenta ni se hizo una prueba recovery cloud. El usuario confirmó la recepción de un correo de prueba en el buzón autorizado local, verificando entrega SMTP local. Esto no prueba clic de recovery/cambio de contraseña, ni entrega cloud. No afirmar esos flujos ni Google OAuth como verificados; la consola Google aún requiere autorizar el callback local `http://127.0.0.1:55321/auth/v1/callback`.
+La configuración SMTP cloud está comprobada por lectura de Admin API, pero la identidad destinataria autorizada no existe en Auth cloud; no se creó otra cuenta ni se hizo una prueba recovery cloud. El usuario confirmó históricamente la recepción de un correo de prueba en el buzón autorizado local, verificando entrega SMTP local. Esto no prueba clic de recovery/cambio de contraseña, ni entrega cloud. La prueba OAuth end-to-end local/cloud sigue en Fase 10A; el callback debe coincidir con el runtime usado (`55321` en config versionada, `54321` en el ajuste local temporal F9).
 
 ### Flujos internos y reglas del release dual
 
@@ -150,9 +150,9 @@ La configuración SMTP cloud está comprobada por lectura de Admin API, pero la 
 
 ### Estado operacional SMTP
 
-La configuración Supabase Auth SMTP autorizada se aplicó en cloud y local con el remitente de SkillBase. Secretos quedan exclusivamente en Auth y `.env` local ignorado; no se incluyen valores en Git, frontend, CI ni esta documentación. La recepción local de un correo de prueba está confirmada por el usuario. Continúan pendientes el clic/cambio de contraseña desde el enlace, la entrega cloud y la verificación OAuth real.
+La configuración Supabase Auth SMTP autorizada se aplicó en cloud y local con el remitente de SkillBase. Secretos quedan exclusivamente en Auth y `.env` local ignorado; no se incluyen valores en Git, frontend, CI ni esta documentación. La recepción local de un correo de prueba fue confirmada históricamente por el usuario. Continúan pendientes el recovery/cambio completo end-to-end local y cloud y la prueba real OAuth local/cloud prevista para Fase 10A. Cualquier login/email real requiere coordinación autorizada con el usuario; no automatizar consentimiento, reutilizar acceso a un perfil real ni enviar correo como parte de una actualización documental.
 
-La autorización manual del callback Google local `http://127.0.0.1:55321/auth/v1/callback` en Google Console sigue pendiente de forma independiente; conservar el callback activo y no afirmar que OAuth real esté validado por configurar SMTP.
+La autorización manual del callback en Google Console debe verificarse con el usuario para el puerto del runtime de la prueba (configuración versionada `55321`, runtime F9 local `54321`). No afirmar OAuth real validado por configurar SMTP ni por el redirect HTTP parcial observado.
 
 Al cierre inicial de PR 126 no había acción de baja ni esta política. La corrección posterior se integró por PRs 134/136 y se liberó con PR 211/Fase 6. PR 222 añadió edición inline individual de perfiles/lifecycle; ese cambio se promovió a producción con PR 228.
 

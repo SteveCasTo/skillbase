@@ -132,7 +132,7 @@ No asumir que una URL Storage pública equivale a validación.
 
 La ruta de verificación debe consultar el registro actual del certificado.
 
-## IMPLEMENTACIÓN INTEGRADA EN DEVELOPMENT
+## IMPLEMENTACIÓN Y RELEASE
 
 La interfaz conectada al backend disponible en esta rama incluye:
 
@@ -142,7 +142,7 @@ La interfaz conectada al backend disponible en esta rama incluye:
 - Página pública `/certificados/[publicCredentialId]` y formulario de búsqueda en `/certificados`. La respuesta pública es una proyección mínima; no expone snapshots privados ni ofrece descarga anónima del PDF.
 - Verificación local opcional del archivo seleccionado: SHA-256 se calcula en el navegador, sobre el archivo local. El contenido no se transmite para calcular ese hash; no equivale a una firma digital ni demuestra por sí solo la identidad de quien lo presenta.
 
-La UI de PR 297 y el backend de PR 294 están integrados en `development`; la integración se validó en el gate combinado descrito en [`TESTING.md`](TESTING.md). Esto no acredita disponibilidad en producción: `master` no contiene F9 y la migración candidata no se ha aplicado a cloud. Las capacidades ausentes del contrato backend (por ejemplo, índice global de historial de instructores o enlace público de reemplazo) no se simulan en la UI. Ver progreso/release en [`PLAN.md`](PLAN.md).
+Fase 9 está liberada en `master` como `dc55620df325c69dfce0b3661527a1049e392fe5` y desplegada en `https://skillbase-alpha.vercel.app`; migración cloud en ledger 24. La demo cloud contiene ocho registros sintéticos y sus páginas públicas verificadas. Se comprobó metadata/hash público; un PDF privado anónimo devolvió 303, pero no se descargaron bytes privados para comparación SHA-256 independiente. La demo local reconstruida tiene ocho certificados y páginas públicas verificadas; seis PDFs finales privados se descargaron/protegieron y sus bytes/hash SHA-256 y sello DEMO se verificaron. Esto no prueba firma institucional real o manuscrita. Las capacidades ausentes del contrato backend (por ejemplo, índice global de historial de instructores o enlace público de reemplazo) no se simulan en la UI. Las correcciones UI/funcionales quedan en espera de una indicación posterior y no se inventan desde esta documentación. Ver progreso y límites de validación en [`PLAN.md`](PLAN.md), [`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 La carga/revisión manual de un PDF no verifica criptográficamente una firma manuscrita. Los archivos sintéticos usados en QA solo prueban el ciclo técnico; no son certificados institucionales firmados ni evidencia de autoridad legal.
 
