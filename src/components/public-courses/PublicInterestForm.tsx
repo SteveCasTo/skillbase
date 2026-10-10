@@ -96,6 +96,12 @@ export default function PublicInterestForm({
     (result?.ok === false &&
       ["INTEREST_UNAVAILABLE", "COURSE_NOT_FOUND"].includes(result.code));
   const succeeded = result?.ok === true;
+  const transientFailure =
+    hydrated &&
+    !closed &&
+    result?.ok === false &&
+    result.code === "SERVICE_UNAVAILABLE" &&
+    Object.keys(issues).length === 0;
   const unavailablePreference =
     preferredGroupId !== "" &&
     !groups.some((group) => group.id === preferredGroupId);
@@ -155,10 +161,22 @@ export default function PublicInterestForm({
         resultRef.current
       )?.focus();
     } else {
-      resultRef.current?.focus();
+      if (transientFailure)
+        formRef.current
+          ?.querySelector<HTMLInputElement>('[name="firstName"]')
+          ?.focus();
+      else resultRef.current?.focus();
     }
     shouldFocusResult.current = false;
-  }, [result, closed]);
+  }, [result, closed, transientFailure]);
+
+  useEffect(() => {
+    if (!transientFailure || result?.ok !== false) return;
+    notifications.error({
+      title: "No pudimos registrar tu interés",
+      description: result.message,
+    });
+  }, [result, transientFailure]);
 
   useEffect(() => {
     if (closed || succeeded) {
@@ -295,35 +313,37 @@ export default function PublicInterestForm({
       onSubmit={submit}
       className="interest-form"
     >
-      {result?.ok === false && (
-        <div
-          ref={resultRef}
-          className="interest-error-summary"
-          role="alert"
-          tabIndex={-1}
-        >
-          <p>{result.message}</p>
-          {Object.keys(issues).length > 0 && (
-            <ul>
-              {Object.entries(issues).map(([name, message]) => (
-                <li key={name}>
-                  <a
-                    href={`#interest-${name}`}
-                    onClick={(event) => {
-                      if (name === "preferredGroupId" && enhancedSelect) {
-                        event.preventDefault();
-                        groupTriggerRef.current?.focus();
-                      }
-                    }}
-                  >
-                    {message}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      {result?.ok === false &&
+        !transientFailure &&
+        (!hydrated || Object.keys(issues).length === 0) && (
+          <div
+            ref={resultRef}
+            className="interest-error-summary"
+            role="alert"
+            tabIndex={-1}
+          >
+            <p>{result.message}</p>
+            {Object.keys(issues).length > 0 && (
+              <ul>
+                {Object.entries(issues).map(([name, message]) => (
+                  <li key={name}>
+                    <a
+                      href={`#interest-${name}`}
+                      onClick={(event) => {
+                        if (name === "preferredGroupId" && enhancedSelect) {
+                          event.preventDefault();
+                          groupTriggerRef.current?.focus();
+                        }
+                      }}
+                    >
+                      {message}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       <div className="interest-fields">
         {fields.map((field) => (
           <div

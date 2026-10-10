@@ -137,12 +137,14 @@ try {
     Configurar firmantes de certificados
   </a>
   {(success || Astro.url.searchParams.get("success") === "attendance") && (
-    <p
-      role="status"
-      class="mt-6 rounded-lg border bg-secondary px-4 py-3 text-sm"
-    >
-      Configuración guardada.
-    </p>
+    <noscript>
+      <p
+        role="status"
+        class="mt-6 rounded-lg border bg-secondary px-4 py-3 text-sm"
+      >
+        Configuración guardada.
+      </p>
+    </noscript>
   )}
   {pageError && (!settings || !Object.keys(values).length) && (
     <p
