@@ -433,3 +433,7 @@ La clave de idempotencia del curso se vincula en servidor al actor autenticado y
 ### Contraseñas de cuentas internas (implementadas; recovery SMTP no verificado)
 
 Las credenciales pertenecen exclusivamente a Supabase Auth. Crear cuenta y asignar contraseña inicial requiere API privilegiada exclusivamente server-side; no versionar secretos ni retornar/registrar la contraseña después de la respuesta inicial necesaria para entregarla al ADMIN. Nunca persistirla en PostgreSQL, auditarla, incluirla en telemetría, devolverla en cargas de navegación ni repoblar el formulario. Mantener signup público deshabilitado, protección CSRF/origen, cookies seguras, `Cache-Control: private, no-store`, redirects permitidos y rate limiting del proveedor/endpoint. Configurar y comprobar SMTP antes de prometer recuperación por correo en cloud.
+
+## REVISIÓN DE SEGURIDAD (2026-10-09)
+
+La revisión estática de la base `f388327424b9010a0ec5e5c209fe46d09b960d9f` registró un riesgo potencial en el cambio de contraseña Auth y dos coincidencias de advisories con versiones fijadas en `bun.lock`. Son hallazgos pendientes de validación y decisión; no se confirmó una explotación end-to-end ni se aplicaron remediaciones en esa revisión. El detalle, evidencia, límites y estado se mantienen en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md). Esta evidencia no constituye certificación de seguridad ni verificación de configuración/uso en producción.
