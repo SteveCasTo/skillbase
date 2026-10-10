@@ -166,6 +166,10 @@
               );
               (invalid ?? fields()[0])?.focus();
             } else {
+              const successTitle =
+                result.message ??
+                form.dataset.authSuccessTitle ??
+                "Solicitud completada.";
               if (
                 result.redirect &&
                 result.redirect.startsWith("/") &&
@@ -174,15 +178,12 @@
                 if (form.hasAttribute("data-auth-client-redirect")) {
                   notifications.success({
                     id,
-                    title: result.message ?? "Solicitud completada.",
+                    title: successTitle,
                   });
                   await navigate(result.redirect);
                 } else {
                   notifications.dismiss(id);
-                  queueRedirectNotice(
-                    result.redirect,
-                    result.message ?? "Sesión iniciada.",
-                  );
+                  queueRedirectNotice(result.redirect, successTitle);
                   window.location.assign(result.redirect);
                 }
                 return;

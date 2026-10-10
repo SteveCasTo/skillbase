@@ -54,8 +54,43 @@ export function SileoHost() {
       event.preventDefault();
       notifications.clear();
     };
+    // The vendor expands descriptions and pauses expiry on hover only. Give
+    // keyboard focus the same reading time/expansion, including older notices.
+    const focusNotice = (event: FocusEvent) => {
+      if (!(event.target instanceof HTMLElement)) return;
+      const toast = event.target.closest<HTMLElement>("[data-sileo-toast]");
+      if (!toast) return;
+      if (
+        event.relatedTarget instanceof Node &&
+        toast.contains(event.relatedTarget)
+      )
+        return;
+      toast.dispatchEvent(
+        new MouseEvent(event.type === "focusin" ? "mouseover" : "mouseout", {
+          bubbles: true,
+          relatedTarget: event.relatedTarget,
+        }),
+      );
+    };
+    const dismissClickedNotices = (event: MouseEvent) => {
+      if (
+        !(event.target instanceof Element) ||
+        event.target.closest("[data-sileo-button]")
+      )
+        return;
+      const toast = event.target.closest<HTMLElement>("[data-sileo-toast]");
+      if (toast && toast.dataset.state !== "loading") notifications.clear();
+    };
     document.addEventListener("keydown", dismissFocusedNotices);
-    return () => document.removeEventListener("keydown", dismissFocusedNotices);
+    document.addEventListener("focusin", focusNotice);
+    document.addEventListener("focusout", focusNotice);
+    document.addEventListener("click", dismissClickedNotices);
+    return () => {
+      document.removeEventListener("keydown", dismissFocusedNotices);
+      document.removeEventListener("focusin", focusNotice);
+      document.removeEventListener("focusout", focusNotice);
+      document.removeEventListener("click", dismissClickedNotices);
+    };
   }, []);
 
   useEffect(() => {

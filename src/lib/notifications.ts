@@ -89,7 +89,7 @@ function withId(
 }
 
 export const notifications = {
-  clear: () => sileo.clear(notificationPosition),
+  clear: () => sileo.clear(),
   dismiss: (id: string) => sileo.dismiss(id),
   success: (options: NotificationOptions) =>
     sileo.success(withId(options, "success")),

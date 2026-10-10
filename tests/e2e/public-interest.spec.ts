@@ -594,7 +594,10 @@ test("pending is local, network failures preserve contact and can retry without 
     page.getByRole("heading", { name: "Condiciones" }),
   ).toBeVisible();
   release();
-  await expect(form.locator(".interest-error-summary")).toBeFocused();
+  await expect(
+    page.locator("[data-sileo-toast][data-state='error']"),
+  ).toBeVisible();
+  await expect(form.getByLabel("Nombre", { exact: true })).toBeFocused();
   await expect(form.getByLabel("Email", { exact: true })).toHaveValue(email);
   await expect(form.getByRole("button", { name: submitName })).toBeEnabled();
   await page.unroute(`**${path}`);

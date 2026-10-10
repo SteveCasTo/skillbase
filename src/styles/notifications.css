@@ -39,3 +39,8 @@ html [data-sileo-viewport] [data-sileo-toast]:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 4px;
 }
+html [data-sileo-viewport] [data-sileo-button] {
+  color: var(--card-foreground);
+  min-height: 2.75rem;
+  padding-inline: 1rem;
+}

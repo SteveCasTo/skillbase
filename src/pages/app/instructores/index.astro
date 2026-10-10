@@ -42,9 +42,11 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
     />
   </div>
   {Astro.url.searchParams.get("success") === "deleted" && (
-    <p role="status" class="mb-6">
-      Instructor eliminado.
-    </p>
+    <noscript>
+      <p role="status" class="mb-6">
+        Instructor eliminado.
+      </p>
+    </noscript>
   )}
   <header class="flex flex-wrap items-start justify-between gap-5">
     <div>
