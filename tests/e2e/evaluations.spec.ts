@@ -111,6 +111,7 @@ test("ADMIN saves exact course-wide weights and can edit the scheme before gradi
 }) => {
   const fixture = await createAttendanceFlowFixture("2020-05-04");
   try {
+    await context.clock.setFixedTime(fixture.now);
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     const path = schemePath(fixture.courseId);
     await page.goto(path);
@@ -202,6 +203,7 @@ test("INSTRUCTOR saves rows atomically with pending distinct from zero, and corr
 }) => {
   const fixture = await createAttendanceFlowFixture("2020-06-01", true);
   try {
+    await context.clock.setFixedTime(fixture.now);
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     await configure(page, fixture.courseId);
     await context.clearCookies();

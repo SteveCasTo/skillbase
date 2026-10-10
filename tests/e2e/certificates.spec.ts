@@ -244,6 +244,7 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
   const fixture = await createAttendanceFlowFixture("2020-05-04");
   let anonymous: Awaited<ReturnType<typeof browser.newContext>> | undefined;
   try {
+    await context.clock.setFixedTime(fixture.now);
     const environment = getTestSupabaseEnvironment();
     const ledger = await fixture.database.db.execute<{ count: number }>(
       sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
@@ -263,6 +264,7 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
     );
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     anonymous = await browser.newContext();
+    await anonymous.clock.setFixedTime(fixture.now);
     const publicPage = await anonymous.newPage();
     await closeOfficialGroup(page, fixture);
     await page.goto(`${groupPath(fixture)}/certificados`);
@@ -556,8 +558,10 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
   let instructor: Awaited<ReturnType<typeof browser.newContext>> | undefined;
   let instructorPage!: Page;
   try {
+    await context.clock.setFixedTime(fixture.now);
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     instructor = await browser.newContext();
+    await instructor.clock.setFixedTime(fixture.now);
     instructorPage = await instructor.newPage();
     await closeOfficialGroup(page, fixture);
     await settings(page);
