@@ -27,10 +27,10 @@ El adapter de aplicación `src/server/auth/profile.ts:118-129` exige aprobación
 
 **Estado:** coincidencia de paquete/versión reportada; aplicabilidad y exposición de la aplicación pendientes de validar. No se confirmó explotación.
 
-| Paquete fijado en `bun.lock` | Advisory | Riesgo resumido por la revisión | Versión corregida indicada por la revisión |
-| --- | --- | --- | --- |
-| `sharp@0.35.4` (línea 1618) | [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w) | Posible RCE al procesar SVG malicioso; impacto reportado como específico de Linux. | `0.35.5` |
-| `devalue@5.9.2` (línea 1080) | [GHSA-j22f-vq7h-c4qm](https://github.com/advisories/GHSA-j22f-vq7h-c4qm) | Posible exposición de memoria al serializar `Buffer`/vistas compartidas. | `5.9.3` |
+| Paquete fijado en `bun.lock` | Advisory                                                                 | Riesgo resumido por la revisión                                                    | Versión corregida indicada por la revisión |
+| ---------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------------ |
+| `sharp@0.35.4` (línea 1618)  | [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w) | Posible RCE al procesar SVG malicioso; impacto reportado como específico de Linux. | `0.35.5`                                   |
+| `devalue@5.9.2` (línea 1080) | [GHSA-j22f-vq7h-c4qm](https://github.com/advisories/GHSA-j22f-vq7h-c4qm) | Posible exposición de memoria al serializar `Buffer`/vistas compartidas.           | `5.9.3`                                    |
 
 El reporte indicó una consulta de OSV sobre 1.106 combinaciones paquete/versión. Otras coincidencias quedaron sin clasificar y **no** se cuentan aquí como vulnerabilidades. La coincidencia de versiones no establece por sí sola que el código afectado se ejecute con entrada controlable ni que exista exposición en producción. En la superficie inspeccionada no se encontró una ruta de usuario que entregue SVG a Sharp ni una ruta PDF que hidrate los buffers descritos; la ausencia de esas rutas en la inspección acotada no prueba ausencia en todos los contextos.
 
