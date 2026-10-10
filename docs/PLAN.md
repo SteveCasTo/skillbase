@@ -892,99 +892,79 @@ La migración `drizzle/0023_phase9_certificates.sql` corresponde a journal `idx:
 
 Un tercero puede verificar un certificado real mediante una URL pública.
 
-## FASE 10 — CIERRE FUNCIONAL Y CALIDAD
+## FASE 10 — VALIDACIÓN, CALIDAD Y CORRECCIONES
 
-La fase se separa en 10A (cierre funcional) y 10B (calidad integral). Los tests
-unitarios, de integración y E2E siguen acompañando a cada cambio funcional de
-10A; 10B agrega la revisión/regresión global y no posterga la cobertura hasta el
-final. En esta actualización documental no se inicia implementación ni cambio de
-UI.
+El alcance vigente de Fase 10 es validar y corregir la calidad de la experiencia
+y del producto existente; no es una expansión funcional ni autorización para
+implementar automáticamente reportes o módulos nuevos. La clasificación previa
+en 10A (cierre funcional) y 10B (calidad integral) fue una propuesta documental
+posterior al release F9 y queda sustituida por este alcance aclarado por el
+usuario. No se inició ni se completó ninguna de esas etapas por haberlas
+documentado.
 
-### FASE 10A — CIERRE FUNCIONAL
+### Estado de alcance
 
-#### Estado y auditoría de alcance
+- Google OAuth real y recovery/correo ya estaban identificados como pendientes
+  de verificación. Se mantienen dentro de la validación; no se declaran probados
+  ni se da por completada la aceptación end-to-end.
+- El rediseño específico de Fase 9 sigue esperando indicaciones del usuario. Sí
+  queda autorizada la revisión transversal de feedback Sileo en todas las
+  secciones, incluido login, con las correcciones descritas abajo.
+- Se registran propuestas de consultas/reportes en [`REQUIREMENTS.md`](REQUIREMENTS.md)
+  para futura definición. Ninguna autoriza por sí sola una pantalla, módulo,
+  exportación o formato; no implementar hasta recibir definición/aprobación.
 
-10A está autorizada como siguiente etapa, pero no iniciada por este trabajo
-documental. Antes de implementar funcionalidades, auditar los requisitos
-aprobados de F0–F9 contra el source liberado, tests/evidencia y estado productivo.
-Para cada flujo, distinguir: **implementado y evidenciado**, **implementado sin
-verificación suficiente**, **parcial/defecto funcional**, **no probado** y
-**requisito/alcance no aprobado**. Citar evidencia actual por fuente; no marcar
-fase completa únicamente por checks históricos, ni convertir un supuesto en un
-requisito.
+### Bloques aprobados
 
-| Tema          | Estado verificable ahora                                                                                                                                                                                                                                                                                                                         | Tratamiento en 10A                                                                                       |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| F0–F8         | Implementación/releases se registran por fase en este plan y sus referencias; esta revisión documental no repite sus gates ni certifica todos los criterios de forma independiente.                                                                                                                                                              | Trazar los requisitos aprobados y la evidencia vigente, no marcar cierres por herencia.                  |
-| Fase 2B       | El gate separado no tiene un cierre independiente acreditado aquí. PR 113 reportó CI `36828194127` (integration 65/65, E2E 96/96) y smoke productivo de landing, catálogo/detalle 200; F9 CI posterior también da evidencia de regresión. Esto no borra el histórico 81/82 más prueba dirigida 4/4 ni cierra retroactivamente todo el checklist. | Auditoría documental no bloqueante de criterios/evidencia faltantes; sin falsificar el estado histórico. |
-| F9 cloud      | Release/master, migración y seed protegido ejecutados; límites de hash PDF privado y firma se mantienen.                                                                                                                                                                                                                                         | No modificar UI/funcionalidad F9 sin indicación explícita posterior del usuario.                         |
-| Demo local F9 | Dataset reconstruido verificado; Google OAuth solo alcanzó redirect/página del proveedor, sin consentimiento/callback/sesión completa. Recovery E2E no reportado.                                                                                                                                                                                | Completar aceptación real OAuth y recovery local/producción con coordinación del usuario.                |
-| Reportes      | Concepto, actores y contenido no aprobados; requisito abierto, no funcionalidad autorizada.                                                                                                                                                                                                                                                      | Seguimiento aparte; no bloquea los flujos ya aprobados ni 10A.                                           |
-| Evidencia     | Algunos checks de cierres antiguos (incluidos F2B 325–326) describen boundaries históricos, no ejecuciones actuales.                                                                                                                                                                                                                             | Mantener referencias y límites; no marcar como nuevos resultados ni esconder fallos previos.             |
+1. **Auditoría y corrección de feedback Sileo.** Revisar todas las secciones,
+   incluido login; encontrar y corregir errores duplicados entre validación de
+   campos y formulario general, y asegurar que los toast sean visibles y que sus
+   tipos, colores y temas sean coherentes. Mantener errores accionables en su
+   contexto, sin ocultar validación ni alterar reglas de negocio.
+2. **Rendimiento medido.** Establecer y registrar un baseline Lighthouse de la
+   landing antes de optimizar. Evaluar WebP para imágenes y optimizar sin pérdida
+   perceptible de calidad; cualquier otra mejora debe justificarse con medición
+   comparable, no con una optimización supuesta.
+3. **Auditoría de seguridad informativa.** Revisar y entregar hallazgos/reporte
+   únicamente. Este bloque no autoriza remediaciones, cambios de permisos,
+   código, configuración ni despliegue; cualquier corrección requerirá alcance
+   y aprobación aparte.
 
-La reserva histórica del gate original de Fase 2B (checks 325–326 y resultados
-E2E descritos arriba) se mantiene explícita: releases posteriores respaldan
-disponibilidad/regresión de catálogo y detalle, pero no borran fallos históricos
-ni demuestran retroactivamente cada criterio de ese gate.
+### Propuestas funcionales por definir (no aprobadas para implementación)
 
-#### Trabajo funcional aprobado
+Las siguientes ideas se conservan como input para aclaración, no como alcance de
+Fase 10 ni requisitos aceptados: listas de participantes por grupo (solicitadas
+como necesarias, pendiente definir contenido y comportamiento); resumen por curso
+(tentativo); vista general de pagos pendientes en laboratorio (tentativa); y
+consulta de certificados por curso/grupo, con filtros todavía por concretar. No
+se ha aprobado formato de reporte/exportación, nuevos permisos ni nuevos módulos.
+Precisar objetivo, audiencia, campos, filtros y presentación antes de cualquier
+implementación; preferir reutilizar superficies existentes cuando proceda.
 
-- [ ] Completar una matriz requisito → flujo/source → tests → evidencia actual y
-      resolver gaps funcionales de requisitos que ya estén aprobados. Cada corrección
-      funcional agrega o actualiza tests relevantes y conserva autorización,
-      persistencia, ownership y recuperación según su requisito.
-- [ ] Ejecutar aceptación end-to-end de Google OAuth real y recovery de Auth en
-      ambiente local y producción, coordinando con el usuario las cuentas legítimas,
-      invitaciones/roles, autorización OAuth y correo de prueba. No automatizar
-      consentimiento ni acceder al perfil real del usuario. No crear/elevar ADMIN
-      por conveniencia, no usar un flujo falso como evidencia E2E y no resetear datos
-      de producción. Ningún envío real se hace sin coordinación/autorización expresa.
-- [ ] Antes de implementar cualquier reporte, aclarar su objetivo, usuarios/roles,
-      tipos de consulta, campos/datos, filtros y formato. La nota de [`REQUIREMENTS.md`](REQUIREMENTS.md)
-      presenta solo una propuesta de conversación no aprobada: consultas/resúmenes
-      operativos sobre información existente, quizá listados/subtotales/filtros y
-      exportación opcional. No inferir dashboards, analytics, CSV/PDF, nuevos
-      permisos o un módulo; preferir reutilizar pantallas actuales si satisfacen la
-      necesidad. La definición del reporte es seguimiento no bloqueante mientras no
-      sea solicitada/aprobada.
-- [ ] No iniciar correcciones/rediseño funcional o visual de F9 a partir de una
-      valoración general de la UI. Quedan en espera de indicación posterior del
-      usuario sobre secciones y problemas concretos; no forman ahora un backlog
-      aprobado ni bloquean 10A.
+### Verificación y cierre
 
-#### Gate 10A
+- [ ] Completar auditoría/correcciones de feedback Sileo transversal conforme al
+  bloque aprobado, incluida la sección de login.
+- [ ] Medir y registrar baseline Lighthouse reproducible de landing; después
+  aplicar optimizaciones respaldadas por medición, incluyendo WebP solo si no
+  reduce perceptiblemente la calidad.
+- [ ] Completar auditoría de seguridad y entregar reporte de hallazgos, sin
+  aplicar remediaciones bajo esta autorización.
+- [ ] Coordinar y realizar la verificación de Google OAuth real y recovery ya
+  pendientes, sin declarar éxito hasta tener evidencia del flujo completo.
+- [ ] Mantener el rediseño específico F9 en espera; el trabajo transversal de
+  Sileo sí incluye F9.
 
-Cerrar 10A cuando los flujos críticos de requisitos aprobados estén trazados y
-funcionalmente verificados, los gaps aprobados se corrijan con cobertura
-pertinente o se difieran con aprobación explícita, y la aceptación OAuth/recovery
-local y producción se complete con coordinación real. Los reportes no definidos
-y las correcciones F9 no indicadas no son criterios de aceptación inventados.
-Esta etapa no declara que cada fase histórica tenga un gate original reconstruido
-si falta evidencia independiente.
-
-### FASE 10B — CALIDAD INTEGRAL
-
-Inicia después del gate funcional 10A. Incluye revisión global de seguridad y
-trust boundaries, accesibilidad, responsive, performance, estados loading/empty/
-error/success, validaciones de archivos contra requisitos reales, deuda técnica y
-regresión del sistema. No amplía por sí sola el alcance funcional ni añade
-validaciones/políticas de archivos arbitrarias.
-
-- [ ] Revisar seguridad, privacidad, permisos server-side y trust boundaries en
-      el source completo, incluyendo carga/descarga de archivos.
-- [ ] Auditar accesibilidad de teclado/semántica/foco, comportamiento responsive
-      y rendimiento de flujos relevantes.
-- [ ] Verificar estados vacíos, loading, éxito/error y recuperación en recorridos
-      críticos, sin sustituir pruebas de comportamiento por revisión visual.
-- [ ] Ejecutar regresión global de formatter, lint, typecheck, unit, integration,
-      E2E y build; exigir CI requerido first-pass antes de un release candidate,
-      registrar fallos/retries/flakiness sin ocultarlos y conservar la evidencia.
+El cierre de Fase 10 requiere evidencia de los bloques aprobados y sus límites.
+No requiere implementar las propuestas funcionales pendientes ni corregir
+hallazgos de seguridad dentro de esta fase sin autorización adicional.
 
 ### Resultado demostrable
 
-Release candidate con flujos funcionales aprobados cerrados (10A) y revisión
-integral de calidad/regresión terminada (10B), con evidencia trazable y límites
-de verificación explícitos.
+Experiencia existente auditada y corregida en el alcance aprobado, rendimiento
+medido antes/después y reporte de auditoría de seguridad entregado, con
+verificaciones de Auth respaldadas por evidencia y sin expansión funcional
+implícita.
 
 ## REGLA DE AVANCE
 

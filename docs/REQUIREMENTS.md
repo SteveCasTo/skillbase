@@ -557,19 +557,21 @@ Protección de datos personales.
 - requisitos académicos adicionales a la política de ausencias consecutivas aprobada para Fase 6, si se acuerdan para fases posteriores;
 - cuándo se consolida el descuento de auxiliares;
 - lista definitiva de auxiliares beneficiarios;
-- reportes administrativos exactos: su concepto, usuarios/roles, tipos de
-  información, campos, filtros y formatos no están aprobados ni especificados.
-  Como propuesta de conversación (no requisito aprobado), “reportes” podría
-  referirse a consultas/resúmenes operativos de información existente, como
-  listados o subtotales, con filtros y exportación opcional por confirmar. No
-  implica dashboards, analytics, CSV/PDF automático ni un módulo nuevo. Antes de
-  implementar, aclarar el objetivo y preferir reutilizar vistas existentes si
-  satisfacen la necesidad.
+- consultas/reportes administrativos aún por definir. Las siguientes son
+  propuestas de conversación, no requisitos aprobados ni autorización para
+  implementar: listas de participantes por grupo (solicitadas como necesarias,
+  pero con contenido y comportamiento por precisar); resumen por curso
+  (tentativo); vista general de pagos pendientes en laboratorio (tentativa); y
+  consulta de certificados por curso/grupo, con filtros por concretar. No se ha
+  aprobado formato de reporte/exportación, usuarios/roles adicionales ni un
+  módulo nuevo. Antes de implementar, aclarar objetivo, audiencia, datos, campos,
+  filtros y presentación; preferir reutilizar pantallas existentes cuando
+  satisfagan la necesidad.
 
 Tipos de certificado, elegibilidad, firmantes requeridos/posiciones, carga de
 PDF firmado, no-dependencia financiera y exclusión de la boleta física están
 resueltos en el alcance aprobado de Fase 9; ver el contrato enlazado. F9 fue
 liberada a producción y su demo sintética cloud/local tiene resultados y límites
-documentados. Los pendientes de autenticación real y verificación de requisitos
-funcionales forman parte de Fase 10A en [`PLAN.md`](PLAN.md); no añaden nuevas
-reglas de negocio a este documento.
+documentados. La verificación pendiente de Auth y la definición de
+consultas/reportes están reflejadas en Fase 10 de [`PLAN.md`](PLAN.md); no añaden
+nuevas reglas de negocio a este documento.
