@@ -79,11 +79,11 @@ test("private success toast uses semantic theme colors in light and dark modes",
 
   const viewport = page.locator("[data-sileo-viewport]");
   const tokenPairs = [
-    ["success", "primary"],
+    ["success", "feedback-success"],
     ["loading", "muted-foreground"],
     ["error", "destructive"],
-    ["warning", "accent"],
-    ["info", "secondary-foreground"],
+    ["warning", "feedback-warning"],
+    ["info", "feedback-info"],
     ["action", "primary"],
   ] as const;
 

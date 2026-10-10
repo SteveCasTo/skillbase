@@ -1,0 +1,41 @@
+/* Shared by public/auth/private layouts: feedback must not depend on a route. */
+:root {
+  --feedback-success: oklch(0.48 0.14 150);
+  --feedback-warning: oklch(0.5 0.12 75);
+  --feedback-info: oklch(0.48 0.13 250);
+}
+html.dark {
+  --feedback-success: oklch(0.78 0.15 150);
+  --feedback-warning: oklch(0.82 0.14 80);
+  --feedback-info: oklch(0.78 0.12 250);
+}
+html [data-sileo-viewport] {
+  --sileo-width: min(350px, calc(100vw - 2rem));
+  --sileo-state-success: var(--feedback-success);
+  --sileo-state-error: var(--destructive);
+  --sileo-state-warning: var(--feedback-warning);
+  --sileo-state-info: var(--feedback-info);
+  --sileo-state-loading: var(--muted-foreground);
+  --sileo-state-action: var(--primary);
+  z-index: 100;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+html [data-sileo-viewport] [data-sileo-title] {
+  color: var(--card-foreground);
+  text-transform: none;
+}
+html [data-sileo-viewport][data-theme] [data-sileo-description] {
+  color: var(--card-foreground);
+}
+html [data-sileo-viewport] [data-sileo-svg] {
+  filter: drop-shadow(
+    0 4px 12px color-mix(in oklch, var(--foreground) 12%, transparent)
+  );
+}
+html [data-sileo-viewport] :is([data-sileo-pill], [data-sileo-body]) {
+  fill: var(--card);
+}
+html [data-sileo-viewport] [data-sileo-toast]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
