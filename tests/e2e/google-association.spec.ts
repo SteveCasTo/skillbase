@@ -188,6 +188,9 @@ test("mismatched Google restores the owner; unsolicited attachment leaves passwo
       .locator('[data-sileo-toast][data-state="success"]')
       .filter({ hasText: "Sesión iniciada." }),
   ).toBeVisible();
+  await page.screenshot({
+    path: test.info().outputPath("approved-oauth-login.png"),
+  });
   await page.reload();
   await expect(page.locator("[data-oauth-login-notice]")).toHaveCount(0);
 });
