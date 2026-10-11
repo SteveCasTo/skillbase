@@ -173,14 +173,15 @@ test("mismatched Google restores the owner; unsolicited attachment leaves passwo
     maxRedirects: 0,
   });
   expect(start.status()).toBe(303);
-  const authorize = await context.request.get(start.headers().location, {
+  const authorizeUrl = start.headers().location;
+  if (!authorizeUrl) throw new Error("OAuth start did not provide a redirect");
+  const authorize = await context.request.get(authorizeUrl, {
     maxRedirects: 0,
   });
   expect(authorize.status()).toBe(302);
-  const loginCode = await completeLinkProviderFixture(
-    authorize.headers().location,
-    id,
-  );
+  const providerUrl = authorize.headers().location;
+  if (!providerUrl) throw new Error("OAuth provider redirect is unavailable");
+  const loginCode = await completeLinkProviderFixture(providerUrl, id);
   await page.goto(`/auth/callback?code=${encodeURIComponent(loginCode)}`);
   await expect(page).toHaveURL("/app/perfil");
   await expect(
