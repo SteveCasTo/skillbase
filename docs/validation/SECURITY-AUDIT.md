@@ -128,6 +128,45 @@ AUTH-1 sigue **abierto/parcial**: enviar el campo no activa enforcement y la
 frontera nativa de primera contraseña Google sigue sin cerrar. No se declara
 remediación completa ni validación productiva.
 
+### AUTH-1: estado tras release coordinado (2026-10-11)
+
+PR 334 se integró en `development` y PR 335 promovió el árbol completo de
+`development` a `master`, SHA
+`07042f851c8d0fe6b133288c088051bad6973bb5`. El CI de PR 334 (`38114811017`),
+PR 335 (`38115248716`) y push/deploy a `master` (`38115724400`) pasó en intento
+
+1. El deployment Vercel `dpl_6uHo1tyU3KPR75whcmWETJDo1Anz` quedó `READY` para el
+   SHA exacto. Solo después se activó el boolean cloud
+   `security_update_password_require_current_password` de `false` a `true`; una
+   lectura filtrada posterior confirmó `true`. Los demás campos cloud comparados
+   permanecieron idénticos. No hubo migración nueva ni reset, seed, cambio de
+   credenciales o contraseña, envío de recovery, ni modificación de Auth local.
+
+El gate CI registró 464 unit/4,036 assertions; 176 integración PASS y 1 skip
+preexistente; suites F8/F9 independientes 1 PASS cada una; y 145 E2E (76+69),
+sin retries/flakes. Estas suites con proveedor controlado no verifican Google o
+SMTP reales ni el enforcement del control cloud. El smoke de producción fue
+anónimo. No se hicieron flujos autenticados de password/recovery/primera
+contraseña Google. La confirmación manual anterior del usuario sobre asociación
+de recovery precede a este release y no se presenta como comprobación de
+compatibilidad actual.
+
+El control nativo activo hace que GoTrue exija la contraseña actual para cuentas
+con password en cambio normal, con excepciones para recovery y cuentas sin
+password previo. Como GoTrue no conoce la aprobación Google de SkillBase, la
+primera contraseña Google aprobada permanece en el boundary AUTH-1 sin resolver
+en el proveedor. El hallazgo queda **abierto/parcial**; no afirmar cierre
+completo ni ausencia de riesgo. Si se revierte el source a una versión que no
+envía `current_password`, restaurar primero el boolean cloud previo `false`.
+
+Estado local observado tras sincronizar el checkout raíz con `development`
+(`dbf7f3158f24dccf9f2f271ab8d6a24e715ab291`): la app preexistente sigue activa en
+`http://127.0.0.1:4321` (PID 37512), login HTTP 200 y feedback de contraseña
+inválida «Solicitud rechazada». Auth local es GoTrue v2.196.0 y la variable
+`GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD` no tiene asignación
+explícita observada. Esto no prueba que el boolean sea `false` ni enforcement
+local; no se reinició el proceso ni se alteró el WIP de configuración local.
+
 Validación local de esta implementación:
 
 - Frozen install, lint, format global, typecheck (0 errores/0 warnings/354 hints),

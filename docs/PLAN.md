@@ -952,6 +952,11 @@ implementación; preferir reutilizar superficies existentes cuando proceda.
       aplicar remediaciones bajo esta autorización.
 - [ ] Coordinar y realizar la verificación de Google OAuth real y recovery ya
       pendientes, sin declarar éxito hasta tener evidencia del flujo completo.
+      El release PR 335 activó por separado el control nativo cloud de contraseña
+      actual tras desplegar la fuente compatible; no ejecutó flujos autenticados
+      de cambio/recovery/primera contraseña Google ni cierra AUTH-1, cuya frontera
+      Google-only a nivel proveedor sigue pendiente (ver `AUTHENTICATION.md` y
+      `DEPLOYMENT.md`).
 - [ ] Mantener el rediseño específico F9 en espera; el trabajo transversal de
       Sileo sí incluye F9.
 
