@@ -437,3 +437,14 @@ Las credenciales pertenecen exclusivamente a Supabase Auth. Crear cuenta y asign
 ## REVISIÓN DE SEGURIDAD (2026-10-09)
 
 La revisión estática de la base `f388327424b9010a0ec5e5c209fe46d09b960d9f` registró un riesgo potencial en el cambio de contraseña Auth y dos coincidencias de advisories con versiones fijadas en `bun.lock`. Son hallazgos pendientes de validación y decisión; no se confirmó una explotación end-to-end ni se aplicaron remediaciones en esa revisión. El detalle, evidencia, límites y estado se mantienen en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md). Esta evidencia no constituye certificación de seguridad ni verificación de configuración/uso en producción.
+
+El seguimiento autorizado de 2026-10-11 confirmó en un stack efímero GoTrue
+`v2.196.0` la conversión directa de una sesión OAuth de fixture no aprobada a
+login PASSWORD autorizado; no probó adquisición Google real ni explotación
+cloud. `secure_password_change` permite cambios sin nonce durante las primeras
+24 horas y no impone las dos reglas de aplicación (password actual y Google
+aprobado reciente). AUTH-1 sigue abierto, bloqueado para diseño/coordinación de
+frontera proveedor; no se afirma que los guards actuales lo remedien. Las
+correcciones transitivas Sharp 0.35.5/devalue 5.9.3 quedan fijadas mediante
+overrides/lockfile, conservando Astro y el patch Sileo. Evidencia, validaciones y
+límites están en el seguimiento del documento de auditoría.

@@ -51,3 +51,114 @@ No se verificaron dinámicamente integraciones, E2E, permisos cloud, configuraci
 ## Seguimiento
 
 Mantener los hallazgos abiertos hasta que el responsable decida el tratamiento y se aporte evidencia de validación correspondiente. Cualquier remediación, test adicional o cambio de configuración pertenece a una tarea aprobada separada y no debe inferirse como aceptado a partir de este reporte.
+
+## Seguimiento autorizado — 2026-10-11
+
+### Fuente y aislamiento
+
+La remediación se inició en `fix/audited-security-risks`, worktree temporal desde
+`origin/development` `fb24e6882ea800135c02dbbf2c982e24f9f7a4ee`. Comparar con
+`f388327424b9010a0ec5e5c209fe46d09b960d9f` confirmó que los tres archivos Auth
+citados no habían cambiado; el manifest/lockfile ya incluía el patch declarado
+de Sileo 0.1.5, que se conserva sin modificaciones.
+
+No se añadieron tests permanentes. La comprobación directa se ejecutó mediante
+scripts fuera de Git y el runner existente `runWithTestStack`, con proyecto,
+puertos y credenciales efímeros propios, SMTP externo eliminado y cleanup
+estricto. Solo creó y modificó una identidad ADMIN sintética nueva, propiedad
+del experimento. No se usaron cuentas demo existentes, correo real, Google real,
+cloud ni producción; no se reinició/resetearon el stack o la app canónicos.
+
+### AUTH-1: confirmado en boundary controlado; remediación bloqueada
+
+Sobre GoTrue `v2.196.0`, el fixture OAuth existente produjo una sesión firmada
+real mediante intercambio PKCE. Una cuenta interna sintética `ACTIVE`/`ADMIN`,
+primaria `EMAIL`, tenía contraseña y una identidad Google de fixture sin
+`approved_google_identity_id`:
+
+1. `loadRequestAuthContext` rechazó su sesión OAuth (sin usuario interno
+   autorizado).
+2. La misma sesión llamó directamente a `supabase.auth.updateUser({ password })`,
+   sin contraseña actual ni prueba de la aplicación: éxito, sin error Auth.
+3. `signInWithPassword` con esa contraseña tuvo éxito;
+   `loadRequestAuthContext` autorizó `PASSWORD` con rol `ADMIN`.
+
+Esto confirma la conversión de una sesión proveedor no aprobada a acceso
+PASSWORD en el entorno controlado, **no** adquisición real de una sesión Google,
+explotación cloud, ni una elevación desde INSTRUCTOR a ADMIN. El fixture preparó
+la identidad y el flow-state; no ejercitó auto-link ni consentimiento Google
+reales. Cleanup eliminó únicamente el UUID Auth propio y el runner destruyó su
+stack temporal. Un primer intento del script falló antes del experimento por
+una ruta de import incorrecta; también limpió su stack.
+
+La [documentación actual de password security](https://supabase.com/docs/guides/auth/password-security)
+y el [código GoTrue v2.196.0](https://github.com/supabase/auth/blob/v2.196.0/internal/api/user.go)
+confirman que `secure_password_change` permite cambiar sin nonce durante las
+primeras 24 horas de la sesión. No implementa la regla de contraseña actual ni
+la ventana Google de cinco minutos.
+
+Auth sí soporta `security_update_password_require_current_password` y
+`updateUser({ current_password, password })`. El código del proveedor exceptúa
+recovery real (`session.IsRecovery()`) y la primera contraseña (`!HasPassword()`),
+preservando esos caminos; por ello **esa opción sola no resuelve** el límite
+Google-only/aprobación reciente. El SDK fijado expone `current_password`, pero
+[CLI 2.117.0](https://github.com/supabase/cli/blob/v2.117.0/apps/cli-go/pkg/config/auth.go)
+no expone esta opción en su configuración TOML. No se inventó una clave TOML ni
+se cambiaron settings efectivos locales/cloud. El catálogo oficial de
+[Auth Hooks](https://supabase.com/docs/guides/auth/auth-hooks) consultado no ofrece
+un hook de cambio de contraseña que reciba la sesión y pueda imponer ambas
+reglas. La revisión de changelog no encontró un cambio aplicable que aportase
+esa garantía.
+
+**Decisión requerida:** coordinar un diseño de frontera del proveedor para las
+dos operaciones (cambio de password existente y creación Google-only), con
+excepción verificable de recovery y compatibilidad con invitaciones/asociación
+explícita. Habilitar la opción actual de Auth exigiría despliegue de configuración
+fuera del alcance autorizado y pasar la contraseña actual al proveedor; la
+aprobación Google de cinco minutos requiere además un mecanismo autoritativo
+distinto, evaluado y aprobado antes de migración/restructuración. No se aplicó un
+guard-only, un bloqueo genérico de recovery, ni denegación global de Google.
+Los archivos runtime Auth y los contratos actuales quedan intactos; AUTH-1
+permanece **abierto y bloqueado**, no remediado.
+
+### DEP-1: versiones corregidas fijadas
+
+Las APIs oficiales de GitHub confirmaron los advisories no retirados y las
+releases estables [Sharp 0.35.5](https://github.com/lovell/sharp/releases/tag/v0.35.5)
+y [devalue 5.9.3](https://github.com/sveltejs/devalue/releases/tag/v5.9.3).
+Astro 7.3.2 requiere Sharp `^0.35.4` opcional y devalue `^5.8.1`;
+`@astrojs/react` 6.0.5 requiere devalue `^5.8.1`. Ambas correcciones satisfacen esos
+rangos. Overrides exactos en `package.json` y resolución en `bun.lock` actualizan
+solo esas dos familias, incluidos binarios Sharp 0.35.5/libvips 1.3.4. No hay
+actualización masiva, nueva dependencia directa, cambio de Astro, scripts ni
+vendor patch de Sileo.
+
+`bun install --frozen-lockfile` confirmó resolución reproducible y las versiones
+efectivas 0.35.5/5.9.3. La coincidencia de versiones vulnerables DEP-1 queda
+corregida en esta fuente; no afirma actualización de producción ni ausencia de
+otros advisories o de una librsvg instalada globalmente en otro entorno.
+
+### Validación local de esta fuente
+
+- `bun run check`: lint/format/typecheck PASS.
+- `bun run test:unit`: 464 PASS, 0 FAIL (4033 assertions).
+- `bun run build`: PASS, Astro/Vercel con configuración pública sintética y sin
+  acceso a DB canónica.
+- 21 pruebas Auth focales existentes: PASS, antes de la comprobación directa.
+- Comparación puntual fuera de Git del servicio Sharp real de Astro entre
+  0.35.4 y 0.35.5: 16 transforms (4 anchos × WebP/AVIF × 2 calidades), bytes,
+  hashes y dimensiones idénticos en Windows/Node 24. Es input PNG sintético,
+  no comparación de imágenes estáticas de producción ni benchmark de carga.
+  Los tiempos individuales se conservaron solo como observación, no como
+  garantía de rendimiento Linux/cloud. No se cambiaron assets ni encoders.
+- Comprobación manual puntual de devalue en Node 24: `stringify`/`parse` y
+  `uneval` conservaron solo los 2 bytes visibles de un Buffer sintético con
+  backing store compartido, sin serializar el resto del pool.
+- E2E focal existente (Google association, password hydration y public courses)
+  sobre puerto alternativo 44894, sin retries: **7 PASS / 1 FAIL**. El fallo fue
+  `catalog navigation, keyboard focus, and responsive layout`, expectativa de
+  foco del skip-link tras Tab; no fue un error de transformación de imagen.
+  No se eliminó/modificó assertion, timeout ni test. No se atribuye todavía una
+  causa raíz al fallo, ni se declara esa corrida verde.
+- Integración y checks remotos se registran al completarse, no se infieren de
+  la prueba del proveedor o del build.
