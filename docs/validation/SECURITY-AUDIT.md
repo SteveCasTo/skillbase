@@ -62,64 +62,24 @@ La remediación se inició en `fix/audited-security-risks`, worktree temporal de
 citados no habían cambiado; el manifest/lockfile ya incluía el patch declarado
 de Sileo 0.1.5, que se conserva sin modificaciones.
 
-No se añadieron tests permanentes. La comprobación directa se ejecutó mediante
-scripts fuera de Git y el runner existente `runWithTestStack`, con proyecto,
-puertos y credenciales efímeros propios, SMTP externo eliminado y cleanup
-estricto. Solo creó y modificó una identidad ADMIN sintética nueva, propiedad
-del experimento. No se usaron cuentas demo existentes, correo real, Google real,
-cloud ni producción; no se reinició/resetearon el stack o la app canónicos.
+No se añadieron tests permanentes. Las validaciones de integración y E2E usan
+el runner existente, con proyecto, puertos y credenciales efímeros propios y
+SMTP externo eliminado. No se usaron cuentas demo existentes, correo real,
+Google real, cloud ni producción; no se reinició/resetearon el stack o la app
+canónicos.
 
-### AUTH-1: confirmado en boundary controlado; remediación bloqueada
+### AUTH-1: pendiente de decisión y revisión autorizada
 
-Sobre GoTrue `v2.196.0`, el fixture OAuth existente produjo una sesión firmada
-real mediante intercambio PKCE. Una cuenta interna sintética `ACTIVE`/`ADMIN`,
-primaria `EMAIL`, tenía contraseña y una identidad Google de fixture sin
-`approved_google_identity_id`:
+El asunto Auth queda fuera del mantenimiento defensivo de dependencias del
+PR 332. Requiere una revisión específica autorizada de la frontera del proveedor
+y una decisión del responsable que preserve login password, Google, recovery,
+invitaciones y asociación explícita. No se afirma una corrección ni exposición
+verificada en producción. Este seguimiento no proporciona un procedimiento de
+reproducción ni autoriza nuevas comprobaciones sobre ese escenario.
 
-1. `loadRequestAuthContext` rechazó su sesión OAuth (sin usuario interno
-   autorizado).
-2. La misma sesión llamó directamente a `supabase.auth.updateUser({ password })`,
-   sin contraseña actual ni prueba de la aplicación: éxito, sin error Auth.
-3. `signInWithPassword` con esa contraseña tuvo éxito;
-   `loadRequestAuthContext` autorizó `PASSWORD` con rol `ADMIN`.
-
-Esto confirma la conversión de una sesión proveedor no aprobada a acceso
-PASSWORD en el entorno controlado, **no** adquisición real de una sesión Google,
-explotación cloud, ni una elevación desde INSTRUCTOR a ADMIN. El fixture preparó
-la identidad y el flow-state; no ejercitó auto-link ni consentimiento Google
-reales. Cleanup eliminó únicamente el UUID Auth propio y el runner destruyó su
-stack temporal. Un primer intento del script falló antes del experimento por
-una ruta de import incorrecta; también limpió su stack.
-
-La [documentación actual de password security](https://supabase.com/docs/guides/auth/password-security)
-y el [código GoTrue v2.196.0](https://github.com/supabase/auth/blob/v2.196.0/internal/api/user.go)
-confirman que `secure_password_change` permite cambiar sin nonce durante las
-primeras 24 horas de la sesión. No implementa la regla de contraseña actual ni
-la ventana Google de cinco minutos.
-
-Auth sí soporta `security_update_password_require_current_password` y
-`updateUser({ current_password, password })`. El código del proveedor exceptúa
-recovery real (`session.IsRecovery()`) y la primera contraseña (`!HasPassword()`),
-preservando esos caminos; por ello **esa opción sola no resuelve** el límite
-Google-only/aprobación reciente. El SDK fijado expone `current_password`, pero
-[CLI 2.117.0](https://github.com/supabase/cli/blob/v2.117.0/apps/cli-go/pkg/config/auth.go)
-no expone esta opción en su configuración TOML. No se inventó una clave TOML ni
-se cambiaron settings efectivos locales/cloud. El catálogo oficial de
-[Auth Hooks](https://supabase.com/docs/guides/auth/auth-hooks) consultado no ofrece
-un hook de cambio de contraseña que reciba la sesión y pueda imponer ambas
-reglas. La revisión de changelog no encontró un cambio aplicable que aportase
-esa garantía.
-
-**Decisión requerida:** coordinar un diseño de frontera del proveedor para las
-dos operaciones (cambio de password existente y creación Google-only), con
-excepción verificable de recovery y compatibilidad con invitaciones/asociación
-explícita. Habilitar la opción actual de Auth exigiría despliegue de configuración
-fuera del alcance autorizado y pasar la contraseña actual al proveedor; la
-aprobación Google de cinco minutos requiere además un mecanismo autoritativo
-distinto, evaluado y aprobado antes de migración/restructuración. No se aplicó un
-guard-only, un bloqueo genérico de recovery, ni denegación global de Google.
-Los archivos runtime Auth y los contratos actuales quedan intactos; AUTH-1
-permanece **abierto y bloqueado**, no remediado.
+No se modificaron archivos runtime Auth, contratos, permisos, credenciales,
+configuración del proveedor o migraciones. No se presenta un guard de aplicación
+como remediación de la frontera del proveedor. AUTH-1 permanece **abierto**.
 
 ### DEP-1: versiones corregidas fijadas
 
@@ -144,7 +104,7 @@ otros advisories o de una librsvg instalada globalmente en otro entorno.
 - `bun run test:unit`: 464 PASS, 0 FAIL (4033 assertions).
 - `bun run build`: PASS, Astro/Vercel con configuración pública sintética y sin
   acceso a DB canónica.
-- 21 pruebas Auth focales existentes: PASS, antes de la comprobación directa.
+- 21 pruebas Auth focales existentes: PASS.
 - Comparación puntual fuera de Git del servicio Sharp real de Astro entre
   0.35.4 y 0.35.5: 16 transforms (4 anchos × WebP/AVIF × 2 calidades), bytes,
   hashes y dimensiones idénticos en Windows/Node 24. Es input PNG sintético,
