@@ -189,6 +189,32 @@ test("mismatched Google restores the owner; unsolicited attachment leaves passwo
       .locator('[data-sileo-toast][data-state="success"]')
       .filter({ hasText: "Sesión iniciada." }),
   ).toBeVisible();
+  // Visibility alone permits opacity 0 / the entering toast outside the viewport.
+  // Capture its actual presented state, without suppressing Sileo's animation.
+  await page.waitForFunction(() => {
+    const toast = document.querySelector<HTMLElement>(
+      '[data-sileo-toast][data-state="success"]',
+    );
+    if (!toast) return false;
+    const box = toast.getBoundingClientRect();
+    if (
+      box.width < 100 ||
+      box.height < 20 ||
+      box.left < 0 ||
+      box.top < 0 ||
+      box.right > innerWidth ||
+      box.bottom > innerHeight
+    )
+      return false;
+    for (
+      let element: HTMLElement | null = toast;
+      element;
+      element = element.parentElement
+    ) {
+      if (Number(getComputedStyle(element).opacity) < 0.99) return false;
+    }
+    return true;
+  });
   await page.screenshot({
     path: test.info().outputPath("approved-oauth-login.png"),
   });
