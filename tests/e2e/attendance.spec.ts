@@ -163,8 +163,23 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
       })
       .click();
     await page.getByRole("option", { name: "Ausente", exact: true }).click();
-    expect((await rejectedSave).status()).toBe(409);
-    await expect(person.getByRole("alert")).not.toBeEmpty();
+    const rejectedResponse = await rejectedSave;
+    expect(rejectedResponse.status()).toBe(409);
+    const rejectedPayload = (await rejectedResponse.json()) as {
+      message: string;
+    };
+    expect(rejectedPayload.message).not.toBe("");
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+      ),
+    ).toBeVisible();
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+      ),
+    ).toContainText(rejectedPayload.message);
+    await expect(person.getByRole("alert")).toHaveCount(0);
     await expect(
       person.getByRole("combobox", {
         name: "Asistencia de Enrolled Attendance",
