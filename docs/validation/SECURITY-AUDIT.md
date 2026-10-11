@@ -186,6 +186,90 @@ Validación local de esta implementación:
   de este worktree y no se modifica. CI/merge se verifican en el PR antes de
   integrarlo; no se promueve a master desde esta implementación.
 
+### AUTH-1: regla autorizada y guard común de identidad (2026-10-11)
+
+Fuente aislada `fix/auth-identity-authorization`, desde `origin/development`
+`e850190bb96728dd54a05186fe0de42bdf8959ea`. El responsable acepta la primera
+contraseña nativa de una cuenta Google legítima ya vinculada/autorizada, sin exigir
+exclusividad de la pantalla de SkillBase. Sigue exigiendo la misma identidad
+autorizada para cada acceso posterior. No se acepta que un password nuevo sustituya
+la aprobación interna, correo verificado coincidente, UUID vinculado, estado o
+roles. El formulario mantiene prueba Google reciente; la excepción nativa no
+ofrece esa prueba de cinco minutos fuera de la app. Bootstrap ADMIN permanece
+sin ROOT; seed no constituye verificación de identidad Google.
+
+El cambio mínimo en `src/domain/auth/identity.ts` elimina el retorno incondicional
+de PASSWORD/EMAIL_CONFIRMATION: cuentas GOOGLE requieren su Google aprobado,
+verificado y coincidente también después de crear password; una aprobación Google
+explícita registrada no puede sustituirse por el fallback primario legado. Cuentas EMAIL
+conservan provenance interno y correo de cuenta verificado coincidente, incluso
+si se quita la identidad email del proveedor, y conservan password/recovery
+legítimos aunque Auth adjunte Google no aprobado. Añadir identidad email a GOOGLE
+no invalida por sí solo la identidad primaria autorizada. La política se reutiliza
+desde el contexto server-side común; gateway de perfil mantiene `current_password`
+normal, excepciones legítimas y comprobación de sesión live sin modificación.
+No hay migración ni provenance de password nueva; no se cambian hook, provider
+policy cloud, credenciales, roles, seed, Sileo o dependencias.
+
+Validación segura realizada sin requests al proveedor: comprobación manual de la
+política con DTOs íntegramente sintéticos aceptó cinco combinaciones legítimas
+(Google primario tras añadir email en los tres métodos; EMAIL con Google adjunto
+en password/recovery) y rechazó 24 combinaciones de UUID/email/verificación Google
+incompatibles, Google ausente, usuario DISABLED y roles vacíos en los tres métodos.
+La comprobación adicional rechazó tres mismatches del ID Google aprobado
+registrado, uno por cada método. No demuestra una sesión Google real ni una
+operación nativa de password. Las
+464 unitarias existentes pasaron con 4.036 assertions sin añadir/modificar
+tests/casos/suites. La primera integración no llegó a ejecutar tests por fallo de
+arranque del stack temporal; no se atribuye causa no demostrada ni se oculta como
+PASS.
+
+La segunda integración ejecutó 175 PASS/1 FAIL/1 skip preexistente. El fallo
+existente mostró que exigir la presencia actual de identidad email bloqueaba
+password legítimo de una cuenta EMAIL tras unlink nativo, aun conservando su
+provenance interno, UUID y correo de cuenta verificado. Se corrigió el guard para
+conservar esa autorización independiente; no se modificó/eliminó el test ni se
+debilitó su rechazo OAuth no aprobado. Ese resultado fallido no se presenta como
+gate verde; se requiere validación posterior de la fuente corregida.
+
+Los E2E Auth existentes (`dual-auth`, `google-association`,
+`password-hydration`) pasaron 8/8 en Astro aislado `4347`, retries=0, con provider
+controlado y SMTP externo eliminado. Incluyen primera contraseña Google-only
+ADMIN, login posterior y recovery acotado, linking aprobado/no aprobado, password
+actual y fallback sin JavaScript. No se activó el control nativo en ese stack;
+no acredita enforcement cloud/local ni consentimiento Google o entrega SMTP real.
+Frozen install, lint/format global, typecheck (0 errores/0 warnings/354 hints),
+build con placeholders públicos sintéticos y `git diff --check` pasaron. El build
+no conectó a la DB compartida. El ajuste final del fallback registrado se verificó
+de nuevo con las 464 unitarias; el gate remoto y cierre operacional siguen
+separados.
+
+La repetición focal posterior obtuvo 7 PASS/1 FAIL, retries=0: el test de login
+falló antes de autenticar, en el toggle por teclado del campo password (esperaba
+`type=text`, permaneció `password`). No se atribuye todavía causa ni se modifica
+UI/test ajenos para ocultarlo. Una invocación de build posterior alcanzó timeout
+de shell durante el bundling Vercel; los builds previos sí finalizaron. Esos
+resultados no se presentan como nueva corrida final verde.
+
+La fuente corregida `8c05b83` pasó después integración completa **176 PASS/0
+FAIL/1 skip preexistente**, 1.441 assertions, y E2E Auth focal **8/8 PASS** en
+`4347` con retries=0. No se cambió el toggle ni su test; el pase posterior no
+establece causa raíz de la failure anterior. El build dedicado con timeout
+suficiente finalizó PASS y `git diff --check` pasó. Los runners limpiaron sus
+stacks propios; no usaron el stack canónico. Estas validaciones preservan la
+compatibilidad funcional con proveedor controlado, no demuestran el boolean
+nativo activo en ese proveedor ni cierran el gate operacional pendiente.
+
+Estado: **pendiente de cierre operacional**, no resuelto por esta inspección.
+Cloud conserva el control nativo previamente confirmado activo, sin cambios en
+esta tarea. La documentación oficial y GoTrue v2.196.0 confirman campo y
+excepciones; CLI 2.117.0 no tiene mapeo TOML del control. No se reinició ni modificó
+el runtime/configuración WIP local compartido. Antes de cerrar, coordinar con el
+orquestador una vía local soportada, comprobar el control efectivo y demostrar
+flujos normales autorizados con QA propia y el control activo. Consentimiento
+Google/SMTP real requiere autorización manual independiente. No reproducir
+procedimientos de bypass del proveedor ni rotar passwords de cuentas existentes.
+
 ### DEP-1: versiones corregidas fijadas
 
 Las APIs oficiales de GitHub confirmaron los advisories no retirados y las
