@@ -8,7 +8,7 @@ export interface PasswordGateway {
     password: string,
     authUserId: string,
   ): Promise<boolean>;
-  updatePassword(password: string): Promise<boolean>;
+  updatePassword(password: string, currentPassword?: string): Promise<boolean>;
   recordPasswordChanged(actorId: string): Promise<void>;
 }
 
@@ -64,7 +64,14 @@ export async function changeAccountPassword(
       "La nueva contraseña debe ser diferente de la actual.",
       "password",
     );
-  if (!(await gateway.updatePassword(input.password)))
+  if (
+    !(await gateway.updatePassword(
+      input.password,
+      input.hasRecoveryProof || input.hasGoogleProof
+        ? undefined
+        : input.currentPassword,
+    ))
+  )
     throw new Error(
       "No pudimos cambiar la contraseña. Confirma tu acceso e inténtalo nuevamente.",
     );
