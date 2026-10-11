@@ -11,6 +11,9 @@ import {
 } from "@/domain/instructors/profile";
 import { requireInternalUser } from "@/server/auth/context";
 import { createInstructorAccount } from "@/server/auth/provision-instructor";
+import { AccountProvisionError } from "@/domain/auth/account-provision-error";
+import { AuthorizationError } from "@/domain/auth/errors";
+import { logAccountCreationFailure } from "@/server/auth/account-credentials";
 import { requestHasExpectedOrigin } from "@/server/auth/redirects";
 import { readAuthForm } from "@/server/auth/security";
 import { getDatabase } from "@/server/db/client";
@@ -74,7 +77,14 @@ export async function instructorEditor(
           "Recarga la página antes de enviar la solicitud.",
         );
       }
-      const form = await readAuthForm(context.request);
+      let form: URLSearchParams;
+      try {
+        form = await readAuthForm(context.request);
+      } catch {
+        throw new InstructorError(
+          "La solicitud no es válida. Recarga y reintenta desde el formulario.",
+        );
+      }
       const intent = form.get("intent");
       if (intent) {
         if (own || !previous)
@@ -198,11 +208,26 @@ export async function instructorEditor(
           })
         : context.redirect(destination, 303);
     } catch (cause) {
-      if (context.response.status !== 403) context.response.status = 422;
+      if (context.response.status !== 403)
+        context.response.status =
+          cause instanceof AuthorizationError
+            ? 403
+            : cause instanceof InstructorError
+              ? 422
+              : cause instanceof AccountProvisionError
+                ? 503
+                : 500;
+      if (
+        !(cause instanceof InstructorError) &&
+        !(cause instanceof AuthorizationError)
+      )
+        logAccountCreationFailure("instructor_save", cause);
       error =
         cause instanceof InstructorError
           ? cause.message
-          : "No pudimos guardar el instructor. Revisa los datos e inténtalo nuevamente.";
+          : cause instanceof AccountProvisionError
+            ? cause.message
+            : "No pudimos guardar el instructor. Inténtalo nuevamente más tarde.";
       errors = cause instanceof InstructorError ? cause.fieldErrors : {};
       if (context.request.headers.get("accept")?.includes("application/json"))
         response = new Response(

@@ -16,8 +16,9 @@ export class AdminAccountError extends Error {
     readonly code: AdminAccountErrorCode,
     message: string,
     readonly issues: Readonly<Record<string, string>> = {},
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = "AdminAccountError";
   }
 }
