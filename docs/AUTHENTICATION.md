@@ -209,6 +209,76 @@ de cierre operacional coordinado, con evidencia de configuración y flujos norma
 autorizados; no repetir procedimientos de bypass del proveedor. Resultados y
 límites en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md).
 
+### Configuración nativa local reproducible (candidata; sin apply canónico)
+
+`scripts/local-auth-config.ts` prepara/verifica únicamente la propiedad nativa
+`GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD=true` para el proceso
+GoTrue v2.196.0. No copia el `.env` de la aplicación ni las credenciales Auth:
+el archivo y su receipt, fuera de Git, contienen una sola clave literal y IDs/hash
+no secretos. El helper exige proyecto/puertos locales conocidos, imagen fijada,
+proceso y cwd esperados, ausencia de conflicto de entorno, archivo regular sin
+symlink y hash exacto. Un archivo/configuración ajenos se rechazan sin sobrescribir.
+
+La CLI 2.117.0 y la 2.120.0 inspeccionadas no ofrecen el mapeo TOML. GoTrue sí
+soporta cargar `.env` desde su cwd `/` cuando no hay flags de configuración: ese
+loader nativo se utiliza bajo ownership explícito y reinicio del mismo contenedor
+Auth, nunca recreación de DB/Storage ni edición de secretos. Es una integración
+del launcher local, **no un hook oficial de Supabase CLI**. El cambio normal sigue
+enviando `current_password`; recovery y primera contraseña siguen las excepciones
+nativas. No introduce una exigencia de contraseña actual inexistente para Google.
+
+El wrapper `scripts/start-local-supabase.ts` reaplica/verifica después del start
+normal mediante `supabase:start`; `supabase:auth:local` ofrece PLAN/apply/verify/
+rollback explícitos. `scripts/dev.ts` exige la verificación antes de servir QA local. Una
+recreación por CLI pierde el archivo de la capa writable: el wrapper debe ejecutarse
+de nuevo. Un CLI alternativo o cambios de contenedor mientras Astro ya corre no
+están monitorizados continuamente; no declarar enforcement perpetuo ni usar ese
+runtime para QA hasta pasar otra vez el launcher. Los runners generales de tests
+no se modifican ni aplican este control implícitamente. Integración de entradas
+package se limita a esas dos entradas; PERF no modifica package en su rama
+inspeccionada. El apply/reinicio canónico y cierre AUTH-1 requieren una ventana
+operativa posterior del orquestador; no ocurrieron durante esta implementación.
+
+La instalación del archivo es operator-owned mediante Docker archive (`docker
+cp --archive -`) de un tar fijo de una sola entrada `.env`, UID/GID 1000 y modo 0444
+independientes de ACLs Windows; se valida también el literal readonly host.
+El proceso Auth permanece como `supabase` y
+no se ejecuta como root ni se modifica su USER, imagen o privilegios. Hash,
+owner/group `1000:1000` y permisos `0444` legibles se verifican antes del restart,
+junto con el UID/GID originales del proceso `supabase`. No se afirma propiedad
+root: Docker instala con el usuario del servicio; ownership significa gestión
+exclusiva del operador y receipt del helper, no resistencia al propietario host
+ni al propio servicio con capacidad de chmod sobre su archivo.
+El helper serializa sus operadores por lock y revalida container ID/archivo
+inmediatamente antes de copiar; Docker archive no ofrece compare-and-swap entre
+operadores ajenos, por lo que exige ventana exclusiva sin otras operaciones
+Docker. No confiar en esta cooperación como control contra el propietario host.
+Rollback sustituye solo su literal por `...=false`, reinicia el mismo Auth y
+mantiene receipt `rolledback` que bloquea QA; no elimina archivos como root. Ese
+rollback restaura el boolean, **no la ausencia física original del archivo**.
+
+La QA temporal propia `skillbase_test_75b42dad4f824a0f` confirmó enforcement
+nativo: cuenta QA recién creada con password conocido recibió
+`current_password_required` al omitirlo; el cambio normal correcto y login
+posterior conservaron UUID. Con el control activo pasaron los ocho E2E Auth
+existentes, retries=0, incluidos primera contraseña Google-only ADMIN y recovery
+acotado. No se añadieron casos/specs/suites. El proveedor Google es fixture
+controlado; no prueba consentimiento Google ni SMTP reales.
+
+Antes/después de apply, recreación CLI propia y rollback se conservaron conteos
+observados y nombres de volúmenes: ledger 24, certificados **0**, un usuario Auth,
+un usuario interno/rol, un bucket y cero objetos antes de preparar la suite. Son
+conteos **del stack aislado**, no los ocho certificados ni cuentas canónicos.
+No fue comparación por hash de todas las filas. Recreación eliminó el archivo y
+el consumidor falló cerrado; reapply recuperó la configuración antes de QA.
+Rollback al literal false conservó su snapshot y bloqueó el consumidor.
+El runner limpió solo su proyecto propio. Esta prueba no activa ni cierra AUTH-1
+en el runtime canónico, que sigue pendiente de revisión/ventana del orquestador.
+Una comprobación separada en `skillbase_test_ab08e1bf1a7e3515` ejecutó el wrapper
+real, comprobó el bloqueo tras recreación CLI directa y reaplicó mediante el
+mismo wrapper antes de habilitar el consumidor. También fue limpiada por el
+runner estricto, sin repetir la suite Auth.
+
 El full E2E Auth PR 118 pasó 104/104 y PR 120 había pasado 107/107 antes de cambios posteriores. Tras restaurar la dependencia opcional Astro Sharp con `bun install --frozen-lockfile`, la fuente final pasó full E2E 107/107 en `127.0.0.1:4321`; el smoke público/privado pasó y el release CI/deploy de PR 126 se completó. Google OAuth real y SMTP/recovery no estaban probados en ese release histórico. El estado operacional vigente de SMTP (configuración cloud/local y receipt local confirmada, límites de recovery/cloud pendientes) está arriba y en `docs/DEPLOYMENT.md`.
 
 ### Gestión multi-ADMIN de Fase 8 (release PR 286)

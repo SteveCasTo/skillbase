@@ -177,6 +177,49 @@ Los puertos canónicos son API `55321` y PostgreSQL `55322`, definidos en `supab
 
 Utilizar Supabase CLI del proyecto.
 
+### Launcher local de enforcement Auth (candidato coordinado)
+
+El start controlado usa `scripts/start-local-supabase.ts`: conserva Supabase CLI y
+sus servicios existentes, captura su salida sin imprimir claves y aplica/verifica
+el helper de configuración nativa **antes** de habilitar QA. Las entradas de
+`package.json` `supabase:start` y `supabase:auth:local` están integradas como
+dos entradas exclusivamente; la rama PERF inspeccionada no modifica package.
+Esta candidata no afirma que el apply
+canónico se haya realizado. `setup` ya usa `supabase:start`; no ejecutar setup
+para activar el control sobre una DB existente, pues hace reset destructivo.
+
+El helper se ejecuta con `bun --no-env-file scripts/local-auth-config.ts`:
+PLAN por defecto y `--action apply`, `--action verify` o `--action rollback`
+explícitos. El modo apply instala solo la clave literal nativa en el loader
+GoTrue v2.196.0 y reinicia solamente el contenedor Auth existente. Rechaza
+configuración/archivo no propios, contenido extra, symlinks, flags/cwd/imagen
+inesperados y conflictos de entorno. Receipt con startup confirmado permite
+verify e idempotencia; un apply interrumpido mantiene estado pending que no
+habilita el consumidor y permite recuperación/rollback propio. Datos y passwords
+permanecen en Auth/DB, no en el archivo nativo.
+
+`dev` falla cerrado si el archivo/receipt/startup no coinciden. Una ejecución CLI
+stop/start directa conserva volúmenes pero elimina el contenedor y su archivo
+writable; debe volver a pasar por el wrapper. El helper no vigila permanentemente
+un Astro ya abierto ni garantiza comandos CLI alternativos: coordinar esos
+operadores y detener QA hasta verificar de nuevo. No reiniciar la app/Supabase
+compartidos automáticamente mientras otro agente trabaja; la aplicación
+canónica requiere una ventana operativa y snapshot previo independiente.
+
+Rollback reemplaza exclusivamente el literal nativo propio por `false` con
+hash/ID coincidentes y reinicia el mismo Auth; no restaura ausencia física del
+archivo y no ejecuta Auth ni comandos como root. No modifica TOML, puertos, DB, Storage, provider cloud ni
+credenciales. El `.env` de la app no se copia ni se usa como archivo de GoTrue.
+Ver [`AUTHENTICATION.md`](AUTHENTICATION.md) para límites de aceptación.
+
+Docker archive instala ese único archivo operator-owned readonly, no un script o
+executable. Verifica UID/GID `1000:1000`, modo legible `0444`, hash y proceso
+`supabase` intactos. Lock exclusivo del helper, check inmediato antes de copiar y
+ID exacto evitan colisiones entre sus llamadas. Docker no ofrece CAS para archive
+frente a otros operadores host; la ventana exclusiva es requisito. No invocar
+Docker alternativo en paralelo. Un receipt pending/rolledback y un lock presente
+bloquean iniciar QA; no borrar locks stale automáticamente.
+
 Flujo habitual:
 
 ```text

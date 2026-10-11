@@ -606,3 +606,46 @@ observado es v2.196.0 y no presenta asignación explícita de
 control local esté en `false` ni verificado. La configuración nativa cloud
 `true` documentada arriba no implica sincronización/configuración del Supabase
 local.
+
+## Launcher nativo Auth local (candidato; operación canónica pendiente)
+
+PR 337 integró en `development` el guard de identidad común como
+`2bd5d05244fb151501dfe8cda8249cb0d0b8fe40`; CI `38175262811` pasó quality,
+integration y ambas shards E2E, además del agregador requerido. La cohorte tuvo
+145 casos, **1 flaky y 2 retries**; no fue first-pass limpio. Deploy se omitió por
+ser PR a development; no se promovió a master ni cambió cloud.
+
+La candidata local añade un helper/launcher limitado a GoTrue v2.196.0 y una
+verificación antes del nuevo `dev`. CLI 2.117.0 y 2.120.0 no tienen mapeo TOML del
+boolean nativo: `secure_password_change` sigue siendo nonce/reautenticación. El
+helper utiliza el loader oficial de archivo de GoTrue, no una clave inventada ni
+`config push`. Su archivo de una clave y receipt quedan fuera de Git y no incluyen
+secretos. La capa writable no sobrevive recreación de contenedor; reapply/verify
+es parte obligatoria del launcher normal, no una promesa de monitorización
+continua ni soporte oficial del lifecycle CLI para ese archivo.
+
+La operación canónica sigue bloqueada hasta revisión y ventana del orquestador:
+preservar WIP por hash, API runtime 54321, DB 55322, identidad/imagen Auth,
+volúmenes DB/Storage y snapshot vigente de ledger/certificados/usuarios. No usar
+los conteos del stack aislado como conteos canónicos. Apply reinicia únicamente
+Auth, no la app/otros servicios, y conserva el mismo container ID; después deben
+comprobarse salud, preservación y flujos QA autorizados. No reset, seed, migración,
+cambio cloud ni rotación de una cuenta existente. Rollback restaura exclusivamente
+el boolean previo con literal `false` en el archivo propio (no su ausencia física)
+y reinicia el mismo Auth bajo coordinación, sin exec root ni USER/privilegios
+nuevos. Instalación operator-owned readonly vía Docker archive exige ventana
+exclusiva: su API no tiene CAS frente a comandos Docker ajenos. AUTH-1
+permanece parcial hasta configurar/verificar el runtime canónico y completar su
+aceptación; una prueba aislada no acredita OAuth Google/SMTP reales.
+
+La verificación aislada del helper confirmó control nativo efectivo sobre una
+cuenta nueva propia, cambio normal con password actual conocido y login posterior
+con el mismo UUID. Los ocho E2E Auth existentes pasaron con ese control activo,
+sin retries, preservando primera contraseña Google aprobada y recovery acotado.
+La recreación CLI propia exigió reapply y bloqueó el consumidor sin archivo;
+apply/rollback conservaron conteos/volúmenes del stack aislado. Baseline observado:
+ledger24/certificados0/Auth users1/internal users1/roles1/buckets1/objects0, no
+inventario canónico ni comparación de hashes fila por fila. Es evidencia de
+compatibilidad local controlada, no configuración cloud/canónica ni cierre
+operacional AUTH-1. La ventana canónica debe revisar límites de owner1000,
+operación Docker exclusiva y rollback false antes de aplicar.
