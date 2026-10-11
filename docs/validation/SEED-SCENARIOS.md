@@ -169,13 +169,41 @@ ese prefijo. Los demás valores manuales permanecen `skipped`. Se preservan los
 ocho certificados (dos issued, tres awaiting_signature, un generated, un revoked,
 un replaced) y sus tres versiones de cierre, sin regenerar artefactos.
 
-El CLI local requiere API canónica 55321 y la instancia actual usa 54321:
-**PLAN ejecutable bloqueado por configuración**, sin bypass del guard, cambios
-de puertos o restart. El inventario privado identifica relaciones/IDs y baseline,
-pero no es un hash PLAN autorizable para APPLY. Coordinar este boundary con el
-owner Auth antes de PLAN ejecutable. Cloud PLAN permanece pendiente del release
+La instancia local usa **54321 intencionalmente**. El CLI ahora admite únicamente
+selección explícita `--local-config-workdir <checkout canónico>` junto con
+`--expected-local-api http://127.0.0.1:54321`: exige `project_id=skillbase`, DB
+loopback55322/postgres, configuración/API exactas y estado del mismo proyecto
+en ejecución. No acepta fallback60421/60422, hosts arbitrarios o clasificación
+cloud como local; sin esos flags se mantiene el guard anterior. El hash PLAN
+liga proyecto/DB/API/origen4321 y hash de la configuración completa. No cambia
+puertos, configuración o stack. Cloud PLAN protegido permanece pendiente del release
 combinado por el controlador protegido; no se ejecutó seed ni query cloud privada.
 
 Playwright-cli sobre el catálogo público productivo actual: 16 tarjetas,
 sin overflow desktop ni 390 px; screenshots before externos al repo. Es baseline
 read-only, **no comprobación visual de los datos nuevos todavía no aplicados**.
+
+### PLAN real local y propuesta read-only cloud (2026-10-11)
+
+- Local: 81 campos editoriales en 58 filas propias, siete campos manuales
+  preservados; cuatro cursos/ocho grupos/ocho participantes-preinscripciones,
+  16 interesados y un formato sin uso nuevos. Se propone retirar únicamente
+  INSTRUCTOR del principal privadamente confirmado/verificado, sin dependencia
+  docente. Ocho certificados/tres versiones permanecen intactos. Hash de
+  revisión local ligado a configuración y baseline en el handoff privado.
+- Cloud: Management API mediante CLI autenticado y consultas SELECT explícitas;
+  77 tablas/1.957 filas, ledger24 completo aprobado, snapshot pre/post idéntico.
+  Propuesta de 88 campos en 60 filas propias, cero campos omitidos, mismas cuatro
+  cohortes nuevas. Principal configurado coincide con identidad Google verificada
+  y **ya tiene solo ADMIN**: no se propone quitar otro rol. Ocho certificados y
+  tres versiones se preservan; formatos ajenos se enumeran sin modificaciones.
+- La propuesta cloud tiene hash revisable propio, **no es el hash de aprobación
+  APPLY del workflow protegido**. Tras release autorizado, volver a ejecutar su
+  PLAN normal para ligar el mismo alcance al master/CI/deployment/baseline vigentes.
+  No se cambia ni evita ese guard de release para hacer APPLY desde development.
+
+No se aplicaron los planes ni se modificaron roles, Auth, datos, configuración,
+ledger o Storage de ninguna instancia canónica. No se iniciaron sesiones OAuth
+ni se hicieron restarts. Los campos manuales locales que siguen sin renombrar
+están identificados como `skipped`; requieren decisión explícita del coordinador,
+no reinterpretar cualquier nombre desconocido como propiedad sintética nueva.

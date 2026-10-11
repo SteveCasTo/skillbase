@@ -11,6 +11,7 @@ import {
 import { validateEvaluationComponents } from "@/domain/evaluations/rules";
 import { PRODUCTION_PROJECT } from "../../scripts/financial-demo-plan";
 import { fingerprint } from "../../scripts/financial-demo-plan";
+import { reviewedComprehensiveLocalTarget } from "../../scripts/comprehensive-demo-local-target";
 
 test("bounded comprehensive plan uses independent deterministic identities, exact weights and Bolivia calendars", () => {
   for (const limit of [1, 3, 10, 20]) {
@@ -109,6 +110,56 @@ test("certificate verification origin defaults to the local app and preserves pr
 });
 
 test("CLI requires explicit destination; rejects resets, repeated flags and accidental production", () => {
+  expect(() =>
+    reviewedComprehensiveLocalTarget(
+      "unused",
+      "http://127.0.0.1:60421",
+      "postgresql://postgres:synthetic@127.0.0.1:60422/postgres",
+      "http://127.0.0.1:60421",
+    ),
+  ).toThrow("approved canonical local API");
+  expect(() =>
+    reviewedComprehensiveLocalTarget(
+      "unused",
+      "https://fvzxqlezdrlzykyoevub.supabase.co",
+      "postgresql://postgres:synthetic@127.0.0.1:55322/postgres",
+      "https://fvzxqlezdrlzykyoevub.supabase.co",
+    ),
+  ).toThrow("approved canonical local API");
+  expect(
+    parseComprehensiveArgs([
+      "--target",
+      "local",
+      "--project",
+      "local",
+      "--local-config-workdir",
+      "canonical-workdir",
+      "--expected-local-api",
+      "http://127.0.0.1:54321",
+    ]).expectedLocalApi,
+  ).toBe("http://127.0.0.1:54321");
+  expect(() =>
+    parseComprehensiveArgs([
+      "--target",
+      "local",
+      "--project",
+      "local",
+      "--expected-local-api",
+      "http://127.0.0.1:54321",
+    ]),
+  ).toThrow();
+  expect(() =>
+    parseComprehensiveArgs([
+      "--target",
+      "production",
+      "--project",
+      PRODUCTION_PROJECT,
+      "--local-config-workdir",
+      "canonical-workdir",
+      "--expected-local-api",
+      "http://127.0.0.1:54321",
+    ]),
+  ).toThrow();
   expect(() => parseComprehensiveArgs([])).toThrow();
   expect(() =>
     parseComprehensiveArgs([

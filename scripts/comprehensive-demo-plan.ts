@@ -73,7 +73,14 @@ export function parseComprehensiveArgs(args: readonly string[]) {
     "--include-certificates",
     "--refresh-scenarios",
   ]);
-  const allowed = new Set([...switches, "--target", "--project", "--anchor"]);
+  const allowed = new Set([
+    ...switches,
+    "--target",
+    "--project",
+    "--anchor",
+    "--local-config-workdir",
+    "--expected-local-api",
+  ]);
   for (let i = 0; i < args.length; i++) {
     const key = args[i]!;
     if (!allowed.has(key) || values.has(key))
@@ -85,6 +92,17 @@ export function parseComprehensiveArgs(args: readonly string[]) {
   }
   if (!values.has("--target") || !values.has("--project"))
     throw new Error("Explicit target and project required");
+  if (
+    values.has("--local-config-workdir") !==
+      values.has("--expected-local-api") ||
+    ((values.has("--local-config-workdir") ||
+      values.has("--expected-local-api")) &&
+      (values.get("--target") !== "local" ||
+        values.get("--project") !== "local"))
+  )
+    throw new Error(
+      "Explicit local configuration flags require canonical local target",
+    );
   return {
     target: values.get("--target")!,
     project: values.get("--project")!,
@@ -94,6 +112,8 @@ export function parseComprehensiveArgs(args: readonly string[]) {
     includeCertificates: values.has("--include-certificates"),
     refreshScenarios: values.has("--refresh-scenarios"),
     anchorDay: values.get("--anchor"),
+    localConfigWorkdir: values.get("--local-config-workdir"),
+    expectedLocalApi: values.get("--expected-local-api"),
   };
 }
 

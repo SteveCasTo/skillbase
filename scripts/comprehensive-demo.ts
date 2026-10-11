@@ -62,6 +62,7 @@ import {
 } from "./comprehensive-demo-preservation";
 import { assertReviewedPlan } from "./comprehensive-demo-execution";
 import { comprehensiveScenarioMatrix } from "./comprehensive-demo-scenarios";
+import { reviewedComprehensiveLocalTarget } from "./comprehensive-demo-local-target";
 
 const manifestId = comprehensiveDemoId("manifest");
 export interface ComprehensiveDemoOptions {
@@ -609,13 +610,23 @@ if (import.meta.main) {
     );
     const url = process.env.DEMO_DATABASE_URL ?? "";
     const api = process.env.DEMO_SUPABASE_URL ?? "";
-    assertComprehensiveTarget(
-      args.target,
-      args.project,
-      url,
-      api,
-      args.allowProduction,
-    );
+    const localEvidence =
+      args.localConfigWorkdir && args.expectedLocalApi
+        ? reviewedComprehensiveLocalTarget(
+            args.localConfigWorkdir,
+            args.expectedLocalApi,
+            url,
+            api,
+          )
+        : null;
+    if (!localEvidence)
+      assertComprehensiveTarget(
+        args.target,
+        args.project,
+        url,
+        api,
+        args.allowProduction,
+      );
     if (args.target === "production") {
       const git = (argv: string[]) => {
         const result = spawnSync("git", argv, {
@@ -633,7 +644,7 @@ if (import.meta.main) {
         process.env.DEMO_APPROVED_RELEASE_SHA ?? "",
       );
     }
-    if (args.target === "local") {
+    if (args.target === "local" && !localEvidence) {
       const local = getLocalSupabaseEnvironment();
       if (url !== local.databaseUrl || api !== local.apiUrl)
         throw new Error("Running local target mismatch");
@@ -663,19 +674,21 @@ if (import.meta.main) {
       const plan = await runRealisticScenarioRefresh(connection.db, options);
       assertDemoNoChanges(before, await captureDemoSnapshot(connection.db));
       const approvalHash = fingerprint({
-        plan: redactRefreshPlan(plan),
+        plan,
         scenarios: plan.additions
           ? comprehensiveScenarioMatrix(plan.additions)
           : [],
         baseline: before,
         target: args.target,
         project: args.project,
+        localEvidence,
       });
       console.info(
         JSON.stringify(
           {
             mode: args.apply ? "APPLY" : "PLAN",
-            plan,
+            plan: redactRefreshPlan(plan),
+            localEvidence,
             reviewedPlanSha256: approvalHash,
           },
           null,
@@ -688,6 +701,18 @@ if (import.meta.main) {
         approvalHash,
       );
       if (args.apply) {
+        if (
+          localEvidence &&
+          fingerprint(
+            reviewedComprehensiveLocalTarget(
+              args.localConfigWorkdir!,
+              args.expectedLocalApi!,
+              url,
+              api,
+            ),
+          ) !== fingerprint(localEvidence)
+        )
+          throw new Error("Reviewed local configuration changed before APPLY");
         const changes = await captureRefreshChanges(connection.db, plan);
         await runRealisticScenarioRefresh(connection.db, {
           ...options,
