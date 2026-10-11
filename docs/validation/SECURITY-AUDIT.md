@@ -51,3 +51,77 @@ No se verificaron dinámicamente integraciones, E2E, permisos cloud, configuraci
 ## Seguimiento
 
 Mantener los hallazgos abiertos hasta que el responsable decida el tratamiento y se aporte evidencia de validación correspondiente. Cualquier remediación, test adicional o cambio de configuración pertenece a una tarea aprobada separada y no debe inferirse como aceptado a partir de este reporte.
+
+## Seguimiento autorizado — 2026-10-11
+
+### Fuente y aislamiento
+
+La remediación se inició en `fix/audited-security-risks`, worktree temporal desde
+`origin/development` `fb24e6882ea800135c02dbbf2c982e24f9f7a4ee`. Comparar con
+`f388327424b9010a0ec5e5c209fe46d09b960d9f` confirmó que los tres archivos Auth
+citados no habían cambiado; el manifest/lockfile ya incluía el patch declarado
+de Sileo 0.1.5, que se conserva sin modificaciones.
+
+No se añadieron tests permanentes. Las validaciones de integración y E2E usan
+el runner existente, con proyecto, puertos y credenciales efímeros propios y
+SMTP externo eliminado. No se usaron cuentas demo existentes, correo real,
+Google real, cloud ni producción; no se reinició/resetearon el stack o la app
+canónicos.
+
+### AUTH-1: pendiente de decisión y revisión autorizada
+
+El asunto Auth queda fuera del mantenimiento defensivo de dependencias del
+PR 332. Requiere una revisión específica autorizada de la frontera del proveedor
+y una decisión del responsable que preserve login password, Google, recovery,
+invitaciones y asociación explícita. No se afirma una corrección ni exposición
+verificada en producción. Este seguimiento no proporciona un procedimiento de
+reproducción ni autoriza nuevas comprobaciones sobre ese escenario.
+
+No se modificaron archivos runtime Auth, contratos, permisos, credenciales,
+configuración del proveedor o migraciones. No se presenta un guard de aplicación
+como remediación de la frontera del proveedor. AUTH-1 permanece **abierto**.
+
+### DEP-1: versiones corregidas fijadas
+
+Las APIs oficiales de GitHub confirmaron los advisories no retirados y las
+releases estables [Sharp 0.35.5](https://github.com/lovell/sharp/releases/tag/v0.35.5)
+y [devalue 5.9.3](https://github.com/sveltejs/devalue/releases/tag/v5.9.3).
+Astro 7.3.2 requiere Sharp `^0.35.4` opcional y devalue `^5.8.1`;
+`@astrojs/react` 6.0.5 requiere devalue `^5.8.1`. Ambas correcciones satisfacen esos
+rangos. Overrides exactos en `package.json` y resolución en `bun.lock` actualizan
+solo esas dos familias, incluidos binarios Sharp 0.35.5/libvips 1.3.4. No hay
+actualización masiva, nueva dependencia directa, cambio de Astro, scripts ni
+vendor patch de Sileo.
+
+`bun install --frozen-lockfile` confirmó resolución reproducible y las versiones
+efectivas 0.35.5/5.9.3. La coincidencia de versiones vulnerables DEP-1 queda
+corregida en esta fuente; no afirma actualización de producción ni ausencia de
+otros advisories o de una librsvg instalada globalmente en otro entorno.
+
+### Validación local de esta fuente
+
+- `bun run check`: lint/format/typecheck PASS.
+- `bun run test:unit`: 464 PASS, 0 FAIL (4033 assertions).
+- `bun run build`: PASS, Astro/Vercel con configuración pública sintética y sin
+  acceso a DB canónica.
+- 21 pruebas Auth focales existentes: PASS.
+- Comparación puntual fuera de Git del servicio Sharp real de Astro entre
+  0.35.4 y 0.35.5: 16 transforms (4 anchos × WebP/AVIF × 2 calidades), bytes,
+  hashes y dimensiones idénticos en Windows/Node 24. Es input PNG sintético,
+  no comparación de imágenes estáticas de producción ni benchmark de carga.
+  Los tiempos individuales se conservaron solo como observación, no como
+  garantía de rendimiento Linux/cloud. No se cambiaron assets ni encoders.
+- Comprobación manual puntual de devalue en Node 24: `stringify`/`parse` y
+  `uneval` conservaron solo los 2 bytes visibles de un Buffer sintético con
+  backing store compartido, sin serializar el resto del pool.
+- E2E focal existente (Google association, password hydration y public courses)
+  sobre puerto alternativo 44894, sin retries: **7 PASS / 1 FAIL**. El fallo fue
+  `catalog navigation, keyboard focus, and responsive layout`, expectativa de
+  foco del skip-link tras Tab; no fue un error de transformación de imagen.
+  No se eliminó/modificó assertion, timeout ni test. No se atribuye todavía una
+  causa raíz al fallo, ni se declara esa corrida verde.
+- `bun run test:integration`: 176 PASS, 0 FAIL, 1 skip preexistente de
+  `attendance-flow-fixture` condicionado al fin de semana; no se añadió skip ni
+  se modificaron pruebas. 1441 assertions, stack aislado limpiado.
+- Checks remotos se verifican en el PR antes del merge; no se infieren de la
+  prueba del proveedor o del build.

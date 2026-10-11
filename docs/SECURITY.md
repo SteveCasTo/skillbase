@@ -437,3 +437,11 @@ Las credenciales pertenecen exclusivamente a Supabase Auth. Crear cuenta y asign
 ## REVISIÓN DE SEGURIDAD (2026-10-09)
 
 La revisión estática de la base `f388327424b9010a0ec5e5c209fe46d09b960d9f` registró un riesgo potencial en el cambio de contraseña Auth y dos coincidencias de advisories con versiones fijadas en `bun.lock`. Son hallazgos pendientes de validación y decisión; no se confirmó una explotación end-to-end ni se aplicaron remediaciones en esa revisión. El detalle, evidencia, límites y estado se mantienen en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md). Esta evidencia no constituye certificación de seguridad ni verificación de configuración/uso en producción.
+
+El seguimiento de 2026-10-11 mantiene AUTH-1 abierto, pendiente de decisión y
+revisión específica autorizada de la frontera del proveedor. No se modificaron
+Auth, permisos, credenciales, configuración de proveedor ni migraciones, y no se
+afirma corrección ni exposición verificada en producción. El mantenimiento del
+PR 332 fija únicamente las correcciones transitivas Sharp 0.35.5/devalue 5.9.3
+mediante overrides/lockfile, conservando Astro y el patch Sileo. Validaciones y
+límites están en el seguimiento del documento de auditoría.
