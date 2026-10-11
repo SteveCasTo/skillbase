@@ -71,21 +71,36 @@ export default function RevokeCertificate({
         setOpen(false);
         await navigate(path, { history: "replace" });
       } else {
-        notifications.dismiss(key.current);
-        setError(
-          "message" in result && typeof result.message === "string"
-            ? result.message
-            : "No se pudo confirmar la revocación.",
-        );
-        alert.current?.focus();
+        const reasonIssue =
+          "issues" in result &&
+          result.issues &&
+          typeof result.issues === "object" &&
+          "reason" in result.issues &&
+          typeof result.issues.reason === "string"
+            ? result.issues.reason
+            : "";
+        if (reasonIssue) {
+          setError(reasonIssue);
+          notifications.dismiss(key.current);
+          requestAnimationFrame(() =>
+            document.getElementById("revocation-reason")?.focus(),
+          );
+        } else
+          notifications.error({
+            id: key.current,
+            title:
+              "message" in result && typeof result.message === "string"
+                ? result.message
+                : "No se pudo confirmar la revocación.",
+          });
         if (response.status === 409) key.current = "";
       }
     } catch {
-      notifications.dismiss(key.current);
-      setError(
-        "No se pudo confirmar la revocación. Reintenta la misma solicitud.",
-      );
-      alert.current?.focus();
+      notifications.error({
+        id: key.current,
+        title:
+          "No se pudo confirmar la revocación. Reintenta la misma solicitud.",
+      });
     } finally {
       lock.current = false;
       setPending(false);
@@ -113,6 +128,7 @@ export default function RevokeCertificate({
         onChange={(event) => setReason(event.target.value)}
         disabled={pending}
         aria-describedby="revocation-error"
+        aria-invalid={Boolean(error)}
         className="bg-background focus-visible:outline-ring min-h-24 w-full rounded-lg border px-3 py-2 text-sm focus-visible:outline-2"
       />
       <p

@@ -205,6 +205,7 @@ const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
 </PrivateLayout>
 <script>
   import { navigate } from "astro:transitions/client";
+  import { notifications } from "@/lib/notifications";
   class GroupRosterSearch extends HTMLElement {
     private controller?: AbortController;
     private timer?: ReturnType<typeof setTimeout>;
@@ -265,11 +266,12 @@ const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
           if (controller.signal.aborted) return;
           status.textContent = "";
           status.hidden = true;
-          error.textContent =
-            failure instanceof Error
-              ? failure.message
-              : "No se pudo buscar. Reintenta con Enter.";
-          error.hidden = false;
+          notifications.error({
+            title:
+              failure instanceof Error
+                ? failure.message
+                : "No se pudo buscar. Reintenta con Enter.",
+          });
         } finally {
           if (!controller.signal.aborted) results.removeAttribute("aria-busy");
         }

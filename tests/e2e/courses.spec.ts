@@ -350,7 +350,9 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   });
   await page.getByRole("button", { name: "Crear borrador" }).click();
   await expect(
-    page.getByRole("alert").filter({ hasText: "Fallo temporal de carga." }),
+    page
+      .locator('[data-sileo-toast][data-state="error"][data-exiting="false"]')
+      .filter({ hasText: "Fallo temporal de carga." }),
   ).toBeVisible();
   const draftUrl = await page
     .getByRole("link", { name: "Abrir borrador" })
@@ -370,7 +372,12 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
     }
   });
   await page.getByRole("button", { name: "Reintentar pendientes" }).click();
-  await expect(page.locator(".artwork-create-error")).toBeVisible();
+  await expect(page.locator(".artwork-create-error")).toBeHidden();
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Reintentar pendientes" }),
   ).toBeEnabled();
@@ -786,9 +793,11 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   await expect(page.getByLabel("Descripción")).toHaveValue(
     "Texto conservado tras rechazo.",
   );
-  await expect(page.getByRole("alert").first()).toContainText(
-    "La revisión del curso no es válida.",
-  );
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toContainText("La revisión del curso no es válida.");
   await page
     .locator('.course-form input[name="revision"]')
     .evaluate((input, revision) => {
@@ -896,7 +905,12 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     else await route.continue();
   });
   await save.click();
-  await expect(page.locator("[data-save-error]")).toBeVisible();
+  await expect(page.locator("[data-save-error]")).toBeHidden();
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toBeVisible();
   await expect(save).toBeEnabled();
   await expect(
     page
@@ -1067,7 +1081,9 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   expect(publishedElsewhere.status()).toBe(200);
   await dialog.getByRole("button", { name: "Publicar curso" }).click();
   await expect(
-    page.locator("[data-save-error]").filter({ hasText: /El curso cambió/ }),
+    page
+      .locator('[data-sileo-toast][data-state="error"][data-exiting="false"]')
+      .filter({ hasText: /El curso cambió/ }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Publicar curso" }),

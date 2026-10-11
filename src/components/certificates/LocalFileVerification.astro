@@ -1,5 +1,7 @@
 ---
 import CertificateFilePicker from "./CertificateFilePicker.astro";
+import { SileoHost } from "@/components/SileoHost";
+import "sileo/styles.css";
 interface Props {
   officialHash: string;
   state: "issued" | "revoked" | "replaced";
@@ -57,8 +59,10 @@ const { officialHash, state } = Astro.props;
     </p>
   </noscript>
 </section>
+<SileoHost client:load />
 <script>
-  import { hashComparison, localPdfSha256 } from "./local-hash";
+  import { hashComparison, localPdfSha256, localPdfError } from "./local-hash";
+  import { notifications } from "@/lib/notifications";
   const root = document.querySelector<HTMLElement>("[data-local-verification]");
   const input = root?.querySelector<HTMLInputElement>("#local-pdf");
   const result = root?.querySelector<HTMLElement>("#local-result");
@@ -66,11 +70,13 @@ const { officialHash, state } = Astro.props;
   const controls = root?.querySelector<HTMLElement>("[data-local-controls]");
   if (root && input && result && output && controls) {
     let latest = 0;
+    let notificationId: string | undefined;
     if (window.crypto?.subtle) controls.hidden = false;
     else
       result.textContent =
         "La comparación local requiere un navegador compatible y una conexión segura.";
     const clear = () => {
+      if (notificationId) notifications.dismiss(notificationId);
       latest += 1;
       input.value = "";
       const filename = root.querySelector<HTMLElement>("[data-file-name]");
@@ -86,6 +92,7 @@ const { officialHash, state } = Astro.props;
     });
     input.addEventListener("change", async () => {
       const token = ++latest;
+      if (notificationId) notifications.dismiss(notificationId);
       const file = input.files?.[0];
       const filename = root.querySelector<HTMLElement>("[data-file-name]");
       if (filename)
@@ -99,8 +106,16 @@ const { officialHash, state } = Astro.props;
         root.removeAttribute("aria-busy");
         return;
       }
+      const validation = localPdfError(file);
+      if (validation) {
+        result.textContent = validation;
+        root.removeAttribute("aria-busy");
+        return;
+      }
       root.setAttribute("aria-busy", "true");
-      result.textContent = "Calculando SHA-256 en tu dispositivo…";
+      const id = crypto.randomUUID();
+      notificationId = id;
+      notifications.loading({ id, title: "Comprobando tu archivo…" });
       try {
         const hash = await localPdfSha256(file);
         if (token !== latest) return;
@@ -111,12 +126,21 @@ const { officialHash, state } = Astro.props;
           root.dataset.officialHash ?? "",
           root.dataset.certificateState ?? "",
         );
+        notifications.success({
+          id,
+          title: "Comparación completada.",
+          description:
+            "Revisa el resultado y el estado oficial del certificado.",
+        });
       } catch (error) {
         if (token !== latest) return;
-        result.textContent =
-          error instanceof Error
-            ? error.message
-            : "No se pudo leer el archivo. Selecciónalo de nuevo.";
+        notifications.error({
+          id,
+          title:
+            error instanceof Error
+              ? error.message
+              : "No se pudo leer el archivo. Selecciónalo de nuevo.",
+        });
       } finally {
         if (token === latest) root.removeAttribute("aria-busy");
       }

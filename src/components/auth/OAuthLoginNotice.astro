@@ -1,0 +1,29 @@
+---
+interface Props {
+  visible: boolean;
+}
+const { visible } = Astro.props;
+---
+
+{visible && (
+  <p data-oauth-login-notice role="status">
+    Sesión iniciada.
+  </p>
+)}
+
+<script>
+  import { notifications } from "@/lib/notifications";
+
+  const showLoginNotice = () => {
+    document
+      .querySelectorAll<HTMLElement>("[data-oauth-login-notice]")
+      .forEach((notice) => {
+        if (notice.dataset.notified) return;
+        notice.dataset.notified = "true";
+        notice.hidden = true;
+        notifications.success({ title: "Sesión iniciada." });
+      });
+  };
+  showLoginNotice();
+  document.addEventListener("astro:page-load", showLoginNotice);
+</script>

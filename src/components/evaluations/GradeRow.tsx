@@ -121,13 +121,15 @@ export function GradeRow({
       if (componentId) fields[componentId] = issue;
     }
     setErrors(fields);
-    setMessage(Object.keys(fields).length ? "" : result.message);
+    setMessage("");
     setConflict(
       result.code === "CONCURRENT_UPDATE" ||
         result.code === "IDEMPOTENCY_CONFLICT",
     );
-    notifications.dismiss(id);
-    focusError();
+    if (Object.keys(fields).length) {
+      notifications.dismiss(id);
+      focusError();
+    } else notifications.error({ id, title: result.message });
   };
 
   return (

@@ -87,7 +87,7 @@ function initialize() {
             if (result.fieldErrors?.[input.name]) {
               fieldError.textContent = message;
               input.setAttribute("aria-invalid", "true");
-            } else error.textContent = message;
+            }
             failureMessage = message;
             throw new Error(message);
           }
@@ -118,8 +118,8 @@ function initialize() {
           const message =
             failureMessage ||
             "No se pudo guardar. Revisa tu conexión e inténtalo nuevamente.";
-          if (!fieldError.textContent) error.textContent = message;
-          notifications.dismiss(id);
+          if (fieldError.textContent) notifications.dismiss(id);
+          else notifications.error({ id, title: message });
         } finally {
           delete details.dataset.pending;
           form.removeAttribute("aria-busy");
@@ -128,7 +128,9 @@ function initialize() {
           );
           if (fieldError.textContent) input.focus();
           else if (error.textContent) error.focus();
-          else edit.focus();
+          else if (form.querySelector("[data-inline-editor][hidden]"))
+            edit.focus();
+          else save.focus();
         }
       });
     });

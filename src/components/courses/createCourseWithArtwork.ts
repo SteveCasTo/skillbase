@@ -6,7 +6,14 @@ import {
   isCourseSaveResult,
 } from "@/domain/courses/mutation-result";
 
-export class DefinitiveCreateError extends Error {}
+export class DefinitiveCreateError extends Error {
+  constructor(
+    message: string,
+    readonly fieldErrors: Readonly<Record<string, string>> = {},
+  ) {
+    super(message);
+  }
+}
 
 export function openCreatedCourse(id: string, groups = false) {
   if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id))
@@ -41,12 +48,28 @@ export async function createCourseWithArtwork(
       "La sesión cambió. Recarga la página e inténtalo de nuevo.",
     );
   const result: unknown = await response.json();
-  if (!response.ok || !isDraft(result))
-    throw new (
-      response.status >= 400 && response.status < 500
-        ? DefinitiveCreateError
-        : Error
-    )(isError(result) ? formError(result) : "No se pudo crear el borrador.");
+  if (!response.ok || !isDraft(result)) {
+    const message = isError(result)
+      ? formError(result)
+      : "No se pudo crear el borrador.";
+    if (response.status >= 400 && response.status < 500) {
+      const fields =
+        result &&
+        typeof result === "object" &&
+        "fieldErrors" in result &&
+        result.fieldErrors &&
+        typeof result.fieldErrors === "object"
+          ? Object.fromEntries(
+              Object.entries(result.fieldErrors).filter(
+                (entry): entry is [string, string] =>
+                  typeof entry[1] === "string",
+              ),
+            )
+          : {};
+      throw new DefinitiveCreateError(message, fields);
+    }
+    throw new Error(message);
+  }
 
   const destination = `/app/cursos/${result.id}/editar`;
   let attached = !image;

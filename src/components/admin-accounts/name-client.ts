@@ -49,7 +49,6 @@ function initialize() {
         refresh.hidden = true;
         const id = crypto.randomUUID();
         notifications.loading({ id, title: "Guardando nombre…" });
-        let success = false;
         try {
           const result = await postAdminAccount(form.action, body);
           if (!result.ok) {
@@ -58,7 +57,9 @@ function initialize() {
               "aria-invalid",
               String(Boolean(fieldError.textContent)),
             );
-            if (!fieldError.textContent) error.textContent = result.message;
+            if (!fieldError.textContent)
+              notifications.error({ id, title: result.message });
+            else notifications.dismiss(id);
             refresh.hidden = false;
           } else if (result.value.account) {
             const account = result.value.account;
@@ -93,20 +94,23 @@ function initialize() {
             );
             form.dispatchEvent(new Event("registration:saved"));
             notifications.success({ id, title: result.message });
-            success = true;
           } else throw new Error("Account missing");
         } catch {
-          error.textContent =
-            "No pudimos confirmar el cambio. Recarga la cuenta antes de reintentar.";
+          notifications.error({
+            id,
+            title:
+              "No pudimos confirmar el cambio. Recarga la cuenta antes de reintentar.",
+          });
           refresh.hidden = false;
         } finally {
           delete page.dataset.pending;
           form.removeAttribute("aria-busy");
           page.dispatchEvent(new Event("admin-account:pending"));
-          if (!success) notifications.dismiss(id);
           if (fieldError.textContent) input.focus();
           else if (error.textContent) error.focus();
-          else edit.focus();
+          else if (form.querySelector("[data-inline-editor][hidden]"))
+            edit.focus();
+          else save.focus();
         }
       });
     });

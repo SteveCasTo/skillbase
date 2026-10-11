@@ -14,6 +14,7 @@ import { accountIdentity } from "@/server/auth/identity";
 import { consumeAuthAttempt } from "@/server/auth/security";
 import { loadVerifiedAuthSession } from "@/server/auth/session";
 import { finishGoogleAssociation } from "@/server/auth/google-association";
+import { setOAuthLoginNotice } from "@/server/auth/login-notice";
 
 export const GET: APIRoute = async ({
   url,
@@ -40,6 +41,7 @@ export const GET: APIRoute = async ({
     );
   }
   if (!code) return redirect("/login?error=oauth_callback", 303);
+  let approvedAuthUserId: string | null = null;
   const result = await completeOAuthCallback(
     {
       async exchangeCode(value) {
@@ -81,6 +83,7 @@ export const GET: APIRoute = async ({
           )
         )
           return null;
+        approvedAuthUserId = data.user.id;
         return {
           authUserId: data.user.id,
           email: data.user.email,
@@ -96,16 +99,16 @@ export const GET: APIRoute = async ({
     repository,
     code,
   );
-  if (!result.success) {
+  if (!result.success || !approvedAuthUserId) {
+    cookies.delete("auth-next", { path: "/auth" });
+    if (result.success) return redirect("/login?error=oauth_callback", 303);
     if (result.reason === "oauth_callback")
       return redirect("/login?error=oauth_callback", 303);
-    return redirect(
-      `/unauthorized?reason=${encodeURIComponent(result.reason)}`,
-      303,
-    );
+    return redirect(`/login?error=oauth_not_approved`, 303);
   }
 
   const next = safeRelativeRedirect(cookies.get("auth-next")?.value);
   cookies.delete("auth-next", { path: "/auth" });
+  setOAuthLoginNotice(cookies, url, approvedAuthUserId);
   return redirect(next, 303);
 };

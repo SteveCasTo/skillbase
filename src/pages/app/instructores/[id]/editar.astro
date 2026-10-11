@@ -56,16 +56,20 @@ const lifecycle = editor.previous
           </p>
         )}
         {Astro.url.searchParams.get("success") === "saved" && (
-          <p role="status" class="mt-6">
-            Instructor guardado correctamente.
-          </p>
+          <noscript>
+            <p role="status" class="mt-6">
+              Instructor guardado correctamente.
+            </p>
+          </noscript>
         )}
         {["activate", "deactivate"].includes(
           Astro.url.searchParams.get("success") ?? "",
         ) && (
-          <p role="status" class="mt-6">
-            Acceso de la cuenta actualizado correctamente.
-          </p>
+          <noscript>
+            <p role="status" class="mt-6">
+              Acceso de la cuenta actualizado correctamente.
+            </p>
+          </noscript>
         )}
         {editor.previous && (
           <InstructorDetails

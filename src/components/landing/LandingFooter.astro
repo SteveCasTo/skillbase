@@ -1,24 +1,23 @@
 ---
-import { getImage } from "astro:assets";
-
-import cotaFooterDesktop from "../../../assets/plates/cota-footer-desktop.png";
-import cotaFooterMobile from "../../../assets/plates/cota-footer-mobile.png";
+import cotaFooterDesktop from "../../../assets/plates/optimized/cota-footer-desktop-1916.webp";
+import cotaFooterMobile from "../../../assets/plates/optimized/cota-footer-mobile-1122.webp";
 import { responsiveSourceSet } from "./responsive-images";
 
 const mobileWidths = [320, 480, 640, 960, 1122] as const;
 const desktopWidths = [640, 960, 1280, 1600, 1916] as const;
-const [mobileAvif, mobileWebp, desktopAvif, desktopWebp] = await Promise.all([
-  responsiveSourceSet(cotaFooterMobile, mobileWidths, "avif", 52),
-  responsiveSourceSet(cotaFooterMobile, mobileWidths, "webp", 82),
-  responsiveSourceSet(cotaFooterDesktop, desktopWidths, "avif", 52),
-  responsiveSourceSet(cotaFooterDesktop, desktopWidths, "webp", 82),
-]);
-const fallback = await getImage({
-  src: cotaFooterDesktop,
-  width: cotaFooterDesktop.width,
-  format: "webp",
-  quality: 82,
-});
+const mobileAvif = responsiveSourceSet(cotaFooterMobile, mobileWidths, "avif");
+const mobileWebp = responsiveSourceSet(cotaFooterMobile, mobileWidths, "webp");
+const desktopAvif = responsiveSourceSet(
+  cotaFooterDesktop,
+  desktopWidths,
+  "avif",
+);
+const desktopWebp = responsiveSourceSet(
+  cotaFooterDesktop,
+  desktopWidths,
+  "webp",
+);
+const fallback = cotaFooterDesktop;
 ---
 
 <footer class="site-footer">

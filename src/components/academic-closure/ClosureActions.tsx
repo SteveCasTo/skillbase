@@ -68,20 +68,27 @@ export function ClosureActions({
           .getElementById("closure-state")
           ?.focus({ preventScroll: true });
       } else {
-        notifications.dismiss(requestKey);
         const reasonField = document.getElementById("closure-reason");
-        if (reasonField?.getAttribute("aria-invalid") === "true")
+        if (reasonField?.getAttribute("aria-invalid") === "true") {
+          notifications.dismiss(requestKey);
           reasonField.focus({ preventScroll: true });
-        else
-          document
-            .getElementById("closure-error")
-            ?.focus({ preventScroll: true });
+        } else {
+          const message = document.getElementById("closure-error");
+          notifications.error({
+            id: requestKey,
+            title:
+              message?.textContent?.trim() ||
+              "No se pudo confirmar la operación. Reintenta la misma solicitud.",
+          });
+          if (message) message.hidden = true;
+        }
       }
     } catch {
-      notifications.dismiss(requestKey);
-      setError(
-        "No se pudo confirmar la operación. Reintenta la misma solicitud.",
-      );
+      notifications.error({
+        id: requestKey,
+        title:
+          "No se pudo confirmar la operación. Reintenta la misma solicitud.",
+      });
     } finally {
       busy.current = false;
       setPending(false);

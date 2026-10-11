@@ -52,6 +52,7 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
 }) => {
   const fixture = await createAttendanceFlowFixture("2020-05-04");
   try {
+    await context.clock.setFixedTime(fixture.now);
     await signInFixture(context, AUTH_FIXTURES.admin.email);
     const path = route(
       "cursos",
@@ -162,8 +163,23 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
       })
       .click();
     await page.getByRole("option", { name: "Ausente", exact: true }).click();
-    expect((await rejectedSave).status()).toBe(409);
-    await expect(person.getByRole("alert")).not.toBeEmpty();
+    const rejectedResponse = await rejectedSave;
+    expect(rejectedResponse.status()).toBe(409);
+    const rejectedPayload = (await rejectedResponse.json()) as {
+      message: string;
+    };
+    expect(rejectedPayload.message).not.toBe("");
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+      ),
+    ).toBeVisible();
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+      ),
+    ).toContainText(rejectedPayload.message);
+    await expect(person.getByRole("alert")).toHaveCount(0);
     await expect(
       person.getByRole("combobox", {
         name: "Asistencia de Enrolled Attendance",
@@ -364,6 +380,7 @@ test("INSTRUCTOR records only enrolled own participants without contacts or fina
 }) => {
   const fixture = await createAttendanceFlowFixture("2020-06-01", true);
   try {
+    await context.clock.setFixedTime(fixture.now);
     await signInFixture(context, AUTH_FIXTURES.instructor.email);
     const path = route(
       "mis-cursos",

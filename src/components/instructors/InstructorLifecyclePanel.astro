@@ -281,10 +281,7 @@ const actions = deleteReason
               const message =
                 failureMessage ||
                 "No se pudo actualizar la cuenta. Recarga para comprobar su estado.";
-              error.textContent = message;
-              error.hidden = false;
-              error.focus();
-              notifications.dismiss(id);
+              notifications.error({ id, title: message });
             } finally {
               pending = false;
               controls.forEach((control) => {

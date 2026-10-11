@@ -1,6 +1,10 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AdminCredentialGateway } from "@/application/admin-accounts/repository";
-import { getPublicAuthEnvironment } from "@/server/environment";
+import {
+  createConfirmedAccount,
+  getAccountCredentialClient,
+  removeCreatedAccount,
+} from "@/server/auth/account-credentials";
 
 export function adminCredentialGateway(
   client: SupabaseClient,
@@ -12,28 +16,12 @@ export function adminCredentialGateway(
       throw new Error("Auth deletion unavailable");
   };
   return {
-    async createConfirmedUser(email, password) {
-      const { data, error } = await client.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-      });
-      return error ? null : (data.user?.id ?? null);
-    },
-    removeCreatedUser: remove,
+    createConfirmedUser: (email, password) =>
+      createConfirmedAccount(client, email, password),
+    removeCreatedUser: (id) => removeCreatedAccount(client, id),
     deleteUser: remove,
   };
 }
 export function getAdminCredentialGateway(): AdminCredentialGateway {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!key) throw new Error("Account provisioning unavailable");
-  return adminCredentialGateway(
-    createClient(getPublicAuthEnvironment().supabaseUrl, key, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    }),
-  );
+  return adminCredentialGateway(getAccountCredentialClient());
 }

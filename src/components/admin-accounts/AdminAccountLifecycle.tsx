@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { AdminAccountDto } from "@/domain/admin-accounts/types";
-import { notifications } from "@/lib/notifications";
+import { notifications, queueRedirectNotice } from "@/lib/notifications";
 import { adminAccountActions, adminAccountBlockedReason } from "./presentation";
 import { postAdminAccount } from "./request";
 import { confirmationFooterClassName } from "@/components/ui/confirmation-footer";
@@ -83,10 +83,11 @@ export default function AdminAccountLifecycle({
         new URLSearchParams({ revision: account.revision }),
       );
       if (!result.ok) {
-        setError(result.message);
-        notifications.dismiss(id);
-      } else if (!result.value.actorActive) window.location.assign("/login");
-      else {
+        notifications.error({ id, title: result.message });
+      } else if (!result.value.actorActive) {
+        queueRedirectNotice("/login", result.message);
+        window.location.assign("/login");
+      } else {
         notifications.success({ id, title: result.message });
         await navigate(
           result.value.deleted
@@ -95,10 +96,11 @@ export default function AdminAccountLifecycle({
         );
       }
     } catch {
-      notifications.dismiss(id);
-      setError(
-        "No pudimos confirmar la operación. Recarga para comprobar el estado de la cuenta.",
-      );
+      notifications.error({
+        id,
+        title:
+          "No pudimos confirmar la operación. Recarga para comprobar el estado de la cuenta.",
+      });
     } finally {
       delete container.dataset.pending;
       container.removeAttribute("aria-busy");

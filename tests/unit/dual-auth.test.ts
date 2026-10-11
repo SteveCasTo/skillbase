@@ -206,10 +206,12 @@ test("trusted AMR classifies the current session, not account providers or user-
 });
 test("password changes require old password verification or a bounded recovery confirmation", async () => {
   let changed = 0;
+  const passwordUpdates: Array<[string, string | undefined]> = [];
   const auditActors: string[] = [];
   const gateway = {
     verifyCurrentPassword: async () => false,
-    updatePassword: async () => {
+    updatePassword: async (password: string, currentPassword?: string) => {
+      passwordUpdates.push([password, currentPassword]);
       changed++;
       return true;
     },
@@ -245,12 +247,17 @@ test("password changes require old password verification or a bounded recovery c
     gateway,
   );
   expect(changed).toBe(1);
+  expect(passwordUpdates).toEqual([[input.password, undefined]]);
   expect(auditActors).toEqual([user.id]);
   await changeAccountPassword(user, input, {
     ...gateway,
     verifyCurrentPassword: async () => true,
   });
   expect(changed).toBe(2);
+  expect(passwordUpdates).toEqual([
+    [input.password, undefined],
+    [input.password, input.currentPassword],
+  ]);
   expect(auditActors).toEqual([user.id, user.id]);
   await expect(
     changeAccountPassword(

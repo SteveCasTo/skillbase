@@ -881,15 +881,6 @@ const statusLabel = {
                     failedIntent = intent;
                     if (retry) retry.hidden = recovery?.hidden === false;
                     dialog.close();
-                    if (error) {
-                      error.textContent =
-                        failure instanceof Error
-                          ? failure.message
-                          : "No se pudo completar la acción.";
-                      error.hidden = false;
-                      error.setAttribute("tabindex", "-1");
-                      error.focus();
-                    }
                     throw failure;
                   } finally {
                     pending = false;
@@ -1001,13 +992,6 @@ const statusLabel = {
                       failedForm = form;
                       failedIntent = "feature";
                       if (retry) retry.hidden = recovery?.hidden === false;
-                      if (error) {
-                        error.textContent =
-                          failure instanceof Error
-                            ? failure.message
-                            : "No se pudo completar la acción.";
-                        error.hidden = false;
-                      }
                       throw failure;
                     } finally {
                       pending = false;

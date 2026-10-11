@@ -242,27 +242,30 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
   browser,
 }, testInfo) => {
   const fixture = await createAttendanceFlowFixture("2020-05-04");
-  const environment = getTestSupabaseEnvironment();
-  const ledger = await fixture.database.db.execute<{ count: number }>(
-    sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
-  );
-  expect(ledger[0]!.count).toBe(24);
-  console.info(
-    "Certificate UI isolated QA",
-    process.env.TEST_SUPABASE_PROJECT_ID,
-    "API",
-    new URL(environment.apiUrl).port,
-    "DB",
-    new URL(environment.databaseUrl).port,
-    "APP",
-    new URL(e2eSiteUrl()).port,
-    "ledger",
-    ledger[0]!.count,
-  );
-  await signInFixture(context, AUTH_FIXTURES.admin.email);
-  const anonymous = await browser.newContext();
-  const publicPage = await anonymous.newPage();
+  let anonymous: Awaited<ReturnType<typeof browser.newContext>> | undefined;
   try {
+    await context.clock.setFixedTime(fixture.now);
+    const environment = getTestSupabaseEnvironment();
+    const ledger = await fixture.database.db.execute<{ count: number }>(
+      sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
+    );
+    expect(ledger[0]!.count).toBe(24);
+    console.info(
+      "Certificate UI isolated QA",
+      process.env.TEST_SUPABASE_PROJECT_ID,
+      "API",
+      new URL(environment.apiUrl).port,
+      "DB",
+      new URL(environment.databaseUrl).port,
+      "APP",
+      new URL(e2eSiteUrl()).port,
+      "ledger",
+      ledger[0]!.count,
+    );
+    await signInFixture(context, AUTH_FIXTURES.admin.email);
+    anonymous = await browser.newContext();
+    await anonymous.clock.setFixedTime(fixture.now);
+    const publicPage = await anonymous.newPage();
     await closeOfficialGroup(page, fixture);
     await page.goto(`${groupPath(fixture)}/certificados`);
     await expect(
@@ -538,8 +541,11 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
       }),
     ).toBeVisible();
   } finally {
-    await anonymous.close();
-    await fixture.close();
+    try {
+      await anonymous?.close();
+    } finally {
+      await fixture.close();
+    }
   }
 });
 
@@ -549,10 +555,14 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
   browser,
 }, testInfo) => {
   const fixture = await createAttendanceFlowFixture("2020-06-01", true);
-  await signInFixture(context, AUTH_FIXTURES.admin.email);
-  const instructor = await browser.newContext();
-  const instructorPage = await instructor.newPage();
+  let instructor: Awaited<ReturnType<typeof browser.newContext>> | undefined;
+  let instructorPage!: Page;
   try {
+    await context.clock.setFixedTime(fixture.now);
+    await signInFixture(context, AUTH_FIXTURES.admin.email);
+    instructor = await browser.newContext();
+    await instructor.clock.setFixedTime(fixture.now);
+    instructorPage = await instructor.newPage();
     await closeOfficialGroup(page, fixture);
     await settings(page);
     const approval = await generate(page, fixture);
@@ -673,7 +683,10 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
       await publicContext.close();
     }
   } finally {
-    await instructor.close();
-    await fixture.close();
+    try {
+      await instructor?.close();
+    } finally {
+      await fixture.close();
+    }
   }
 });

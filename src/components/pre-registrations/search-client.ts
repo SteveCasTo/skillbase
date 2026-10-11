@@ -1,6 +1,7 @@
 import type { ParticipantDto } from "@/domain/pre-registrations/types";
 import type { AdminInterestRegistrationDto } from "@/domain/interests/types";
 import { createLatestSearch } from "./request-state";
+import { notifications } from "@/lib/notifications";
 
 /** Supplied by the future authorized route adapter; never guesses a URL. */
 export function bindParticipantLookup(
@@ -52,9 +53,11 @@ export function bindParticipantLookup(
           interests: result.interests.slice(0, 30),
         });
     } catch {
-      if (token === generation && error)
-        error.textContent =
-          "No se pudo buscar. Reintenta o completa los datos directamente.";
+      if (token === generation)
+        notifications.error({
+          title:
+            "No se pudo buscar. Reintenta o completa los datos directamente.",
+        });
     } finally {
       if (token === generation) pending(false);
     }

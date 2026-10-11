@@ -98,7 +98,8 @@ function initialize() {
               mark(input, result.issues[input.name] ?? ""),
             );
             if (!Object.keys(result.issues).length)
-              alert.textContent = result.message;
+              notifications.error({ id, title: result.message });
+            else notifications.dismiss(id);
           } else if (result.value.account) {
             success = true;
             notifications.success({ id, title: result.message });
@@ -111,8 +112,11 @@ function initialize() {
               "No pudimos confirmar la cuenta. Recarga antes de reintentar.",
             );
         } catch {
-          alert.textContent =
-            "No pudimos confirmar la cuenta. Recarga antes de reintentar.";
+          notifications.error({
+            id,
+            title:
+              "No pudimos confirmar la cuenta. Recarga antes de reintentar.",
+          });
         } finally {
           body.delete("password");
           password.value = "";
@@ -124,7 +128,6 @@ function initialize() {
           });
           sync();
           if (!success) {
-            notifications.dismiss(id);
             const hint = form.querySelector<HTMLElement>(
               '[data-field-error="password"]',
             )!;

@@ -167,7 +167,7 @@ export async function updateProfilePassword(
             return false;
           return true;
         },
-        async updatePassword(password) {
+        async updatePassword(password, currentPassword) {
           const latest = await loadRequestAuthContext(supabase, repository);
           if (
             !latest.internalUser ||
@@ -215,7 +215,21 @@ export async function updateProfilePassword(
               auth.authUser!.id,
               google.id,
             );
-          const { error } = await supabase.auth.updateUser({ password });
+          const { error } = await supabase.auth.updateUser({
+            password,
+            ...(currentPassword === undefined
+              ? {}
+              : { current_password: currentPassword }),
+          });
+          if (
+            isAuthApiError(error) &&
+            (error.code === "current_password_required" ||
+              error.code === "current_password_mismatch")
+          )
+            throw new PasswordChangeError(
+              "La contraseña actual es incorrecta. Inténtalo nuevamente.",
+              "currentPassword",
+            );
           if (isAuthApiError(error) && error.code === "same_password")
             throw new PasswordChangeError(
               "La nueva contraseña debe ser diferente de la actual.",

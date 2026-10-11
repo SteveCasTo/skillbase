@@ -38,7 +38,7 @@ test("inline-owned operations preserve returned DTO and one loading/success id",
   expect(error).not.toHaveBeenCalled();
 });
 
-test("persistent failure rejects unchanged and dismisses loading without duplicate error toast", async () => {
+test("operational failure rejects unchanged and replaces loading with an error toast", async () => {
   const failure = new Error("Conflict: consult current values");
   let caught: unknown;
   try {
@@ -55,9 +55,12 @@ test("persistent failure rejects unchanged and dismisses loading without duplica
     caught = result;
   }
   expect(caught).toBe(failure);
-  expect(dismiss).toHaveBeenCalledWith("operation-owned");
+  expect(dismiss).not.toHaveBeenCalled();
   expect(success).not.toHaveBeenCalled();
-  expect(error).not.toHaveBeenCalled();
+  expect(error).toHaveBeenCalledWith({
+    id: "operation-owned",
+    title: failure.message,
+  });
 });
 
 test("simultaneous operations do not replace each other's notification ids", async () => {

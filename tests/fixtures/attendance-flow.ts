@@ -10,6 +10,7 @@ import {
 } from "@/domain/courses/weekday-schedule";
 import { civilDay } from "@/domain/attendance/rules";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
+import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { AUTH_FIXTURES } from "./auth-users";
 import { createInstructorFixture } from "./instructors";
 
@@ -22,12 +23,32 @@ type AttendanceFixtureTestHooks = {
   afterDatabaseClosed?: () => void;
 };
 
-/** Trusted setup only, on the runner's verified ephemeral DB. HTTP uses real time. */
+function attendanceFixtureNow() {
+  const current = new Date();
+  if (process.env.E2E_TEST_CLOCK_CONTROL !== "1") return current;
+  const day = new Date(`${civilDay(current)}T00:00:00Z`).getUTCDay();
+  return day === 0 || day === 6
+    ? new Date(current.getTime() - (day === 6 ? 1 : 2) * 86_400_000)
+    : current;
+}
+
+async function setAttendanceFixtureClock(now: Date | null) {
+  if (process.env.E2E_TEST_CLOCK_CONTROL !== "1") return;
+  const url = now
+    ? `${e2eSiteUrl()}/__e2e/clock?now=${encodeURIComponent(now.toISOString())}`
+    : `${e2eSiteUrl()}/__e2e/clock/reset`;
+  const response = await fetch(url, { method: "POST" });
+  if (response.status !== 204)
+    throw new Error("Unable to control the isolated E2E application clock");
+}
+
+/** Trusted setup only, on the runner's verified ephemeral DB and scoped E2E clock. */
 export async function createAttendanceFlowFixture(
   startDate: string,
   withForeign = false,
   testHooks: AttendanceFixtureTestHooks = {},
 ) {
+  const now = attendanceFixtureNow();
   const database = createDatabase(getTestSupabaseEnvironment().databaseUrl);
   const db = database.db;
   const [admin] = await db
@@ -46,28 +67,63 @@ export async function createAttendanceFlowFixture(
   const groupsToCancel: { id: string; updatedAt: Date }[] = [];
   const groups = new DrizzleGroupRepository(db);
   let closed = false;
+  let databaseClosed = false;
+  let clockReset = false;
   async function cleanup() {
     // Archive first so a partially-created course is not exposed as an offer;
-    // cancel its tracked groups through the repository to release reservations.
-    for (const id of courseIds)
-      await db
-        .update(schema.courses)
-        .set({ status: "ARCHIVED" })
-        .where(eq(schema.courses.id, id));
-    for (const group of groupsToCancel)
-      await groups.cancel(group.id, admin!.id, group.updatedAt);
+    // cancel every tracked group through the repository to release reservations.
+    const failures: unknown[] = [];
+    for (const id of courseIds) {
+      try {
+        await db
+          .update(schema.courses)
+          .set({ status: "ARCHIVED" })
+          .where(eq(schema.courses.id, id));
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    for (const group of groupsToCancel) {
+      try {
+        await groups.cancel(group.id, admin!.id, group.updatedAt);
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (failures.length)
+      throw new AggregateError(failures, "Attendance fixture cleanup failed");
   }
   async function close() {
     if (closed) return;
-    closed = true;
+    const failures: unknown[] = [];
     try {
       await cleanup();
-    } finally {
-      await database.close();
-      testHooks.afterDatabaseClosed?.();
+    } catch (error) {
+      failures.push(error);
     }
+    if (!databaseClosed) {
+      try {
+        await database.close();
+        databaseClosed = true;
+        testHooks.afterDatabaseClosed?.();
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (!clockReset) {
+      try {
+        await setAttendanceFixtureClock(null);
+        clockReset = true;
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (failures.length)
+      throw new AggregateError(failures, "Attendance fixture close failed");
+    closed = true;
   }
   try {
+    await setAttendanceFixtureClock(now);
     const clock = new Date("2020-01-01T12:00:00.000Z");
     const [format] = await db
       .insert(schema.courseTypes)
@@ -130,12 +186,7 @@ export async function createAttendanceFlowFixture(
       return { course: created!, group };
     }
     const history = await course(teacher.id, startDate);
-    const now = new Date();
     const today = civilDay(now);
-    const todayWeekday = new Date(`${today}T00:00:00Z`).getUTCDay();
-    if (todayWeekday === 0 || todayWeekday === 6) {
-      throw new Error("Attendance E2E fixture requires a weekday Bolivia run");
-    }
     const own = await course(
       teacher.id,
       today,
@@ -200,7 +251,7 @@ export async function createAttendanceFlowFixture(
     const adjustable = await course(
       teacher.id,
       adjustableDate,
-      new Date(),
+      now,
       withForeign ? "20:00" : "12:00",
     );
     const adjustableCalendar = await attendance.getGroup(
@@ -226,6 +277,7 @@ export async function createAttendanceFlowFixture(
     }
     return {
       database,
+      now,
       attendance,
       adminId: admin.id,
       instructorId: teacher.id,

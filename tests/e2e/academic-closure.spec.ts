@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import { eq } from "drizzle-orm";
 import { users } from "@/server/db/schema";
@@ -57,16 +58,58 @@ async function downloadOfficialDocuments(
   path: string,
   version: ClosureVersionDto,
   privateCi: string,
+  enhanced = true,
 ) {
   let csv = "";
   for (const [artifact, label] of documents) {
     const url = `${path}/${version.version}/${artifact}`;
     const link = page.getByRole("link", { name: label, exact: true });
     await expect(link).toHaveAttribute("href", url);
+    const documentUrl = new URL(url, e2eSiteUrl()).href;
+    const documentResponse = enhanced
+      ? page.waitForResponse(
+          (response) =>
+            response.url() === documentUrl &&
+            response.request().method() === "GET",
+        )
+      : null;
+    const currentPage = page.url();
+    const previousNotices = await page
+      .locator("[data-sileo-id]")
+      .evaluateAll((nodes) =>
+        nodes.map((node) => node.getAttribute("data-sileo-id")!),
+      );
+    let browserDigest: string | undefined;
     const pending = page.waitForEvent("download");
     await link.click();
     const download = await pending;
-    expect(download.url()).toBe(new URL(url, e2eSiteUrl()).href);
+    if (documentResponse) {
+      const fetched = await documentResponse;
+      expect(fetched.status()).toBe(200);
+      expect(fetched.url()).toBe(documentUrl);
+      expect(new URL(download.url()).protocol).toBe("blob:");
+      expect(new URL(download.url()).origin).toBe(new URL(documentUrl).origin);
+      // Attachment bodies can be empty in the protocol inspector even though
+      // fetch/blob delivered bytes. Compare the browser's actual blob to disk.
+      browserDigest = await page.evaluate(async (url) => {
+        const bytes = await (await fetch(url)).arrayBuffer();
+        const digest = await crypto.subtle.digest("SHA-256", bytes);
+        return [...new Uint8Array(digest)]
+          .map((value) => value.toString(16).padStart(2, "0"))
+          .join("");
+      }, download.url());
+      await expect(page).toHaveURL(currentPage);
+      const resultNotice = page
+        .locator(
+          '[data-sileo-toast][data-state="success"][data-exiting="false"]' +
+            previousNotices
+              .map((id) => `:not([data-sileo-id="${id}"])`)
+              .join(""),
+        )
+        .filter({ hasText: "Descarga preparada." });
+      await expect(resultNotice).toHaveCount(1);
+      await expect(resultNotice).toBeVisible();
+    } else expect(download.url()).toBe(documentUrl);
     expect(await download.failure()).toBeNull();
     expect(download.suggestedFilename()).toBe(
       `cierre-v${version.version}-${artifact}`,
@@ -74,6 +117,10 @@ async function downloadOfficialDocuments(
     const file = await download.path();
     if (!file) throw new Error("Browser download missing");
     const bytes = await readFile(file);
+    if (browserDigest)
+      expect(
+        createHash("sha256").update(new Uint8Array(bytes)).digest("hex"),
+      ).toBe(browserDigest);
     const response = await page.request.get(url);
     expect(response.status()).toBe(200);
     expect(response.headers()["cache-control"]).toBe("private, no-store");
@@ -213,10 +260,11 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
   context,
 }) => {
   const fixture = await createAttendanceFlowFixture("2020-05-04");
-  await signInFixture(context, AUTH_FIXTURES.admin.email);
   const base = basePath(fixture.historyCourseId, fixture.historyGroupId),
     path = `${base}/cierre`;
   try {
+    await context.clock.setFixedTime(fixture.now);
+    await signInFixture(context, AUTH_FIXTURES.admin.email);
     const participant = await exportParticipant(fixture);
     await page.goto(path);
     await expect(
@@ -282,6 +330,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     );
     const anonymous = await context.browser()!.newContext();
     try {
+      await anonymous.clock.setFixedTime(fixture.now);
       const denied = await anonymous.request.get(`${path}/1/planilla.pdf`, {
         maxRedirects: 0,
       });
@@ -333,11 +382,31 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     await page
       .getByRole("button", { name: "Confirmar cierre", exact: true })
       .click();
-    expect((await stale).status()).toBe(409);
+    const staleResponse = await stale;
+    expect(staleResponse.status()).toBe(409);
+    const staleMessage = await page.evaluate(
+      (html) =>
+        new DOMParser()
+          .parseFromString(html, "text/html")
+          .querySelector("#closure-error")
+          ?.textContent?.trim() ?? "",
+      await staleResponse.text(),
+    );
+    expect(staleMessage).not.toBe("");
     await expect(
       page.getByRole("heading", { name: "Versión oficial 2" }),
     ).toBeVisible();
-    await expect(page.locator("#closure-error")).not.toBeEmpty();
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+      ),
+    ).toBeVisible();
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+      ),
+    ).toContainText(staleMessage);
+    await expect(page.locator("#closure-error")).toBeHidden();
     await page.getByRole("link", { name: "Versión 1", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "Versión 1", exact: true }),
@@ -352,20 +421,23 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
       page.getByRole("button", { name: /Cerrar grupo|Confirmar reapertura/ }),
     ).toHaveCount(0);
   } finally {
-    const state = await read(page, path);
-    if (state.status === "CLOSED")
-      expect(
-        (
-          await command(
-            page,
-            path,
-            "reopen",
-            state.revision,
-            "Limpieza de fixture aislado",
-          )
-        ).status(),
-      ).toBe(200);
-    await fixture.close();
+    try {
+      const state = await read(page, path);
+      if (state.status === "CLOSED")
+        expect(
+          (
+            await command(
+              page,
+              path,
+              "reopen",
+              state.revision,
+              "Limpieza de fixture aislado",
+            )
+          ).status(),
+        ).toBe(200);
+    } finally {
+      await fixture.close();
+    }
   }
 });
 
@@ -375,11 +447,17 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
   browser,
 }) => {
   const fixture = await createAttendanceFlowFixture("2020-05-04", true);
-  const adminContext = await browser.newContext();
-  await signInFixture(adminContext, AUTH_FIXTURES.admin.email);
-  const admin = await adminContext.newPage();
+  let adminContext: Awaited<ReturnType<typeof browser.newContext>> | undefined;
+  let admin!: Page;
+  let adminReady = false;
   const adminPath = `${basePath(fixture.historyCourseId, fixture.historyGroupId)}/cierre`;
   try {
+    await context.clock.setFixedTime(fixture.now);
+    adminContext = await browser.newContext();
+    await adminContext.clock.setFixedTime(fixture.now);
+    await signInFixture(adminContext, AUTH_FIXTURES.admin.email);
+    admin = await adminContext.newPage();
+    adminReady = true;
     await exportParticipant(fixture);
     const prepared = await prepare(admin, fixture, 8);
     const adminReport = (await read(admin, adminPath)).provisional!;
@@ -498,21 +576,29 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
         .where(eq(users.id, fixture.instructorId));
     }
   } finally {
-    const state = await read(admin, adminPath);
-    if (state.status === "CLOSED")
-      expect(
-        (
-          await command(
-            admin,
-            adminPath,
-            "reopen",
-            state.revision,
-            "Limpieza de fixture aislado",
-          )
-        ).status(),
-      ).toBe(200);
-    await adminContext.close();
-    await fixture.close();
+    try {
+      if (adminContext && adminReady) {
+        const state = await read(admin, adminPath);
+        if (state.status === "CLOSED")
+          expect(
+            (
+              await command(
+                admin,
+                adminPath,
+                "reopen",
+                state.revision,
+                "Limpieza de fixture aislado",
+              )
+            ).status(),
+          ).toBe(200);
+      }
+    } finally {
+      try {
+        await adminContext?.close();
+      } finally {
+        await fixture.close();
+      }
+    }
   }
 });
 
@@ -520,11 +606,14 @@ test("HTML without JavaScript retains server validation and supports closing and
   browser,
 }) => {
   const fixture = await createAttendanceFlowFixture("2020-05-04");
-  const context = await browser.newContext({ javaScriptEnabled: false });
-  await signInFixture(context, AUTH_FIXTURES.admin.email);
-  const page = await context.newPage();
+  let context: Awaited<ReturnType<typeof browser.newContext>> | undefined;
+  let page!: Page;
   const path = `${basePath(fixture.historyCourseId, fixture.historyGroupId)}/cierre`;
   try {
+    context = await browser.newContext({ javaScriptEnabled: false });
+    await context.clock.setFixedTime(fixture.now);
+    await signInFixture(context, AUTH_FIXTURES.admin.email);
+    page = await context.newPage();
     const participant = await exportParticipant(fixture);
     await prepare(page, fixture);
     await page.goto(path);
@@ -540,6 +629,7 @@ test("HTML without JavaScript retains server validation and supports closing and
       path,
       (await read(page, path)).official!,
       participant.ci,
+      false,
     );
     await page.getByText("Reabrir grupo", { exact: true }).click();
     await page
@@ -580,20 +670,26 @@ test("HTML without JavaScript retains server validation and supports closing and
       ).status(),
     ).toBe(404);
   } finally {
-    const state = await read(page, path);
-    if (state.status === "CLOSED")
-      expect(
-        (
-          await command(
-            page,
-            path,
-            "reopen",
-            state.revision,
-            "Limpieza de fixture aislado",
-          )
-        ).status(),
-      ).toBe(200);
-    await context.close();
-    await fixture.close();
+    try {
+      const state = await read(page, path);
+      if (state.status === "CLOSED")
+        expect(
+          (
+            await command(
+              page,
+              path,
+              "reopen",
+              state.revision,
+              "Limpieza de fixture aislado",
+            )
+          ).status(),
+        ).toBe(200);
+    } finally {
+      try {
+        await context?.close();
+      } finally {
+        await fixture.close();
+      }
+    }
   }
 });

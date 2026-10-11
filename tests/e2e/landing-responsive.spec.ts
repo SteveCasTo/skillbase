@@ -76,8 +76,9 @@ async function expectModernHeroArtDirection(page: Page) {
   const viewportWidth = page.viewportSize()?.width ?? 0;
   const evidence = await page
     .locator("picture.hero-plate")
-    .evaluate((picture) => {
+    .evaluate(async (picture) => {
       const image = picture.querySelector("img");
+      await image?.decode();
       const normalize = (value: string) =>
         new URL(value, window.location.href).href;
       const urlsFrom = (source: HTMLSourceElement) =>
@@ -90,6 +91,12 @@ async function expectModernHeroArtDirection(page: Page) {
 
       return {
         currentSrc: image?.currentSrc ?? "",
+        complete: image?.complete ?? false,
+        naturalWidth: image?.naturalWidth ?? 0,
+        naturalHeight: image?.naturalHeight ?? 0,
+        alt: image?.getAttribute("alt"),
+        loading: image?.loading,
+        fetchPriority: image?.fetchPriority,
         mobileSources: sources
           .filter((source) => source.media === "(max-width: 639px)")
           .flatMap(urlsFrom),
@@ -106,8 +113,21 @@ async function expectModernHeroArtDirection(page: Page) {
     "image/avif",
     "image/webp",
   ]);
-  expect(evidence.currentSrc).toMatch(/\/_image(?:\?|\/)/);
-  expect(evidence.currentSrc).toMatch(/[?&]f=(?:avif|webp)(?:&|$)/);
+  // Development serves @fs assets; production serves fingerprinted _astro assets.
+  // Neither path requires request-time encoding after static variant generation.
+  expect(new URL(evidence.currentSrc).pathname).toMatch(
+    /\/(?:_astro\/|@fs\/.*\/assets\/plates\/optimized\/)cota-activa-(?:mobile|desktop)-\d+(?:\.[\w-]+)?\.(?:avif|webp)$/,
+  );
+  expect(evidence.complete).toBe(true);
+  expect(evidence.naturalWidth).toBeGreaterThan(0);
+  expect(evidence.naturalHeight).toBeGreaterThan(0);
+  expect(evidence.naturalWidth / evidence.naturalHeight).toBeCloseTo(
+    viewportWidth < 640 ? 1198 / 1313 : 1672 / 941,
+    2,
+  );
+  expect(evidence.alt).toBe("");
+  expect(evidence.loading).toBe("eager");
+  expect(evidence.fetchPriority).toBe("high");
 
   const expectedSources =
     viewportWidth < 640 ? evidence.mobileSources : evidence.desktopSources;

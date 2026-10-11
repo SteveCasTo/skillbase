@@ -1,0 +1,137 @@
+diff --git a/dist/index.js b/dist/index.js
+index 253c3eac406861c781b552d6ecd330224fe09c15..cb574cc9431159631ad60bdb6a6c42ab2ebd4f25 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -187,6 +187,7 @@ const Check = ()=>/*#__PURE__*/ jsxRuntime.jsx(Icon, {
+     });
+ });
+ /* ------------------------------- Component -------------------------------- */ const Sileo = /*#__PURE__*/ react.memo(function Sileo({ id, fill = "#FFFFFF", state = "success", title = state, description, position = "left", expand = "bottom", className, icon, styles, button, roundness, exiting = false, autoExpandDelayMs, autoCollapseDelayMs, canExpand, interruptKey, refreshKey, onMouseEnter, onMouseLeave, onDismiss }) {
++    const reducedMotion = react$1.useReducedMotion();
+     var _headerLayer_current_view_icon, _headerLayer_prev_view_icon;
+     var _headerLayer_current_view_styles, _headerLayer_current_view_styles1, _headerLayer_prev_view_styles, _headerLayer_prev_view_styles1, _view_styles, _view_styles1;
+     const next = react.useMemo(()=>({
+@@ -467,15 +468,17 @@ const Check = ()=>/*#__PURE__*/ jsxRuntime.jsx(Icon, {
+         open,
+         expandedContent
+     ]);
+-    const bodyTransition = react.useMemo(()=>open ? SPRING : cc._extends({}, SPRING, {
++    const bodyTransition = react.useMemo(()=>reducedMotion ? { duration: 0 } : open ? SPRING : cc._extends({}, SPRING, {
+             bounce: 0
+         }), [
+-        open
++        open,
++        reducedMotion
+     ]);
+-    const pillTransition = react.useMemo(()=>ready ? SPRING : {
++    const pillTransition = react.useMemo(()=>ready && !reducedMotion ? SPRING : {
+             duration: 0
+         }, [
+-        ready
++        ready,
++        reducedMotion
+     ]);
+     const viewBox = `0 0 ${WIDTH} ${svgHeight}`;
+     const canvasStyle = react.useMemo(()=>({
+@@ -584,9 +587,11 @@ const Check = ()=>/*#__PURE__*/ jsxRuntime.jsx(Icon, {
+         exiting,
+         onDismiss
+     ]);
+-    /* --------------------------------- Render --------------------------------- */ return /*#__PURE__*/ jsxRuntime.jsxs("button", {
++    /* --------------------------------- Render --------------------------------- */ return /*#__PURE__*/ jsxRuntime.jsxs("div", {
+         ref: buttonRef,
+-        type: "button",
++        role: "group",
++        tabIndex: 0,
++        "data-sileo-id": id,
+         "data-sileo-toast": true,
+         "data-ready": ready,
+         "data-expanded": open,
+@@ -607,6 +612,7 @@ const Check = ()=>/*#__PURE__*/ jsxRuntime.jsx(Icon, {
+                 style: canvasStyle,
+                 children: /*#__PURE__*/ jsxRuntime.jsxs("svg", {
+                     "data-sileo-svg": true,
++                    "aria-hidden": true,
+                     width: WIDTH,
+                     height: svgHeight,
+                     viewBox: viewBox,
+@@ -699,9 +705,7 @@ const Check = ()=>/*#__PURE__*/ jsxRuntime.jsx(Icon, {
+                     className: (_view_styles = view.styles) == null ? void 0 : _view_styles.description,
+                     children: [
+                         view.description,
+-                        view.button && // biome-ignore lint/a11y/useValidAnchor: cannot use button inside a button
+-                        /*#__PURE__*/ jsxRuntime.jsx("a", {
+-                            href: "#",
++                        view.button && /*#__PURE__*/ jsxRuntime.jsx("button", {
+                             type: "button",
+                             "data-sileo-button": true,
+                             "data-state": view.state,
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 275118b7f838d1910fd03586bcc7c3de4736db7f..5b3e217963e6f502e68ff4fe36ad0012a7848b92 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -14,1 +14,1 @@
+-import { motion } from 'motion/react';
++import { motion, useReducedMotion } from 'motion/react';
+@@ -185,6 +185,7 @@ const Check = ()=>/*#__PURE__*/ jsx(Icon, {
+     });
+ });
+ /* ------------------------------- Component -------------------------------- */ const Sileo = /*#__PURE__*/ memo(function Sileo({ id, fill = "#FFFFFF", state = "success", title = state, description, position = "left", expand = "bottom", className, icon, styles, button, roundness, exiting = false, autoExpandDelayMs, autoCollapseDelayMs, canExpand, interruptKey, refreshKey, onMouseEnter, onMouseLeave, onDismiss }) {
++    const reducedMotion = useReducedMotion();
+     var _headerLayer_current_view_icon, _headerLayer_prev_view_icon;
+     var _headerLayer_current_view_styles, _headerLayer_current_view_styles1, _headerLayer_prev_view_styles, _headerLayer_prev_view_styles1, _view_styles, _view_styles1;
+     const next = useMemo(()=>({
+@@ -465,15 +466,17 @@ const Check = ()=>/*#__PURE__*/ jsx(Icon, {
+         open,
+         expandedContent
+     ]);
+-    const bodyTransition = useMemo(()=>open ? SPRING : _extends({}, SPRING, {
++    const bodyTransition = useMemo(()=>reducedMotion ? { duration: 0 } : open ? SPRING : _extends({}, SPRING, {
+             bounce: 0
+         }), [
+-        open
++        open,
++        reducedMotion
+     ]);
+-    const pillTransition = useMemo(()=>ready ? SPRING : {
++    const pillTransition = useMemo(()=>ready && !reducedMotion ? SPRING : {
+             duration: 0
+         }, [
+-        ready
++        ready,
++        reducedMotion
+     ]);
+     const viewBox = `0 0 ${WIDTH} ${svgHeight}`;
+     const canvasStyle = useMemo(()=>({
+@@ -582,9 +585,11 @@ const Check = ()=>/*#__PURE__*/ jsx(Icon, {
+         exiting,
+         onDismiss
+     ]);
+-    /* --------------------------------- Render --------------------------------- */ return /*#__PURE__*/ jsxs("button", {
++    /* --------------------------------- Render --------------------------------- */ return /*#__PURE__*/ jsxs("div", {
+         ref: buttonRef,
+-        type: "button",
++        role: "group",
++        tabIndex: 0,
++        "data-sileo-id": id,
+         "data-sileo-toast": true,
+         "data-ready": ready,
+         "data-expanded": open,
+@@ -605,6 +610,7 @@ const Check = ()=>/*#__PURE__*/ jsx(Icon, {
+                 style: canvasStyle,
+                 children: /*#__PURE__*/ jsxs("svg", {
+                     "data-sileo-svg": true,
++                    "aria-hidden": true,
+                     width: WIDTH,
+                     height: svgHeight,
+                     viewBox: viewBox,
+@@ -697,9 +703,7 @@ const Check = ()=>/*#__PURE__*/ jsx(Icon, {
+                     className: (_view_styles = view.styles) == null ? void 0 : _view_styles.description,
+                     children: [
+                         view.description,
+-                        view.button && // biome-ignore lint/a11y/useValidAnchor: cannot use button inside a button
+-                        /*#__PURE__*/ jsx("a", {
+-                            href: "#",
++                        view.button && /*#__PURE__*/ jsx("button", {
+                             type: "button",
+                             "data-sileo-button": true,
+                             "data-state": view.state,

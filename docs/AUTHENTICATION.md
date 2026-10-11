@@ -100,14 +100,16 @@ En requests posteriores, el middleware crea un cliente `@supabase/ssr` ligado a 
 
 El parámetro de retorno permite solo rutas relativas locales. El siguiente destino del OAuth se conserva en una cookie breve, `HttpOnly` y `SameSite=Lax`. Logout es `POST`, valida el origen y usa `signOut({ scope: "local" })`.
 
+El callback normal de Google prepara «Sesión iniciada.» solo después de verificar sesión OAuth, identidad aprobada y usuario interno autorizado. El layout privado revalida el usuario y consume una cookie de feedback de un uso, `HttpOnly`, limitada a `/app`, al mismo origen y UUID Auth y con vigencia de 60 segundos; no contiene credenciales ni concede acceso. Sileo presenta el mismo éxito que el login password, incluso tras las navegaciones completas Google→Supabase→app. Los fallos del callback vuelven a login con aviso Sileo; los errores de campo siguen junto al campo. El botón Google muestra «Abriendo Google…» durante la salida, sin éxito anticipado ni toast loading permanente. La asociación Google desde perfil conserva su flujo separado. La cobertura del callback con proveedor controlado no equivale a consentimiento Google real end-to-end.
+
 ### Configuración local
 
 - Site URL: `http://127.0.0.1:4321`.
 - Redirect permitido exacto: `http://127.0.0.1:4321/auth/callback`.
-- Callback que debe registrarse en Google para Supabase local: `http://127.0.0.1:55321/auth/v1/callback`.
+- Callback que debe registrarse en Google para la configuración versionada de Supabase local: `http://127.0.0.1:55321/auth/v1/callback`.
 - Client ID y secret de Google se leen desde variables ignoradas por Git declaradas en `.env.example`.
 
-Al cambiar los puertos locales, el callback anterior `http://127.0.0.1:54321/auth/v1/callback` se sustituye por el de arriba. La allowlist/credencial de Google en consola requiere actualización manual; no se afirma que ya se haya autorizado el nuevo callback ni que Google OAuth real se haya probado. Site URL y redirect de la aplicación web continúan en `127.0.0.1:4321`.
+La configuración versionada en el source base de esta documentación conserva API local `55321`. Durante la operación local F9 se autorizó un ajuste solo local a API `54321`; en ese runtime el callback esperado es `http://127.0.0.1:54321/auth/v1/callback`. La app mantiene Site URL/redirect `127.0.0.1:4321`. El inicio de OAuth local devolvió HTTP 302 hacia ese callback y la página de Google cargó HTTP 200 sin error de redirect observado; no se completaron consentimiento real, callback PKCE ni sesión. Esta observación parcial no demuestra login OAuth end-to-end ni modifica el source/release. Antes de una prueba real, el usuario/operador debe coordinar cuenta, invitación, autorización de callback y sesión; no se otorgan roles por defecto.
 
 Los fixtures locales crean usuarios de Auth confirmados mediante Admin API y obtienen sesiones E2E controladas; Google real no es dependencia de la suite general.
 
@@ -119,7 +121,7 @@ Las rutas privadas tienen políticas fail-closed: `/app` y `/app/perfil` permite
 
 El proyecto `SkillBase` está enlazado con referencia `fvzxqlezdrlzykyoevub`. Google OAuth, Site URL y el callback `https://skillbase-alpha.vercel.app/auth/callback` están configurados. El primer administrador permanece como invitación `INVITED` hasta completar su primer acceso Google, momento en que se vinculará su UUID Auth y pasará a `ACTIVE`.
 
-El flujo cloud fue verificado manualmente desde Vercel hasta Google y de regreso a `/app`. El primer administrador quedó vinculado a su identidad Auth, en estado `ACTIVE` y con rol `ADMIN`.
+El flujo cloud fue verificado manualmente en un boundary histórico desde Vercel hasta Google y de regreso a `/app`. El primer administrador quedó vinculado a su identidad Auth, en estado `ACTIVE` y con rol `ADMIN`. Esa evidencia histórica se conserva, pero no sustituye la aceptación OAuth/recovery local y de producción end-to-end que queda en Fase 10A.
 
 ## AUTENTICACIÓN DUAL (Fase 4 liberada mediante PR 126)
 
@@ -131,7 +133,7 @@ La plantilla `supabase/templates/recovery.html` está en español, explica una �
 
 La configuración SMTP local está integrada en `development` mediante `supabase/config.toml`/plantilla y referencias privadas; el `.env` ignorado del checkout canónico contiene secretos, nunca versionados. Las suites aisladas eliminan el transporte SMTP externo y sus variables antes de arrancar, y copian únicamente las plantillas públicas. No necesitan credenciales de Gmail ni envían correo real.
 
-La configuración SMTP cloud está comprobada por lectura de Admin API, pero la identidad destinataria autorizada no existe en Auth cloud; no se creó otra cuenta ni se hizo una prueba recovery cloud. El usuario confirmó la recepción de un correo de prueba en el buzón autorizado local, verificando entrega SMTP local. Esto no prueba clic de recovery/cambio de contraseña, ni entrega cloud. No afirmar esos flujos ni Google OAuth como verificados; la consola Google aún requiere autorizar el callback local `http://127.0.0.1:55321/auth/v1/callback`.
+La configuración SMTP cloud está comprobada por lectura de Admin API, pero la identidad destinataria autorizada no existe en Auth cloud; no se creó otra cuenta ni se hizo una prueba recovery cloud. El usuario confirmó históricamente la recepción de un correo de prueba en el buzón autorizado local, verificando entrega SMTP local. Esto no prueba clic de recovery/cambio de contraseña, ni entrega cloud. La prueba OAuth end-to-end local/cloud sigue en Fase 10A; el callback debe coincidir con el runtime usado (`55321` en config versionada, `54321` en el ajuste local temporal F9).
 
 ### Flujos internos y reglas del release dual
 
@@ -150,9 +152,9 @@ La configuración SMTP cloud está comprobada por lectura de Admin API, pero la 
 
 ### Estado operacional SMTP
 
-La configuración Supabase Auth SMTP autorizada se aplicó en cloud y local con el remitente de SkillBase. Secretos quedan exclusivamente en Auth y `.env` local ignorado; no se incluyen valores en Git, frontend, CI ni esta documentación. La recepción local de un correo de prueba está confirmada por el usuario. Continúan pendientes el clic/cambio de contraseña desde el enlace, la entrega cloud y la verificación OAuth real.
+La configuración Supabase Auth SMTP autorizada se aplicó en cloud y local con el remitente de SkillBase. Secretos quedan exclusivamente en Auth y `.env` local ignorado; no se incluyen valores en Git, frontend, CI ni esta documentación. La recepción local de un correo de prueba fue confirmada históricamente por el usuario. Continúan pendientes el recovery/cambio completo end-to-end local y cloud y la prueba real OAuth local/cloud prevista para Fase 10A. Cualquier login/email real requiere coordinación autorizada con el usuario; no automatizar consentimiento, reutilizar acceso a un perfil real ni enviar correo como parte de una actualización documental.
 
-La autorización manual del callback Google local `http://127.0.0.1:55321/auth/v1/callback` en Google Console sigue pendiente de forma independiente; conservar el callback activo y no afirmar que OAuth real esté validado por configurar SMTP.
+La autorización manual del callback en Google Console debe verificarse con el usuario para el puerto del runtime de la prueba (configuración versionada `55321`, runtime F9 local `54321`). No afirmar OAuth real validado por configurar SMTP ni por el redirect HTTP parcial observado.
 
 Al cierre inicial de PR 126 no había acción de baja ni esta política. La corrección posterior se integró por PRs 134/136 y se liberó con PR 211/Fase 6. PR 222 añadió edición inline individual de perfiles/lifecycle; ese cambio se promovió a producción con PR 228.
 
@@ -162,6 +164,8 @@ Al cierre inicial de PR 126 no había acción de baja ni esta política. La corr
 - Eliminación disponible solo si la persona nunca fue asignada, tiene exclusivamente el rol `INSTRUCTOR` y no tiene dependencias de dominio. La operación ADMIN hace transición a `DISABLED`/deletion-pending en PostgreSQL, luego elimina la identidad mediante Supabase Auth Admin y finaliza con perfil/rol removidos y tombstone interno mínimo para conservar referencias/auditoría. Si falla Auth o el paso final, no se reactiva: queda bloqueada y el mismo flujo permite reintentar. Registro y sesión ADMIN se verifican en servidor.
 - Todas las rutas/acciones revalidan estado interno; cookie ya emitida no mantiene acceso para instructor desactivado. Reactivación recupera la identidad preservada y la autorización sin recrear ni resetear credenciales.
 - La página de cambio de contraseña es independiente de `/app/perfil`. Cuenta password exige validar password actual en servidor, además de nueva/confirmación. La acción «Crear contraseña» de Google-only exige claims firmados de sesión OAuth Google aprobada, `getUser()`/cuenta live y prueba OAuth reciente (menos de 5 minutos); no depende de metadata, de una identidad histórica aislada ni añade verificación por correo en ese formulario. Una prueba de recuperación válida es un camino distinto desde recovery. Auth vuelve a comprobar actor/sesión antes de escribir. Error de password igual a anterior se muestra de forma específica/recuperable. El recovery «Olvidaste tu contraseña» está en página independiente con validez del email y respuesta neutra.
+- El cambio normal transmite además la contraseña actual validada como `current_password` a `auth.updateUser`; recovery y primera contraseña Google aprobada omiten esa propiedad, aunque el formulario envíe un valor. El gateway conserva esta separación fuera de presentación. Los códigos del proveedor `current_password_required`/`current_password_mismatch` se convierten al error seguro del campo actual; no se muestran detalles crudos ni se registran credenciales. Esto prepara compatibilidad con el control nativo, pero no lo activa ni acredita enforcement por sí solo.
+- Supabase JS/auth-js 2.116.0 tipa el parámetro; el GoTrue local observado v2.196.0 lo implementa con excepciones para sesión recovery y cuenta sin contraseña previa. CLI 2.117.0 no ofrece una clave TOML para activar `UpdatePasswordRequireCurrentPassword`; no inventar una. `auth.email.secure_password_change` es reautenticación/nonce, no contraseña actual. La activación cloud de «Require current password when changing password» y su verificación corresponden al release coordinado, no a este cambio de source. No se modifican configuración/puertos/env del runtime local existente, bootstrap ADMIN Google ni configuración cloud. La frontera de primera contraseña Google a nivel proveedor sigue pendiente en AUTH-1.
 - SMTP cloud/local está configurado; el usuario confirmó recepción de un correo de prueba local. No equivale a recovery/cambio completo ni a entrega cloud, que permanecen sin verificar. La verificación manual de Google OAuth/allowlist continúa pendiente de forma independiente.
 - La fuente final `8735d676fe0d96e7230b4636efa8cb51045d1eca` (base `ddd0f3de`) pasó 178 unit, 98 integration y full E2E 120/120, además de lint/format/typecheck/build/Drizzle/diff checks; se integró en `development` por PR 136 (`8cdb38f`). Después, PR 211 liberó Fase 6 y PR 228 liberó las correcciones/profile UI. SMTP recovery y Google OAuth real mantienen verificaciones independientes pendientes.
 

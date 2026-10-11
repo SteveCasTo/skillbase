@@ -99,10 +99,12 @@ test("password creation accepts only recent verified OAuth for the same approved
 });
 test("password errors are actionable, scoped to fields and never update or audit invalid values", async () => {
   let updates = 0;
+  const passwordUpdates: Array<[string, string | undefined]> = [];
   const current = "Synthetic-Current-2026";
   const gateway = {
     verifyCurrentPassword: async () => true,
-    updatePassword: async () => {
+    updatePassword: async (password: string, currentPassword?: string) => {
+      passwordUpdates.push([password, currentPassword]);
       updates++;
       return true;
     },
@@ -143,4 +145,5 @@ test("password errors are actionable, scoped to fields and never update or audit
     },
   );
   expect(updates).toBe(1);
+  expect(passwordUpdates).toEqual([[input.password, undefined]]);
 });

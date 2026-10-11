@@ -242,9 +242,12 @@ test("inline editing swaps icons in the same row, filters input and cancels with
   });
   await form.getByRole("button", { name: "Guardar precio estudiante" }).click();
   await expect(form).toBeVisible();
-  await expect(form.locator("#error-studentAmount")).toContainText(
-    "No se pudo confirmar",
-  );
+  await expect(form.locator("#error-studentAmount")).toHaveCount(0);
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toContainText("No se pudo confirmar");
   await expect(input).toHaveValue("95.00");
   await expect(input).toBeEditable();
   await page.unroute(`**${path}`);
@@ -325,9 +328,11 @@ test("inline editing swaps icons in the same row, filters input and cancels with
       ),
     );
   releaseFailure();
-  await expect(page.locator("[data-action-error]")).toContainText(
-    "Fallo recuperable de prueba.",
-  );
+  await expect(
+    page
+      .locator('[data-sileo-toast][data-state="error"][data-exiting="false"]')
+      .filter({ hasText: "Fallo recuperable de prueba." }),
+  ).toContainText("Fallo recuperable de prueba.");
   expect(attempts).toBe(1);
   await expect(
     page.getByRole("button", { name: "Reintentar acción" }),
@@ -362,9 +367,11 @@ test("inline editing swaps icons in the same row, filters input and cancels with
   expect(conflict.status()).toBe(303);
   await deleteButton.click();
   await dialog.getByRole("button", { name: "Eliminar formato" }).click();
-  await expect(page.locator("[data-action-error]")).toContainText(
-    "Recarga y revisa",
-  );
+  await expect(
+    page
+      .locator('[data-sileo-toast][data-state="error"][data-exiting="false"]')
+      .filter({ hasText: "Recarga y revisa" }),
+  ).toContainText("Recarga y revisa");
   await expect(page).toHaveURL(new RegExp(`${path}$`));
   await page.reload();
   await page.evaluate(() => {

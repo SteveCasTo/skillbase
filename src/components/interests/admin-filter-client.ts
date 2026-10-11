@@ -2,6 +2,7 @@ import type {
   TransitionBeforePreparationEvent,
   TransitionBeforeSwapEvent,
 } from "astro:transitions/client";
+import { notifications } from "@/lib/notifications";
 
 /** Cancellation alone is insufficient when a response has already resolved. */
 export function interestRequestGate() {
@@ -192,8 +193,9 @@ export function initializeInterestFilters(
           : failure instanceof Error
             ? failure.message
             : "No pudimos cargar los interesados. Reintenta el filtro.";
-      error!.textContent = message;
-      error!.hidden = false;
+      notifications.error({ title: message });
+      error!.textContent = "";
+      error!.hidden = true;
       retry!.hidden = false;
       pending(false);
       if (hadListFocus)

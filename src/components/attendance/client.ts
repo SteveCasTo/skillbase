@@ -250,11 +250,13 @@ function initializeAutosave(form: HTMLFormElement) {
   });
   form.addEventListener("registration:updated", () => {
     const hasError =
+      Boolean(form.dataset.saveFailed) ||
       Boolean(
         form
           .querySelector<HTMLElement>("[data-form-error]")
           ?.textContent?.trim(),
-      ) || Boolean(form.querySelector('[aria-invalid="true"]'));
+      ) ||
+      Boolean(form.querySelector('[aria-invalid="true"]'));
     if (submit) submit.hidden = !hasError;
   });
   const sync = () => {
@@ -302,17 +304,24 @@ function bindAutosaveMutation(
     try {
       const result = await adapter.submit({ ...values, requestKey });
       if (result.ok) {
+        delete form.dataset.saveFailed;
         await adapter.onSuccess(result.value);
         notifications.success({ id, title: adapter.successMessage });
       } else {
-        showFormIssues(form, { ...result.issues, form: result.message });
-        notifications.dismiss(id);
+        showFormIssues(form, { ...result.issues, form: "" });
+        if (form.querySelector('[aria-invalid="true"]'))
+          notifications.dismiss(id);
+        else notifications.error({ id, title: result.message });
+        form.dataset.saveFailed = "true";
       }
     } catch {
-      showFormIssues(form, {
-        form: "No se pudo confirmar el guardado. Conservamos tus cambios; reintenta sin cambiar los datos.",
+      showFormIssues(form, {});
+      form.dataset.saveFailed = "true";
+      notifications.error({
+        id,
+        title:
+          "No se pudo confirmar el guardado. Conservamos tus cambios; reintenta sin cambiar los datos.",
       });
-      notifications.dismiss(id);
     } finally {
       request.finish();
       delete form.dataset.pending;
@@ -504,9 +513,11 @@ export function initializeAttendanceForms() {
             const error = document.querySelector<HTMLElement>(
               "[data-attendance-page-error]",
             );
-            if (error)
-              error.textContent =
-                "Operación guardada. Recarga la sesión para ver los cambios.";
+            if (error) error.textContent = "";
+            notifications.warning({
+              title:
+                "Operación guardada. Recarga la sesión para ver los cambios.",
+            });
             document
               .querySelector<HTMLElement>("[data-attendance-refresh]")
               ?.removeAttribute("hidden");
@@ -543,9 +554,11 @@ export function initializeAttendanceForms() {
           const error = document.querySelector<HTMLElement>(
             "[data-attendance-page-error]",
           );
-          if (error)
-            error.textContent =
-              "No se pudo actualizar la sesión. Conservamos tus cambios; reintenta.";
+          if (error) error.textContent = "";
+          notifications.error({
+            title:
+              "No se pudo actualizar la sesión. Conservamos tus cambios; reintenta.",
+          });
         } finally {
           delete link.dataset.pending;
         }

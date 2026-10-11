@@ -47,8 +47,10 @@ test("ADMIN creates and edits a registered instructor with a semantic full-card 
     /\/app\/instructores\/[0-9a-f-]+\/editar\?success=saved$/u,
   );
   await expect(
-    page.getByText("Instructor guardado correctamente."),
-  ).toBeVisible();
+    page
+      .getByRole("status")
+      .filter({ hasText: "Instructor guardado correctamente." }),
+  ).toHaveCount(0);
   expect(await page.content()).not.toContain(password);
   await expect(
     page
@@ -257,9 +259,13 @@ test("instructor creation and validation work without JavaScript and never echo 
     await expect(page).toHaveURL(
       /\/app\/instructores\/[0-9a-f-]+\/editar\?success=saved$/u,
     );
-    await expect(
-      page.getByText("Instructor guardado correctamente."),
-    ).toBeVisible();
+    const successNotice = page
+      .getByRole("status")
+      .filter({ hasText: "Instructor guardado correctamente." });
+    await expect(successNotice).toBeVisible();
+    await expect(successNotice).toHaveText(
+      "Instructor guardado correctamente.",
+    );
     await page.goto("/app/instructores");
     const search = page.getByRole("searchbox", {
       name: "Buscar por nombre o correo",
