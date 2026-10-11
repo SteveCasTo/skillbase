@@ -77,7 +77,14 @@ export async function instructorEditor(
           "Recarga la página antes de enviar la solicitud.",
         );
       }
-      const form = await readAuthForm(context.request);
+      let form: URLSearchParams;
+      try {
+        form = await readAuthForm(context.request);
+      } catch {
+        throw new InstructorError(
+          "La solicitud no es válida. Recarga y reintenta desde el formulario.",
+        );
+      }
       const intent = form.get("intent");
       if (intent) {
         if (own || !previous)
