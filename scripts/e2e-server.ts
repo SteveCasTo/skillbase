@@ -1,6 +1,7 @@
 import { getTestSupabaseEnvironment } from "./supabase-local-env";
 import { e2ePort, e2eSiteUrl } from "./e2e-port";
 import type { Plugin } from "vite";
+import { resolve } from "node:path";
 
 const nativeDate = Date;
 let controlledNow: number | undefined;
@@ -66,6 +67,9 @@ const { dev } = await import("astro");
 const server = await dev({
   // Vite must not load the developer's .env over the isolated test values.
   vite: {
+    // Each isolated stack owns its optimizer output, too: concurrent canonical
+    // dev/build processes must not overwrite this server's React runtime.
+    cacheDir: resolve(process.env.TEST_SUPABASE_WORKDIR!, "vite-cache"),
     envDir: process.env.TEST_SUPABASE_WORKDIR!,
     plugins: [e2eClockControl],
   },

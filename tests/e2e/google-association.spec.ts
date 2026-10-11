@@ -162,6 +162,64 @@ test("mismatched Google restores the owner; unsolicited attachment leaves passwo
   await expect(
     page.getByRole("button", { name: "Asociar Google" }),
   ).toHaveCount(0);
+  // Exercise the approved normal callback, not just a fixture-injected session.
+  await page
+    .getByRole("button", { name: "Cerrar sesión", exact: true })
+    .first()
+    .click();
+  const start = await context.request.post("/auth/google", {
+    headers: { origin: new URL(baseURL!).origin },
+    form: { next: "/app/perfil" },
+    maxRedirects: 0,
+  });
+  expect(start.status()).toBe(303);
+  const authorizeUrl = start.headers().location;
+  if (!authorizeUrl) throw new Error("OAuth start did not provide a redirect");
+  const authorize = await context.request.get(authorizeUrl, {
+    maxRedirects: 0,
+  });
+  expect(authorize.status()).toBe(302);
+  const providerUrl = authorize.headers().location;
+  if (!providerUrl) throw new Error("OAuth provider redirect is unavailable");
+  const loginCode = await completeLinkProviderFixture(providerUrl, id);
+  await page.goto(`/auth/callback?code=${encodeURIComponent(loginCode)}`);
+  await expect(page).toHaveURL("/app/perfil");
+  await expect(
+    page
+      .locator('[data-sileo-toast][data-state="success"]')
+      .filter({ hasText: "Sesión iniciada." }),
+  ).toBeVisible();
+  // Visibility alone permits opacity 0 / the entering toast outside the viewport.
+  // Capture its actual presented state, without suppressing Sileo's animation.
+  await page.waitForFunction(() => {
+    const toast = document.querySelector<HTMLElement>(
+      '[data-sileo-toast][data-state="success"]',
+    );
+    if (!toast) return false;
+    const box = toast.getBoundingClientRect();
+    if (
+      box.width < 100 ||
+      box.height < 20 ||
+      box.left < 0 ||
+      box.top < 0 ||
+      box.right > innerWidth ||
+      box.bottom > innerHeight
+    )
+      return false;
+    for (
+      let element: HTMLElement | null = toast;
+      element;
+      element = element.parentElement
+    ) {
+      if (Number(getComputedStyle(element).opacity) < 0.99) return false;
+    }
+    return true;
+  });
+  await page.screenshot({
+    path: test.info().outputPath("approved-oauth-login.png"),
+  });
+  await page.reload();
+  await expect(page.locator("[data-oauth-login-notice]")).toHaveCount(0);
 });
 
 test("switched password sessions and forged link cookies cannot approve Google or silently sign out the owner", async ({

@@ -41,7 +41,9 @@ const recoverySent = Astro.url.searchParams.get("status") === "recovery_sent";
           class="mt-5 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
           role="alert"
         >
-          No pudimos iniciar la sesión. Inténtalo nuevamente.
+          {error === "oauth_not_approved"
+            ? "No pudimos habilitar el acceso con Google. Contacta a administración."
+            : "No pudimos iniciar la sesión. Inténtalo nuevamente."}
         </p>
       )}
       {recoverySent && (
