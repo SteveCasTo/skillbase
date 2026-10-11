@@ -96,8 +96,11 @@ export function isGoogleAssociated(
     google[0]!.verified &&
     normalizeEmail(google[0]!.email) === normalizeEmail(user.email) &&
     (google[0]!.id === user.approvedGoogleIdentityId ||
-      (user.authPrimaryProvider === "GOOGLE" &&
-        identity.identities.every((entry) => entry.provider === "google")))
+      (!user.approvedGoogleIdentityId &&
+        user.authPrimaryProvider === "GOOGLE" &&
+        identity.identities.every((entry) =>
+          ["google", "email"].includes(entry.provider),
+        )))
   );
 }
 
@@ -128,10 +131,32 @@ export function requireApprovedProviders(
   session: VerifiedAuthSession,
 ): void {
   requireMatchingAccount(user, identity);
-  // Identities do not prove the method used by the current session. Native
-  // linking must not disable password/email ownership or approve OAuth access.
-  if (session.method === "PASSWORD" || session.method === "EMAIL_CONFIRMATION")
+  // AMR proves the current method, not approval of the account's identity.
+  // Google-primary accounts retain that boundary after password creation or
+  // recovery. Persisted EMAIL provenance retains verified account ownership even
+  // if the provider's email identity is unlinked; its password remains valid.
+  // an automatically attached Google identity does not approve OAuth access.
+  if (
+    session.method === "PASSWORD" ||
+    session.method === "EMAIL_CONFIRMATION"
+  ) {
+    const approvedAccount =
+      user.authPrimaryProvider === "GOOGLE"
+        ? isGoogleAssociated(user, identity)
+        : user.authPrimaryProvider === "EMAIL" ||
+          identity.identities.some(
+            (entry) =>
+              entry.provider === "email" &&
+              entry.verified &&
+              normalizeEmail(entry.email) === normalizeEmail(user.email),
+          );
+    if (!approvedAccount)
+      throw new AuthorizationError(
+        "IDENTITY_CONFLICT",
+        "Account provider identity is not approved",
+      );
     return;
+  }
   const google = identity.identities.filter(
     (entry) => entry.provider === "google",
   );

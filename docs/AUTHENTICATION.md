@@ -143,6 +143,7 @@ La configuración SMTP cloud está comprobada por lectura de Admin API, pero la 
 - Después de que Supabase Auth confirma el cambio, la aplicación registra `PASSWORD_CHANGED` en `audit_events` con actor/entidad internos y sin password, token ni metadata sensible. Auth y PostgreSQL no comparten transacción: si falla esa escritura, el cambio ya aplicado no se reporta como fallido y se emite únicamente `PASSWORD_CHANGE_AUDIT_WRITE_FAILED` con el ID interno del actor.
 - El usuario puede solicitar asociación Google explícita desde `/app/perfil`. El intento se liga por cookie firmada y `HttpOnly`, nonce aleatorio almacenado como hash de un uso y expiración de cinco minutos, usuario interno, ID de sesión y `flowId` PKCE. La callback comprueba la sesión original, la identidad Auth resultante, OAuth vigente, Google verificado y coincidencia de email normalizada. Email/Supabase puede asociar automáticamente identidades Google de correo verificado y coincidente; Supabase no ofrece aquí una garantía de impedir esa asociación a nivel proveedor. Por ello la aplicación conserva `approved_google_identity_id` y **deniega autenticación OAuth** por Google no aprobada. En asociación rechazada intenta quitar únicamente la nueva identidad Google y restaura la sesión original; identidad ya asociada en Auth no constituye por sí sola autorización de la aplicación. No se auto-fusionan usuarios internos ni se cambia identidad primaria por una coincidencia de email.
 - Para una identidad interna preexistente `auth_primary_provider=GOOGLE`, el login Google vigente se conserva y la contraseña puede añadirse opcionalmente desde perfil. Cuenta provisionada con `auth_primary_provider=EMAIL` requiere asociación explícita aprobada para que OAuth funcione; el login por password sigue siendo independiente y válido aunque Auth haya añadido una identidad Google no aprobada.
+- La aprobación de la identidad de cuenta se revalida también para PASSWORD y confirmación/recovery: una cuenta primaria GOOGLE conserva su único Google verificado y coincidente aun después de añadir password/identidad email; una cuenta EMAIL conserva su provenance interno y correo de cuenta verificado coincidente, aunque se quite la identidad email del proveedor. Ningún método sustituye el UUID Auth vinculado, correo verificado, estado ACTIVE ni roles internos. Una asociación Google automática no bloquea password/recovery legítimo de EMAIL ni autoriza su OAuth.
 - Se mantienen guards, rol/estado internos y rutas fail-closed. ADMIN gestiona perfiles desde `/app/instructores`; un instructor puede editar su nombre/apellidos/teléfono (email de solo lectura) en la sección profesional de `/app/perfil`, consultar `/app/mis-cursos` y operar asistencia solo en grupos propios. Los listados/consultas siempre filtran por `users.id` autenticado, además del guard exacto `INSTRUCTOR`; una URL directa ajena no otorga acceso. Instructor no obtiene acceso a edición de cursos/grupos, formatos, interesados, participantes, settings ni finanzas.
 - Desde PR 222, un ADMIN **sin rol INSTRUCTOR** puede editar en `/app/perfil` únicamente `users.name`; el email se muestra solo lectura. La mutación revalida actor activo/rol y origen en servidor, exige la revisión observada, actualiza bajo bloqueo y audita `USER_PROFILE_UPDATED` con `fields: name`. No introduce apellidos, teléfono ni perfil profesional para ADMIN puro. Un usuario multirol que también tiene `INSTRUCTOR` usa los campos de su perfil profesional de instructor (nombre, apellidos y teléfono; email readonly), no el editor exclusivo de ADMIN puro.
 - Los campos profesionales de INSTRUCTOR y las acciones lifecycle se editan por acción/campo desde PR 222; ciclo de vida se restringe según exclusividad de rol, asignaciones e historial. Estos cambios se liberaron junto con las correcciones mediante PR 228.
@@ -179,6 +180,34 @@ No se ejecutó un flujo autenticado de cambio/recovery/primera contraseña en pr
 En el checkout local canónico, `development` está sincronizado con `dbf7f3158f24dccf9f2f271ab8d6a24e715ab291`; el proceso existente (PID 37512) conserva la app en `http://127.0.0.1:4321`, login HTTP 200 y el toast «Solicitud rechazada» al probar una clave inválida. La instancia Auth local observada es GoTrue v2.196.0 y no tiene asignación explícita de `GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD`; esto **no** demuestra que el boolean esté en `false` ni que el control nativo local esté aplicado. El runtime y el WIP de `supabase/config.toml` no se reiniciaron ni modificaron para este release.
 
 La migración aditiva 0014 vincula el perfil profesional con el ID interno estable y añade `courses.instructor_id`, preservando `instructor_name` histórico sin backfill automático. PRs 118–123 integraron Auth, instructores, seed local, auditoría de password y guard de formato; PR 126 los desplegó a producción.
+
+### Seguimiento de identidad autorizada AUTH-1 (2026-10-11)
+
+La regla autorizada no exige que toda primera contraseña se cree exclusivamente
+desde una pantalla de SkillBase. Se acepta la excepción nativa del proveedor para
+una cuenta Google legítima, con correo realmente verificado/coincidente, UUID Auth
+ya vinculado y usuario interno ACTIVE con roles. Esa aprobación debe conservarse
+en todos los accesos posteriores, incluidos PASSWORD y recovery; la credencial
+nueva no autoriza otra identidad ni concede roles. Bootstrap continúa siendo
+invitación ADMIN por correo, sin ROOT y sin fabricar verificación Google desde el
+seed. El formulario de aplicación mantiene su prueba Google reciente de cinco
+minutos y sus revalidaciones live; recovery conserva su prueba acotada separada.
+
+`requireApprovedProviders` aplica esta frontera común desde
+`loadRequestAuthContext`, usado por middleware, login, recovery y gateway de
+password. Para GOOGLE, añadir una identidad email no elimina la aprobación del
+Google primario verificado. Para EMAIL, el acceso password/recovery mantiene la
+propiedad de cuenta verificada y provenance EMAIL internos, independiente de un
+Google autoasociado no aprobado o del unlink nativo de la identidad email.
+No cambia el provisioning, hook, roles, schema, SMTP, Sileo ni secretos.
+
+Esta implementación aislada no acredita enforcement nativo local ni un flujo
+autenticado con ese control activo en producción. La CLI fijada 2.117.0 sigue sin
+mapear una clave TOML al boolean nativo; no se inventa una ni se reinicia el stack
+compartido mientras el seed paralelo está trabajando. AUTH-1 permanece pendiente
+de cierre operacional coordinado, con evidencia de configuración y flujos normales
+autorizados; no repetir procedimientos de bypass del proveedor. Resultados y
+límites en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md).
 
 El full E2E Auth PR 118 pasó 104/104 y PR 120 había pasado 107/107 antes de cambios posteriores. Tras restaurar la dependencia opcional Astro Sharp con `bun install --frozen-lockfile`, la fuente final pasó full E2E 107/107 en `127.0.0.1:4321`; el smoke público/privado pasó y el release CI/deploy de PR 126 se completó. Google OAuth real y SMTP/recovery no estaban probados en ese release histórico. El estado operacional vigente de SMTP (configuración cloud/local y receipt local confirmada, límites de recovery/cloud pendientes) está arriba y en `docs/DEPLOYMENT.md`.
 

@@ -447,3 +447,17 @@ mediante overrides/lockfile, conservando Astro y el patch Sileo. Validaciones y
 límites están en el seguimiento del documento de auditoría.
 
 La implementación defensiva transmite `current_password` en el cambio normal después de la verificación server-side existente. Recovery validado y primera contraseña Google aprobada no transmiten contraseña actual. Tras el release de PR 335, el boolean nativo cloud `security_update_password_require_current_password` se cambió de `false` a `true` y se confirmó activo por lectura filtrada. No se cambiaron secretos, roles, sesiones, migraciones, provisioning, configuración local ni otros campos de configuración cloud. El envío del campo más el control nativo protegen el cambio normal con contraseña previa, pero el proveedor exime cuentas sin password y no conoce la aprobación Google interna. No se probaron en producción cambios autenticados, recovery, primera contraseña Google ni OAuth/SMTP real; AUTH-1 sigue **abierto/parcial**, no completamente remediado. Evidencia y límites constan en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md) y [`AUTHENTICATION.md`](AUTHENTICATION.md).
+
+El seguimiento de identidad autorizada acepta explícitamente que una primera
+contraseña de la misma cuenta Google legítima pueda establecerse por el mecanismo
+nativo soportado, no exclusivamente por la pantalla de la app. No acepta acceso de
+otro UUID, correo no verificado/diferente, usuario deshabilitado/sin roles ni
+Google no aprobado. El guard común revalida identidad de cuenta también en
+PASSWORD y EMAIL_CONFIRMATION: GOOGLE conserva su Google verificado coincidente
+tras añadir email/password; EMAIL conserva provenance interno y propiedad de
+cuenta verificada aun con unlink nativo de la identidad email, y OAuth
+sigue requiriendo asociación Google aprobada. La app mantiene prueba Google
+reciente para su propio formulario y prueba recovery ligada a sesión. La
+excepción del proveedor no se describe como una garantía de prueba OAuth de cinco
+minutos fuera de la app. Esta decisión y el fix no son certificación global ni
+cierre operacional: faltan los gates coordinados descritos en la auditoría.
