@@ -270,6 +270,60 @@ flujos normales autorizados con QA propia y el control activo. Consentimiento
 Google/SMTP real requiere autorización manual independiente. No reproducir
 procedimientos de bypass del proveedor ni rotar passwords de cuentas existentes.
 
+### AUTH-1: helper nativo local y aceptación aislada (candidata)
+
+PR337 se integró en development como `2bd5d052` con CI38175262811 SUCCESS;
+145 E2E tuvieron 1 flaky/2 retries. Se recuperó la evidencia: courses.spec.ts:913
+falló primer intento/retry1 por selector genérico de error Sileo que encontró dos
+avisos legítimos activos. La corrección candidata restringe únicamente esa
+expectativa existente al mensaje de respuesta de guardado inválida, sin borrar
+avisos, escoger `.first()`, cambiar duración/timeouts/retries ni tocar Sileo.
+La prueba existente afectada pasó una vez, aislada en `4347`, **1/1 PASS** con
+retries=0. No se añadió ningún test/caso/suite ni se repitió el full gate local.
+
+La candidata `fix/local-native-auth-control` implementa literal nativo único,
+imagen/process/user/cwd fijados, hash/archivo regular sin symlink, owner1000:1000
+readonly0444, receipt/lock exclusivos y launcher start+guard dev. Docker archive
+gestiona el archivo como operador, no ejecuta Auth/root ni copia secretos. Su
+API no ofrece CAS ante operadores host ajenos: exige ventana exclusiva. El
+servicio/host que puede chmod el archivo no queda protegido por esa propiedad;
+no existe monitorización continua después del inicio de Astro. Rollback restaura
+false en el archivo propio, no ausencia física, y bloquea QA. No hay clave TOML
+inventada, upgrade CLI, nuevas dependencias ni casos/specs/suites permanentes.
+
+Después de fallos acotados de precondición/instalación (sin activación), la QA
+propia `skillbase_test_75b42dad4f824a0f` confirmó nativamente
+`current_password_required` sobre cuenta nueva conocida al omitir contraseña
+actual, cambio correcto y login con el mismo UUID. Con el control activo pasaron
+8/8 E2E Auth existentes, retries=0, incluidas primera contraseña Google-only
+ADMIN y recovery acotado. Apply, recreación CLI propia/reapply y rollback
+conservaron snapshots de conteos y volúmenes; el consumidor rechazó configuración
+ausente/rollback. Baseline aislado: ledger24, certificados0, Auth users1, internal
+users1, roles1, buckets1, objects0. No es inventario canónico ni hash de todas las
+filas. Stacks propios limpiados por runner estricto, no reset/seed canónico.
+El wrapper real se verificó además en proyecto aislado independiente
+`skillbase_test_ab08e1bf1a7e3515`: start verificado, consumer rechazado tras
+recreación CLI alternativa y wrapper reaplicado antes de QA. No se repitieron
+tests Auth para esa comprobación operacional manual.
+
+Estado sigue **parcial operacional**: no se aplicó/reinició Auth canónico ni cloud,
+no se rotaron cuentas existentes ni se probaron consentimiento Google/SMTP reales.
+La revisión del orquestador y la ventana canónica siguen siendo gates separados.
+
+La revisión independiente exigió comprobar además la etiqueta oficial
+`Config.Labels["com.supabase.cli.project"]` contra el proyecto esperado. El
+helper ahora falla cerrado con etiqueta ausente/null/vacía/diferente en la
+inspección inicial, la revalidación antes de archive copy, inmediatamente antes
+del restart y después del restart. No basta el nombre del contenedor. La lectura
+filtrada canónica confirmó etiqueta `skillbase`, sin mutación. Una comprobación
+manual temporal del mismo source con adaptador spawn sustituido por fixtures
+sintéticos rechazó las cuatro variantes antes de exec/mutación y aceptó la
+etiqueta correcta; no añadió tests/casos/suites permanentes ni ejecutó requests
+al proveedor. Los ocho E2E nativos previos son evidencia del source anterior,
+no una nueva corrida del HEAD con este guard. El nuevo HEAD requiere CI completo
+y aceptación específica de revisión antes de integrar; no usar el CI anterior
+para el merge ni aplicar al canónico.
+
 ### DEP-1: versiones corregidas fijadas
 
 Las APIs oficiales de GitHub confirmaron los advisories no retirados y las
