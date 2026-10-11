@@ -17,6 +17,7 @@
           'button[type="submit"]',
         );
         if (!button) return;
+        const initialButtonContent = button.innerHTML;
         const enhanced = form.hasAttribute("data-auth-enhanced");
         if (enhanced) form.noValidate = true;
         let pending = false;
@@ -67,6 +68,8 @@
         };
         const restore = () => {
           pending = false;
+          if (!enhanced && form.getAttribute("action") === "/auth/google")
+            button.innerHTML = initialButtonContent;
           form.removeAttribute("aria-busy");
           button.removeAttribute("aria-busy");
           sync();
@@ -108,7 +111,11 @@
           form.setAttribute("aria-busy", "true");
           button.disabled = true;
           button.setAttribute("aria-busy", "true");
-          if (!enhanced) return;
+          if (!enhanced) {
+            if (form.getAttribute("action") === "/auth/google")
+              button.textContent = "Abriendo Google…";
+            return;
+          }
           const id = `notification-${crypto.randomUUID()}`;
           notifications.loading({ id, title: "Procesando solicitud…" });
           let resultNode =

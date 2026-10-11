@@ -162,6 +162,34 @@ test("mismatched Google restores the owner; unsolicited attachment leaves passwo
   await expect(
     page.getByRole("button", { name: "Asociar Google" }),
   ).toHaveCount(0);
+  // Exercise the approved normal callback, not just a fixture-injected session.
+  await page
+    .getByRole("button", { name: "Cerrar sesión", exact: true })
+    .first()
+    .click();
+  const start = await context.request.post("/auth/google", {
+    headers: { origin: new URL(baseURL!).origin },
+    form: { next: "/app/perfil" },
+    maxRedirects: 0,
+  });
+  expect(start.status()).toBe(303);
+  const authorize = await context.request.get(start.headers().location, {
+    maxRedirects: 0,
+  });
+  expect(authorize.status()).toBe(302);
+  const loginCode = await completeLinkProviderFixture(
+    authorize.headers().location,
+    id,
+  );
+  await page.goto(`/auth/callback?code=${encodeURIComponent(loginCode)}`);
+  await expect(page).toHaveURL("/app/perfil");
+  await expect(
+    page
+      .locator('[data-sileo-toast][data-state="success"]')
+      .filter({ hasText: "Sesión iniciada." }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(page.locator("[data-oauth-login-notice]")).toHaveCount(0);
 });
 
 test("switched password sessions and forged link cookies cannot approve Google or silently sign out the owner", async ({

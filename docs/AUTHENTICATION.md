@@ -100,6 +100,8 @@ En requests posteriores, el middleware crea un cliente `@supabase/ssr` ligado a 
 
 El parámetro de retorno permite solo rutas relativas locales. El siguiente destino del OAuth se conserva en una cookie breve, `HttpOnly` y `SameSite=Lax`. Logout es `POST`, valida el origen y usa `signOut({ scope: "local" })`.
 
+El callback normal de Google prepara «Sesión iniciada.» solo después de verificar sesión OAuth, identidad aprobada y usuario interno autorizado. El layout privado revalida el usuario y consume una cookie de feedback de un uso, `HttpOnly`, limitada a `/app`, al mismo origen y UUID Auth y con vigencia de 60 segundos; no contiene credenciales ni concede acceso. Sileo presenta el mismo éxito que el login password, incluso tras las navegaciones completas Google→Supabase→app. Los fallos del callback vuelven a login con aviso Sileo; los errores de campo siguen junto al campo. El botón Google muestra «Abriendo Google…» durante la salida, sin éxito anticipado ni toast loading permanente. La asociación Google desde perfil conserva su flujo separado. La cobertura del callback con proveedor controlado no equivale a consentimiento Google real end-to-end.
+
 ### Configuración local
 
 - Site URL: `http://127.0.0.1:4321`.

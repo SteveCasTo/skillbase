@@ -10,6 +10,8 @@ import ThemeToggle from "@/components/ThemeToggle.astro";
 import { hasRole } from "@/domain/auth/policies";
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import { requireInternalUser } from "@/server/auth/context";
+import OAuthLoginNotice from "@/components/auth/OAuthLoginNotice.astro";
+import { consumeOAuthLoginNotice } from "@/server/auth/login-notice";
 
 interface Props {
   title: string;
@@ -20,9 +22,15 @@ const user = requireInternalUser(Astro.locals);
 const isAdmin = hasRole(user, "ADMIN");
 const isInstructor = hasRole(user, "INSTRUCTOR");
 const currentPath = Astro.url.pathname;
+const oauthLoginNotice = consumeOAuthLoginNotice(
+  Astro.cookies,
+  Astro.url,
+  user.authUserId,
+);
 ---
 
 <BaseLayout title={`${title} | SkillBase`} clientRouter>
+  <OAuthLoginNotice visible={oauthLoginNotice} />
   <div class="private-shell" data-private-shell>
     <aside class="private-sidebar" aria-label="Barra lateral">
       <div class="private-sidebar-panel">
