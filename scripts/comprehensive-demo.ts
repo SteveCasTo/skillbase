@@ -38,6 +38,8 @@ import {
   COMPREHENSIVE_DEMO_OWNER,
   comprehensiveDemoId,
   comprehensiveDemoPlan,
+  legacyComprehensiveDemoPlan,
+  REALISTIC_SEED_VERSION,
   assertComprehensiveTarget,
   assertComprehensiveRelease,
   comprehensiveDemoVerificationOrigin,
@@ -48,6 +50,19 @@ import {
 import { currentAnchor, fingerprint } from "./financial-demo-plan";
 import { getLocalSupabaseEnvironment } from "./supabase-local-env";
 import { runComprehensiveCertificates } from "./comprehensive-demo-certificates";
+import {
+  runRealisticScenarioRefresh,
+  captureRefreshChanges,
+  redactRefreshPlan,
+} from "./comprehensive-demo-refresh";
+import {
+  captureDemoSnapshot,
+  assertDemoNoChanges,
+  assertDemoPreservation,
+} from "./comprehensive-demo-preservation";
+import { assertReviewedPlan } from "./comprehensive-demo-execution";
+import { comprehensiveScenarioMatrix } from "./comprehensive-demo-scenarios";
+import { reviewedComprehensiveLocalTarget } from "./comprehensive-demo-local-target";
 
 const manifestId = comprehensiveDemoId("manifest");
 export interface ComprehensiveDemoOptions {
@@ -57,11 +72,13 @@ export interface ComprehensiveDemoOptions {
   apply: boolean;
   anchorDay?: string;
   now?: Date;
+  /** Compatibility fixture selection; CLIs always insert the current profile. */
+  sourceVersion?: "legacy-v1" | "realistic-v2";
   expectedPlanHash?: string;
   preview?: (plan: ComprehensiveDemoPlan, existing: boolean) => void;
 }
 
-async function preflight(
+export async function preflight(
   tx: RegistrationTransaction,
   plan: ComprehensiveDemoPlan,
 ) {
@@ -149,22 +166,48 @@ async function interests(
   tx: RegistrationTransaction,
   actor: InternalUser,
   plan: ComprehensiveDemoPlan,
+  legacyLabels = false,
 ) {
   const repo = new DrizzleInterestRepository(tx);
-  const sample = plan.samples.find((x) => x.key === "future")!;
-  const free = plan.samples.find((x) => x.key === "free")!;
-  const converted = sample.registrations.find(
+  const sample = plan.samples.find((x) => x.key === "future");
+  const free = plan.samples.find((x) => x.key === "free");
+  const converted = sample?.registrations.find(
     (r) => r.scenario === "converted",
-  )!;
-  for (const [i, course] of [sample, free].entries()) {
-    for (let n = 0; n < 6; n++) {
+  );
+  const interestedCourses = [
+    sample,
+    free,
+    ...plan.samples.filter((course) =>
+      String(course.key).startsWith("next-open-"),
+    ),
+  ].filter((course) => course !== undefined);
+  for (const [courseIndex, course] of interestedCourses.entries()) {
+    const interestKey = legacyLabels ? String(courseIndex) : course.key;
+    const count =
+      String(course.key) === "next-open-data"
+        ? 12
+        : String(course.key) === "next-open-web"
+          ? 4
+          : 6;
+    for (let n = 0; n < count; n++) {
       const participant =
-        n === 0
+        n === 0 && converted
           ? converted.participant
           : {
-              firstName: ["Ana", "Luis", "Sara", "Pablo", "Eva", "Nicolás"][n]!,
-              lastName: "Demo Interés",
-              email: `comprehensive.v1.interest.${i}.${n}@example.test`,
+              firstName: ["Ana", "Luis", "Sara", "Pablo", "Eva", "Nicolás"][
+                n % 6
+              ]!,
+              lastName: legacyLabels
+                ? "Demo Interés"
+                : [
+                    "Varela Durán",
+                    "Rivas Toledo",
+                    "Zamora Téllez",
+                    "Beltrán Orellana",
+                    "Figueroa Montes",
+                    "Palacios Ugarte",
+                  ][n % 6]!,
+              email: `comprehensive.v1.interest.${interestKey}.${n}@example.test`,
               phone: null,
             };
       await registerInterest(repo, course.course.slug, {
@@ -175,7 +218,8 @@ async function interests(
         preferredGroupId:
           n % 3 === 0
             ? null
-            : course.groups[n % 2 === 0 && course.key === "future" ? 1 : 0]!.id,
+            : course.groups[n % 2 === 0 && course.groups.length > 1 ? 1 : 0]!
+                .id,
       });
     }
     const [cancelled] = await tx
@@ -184,7 +228,7 @@ async function interests(
       .where(
         eq(
           s.interestRegistrations.email,
-          `comprehensive.v1.interest.${i}.5@example.test`,
+          `comprehensive.v1.interest.${interestKey}.${count - 1}@example.test`,
         ),
       );
     if (!cancelled) throw new Error("Demo interest missing");
@@ -194,6 +238,7 @@ async function interests(
       revision: cancelled.updatedAt.toISOString(),
     });
   }
+  if (!converted || !sample) return null;
   const [source] = await tx
     .select()
     .from(s.interestRegistrations)
@@ -207,11 +252,12 @@ async function interests(
   return sources.find((r) => r.courseId === sample.course.id)!.id;
 }
 
-async function createBusinessFixtures(
+export async function createBusinessFixtures(
   tx: RegistrationTransaction,
   actor: InternalUser,
   plan: ComprehensiveDemoPlan,
   accounts: { instructors: string[]; admins: Record<string, string> },
+  legacyLabels = false,
 ) {
   const context: ComprehensiveDemoContext = {
     owner: COMPREHENSIVE_DEMO_OWNER,
@@ -267,7 +313,7 @@ async function createBusinessFixtures(
       groupIds: sample.groups.map((g) => g.id),
     };
   }
-  const conversionId = await interests(tx, actor, plan);
+  const conversionId = await interests(tx, actor, plan, legacyLabels);
   for (const sample of plan.samples) {
     if (!sample.registrations.length) continue;
     const repo = new DrizzleRegistrationRepository(
@@ -384,7 +430,7 @@ async function createBusinessFixtures(
         .where(eq(s.users.id, accounts.admins.operator!))
     )[0]!.authUserId!,
   );
-  await seedComprehensiveAcademics(tx, operator, plan, context);
+  await seedComprehensiveAcademics(tx, operator, plan, context, legacyLabels);
   return context;
 }
 
@@ -433,7 +479,14 @@ export async function runComprehensiveDemo(
         throw new Error("Invalid demo context");
       if (options.anchorDay && options.anchorDay !== context.anchorDay)
         throw new Error("Persisted anchor cannot move");
-      const plan = comprehensiveDemoPlan(
+      const planBuilder =
+        marker.metadata.planVersion === REALISTIC_SEED_VERSION
+          ? comprehensiveDemoPlan
+          : marker.metadata.planVersion === undefined
+            ? legacyComprehensiveDemoPlan
+            : null;
+      if (!planBuilder) throw new Error("Unrecognized seed source version");
+      const plan = planBuilder(
         context.anchorDay,
         Number(marker.metadata.limit),
         Number(marker.metadata.minimumPaymentPercent),
@@ -458,7 +511,11 @@ export async function runComprehensiveDemo(
       throw new Error(
         "Initial anchor must be today's Bolivia date; existing anchors never move",
       );
-    const plan = comprehensiveDemoPlan(
+    const plan = (
+      options.sourceVersion === "legacy-v1"
+        ? legacyComprehensiveDemoPlan
+        : comprehensiveDemoPlan
+    )(
       anchor,
       attendance.consecutiveAbsenceLimit,
       registration.minimumPaymentPercent,
@@ -479,6 +536,7 @@ export async function runComprehensiveDemo(
     actor,
     options.password,
     options.apply,
+    options.sourceVersion === "legacy-v1",
   );
   if (!options.apply) return null;
   return db.transaction(async (tx) => {
@@ -509,6 +567,7 @@ export async function runComprehensiveDemo(
       actor,
       initial.plan,
       accounts,
+      options.sourceVersion === "legacy-v1",
     );
     await tx.insert(s.auditEvents).values({
       id: manifestId,
@@ -518,6 +577,9 @@ export async function runComprehensiveDemo(
       action: "DEMO_SEEDED",
       metadata: {
         seedOwner: COMPREHENSIVE_DEMO_OWNER,
+        ...(options.sourceVersion === "legacy-v1"
+          ? {}
+          : { planVersion: REALISTIC_SEED_VERSION }),
         anchorDay: initial.plan.anchorDay,
         limit: initial.plan.limit,
         minimumPaymentPercent: initial.plan.minimumPaymentPercent,
@@ -534,6 +596,12 @@ if (import.meta.main) {
   let connection: ReturnType<typeof createDatabase> | undefined;
   try {
     const args = parseComprehensiveArgs(process.argv.slice(2));
+    if (args.includeCertificates && args.refreshScenarios)
+      throw new Error("Select exactly one seed operation");
+    if (args.refreshScenarios && args.target === "production")
+      throw new Error(
+        "Production refresh requires the protected production controller",
+      );
     assertComprehensiveExecution(
       process.env,
       args.protectedManual,
@@ -542,13 +610,23 @@ if (import.meta.main) {
     );
     const url = process.env.DEMO_DATABASE_URL ?? "";
     const api = process.env.DEMO_SUPABASE_URL ?? "";
-    assertComprehensiveTarget(
-      args.target,
-      args.project,
-      url,
-      api,
-      args.allowProduction,
-    );
+    const localEvidence =
+      args.localConfigWorkdir && args.expectedLocalApi
+        ? reviewedComprehensiveLocalTarget(
+            args.localConfigWorkdir,
+            args.expectedLocalApi,
+            url,
+            api,
+          )
+        : null;
+    if (!localEvidence)
+      assertComprehensiveTarget(
+        args.target,
+        args.project,
+        url,
+        api,
+        args.allowProduction,
+      );
     if (args.target === "production") {
       const git = (argv: string[]) => {
         const result = spawnSync("git", argv, {
@@ -566,7 +644,7 @@ if (import.meta.main) {
         process.env.DEMO_APPROVED_RELEASE_SHA ?? "",
       );
     }
-    if (args.target === "local") {
+    if (args.target === "local" && !localEvidence) {
       const local = getLocalSupabaseEnvironment();
       if (url !== local.databaseUrl || api !== local.apiUrl)
         throw new Error("Running local target mismatch");
@@ -574,7 +652,82 @@ if (import.meta.main) {
     const key = process.env.DEMO_SUPABASE_SERVICE_ROLE_KEY;
     if (!key) throw new Error("Privileged Auth credential required");
     connection = createDatabase(url, { max: 1 });
-    if (args.includeCertificates) {
+    if (args.refreshScenarios) {
+      const options = {
+        actorId: process.env.DEMO_ADMIN_ID ?? "",
+        auth: createClient(api, key, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        }),
+        password: "",
+        apply: false,
+        ...(process.env.DEV_INITIAL_ADMIN_EMAIL
+          ? { primaryAdminEmail: process.env.DEV_INITIAL_ADMIN_EMAIL }
+          : {}),
+        ...(process.env.DEMO_CONFIRMED_PRIMARY_ADMIN_ID
+          ? {
+              confirmedPrimaryAdminId:
+                process.env.DEMO_CONFIRMED_PRIMARY_ADMIN_ID,
+            }
+          : {}),
+      };
+      const before = await captureDemoSnapshot(connection.db);
+      const plan = await runRealisticScenarioRefresh(connection.db, options);
+      assertDemoNoChanges(before, await captureDemoSnapshot(connection.db));
+      const approvalHash = fingerprint({
+        plan,
+        scenarios: plan.additions
+          ? comprehensiveScenarioMatrix(plan.additions)
+          : [],
+        baseline: before,
+        target: args.target,
+        project: args.project,
+        localEvidence,
+      });
+      console.info(
+        JSON.stringify(
+          {
+            mode: args.apply ? "APPLY" : "PLAN",
+            plan: redactRefreshPlan(plan),
+            localEvidence,
+            reviewedPlanSha256: approvalHash,
+          },
+          null,
+          2,
+        ),
+      );
+      assertReviewedPlan(
+        args.apply ? "apply" : "plan",
+        process.env.DEMO_REVIEWED_PLAN_SHA256 ?? "",
+        approvalHash,
+      );
+      if (args.apply) {
+        if (
+          localEvidence &&
+          fingerprint(
+            reviewedComprehensiveLocalTarget(
+              args.localConfigWorkdir!,
+              args.expectedLocalApi!,
+              url,
+              api,
+            ),
+          ) !== fingerprint(localEvidence)
+        )
+          throw new Error("Reviewed local configuration changed before APPLY");
+        const changes = await captureRefreshChanges(connection.db, plan);
+        await runRealisticScenarioRefresh(connection.db, {
+          ...options,
+          apply: true,
+          expectedPlanHash: fingerprint(plan),
+        });
+        const after = await captureDemoSnapshot(connection.db);
+        assertDemoPreservation(before, after, changes);
+        await runRealisticScenarioRefresh(connection.db, {
+          ...options,
+          apply: true,
+        });
+        assertDemoNoChanges(after, await captureDemoSnapshot(connection.db));
+      }
+    } else if (args.includeCertificates) {
       await runComprehensiveCertificates(connection.db, {
         actorId: process.env.DEMO_ADMIN_ID ?? "",
         auth: createClient(api, key, {
@@ -631,6 +784,7 @@ if (import.meta.main) {
                 preservesExistingRows: true,
                 resetAllowed: false,
                 certificatesIncluded: false,
+                scenarios: comprehensiveScenarioMatrix(plan),
               },
               null,
               2,

@@ -38,6 +38,7 @@ export async function seedComprehensiveAcademics(
   actor: InternalUser,
   plan: ComprehensiveDemoPlan,
   context: ComprehensiveDemoContext,
+  legacyLabels = false,
 ) {
   const attendance = new DrizzleAttendanceRepository(tx, () => plan.now);
   const evaluations = new DrizzleEvaluationRepository(tx, () => plan.now);
@@ -137,9 +138,11 @@ export async function seedComprehensiveAcademics(
                 ? "70.00"
                 : "92.35";
         const components =
-          sample.key === "pending" || sample.key === "current"
+          sample.key === "current"
             ? sample.components.slice(0, 1)
-            : sample.components;
+            : sample.key === "pending"
+              ? sample.components.slice(0, legacyLabels ? 1 : -1)
+              : sample.components;
         if (scenario === "pending") continue;
         const result = await saveEvaluationRow(evaluations, actor, {
           requestKey: comprehensiveDemoId(
@@ -251,7 +254,9 @@ export async function seedComprehensiveAcademics(
             new DrizzleAdminAccountRepository(tx),
             actor,
             actor.id,
-            "[DEMO] Coordinación académica · actualizado",
+            legacyLabels
+              ? "[DEMO] Coordinación académica · actualizado"
+              : "Adriana Valcárcel Soria Rojas",
             account!.updatedAt.toISOString(),
           );
           await closeAcademicGroup(closure, actor, {

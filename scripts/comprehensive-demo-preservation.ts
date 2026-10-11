@@ -10,6 +10,12 @@ export interface DemoSnapshot {
   tables: { name: string; rows: { keyHash: string; rowHash: string }[] }[];
   ledger: DemoMigrationLedgerRow[];
 }
+export interface ApprovedDemoRowChange {
+  table: string;
+  keyHash: string;
+  beforeHash: string;
+  afterHash: string | null;
+}
 /** Read-only, server-hashed evidence. Never fetch raw Auth credentials/session
  * rows into the runner, and never upload this per-row witness as an artifact. */
 export async function captureDemoSnapshot(
@@ -59,6 +65,7 @@ export function demoSnapshotSummary(snapshot: DemoSnapshot) {
 export function assertDemoPreservation(
   before: DemoSnapshot,
   after: DemoSnapshot,
+  approvedChanges: readonly ApprovedDemoRowChange[] = [],
 ): void {
   if (fingerprint(before.ledger) !== fingerprint(after.ledger))
     throw new Error("Migration ledger changed");
@@ -71,6 +78,27 @@ export function assertDemoPreservation(
       hashes.set(key, (hashes.get(key) ?? 0) + 1);
     }
     for (const row of table.rows) {
+      const approved = approvedChanges.find(
+        (change) =>
+          change.table === table.name &&
+          change.keyHash === row.keyHash &&
+          change.beforeHash === row.rowHash,
+      );
+      if (approved) {
+        const resulting = current.rows.filter(
+          (candidate) => candidate.keyHash === row.keyHash,
+        );
+        if (
+          approved.afterHash === null
+            ? resulting.length !== 0
+            : resulting.length !== 1 ||
+              resulting[0]?.rowHash !== approved.afterHash
+        )
+          throw new Error(
+            "Approved exact row change does not match final evidence",
+          );
+        continue;
+      }
       const key = `${row.keyHash}:${row.rowHash}`;
       const count = hashes.get(key) ?? 0;
       if (!count)

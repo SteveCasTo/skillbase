@@ -18,6 +18,11 @@ on:
         description: "Exact current master SHA with first-pass full CI and READY production deployment"
         required: true
         type: string
+      refresh_scenarios:
+        description: "Owned realistic labels and new seasonal cohorts only; mutually exclusive with certificates"
+        required: true
+        default: false
+        type: boolean
       release_ci_run_id:
         description: "Successful attempt-1 master push CI run for that SHA"
         required: true
@@ -63,6 +68,9 @@ jobs:
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
           DEMO_OPERATOR_MODE: ${{ inputs.mode }}
           DEMO_INCLUDE_CERTIFICATES: ${{ inputs.include_certificates }}
+          DEMO_REFRESH_SCENARIOS: ${{ inputs.refresh_scenarios }}
+          DEV_INITIAL_ADMIN_EMAIL: ${{ secrets.DEV_INITIAL_ADMIN_EMAIL }}
+          DEMO_CONFIRMED_PRIMARY_ADMIN_ID: ${{ vars.DEMO_CONFIRMED_PRIMARY_ADMIN_ID }}
           DEMO_PROJECT_REF: ${{ inputs.project_ref }}
           DEMO_APPROVED_RELEASE_SHA: ${{ inputs.approved_release_sha }}
           DEMO_RELEASE_CI_RUN_ID: ${{ inputs.release_ci_run_id }}
