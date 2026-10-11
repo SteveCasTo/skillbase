@@ -1,41 +1,36 @@
-import { createClient } from "@supabase/supabase-js";
 import {
   provisionPasswordInstructor,
   type PasswordProvisionInput,
 } from "@/application/auth/provision-password-user";
-import { getPublicAuthEnvironment } from "@/server/environment";
+import {
+  createConfirmedAccount,
+  getAccountCredentialClient,
+  removeCreatedAccount,
+} from "./account-credentials";
 import { getDatabase } from "@/server/db/client";
 import { DrizzleAuthUserRepository } from "@/server/db/repositories/auth-user-repository";
+import { AccountProvisionError } from "@/domain/auth/account-provision-error";
 
 /** No public endpoint. Call only after getUser() in the instructor application flow. */
 export async function createInstructorAccount(
   actorAuthUserId: string,
   input: PasswordProvisionInput,
 ) {
-  const environment = getPublicAuthEnvironment();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!key) throw new Error("Account provisioning is unavailable");
-  const privileged = createClient(environment.supabaseUrl, key, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
+  let privileged;
+  try {
+    privileged = getAccountCredentialClient();
+  } catch (cause) {
+    throw new AccountProvisionError(
+      "La creación de cuentas no está disponible. Inténtalo nuevamente más tarde.",
+      { cause },
+    );
+  }
   return provisionPasswordInstructor(
     new DrizzleAuthUserRepository(getDatabase()),
     {
-      async createConfirmedUser(email, password) {
-        const { data, error } = await privileged.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
-        });
-        return error ? null : (data.user?.id ?? null);
-      },
-      async removeCreatedUser(id) {
-        await privileged.auth.admin.deleteUser(id);
-      },
+      createConfirmedUser: (email, password) =>
+        createConfirmedAccount(privileged, email, password),
+      removeCreatedUser: (id) => removeCreatedAccount(privileged, id),
     },
     actorAuthUserId,
     input,

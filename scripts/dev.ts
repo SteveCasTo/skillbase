@@ -1,4 +1,5 @@
 import { dev } from "astro";
+import { parseArgs } from "node:util";
 
 import { getLocalSupabaseEnvironment } from "./supabase-local-env";
 
@@ -16,12 +17,15 @@ if (supabaseUrl && new URL(supabaseUrl).hostname === "127.0.0.1") {
       "PUBLIC_SUPABASE_URL does not match the local Supabase stack.",
     );
   }
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||= local.serviceRoleKey;
+  // The running local stack is authoritative, including after a local rebuild.
+  process.env.SUPABASE_SERVICE_ROLE_KEY = local.serviceRoleKey;
 }
 
-const server = await dev({
-  server: { host: "127.0.0.1", port: 4321 },
-});
+const { values } = parseArgs({ options: { port: { type: "string" } } });
+const port = Number(values.port ?? "4321");
+if (!Number.isInteger(port) || port < 1 || port > 65535)
+  throw new Error("--port must be an integer between 1 and 65535.");
+const server = await dev({ server: { host: "127.0.0.1", port } });
 
 async function close() {
   await server.stop();

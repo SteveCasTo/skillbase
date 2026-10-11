@@ -18,6 +18,7 @@ import { requireRoles } from "@/application/auth/authorize";
 import { requestHasExpectedOrigin } from "@/server/auth/redirects";
 import { readInterestRequest } from "@/server/interests/request";
 import { InterestError } from "@/domain/interests/rules";
+import { logAccountCreationFailure } from "@/server/auth/account-credentials";
 export type AdminAccountOperation = "create" | "name" | AdminAccountAction;
 export type AdminAccountHttpPayload =
   | { ok: true; value: AdminAccountResult; message: string }
@@ -187,6 +188,12 @@ export async function handleAdminAccountPost(input: {
       },
     };
   } catch (error) {
+    if (
+      input.operation === "create" &&
+      (!(error instanceof AdminAccountError) ||
+        error.code === "AUTH_UNAVAILABLE")
+    )
+      logAccountCreationFailure("admin_create", error);
     return adminAccountFailure(error);
   }
 }

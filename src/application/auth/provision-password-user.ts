@@ -1,10 +1,12 @@
 import { requireRoles, resolveActiveUser } from "./authorize";
 import type { AuthUserRepository } from "./user-repository";
 import { requirePassword } from "@/domain/auth/identity";
+import { AccountProvisionError } from "@/domain/auth/account-provision-error";
 import { normalizeEmail } from "@/domain/auth/policies";
 import type { InternalUser } from "@/domain/auth/types";
 import {
   validateInstructor,
+  InstructorError,
   instructorFullName,
   type InstructorProfileData,
 } from "@/domain/instructors/profile";
@@ -38,7 +40,13 @@ export async function provisionPasswordInstructor(
 ): Promise<InternalUser> {
   const actor = await resolveActiveUser(repository, actorAuthUserId);
   requireRoles(actor, ["ADMIN"]);
-  requirePassword(input.password);
+  try {
+    requirePassword(input.password);
+  } catch {
+    throw new InstructorError("Revisa la contraseña inicial.", {
+      password: "La contraseña debe tener entre 12 y 128 caracteres.",
+    });
+  }
   const email = normalizeEmail(input.email);
   const profile = input.profile
     ? validateInstructor({
@@ -58,14 +66,15 @@ export async function provisionPasswordInstructor(
   let authUserId: string | null;
   try {
     authUserId = await gateway.createConfirmedUser(email, input.password);
-  } catch {
-    throw new Error(
-      "No pudimos crear la cuenta. Revisa los datos e inténtalo nuevamente.",
+  } catch (cause) {
+    throw new AccountProvisionError(
+      "No pudimos crear la cuenta. Inténtalo nuevamente más tarde.",
+      { cause },
     );
   }
   if (!authUserId)
-    throw new Error(
-      "No pudimos crear la cuenta. Revisa los datos e inténtalo nuevamente.",
+    throw new AccountProvisionError(
+      "No pudimos crear la cuenta. Inténtalo nuevamente más tarde.",
     );
   try {
     // Check again after the provider operation: a disabled actor cannot finish provisioning.
@@ -79,10 +88,11 @@ export async function provisionPasswordInstructor(
       ...(profile ? { profile } : {}),
       actorId: actor.id,
     });
-  } catch {
+  } catch (cause) {
     await gateway.removeCreatedUser(authUserId).catch(() => {});
-    throw new Error(
-      "No pudimos crear la cuenta. Revisa los datos e inténtalo nuevamente.",
+    throw new AccountProvisionError(
+      "No pudimos crear la cuenta. Recarga antes de reintentar.",
+      { cause },
     );
   }
 }

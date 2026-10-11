@@ -52,13 +52,18 @@ export async function createAdminAccount(
   let authUserId: string | null;
   try {
     authUserId = await gateway.createConfirmedUser(email, input.password);
-  } catch {
-    authUserId = null;
+  } catch (cause) {
+    throw new AdminAccountError(
+      "AUTH_UNAVAILABLE",
+      "La creación de cuentas no está disponible. Inténtalo nuevamente más tarde.",
+      {},
+      { cause },
+    );
   }
   if (!authUserId)
     throw new AdminAccountError(
       "AUTH_UNAVAILABLE",
-      "No pudimos crear la cuenta. Revisa el correo e inténtalo nuevamente.",
+      "No pudimos crear la cuenta. Inténtalo nuevamente más tarde.",
     );
   try {
     await repository.authorize(actor.id);
@@ -75,6 +80,8 @@ export async function createAdminAccount(
     throw new AdminAccountError(
       "AUTH_UNAVAILABLE",
       "No pudimos confirmar la cuenta. Recarga antes de reintentar.",
+      {},
+      { cause: error },
     );
   }
 }
