@@ -906,10 +906,12 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   });
   await save.click();
   await expect(page.locator("[data-save-error]")).toBeHidden();
+  // The malformed save response is distinct from earlier field/upload failures;
+  // legitimate concurrent notices must not make this assertion ambiguous.
   await expect(
-    page.locator(
-      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
-    ),
+    page
+      .locator('[data-sileo-toast][data-state="error"][data-exiting="false"]')
+      .filter({ hasText: "Revisa los campos del formulario." }),
   ).toBeVisible();
   await expect(save).toBeEnabled();
   await expect(
