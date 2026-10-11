@@ -6,6 +6,12 @@ import { createDatabase } from "@/server/db/client";
 import { runComprehensiveDemo } from "./comprehensive-demo";
 import { runComprehensiveCertificates } from "./comprehensive-demo-certificates";
 import {
+  runRealisticScenarioRefresh,
+  captureRefreshChanges,
+  redactRefreshPlan,
+  type RealisticRefreshPlan,
+} from "./comprehensive-demo-refresh";
+import {
   assertComprehensiveTarget,
   assertComprehensiveRelease,
 } from "./comprehensive-demo-plan";
@@ -24,6 +30,7 @@ import {
 } from "./comprehensive-demo-preservation";
 import { fingerprint, PRODUCTION_PROJECT } from "./financial-demo-plan";
 import { verifyShardEvidence, type ShardEvidence } from "./e2e-shard-evidence";
+import { comprehensiveScenarioMatrix } from "./comprehensive-demo-scenarios";
 
 const git = (args: string[]) => {
   const result = spawnSync("git", args, { encoding: "utf8", stdio: "pipe" });
@@ -152,6 +159,13 @@ if (import.meta.main) {
     );
     const mode = env.DEMO_OPERATOR_MODE ?? "";
     const includeCertificates = env.DEMO_INCLUDE_CERTIFICATES === "true";
+    const refreshScenarios = env.DEMO_REFRESH_SCENARIOS === "true";
+    if (
+      (includeCertificates && refreshScenarios) ||
+      (env.DEMO_REFRESH_SCENARIOS &&
+        !["true", "false"].includes(env.DEMO_REFRESH_SCENARIOS))
+    )
+      throw new Error("Select exactly one explicit operation");
     if (
       env.DEMO_INCLUDE_CERTIFICATES &&
       !["true", "false"].includes(env.DEMO_INCLUDE_CERTIFICATES)
@@ -193,7 +207,23 @@ if (import.meta.main) {
     let reviewedPlan: unknown;
     let certificatePlanHash = "";
     let certificatePlan: unknown;
-    if (includeCertificates)
+    let refreshPlan: RealisticRefreshPlan | undefined;
+    const primaryOptions = {
+      ...(env.DEV_INITIAL_ADMIN_EMAIL
+        ? { primaryAdminEmail: env.DEV_INITIAL_ADMIN_EMAIL }
+        : {}),
+      ...(env.DEMO_CONFIRMED_PRIMARY_ADMIN_ID
+        ? { confirmedPrimaryAdminId: env.DEMO_CONFIRMED_PRIMARY_ADMIN_ID }
+        : {}),
+    };
+    if (refreshScenarios) {
+      refreshPlan = await runRealisticScenarioRefresh(connection.db, {
+        ...options,
+        ...primaryOptions,
+      });
+      planHash = fingerprint(refreshPlan);
+      reviewedPlan = refreshPlan;
+    } else if (includeCertificates)
       await runComprehensiveCertificates(connection.db, {
         ...options,
         verificationOrigin: "https://skillbase-alpha.vercel.app",
@@ -207,7 +237,11 @@ if (import.meta.main) {
         ...options,
         preview(plan, existing) {
           planHash = fingerprint(plan);
-          reviewedPlan = { plan, existing };
+          reviewedPlan = {
+            plan,
+            existing,
+            scenarios: comprehensiveScenarioMatrix(plan),
+          };
         },
       });
     const afterPlan = await captureDemoSnapshot(connection.db);
@@ -222,6 +256,7 @@ if (import.meta.main) {
       settings,
       baseline: before,
       ...(includeCertificates ? { includeCertificates, certificatePlan } : {}),
+      ...(refreshScenarios ? { refreshScenarios } : {}),
     });
     assertReviewedPlan(mode, env.DEMO_REVIEWED_PLAN_SHA256 ?? "", approvalHash);
     const report: Record<string, unknown> = {
@@ -232,16 +267,29 @@ if (import.meta.main) {
       reviewedPlanSha256: approvalHash,
       planHash,
       before: demoSnapshotSummary(before),
-      plan: reviewedPlan,
+      plan: refreshPlan ? redactRefreshPlan(refreshPlan) : reviewedPlan,
       status: "PLAN_VERIFIED",
       ...(includeCertificates ? { certificates: certificatePlan } : {}),
+      ...(refreshPlan?.additions
+        ? { scenarios: comprehensiveScenarioMatrix(refreshPlan.additions) }
+        : {}),
     };
     if (mode === "apply") {
       stage = "pre-apply-release-recheck";
       await releaseProof(env);
       assertDemoNoChanges(before, await captureDemoSnapshot(connection.db));
       stage = "first-apply";
-      if (includeCertificates)
+      const approvedChanges = refreshPlan
+        ? await captureRefreshChanges(connection.db, refreshPlan)
+        : [];
+      if (refreshScenarios)
+        await runRealisticScenarioRefresh(connection.db, {
+          ...options,
+          ...primaryOptions,
+          apply: true,
+          expectedPlanHash: planHash,
+        });
+      else if (includeCertificates)
         await runComprehensiveCertificates(connection.db, {
           ...options,
           apply: true,
@@ -255,9 +303,15 @@ if (import.meta.main) {
           expectedPlanHash: planHash,
         });
       const first = await captureDemoSnapshot(connection.db);
-      assertDemoPreservation(before, first);
+      assertDemoPreservation(before, first, approvedChanges);
       stage = "repeat-apply";
-      if (includeCertificates)
+      if (refreshScenarios)
+        await runRealisticScenarioRefresh(connection.db, {
+          ...options,
+          ...primaryOptions,
+          apply: true,
+        });
+      else if (includeCertificates)
         await runComprehensiveCertificates(connection.db, {
           ...options,
           apply: true,
@@ -270,12 +324,14 @@ if (import.meta.main) {
           expectedPlanHash: planHash,
         });
       const repeated = await captureDemoSnapshot(connection.db);
-      assertDemoPreservation(before, repeated);
+      assertDemoPreservation(before, repeated, approvedChanges);
       assertDemoNoChanges(first, repeated);
       Object.assign(report, {
         status: "APPLY_VERIFIED",
         after: demoSnapshotSummary(repeated),
-        originalRowsPreserved: demoSnapshotSummary(before).rows,
+        originalRowsPreserved:
+          demoSnapshotSummary(before).rows - approvedChanges.length,
+        approvedOwnedRowsChanged: approvedChanges.length,
         repeatedApplyChanges: 0,
       });
     }

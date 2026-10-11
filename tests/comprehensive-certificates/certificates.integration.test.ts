@@ -155,8 +155,8 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
     expect(settings[0]!.revision).toBe(1);
     for (const row of certificates) {
       expect(row.createdBy).toBe(context!.admins.operator!);
-      expect(row.data.courseName).toContain("[DEMO]");
-      expect(row.data.recipientName.toLowerCase()).toContain("demo");
+      expect(row.data.courseName).not.toContain("[DEMO]");
+      expect(row.data.recipientName.toLowerCase()).not.toContain("demo");
       expect(row.data.templateVersion).toBe("phase9-v1");
       expect(row.data.venue).toBe(defaultCertificateConfiguration.venue);
       expect(row.data.printedMonth).toBe(Number(row.data.endsOn.slice(5, 7)));

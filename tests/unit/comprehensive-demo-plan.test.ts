@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   comprehensiveDemoPlan,
+  legacyComprehensiveDemoPlan,
   comprehensiveDemoId,
   parseComprehensiveArgs,
   assertComprehensiveTarget,
@@ -9,12 +10,13 @@ import {
 } from "../../scripts/comprehensive-demo-plan";
 import { validateEvaluationComponents } from "@/domain/evaluations/rules";
 import { PRODUCTION_PROJECT } from "../../scripts/financial-demo-plan";
+import { fingerprint } from "../../scripts/financial-demo-plan";
 
 test("bounded comprehensive plan uses independent deterministic identities, exact weights and Bolivia calendars", () => {
   for (const limit of [1, 3, 10, 20]) {
     const plan = comprehensiveDemoPlan("2026-10-08", limit, 25);
-    expect(plan.samples).toHaveLength(8);
-    expect(plan.samples.flatMap((s) => s.registrations)).toHaveLength(26);
+    expect(plan.samples).toHaveLength(12);
+    expect(plan.samples.flatMap((s) => s.registrations)).toHaveLength(34);
     const ids = plan.samples.flatMap((s) => [
       s.course.id,
       ...s.groups.map((g) => g.id),
@@ -26,10 +28,16 @@ test("bounded comprehensive plan uses independent deterministic identities, exac
       expect(sample.course.slug.startsWith("demo-comprehensive-v1-")).toBe(
         true,
       );
-      expect(sample.course.name.startsWith("[DEMO]")).toBe(true);
-      expect(sample.course.registrationStartAt.getTime()).toBeLessThan(
-        sample.fixtureClock.getTime(),
-      );
+      expect(sample.course.name).not.toContain("DEMO");
+      expect(
+        sample.registrations.every(
+          (registration) => registration.participant.lastName !== "Demo",
+        ),
+      ).toBe(true);
+      if (sample.registrations.length)
+        expect(sample.course.registrationStartAt.getTime()).toBeLessThan(
+          sample.fixtureClock.getTime(),
+        );
       expect(sample.fixtureClock.getTime()).toBeLessThan(
         sample.course.registrationEndAt.getTime(),
       );
@@ -44,7 +52,25 @@ test("bounded comprehensive plan uses independent deterministic identities, exac
     expect(new Set(plan.samples.map((s) => s.components.length))).toEqual(
       new Set([2, 6, 8]),
     );
+    const seasonal = plan.samples.filter((sample) =>
+      sample.key.startsWith("next-"),
+    );
+    expect(seasonal).toHaveLength(4);
+    expect(
+      seasonal.every(
+        (sample) => sample.course.startsAt.getUTCFullYear() === 2027,
+      ),
+    ).toBe(true);
+    expect(plan.formats).toHaveLength(4);
   }
+  expect(fingerprint(legacyComprehensiveDemoPlan("2026-10-08", 3, 25))).toBe(
+    "5d9a09defed910f009bde5279dd888b5711a13b46d26ec1d100d3add7266ddd5",
+  );
+  expect(
+    comprehensiveDemoPlan("2027-10-11", 3, 25)
+      .samples.filter((sample) => sample.key.startsWith("next-"))
+      .every((sample) => sample.course.startsAt.getUTCFullYear() === 2028),
+  ).toBe(true);
   expect(comprehensiveDemoId("manifest")).toBe(comprehensiveDemoId("manifest"));
   expect(() => comprehensiveDemoPlan("2026-10-08", 21, 25)).toThrow();
   expect(() => comprehensiveDemoPlan("2026-10-08", 3, 0)).toThrow();

@@ -71,6 +71,7 @@ export function parseComprehensiveArgs(args: readonly string[]) {
     "--allow-production",
     "--protected-manual",
     "--include-certificates",
+    "--refresh-scenarios",
   ]);
   const allowed = new Set([...switches, "--target", "--project", "--anchor"]);
   for (let i = 0; i < args.length; i++) {
@@ -91,11 +92,13 @@ export function parseComprehensiveArgs(args: readonly string[]) {
     allowProduction: values.has("--allow-production"),
     protectedManual: values.has("--protected-manual"),
     includeCertificates: values.has("--include-certificates"),
+    refreshScenarios: values.has("--refresh-scenarios"),
     anchorDay: values.get("--anchor"),
   };
 }
 
-export function comprehensiveDemoPlan(
+/** Frozen v1 source: persisted hashes and issued snapshots must remain readable. */
+export function legacyComprehensiveDemoPlan(
   anchorDay: string,
   limit: number,
   minimumPaymentPercent: number,
@@ -320,6 +323,220 @@ export function comprehensiveDemoPlan(
     formats,
     samples,
   };
+}
+export const REALISTIC_SEED_VERSION = "realistic-v2";
+export const realisticCourseNames: Readonly<Record<string, string>> = {
+  closed: "Excel para la gestión administrativa",
+  reclosed: "Análisis de datos con Python",
+  pending: "Diseño de interfaces accesibles",
+  current: "Comunicación efectiva en equipos",
+  future: "Gestión de proyectos colaborativos",
+  free: "Introducción a la programación web",
+  draft: "Seguridad digital para pequeñas organizaciones",
+  archived: "Herramientas digitales para la oficina",
+};
+export const realisticInstructorNames = [
+  ["Gabriela", "Salvatierra Ríos"],
+  ["Joaquín", "Arce Villalba"],
+  ["Natalia", "Quiroga Prado"],
+  ["Esteban", "Ledesma Paredes"],
+] as const;
+export const realisticAdminNames: Readonly<Record<string, string>> = {
+  operator: "Adriana Valcárcel Soria",
+  unused: "Renato Cárdenas Leiva",
+  disabled: "Isabel Alcázar Molina",
+  reactivated: "Tomás Rivero Salinas",
+  deleted: "Clara Mendieta Solís",
+};
+const surnames = [
+  "Valcárcel Soria",
+  "Arce Villalba",
+  "Quiroga Prado",
+  "Ledesma Paredes",
+  "Salvatierra Ríos",
+  "Cárdenas Leiva",
+  "Alcázar Molina",
+  "Rivero Salinas",
+  "Mendieta Solís",
+  "Beltrán Orellana",
+  "Zamora Téllez",
+  "Carrasco Vidal",
+  "Figueroa Montes",
+  "Roldán Espinosa",
+  "Olivares Céspedes",
+  "Varela Durán",
+  "Benavides Roa",
+  "Santillán Núñez",
+  "Palacios Ugarte",
+  "Morales Luján",
+  "Bustos Gallardo",
+  "Rivas Toledo",
+  "Pereyra Lagos",
+  "Cabrera Alvarado",
+  "Herrera Valdés",
+  "Montalvo Ponce",
+  "Aguilar Treviño",
+  "Navarro Salcedo",
+  "Serrano Castro",
+  "Vargas Pizarro",
+  "Delgado Cifuentes",
+  "Medina Suárez",
+  "Paredes Castañeda",
+  "Torres Miranda",
+];
+
+/** A rolling calendar is used only when inserting a new cohort. Persisted
+ * anchors, sessions, closures and issued PDFs are never moved on replay. */
+export function comprehensiveDemoPlan(
+  anchorDay: string,
+  limit: number,
+  minimumPaymentPercent: number,
+) {
+  const source = legacyComprehensiveDemoPlan(
+    anchorDay,
+    limit,
+    minimumPaymentPercent,
+  );
+  const plan = {
+    ...source,
+    samples: source.samples as Array<
+      Omit<(typeof source.samples)[number], "key" | "teacher"> & {
+        key: string;
+        teacher: number;
+      }
+    >,
+  };
+  const formatNames = [
+    "Taller de formación aplicada",
+    "Laboratorio abierto",
+    "Seminario de herramientas digitales",
+  ];
+  plan.formats.forEach((format, i) => {
+    format.name = `${formatNames[i]} · ${format.totalHours} h`;
+  });
+  plan.formats.push({
+    ...plan.formats[0]!,
+    id: comprehensiveDemoId("format:unused"),
+    name: "Clínica de proyectos · formato flexible",
+  });
+  let personIndex = 0;
+  for (const sample of plan.samples) {
+    sample.course.name = realisticCourseNames[sample.key]!;
+    sample.course.description = `Formación práctica en ${sample.course.name.toLowerCase()}, con ejercicios guiados y aplicación a situaciones cotidianas.`;
+    sample.course.conditions =
+      "Se requiere manejo básico de computadora y disponibilidad para las sesiones programadas.";
+    sample.course.contentMarkdown =
+      "## Programa\n\n- Fundamentos y herramientas\n- Resolución de casos\n- Proyecto aplicado y retroalimentación";
+    for (const registration of sample.registrations)
+      registration.participant.lastName =
+        surnames[personIndex++ % surnames.length]!;
+  }
+  const archived = plan.samples.find((sample) => sample.key === "archived")!;
+  const retired = plan.formats[2]!;
+  archived.course.courseTypeRevisionId = comprehensiveDemoId(
+    `revision:${retired.id}`,
+  );
+  archived.groups.forEach((group) => {
+    group.courseTypeRevisionId = archived.course.courseTypeRevisionId;
+  });
+  const year = Number(anchorDay.slice(0, 4)) + 1;
+  const cohorts = [
+    {
+      key: "next-open-data",
+      name: "Visualización de datos para decisiones",
+      day: `${year}-01-18`,
+      teacher: 0,
+      open: true,
+    },
+    {
+      key: "next-open-web",
+      name: "Desarrollo web con JavaScript",
+      day: `${year}-04-12`,
+      teacher: 1,
+      open: true,
+    },
+    {
+      key: "next-upcoming-projects",
+      name: "Planificación de proyectos comunitarios",
+      day: `${year}-06-14`,
+      teacher: 2,
+      open: false,
+    },
+    {
+      key: "next-upcoming-security",
+      name: "Protección de información en equipos",
+      day: `${year}-09-06`,
+      teacher: 3,
+      open: false,
+    },
+  ];
+  for (const cohort of cohorts) {
+    let day = cohort.day;
+    while ([0, 6].includes(new Date(`${day}T00:00:00Z`).getUTCDay()))
+      day = shiftedDay(day, 1);
+    const template = plan.samples.find((sample) => sample.key === "future")!;
+    const format = plan.formats[0]!;
+    const dates = planCourseDates({
+      startDate: day,
+      weekdaysMask: 31,
+      ...format,
+    });
+    const course = {
+      ...template.course,
+      ...dates,
+      id: comprehensiveDemoId(`course:${cohort.key}`),
+      slug: `demo-comprehensive-v1-${cohort.key}`,
+      name: cohort.name,
+      description: `Aprendizaje aplicado de ${cohort.name.toLowerCase()}, mediante casos y proyectos colaborativos.`,
+      registrationStartAt: boliviaCivilToInstant(
+        `${shiftedDay(anchorDay, cohort.open ? -14 : 30)}T00:00`,
+      ),
+      registrationEndAt: boliviaCivilToInstant(`${shiftedDay(day, -1)}T00:00`),
+    };
+    const registrations = cohort.open
+      ? template.registrations.slice(0, 4).map((registration, i) => ({
+          ...registration,
+          key: `${cohort.key}:${i}`,
+          scenario: (["paid", "partial", "external", "auxiliary"] as const)[i]!,
+          participant: {
+            ...registration.participant,
+            firstName: ["Paula", "Martín", "Julieta", "Sebastián"][i]!,
+            lastName: surnames[personIndex++ % surnames.length]!,
+            ci: `00CDV2${cohort.key === "next-open-data" ? "D" : "W"}${i}LP`,
+            email: `comprehensive.v2.${cohort.key}.${i}@example.test`,
+          },
+        }))
+      : [];
+    // Keep internal keys stable and invisible; they are not product labels.
+    plan.samples.push({
+      ...template,
+      key: cohort.key,
+      teacher: cohort.teacher,
+      course,
+      fixtureClock: plan.now,
+      registrations,
+      groups: ["09:00", "11:00"].map((time, i) => ({
+        ...template.groups[0]!,
+        ...groupPlan({ ...dates, weekdaysMask: 31 }, format, time),
+        id: comprehensiveDemoId(`group:${cohort.key}:${i}`),
+        courseId: course.id,
+        publishedAt: plan.now,
+      })),
+      components: template.components.map((component, i) => ({
+        ...component,
+        id: comprehensiveDemoId(`component:${cohort.key}:${i}`),
+      })),
+    });
+  }
+  plan.samples
+    .find((sample) => sample.key === "future")!
+    .registrations.find(
+      (registration) => registration.scenario === "converted",
+    )!.participant = {
+    ...plan.samples.find((sample) => sample.key === "closed")!.registrations[0]!
+      .participant,
+  };
+  return plan;
 }
 export type ComprehensiveDemoPlan = ReturnType<typeof comprehensiveDemoPlan>;
 export interface ComprehensiveDemoContext {

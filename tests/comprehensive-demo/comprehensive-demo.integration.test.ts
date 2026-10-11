@@ -6,6 +6,10 @@ import * as s from "@/server/db/schema";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { runComprehensiveDemo } from "../../scripts/comprehensive-demo";
 import {
+  runRealisticScenarioRefresh,
+  captureRefreshChanges,
+} from "../../scripts/comprehensive-demo-refresh";
+import {
   captureDemoSnapshot,
   assertDemoPreservation,
   assertDemoNoChanges,
@@ -214,6 +218,7 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
       auth,
       password: "QA-only-fixture-password-123!",
       apply: false,
+      sourceVersion: "legacy-v1" as const,
     };
     expect(await runComprehensiveDemo(db, options)).toBeNull();
     expect(await snapshot()).toEqual(before);
@@ -494,6 +499,72 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
     const edited = await snapshot();
     await runComprehensiveDemo(db, { ...options, apply: true });
     expect(await snapshot()).toEqual(edited);
+    const frozenVersionBefore = await closure.getVersion(
+      actor!.id,
+      closed.courseId,
+      closed.groupIds[0]!,
+      1,
+    );
+    const refreshBefore = await captureDemoSnapshot(db);
+    const refreshPlan = await runRealisticScenarioRefresh(db, {
+      ...options,
+      apply: false,
+    });
+    expect(refreshPlan.edits).toHaveLength(87); // One deliberate course-description edit is retained.
+    expect(
+      refreshPlan.edits.filter((edit) => edit.table === "instructor_profiles"),
+    ).toHaveLength(8);
+    expect(
+      refreshPlan.edits.some(
+        (edit) => edit.table === "courses" && edit.field === "name",
+      ),
+    ).toBe(true);
+    expect(
+      refreshPlan.skipped.some(
+        (edit) => edit.id === pending.courseId && edit.field === "description",
+      ),
+    ).toBe(true);
+    expect(refreshPlan.additions?.samples).toHaveLength(4);
+    assertDemoNoChanges(refreshBefore, await captureDemoSnapshot(db));
+    await expect(
+      runRealisticScenarioRefresh(db, {
+        ...options,
+        apply: false,
+        primaryAdminEmail: actor!.email,
+        confirmedPrimaryAdminId: actor!.id,
+      }),
+    ).rejects.toThrow("primary GOOGLE ADMIN");
+    assertDemoNoChanges(refreshBefore, await captureDemoSnapshot(db));
+    await expect(
+      runRealisticScenarioRefresh(db, {
+        ...options,
+        apply: true,
+        expectedPlanHash: "0".repeat(64),
+      }),
+    ).rejects.toThrow("reviewed refresh PLAN");
+    assertDemoNoChanges(refreshBefore, await captureDemoSnapshot(db));
+    const allowed = await captureRefreshChanges(db, refreshPlan);
+    await runRealisticScenarioRefresh(db, {
+      ...options,
+      apply: true,
+      expectedPlanHash: fingerprint(refreshPlan),
+    });
+    const refreshAfter = await captureDemoSnapshot(db);
+    assertDemoPreservation(refreshBefore, refreshAfter, allowed);
+    await runRealisticScenarioRefresh(db, {
+      ...options,
+      apply: true,
+      now: new Date("2028-10-11T12:00:00Z"),
+    });
+    assertDemoNoChanges(refreshAfter, await captureDemoSnapshot(db));
+    const versionAfterRefresh = await closure.getVersion(
+      actor!.id,
+      closed.courseId,
+      closed.groupIds[0]!,
+      1,
+    );
+    expect(versionAfterRefresh).toEqual(frozenVersionBefore);
+    expect(versionAfterRefresh.report.courseName).toContain("[DEMO]");
     await db
       .update(s.auditEvents)
       .set({ metadata: { seedOwner: "unowned" } })
@@ -511,10 +582,10 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
           (n, rows) => n + rows.length,
           0,
         ),
-        newCourses: 8,
-        newGroups: 10,
-        newRegistrations: 26,
-        newParticipants: 25,
+        newCourses: 12,
+        newGroups: 18,
+        newRegistrations: 34,
+        newParticipants: 33,
         closureVersions: 3,
         reopenings: 1,
         completedAdminDeletions: 1,
