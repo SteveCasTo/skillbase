@@ -310,6 +310,20 @@ Estado sigue **parcial operacional**: no se aplicó/reinició Auth canónico ni 
 no se rotaron cuentas existentes ni se probaron consentimiento Google/SMTP reales.
 La revisión del orquestador y la ventana canónica siguen siendo gates separados.
 
+La revisión independiente exigió comprobar además la etiqueta oficial
+`Config.Labels["com.supabase.cli.project"]` contra el proyecto esperado. El
+helper ahora falla cerrado con etiqueta ausente/null/vacía/diferente en la
+inspección inicial, la revalidación antes de archive copy, inmediatamente antes
+del restart y después del restart. No basta el nombre del contenedor. La lectura
+filtrada canónica confirmó etiqueta `skillbase`, sin mutación. Una comprobación
+manual temporal del mismo source con adaptador spawn sustituido por fixtures
+sintéticos rechazó las cuatro variantes antes de exec/mutación y aceptó la
+etiqueta correcta; no añadió tests/casos/suites permanentes ni ejecutó requests
+al proveedor. Los ocho E2E nativos previos son evidencia del source anterior,
+no una nueva corrida del HEAD con este guard. El nuevo HEAD requiere CI completo
+y aceptación específica de revisión antes de integrar; no usar el CI anterior
+para el merge ni aplicar al canónico.
+
 ### DEP-1: versiones corregidas fijadas
 
 Las APIs oficiales de GitHub confirmaron los advisories no retirados y las

@@ -46,6 +46,7 @@ interface Container {
     Cmd: string[];
     Entrypoint: string[] | null;
     Env: string[];
+    Labels?: Record<string, string> | null;
   };
   Mounts: unknown[];
   State: { Running: boolean; StartedAt: string };
@@ -154,6 +155,7 @@ function inspect(value: Target): Container {
   if (
     container.Name !== `/${value.container}` ||
     container.Config?.Image !== image ||
+    container.Config.Labels?.["com.supabase.cli.project"] !== value.project ||
     !container.State?.Running ||
     container.Config.WorkingDir !== "/" ||
     container.Config.User !== "supabase" ||
@@ -433,6 +435,10 @@ async function runConfiguration(
   docker(["cp", "--archive", "-", `${container.Id}:/`], nativeArchive(enabled));
   if (nativeHash(value) !== expected)
     throw new Error("Native Auth file installation failed.");
+  if (inspect(value).Id !== container.Id || nativeHash(value) !== expected)
+    throw new Error(
+      "Native Auth project identity or file changed before restart.",
+    );
   docker(["restart", "--timeout", "10", container.Id]);
   await health(value);
   const restarted = inspect(value);
