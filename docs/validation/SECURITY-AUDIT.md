@@ -251,6 +251,15 @@ UI/test ajenos para ocultarlo. Una invocación de build posterior alcanzó timeo
 de shell durante el bundling Vercel; los builds previos sí finalizaron. Esos
 resultados no se presentan como nueva corrida final verde.
 
+La fuente corregida `8c05b83` pasó después integración completa **176 PASS/0
+FAIL/1 skip preexistente**, 1.441 assertions, y E2E Auth focal **8/8 PASS** en
+`4347` con retries=0. No se cambió el toggle ni su test; el pase posterior no
+establece causa raíz de la failure anterior. El build dedicado con timeout
+suficiente finalizó PASS y `git diff --check` pasó. Los runners limpiaron sus
+stacks propios; no usaron el stack canónico. Estas validaciones preservan la
+compatibilidad funcional con proveedor controlado, no demuestran el boolean
+nativo activo en ese proveedor ni cierran el gate operacional pendiente.
+
 Estado: **pendiente de cierre operacional**, no resuelto por esta inspección.
 Cloud conserva el control nativo previamente confirmado activo, sin cambios en
 esta tarea. La documentación oficial y GoTrue v2.196.0 confirman campo y
