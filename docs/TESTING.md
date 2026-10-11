@@ -802,3 +802,17 @@ El archivo de handoff de credenciales está en `C:/Users/Steve/AppData/Local/Tem
 ### Notas de cronología E2E que no se atribuyen como defectos resueltos
 
 El gate combinado anterior fue limpio, pero no cambia la causalidad de observaciones históricas. El caso de registro con SSR pendiente/interceptores de test fue acotado a su fixture/interceptor; la causa interna previa no se estableció. La temporización de cierre del toggle de teclado en público-interés y la readiness de `PageDown` en calendario tampoco tienen causa raíz confirmada. Una revisión controlada del planificador de días confirmó el montaje tardío del campo y persistencia/format esperado antes/después (2/2); no atribuir retroactivamente a ese cambio todos los fallos históricos de CI. No aumentar timeouts globales ni reclasificar fallos sin evidencia. El historial específico del calendario permanece arriba.
+
+### Gate de release PR 334/335: contraseña actual nativa (2026-10-11)
+
+CI de PR 334 (`38114811017`), PR 335 (`38115248716`) y push/deploy a `master`
+(`38115724400`) pasó en primer intento. Cada ejecución reportó 464 unit/4,036
+assertions, 176 integration PASS más 1 skip preexistente, runners focales F8/F9
+1 PASS cada uno y 145 E2E (76+69), sin retries ni flakes. El deployment fue
+`READY` para `master` `07042f851c8d0fe6b133288c088051bad6973bb5`.
+
+Estas suites validan código con proveedor controlado; no prueban el enforcement
+del boolean cloud, Google OAuth real, entrega SMTP ni flujos autenticados de
+cambio/recovery/primera contraseña en producción. El smoke productivo fue
+anónimo. El detalle de configuración nativa y el estado parcial de AUTH-1 está
+en [`DEPLOYMENT.md`](DEPLOYMENT.md) y [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md).

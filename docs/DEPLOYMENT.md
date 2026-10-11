@@ -562,3 +562,47 @@ de Google y recovery end-to-end local/cloud se coordinan con el usuario en Fase
 documental. El handoff de credenciales está en
 `Temp/opencode/skillbase-demo-access/original-local-f9-credentials.json`, ACL
 privada; no copiar secretos a Git/documentación.
+
+## Release de enforcement nativo de contraseña actual — PR 334/335 (2026-10-11)
+
+PR 334 (`d4714a08ac0a473aed888a23f316b7287a5529bc`) integró en `development`
+la transmisión de `current_password` para cambios normales. PR 335 promovió el
+árbol completo de desarrollo (no solo Auth) a `master` como
+`07042f851c8d0fe6b133288c088051bad6973bb5`; PR 334 se integró mediante merge
+`dbf7f3158f24dccf9f2f271ab8d6a24e715ab291`. No hubo migraciones nuevas; el
+ledger cloud siguió en 24, sin reset ni seed.
+
+Los CI de PR 334 (`38114811017`), PR 335 (`38115248716`) y push/deploy a master
+(`38115724400`) fueron SUCCESS en primer intento: 464 unit (4,036 assertions),
+176 integration PASS más un skip preexistente, F8 1/1 y F9 1/1 en runners
+independientes, y 145 E2E (76+69), sin retries ni flakes. El deployment Vercel
+`dpl_6uHo1tyU3KPR75whcmWETJDo1Anz` quedó `READY` para el SHA exacto con alias
+`https://skillbase-alpha.vercel.app`.
+
+Después de verificar deployment y gates se activó únicamente el boolean Auth
+cloud `security_update_password_require_current_password` (`false` → `true`);
+una lectura filtrada posterior confirmó que continuaba activo y que los demás
+campos comparados no cambiaron. No se ejecutó rollback. Si se revierte a código
+que no reenvía `current_password`, restaurar primero el valor nativo previo
+`false`. No usar `supabase config push` para revertir o activar este control.
+
+El smoke productivo fue anónimo: GET `/`, `/cursos`, `/login` y
+`/recuperar-contrasena` dieron 200; `/app`, `/app/perfil/contrasena` y
+`/app/administradores` redirigieron 303 a login con `private, no-store`. No se
+probó en producción un cambio autenticado, recovery, primera contraseña Google,
+Google OAuth real ni entrega SMTP. El usuario había confirmado antes una
+asociación manual de recovery; no se repitió y no se usa como evidencia de
+compatibilidad con este release. AUTH-1 queda abierto/parcial por el boundary de
+primera contraseña Google y la ausencia de ejecución real de los flujos. Ver
+[`AUTHENTICATION.md`](AUTHENTICATION.md) y el detalle de límites en
+[`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md).
+
+El checkout local canónico quedó en `development` sincronizado con merge
+`dbf7f3158f24dccf9f2f271ab8d6a24e715ab291`. El proceso de desarrollo existente
+(PID 37512) sigue sirviendo `http://127.0.0.1:4321` (login HTTP 200); no se
+reinició ni se cambió el WIP local de `supabase/config.toml`. GoTrue local
+observado es v2.196.0 y no presenta asignación explícita de
+`GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD`; no inferir que el
+control local esté en `false` ni verificado. La configuración nativa cloud
+`true` documentada arriba no implica sincronización/configuración del Supabase
+local.
