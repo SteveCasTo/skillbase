@@ -579,6 +579,7 @@ const successKey = Astro.url.searchParams.get("success");
         constructor(
           message: string,
           readonly conflict: boolean,
+          readonly fieldFailure: boolean,
         ) {
           super(message);
         }
@@ -611,6 +612,7 @@ const successKey = Astro.url.searchParams.get("success");
               result.message ||
               "No se pudo guardar el cambio. Inténtalo nuevamente.",
             response.status === 409,
+            Boolean(field && result.errors?.[field]),
           );
         if (
           intent === "delete"
@@ -903,6 +905,9 @@ const successKey = Astro.url.searchParams.get("success");
                           ? "Nombre actualizado."
                           : "Nueva revisión guardada. Los borradores usan los valores vigentes.",
                     },
+                    isFieldFailure: (failure) =>
+                      failure instanceof FormatMutationError &&
+                      failure.fieldFailure,
                   },
                 );
                 if (!result.format) {
@@ -923,6 +928,27 @@ const successKey = Astro.url.searchParams.get("success");
                 if (returnFocus)
                   details.querySelector<HTMLElement>("summary")?.focus();
               } catch (failure) {
+                if (!(
+                  failure instanceof FormatMutationError && failure.fieldFailure
+                )) {
+                  if (
+                    failure instanceof FormatMutationError &&
+                    failure.conflict
+                  ) {
+                    const recovery = document.createElement("a");
+                    recovery.href = mutationPath;
+                    recovery.className =
+                      "mt-2 inline-flex min-h-11 items-center underline underline-offset-4";
+                    recovery.textContent = "Consultar datos actuales";
+                    recovery.dataset.asyncRecovery = "true";
+                    input.parentElement
+                      ?.querySelector("[data-async-recovery]")
+                      ?.remove();
+                    input.parentElement?.append(recovery);
+                  }
+                  input.focus({ preventScroll: true });
+                  return;
+                }
                 const error = document.createElement("p");
                 error.id = `error-${field}`;
                 error.className = "mt-1 text-sm text-destructive";
@@ -1034,11 +1060,8 @@ const successKey = Astro.url.searchParams.get("success");
               failedForm = form;
               if (retry) retry.hidden = false;
               if (error) {
-                error.textContent =
-                  failure instanceof Error
-                    ? failure.message
-                    : "No se pudo guardar el cambio. Inténtalo nuevamente.";
-                error.hidden = false;
+                error.replaceChildren();
+                error.hidden = true;
                 if (
                   failure instanceof FormatMutationError &&
                   failure.conflict
@@ -1049,6 +1072,7 @@ const successKey = Astro.url.searchParams.get("success");
                     "mt-2 block min-h-11 underline underline-offset-4";
                   recovery.textContent = "Consultar datos actuales";
                   error.append(recovery);
+                  error.hidden = false;
                   if (retry) retry.hidden = true;
                 }
               }

@@ -365,7 +365,7 @@ courseReadinessTest(
   },
 );
 
-test("publication without an assigned instructor shows its cause inline without a duplicate toast", async ({
+test("publication without an assigned instructor reports its cause through Sileo and preserves the draft", async ({
   page,
   context,
 }) => {
@@ -384,14 +384,17 @@ test("publication without an assigned instructor shows its cause inline without 
     .getByRole("button", { name: "Publicar curso", exact: true })
     .click();
   expect((await result).status()).toBe(422);
-  await expect(page.locator("[data-save-error]")).toContainText(
-    "Selecciona un instructor activo registrado.",
-  );
+  await expect(page.locator("[data-save-error]")).toBeHidden();
   await expect(
     page
-      .locator('[data-sileo-toast][data-exiting="false"]')
+      .locator('[data-sileo-toast][data-state="error"][data-exiting="false"]')
       .filter({ hasText: "Selecciona un instructor activo registrado." }),
-  ).toHaveCount(0);
+  ).toHaveCount(1);
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toBeVisible();
   await page.reload();
   await expect(page.locator("[data-course-status]")).toHaveText("Borrador");
 });
@@ -414,9 +417,14 @@ test("last planned group cannot be cancelled while published; withdrawing preser
     .getByRole("button", { name: "Sí, desactivar grupo" })
     .click();
   expect((await result).status()).toBe(409);
-  await expect(page.locator("[data-group-error]")).toContainText(
-    "último grupo de un curso publicado",
-  );
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toContainText("último grupo de un curso publicado");
+  await expect(
+    page.getByRole("button", { name: "Consultar datos actuales" }),
+  ).toBeVisible();
   await expect(
     group.getByRole("button", { name: "Desactivar grupo 1" }),
   ).toBeVisible();
@@ -723,9 +731,14 @@ test("confirmation closes while pending; failure and retry preserve other cards 
     });
   expect(postCount).toBe(1);
   release();
-  await expect(page.locator("[data-group-error]")).toContainText(
-    "Fallo temporal de grupos.",
-  );
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toContainText("Fallo temporal de grupos.");
+  await expect(
+    page.getByRole("button", { name: "Consultar datos actuales" }),
+  ).toBeVisible();
   await expect(first).not.toHaveAttribute("aria-busy", "true");
   await expect(otherInput).toHaveValue("17");
   expect(await otherNode!.evaluate((node) => node.isConnected)).toBe(true);
@@ -933,9 +946,14 @@ test("a delayed create-recovery snapshot cannot resurrect a sibling deleted afte
   await dialog.getByLabel("Hora de inicio").fill("10:00");
   await dialog.getByLabel("Capacidad").fill("15");
   await dialog.getByRole("button", { name: "Crear grupo" }).click();
-  await expect(page.locator("[data-group-error]")).toContainText(
-    "Alta temporalmente no disponible.",
-  );
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toContainText("Alta temporalmente no disponible.");
+  await expect(
+    page.getByRole("button", { name: "Consultar datos actuales" }),
+  ).toBeVisible();
   await dialog.getByRole("button", { name: "Cancelar" }).click();
   await page.getByRole("button", { name: "Consultar datos actuales" }).click();
   await snapshot.promise;

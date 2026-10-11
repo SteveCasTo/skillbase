@@ -335,10 +335,11 @@ const fields = [
               failureMessage ||
               "No se pudo guardar. Revisa tu conexión e inténtalo nuevamente.";
             if (alert) {
-              alert.textContent = fieldFailure ? "" : message;
-              alert.classList.toggle("hidden", fieldFailure);
+              alert.textContent = "";
+              alert.classList.add("hidden");
             }
-            notifications.dismiss(id);
+            if (fieldFailure) notifications.dismiss(id);
+            else notifications.error({ id, title: message });
             const password =
               form.querySelector<HTMLInputElement>('[name="password"]');
             if (password) {
@@ -354,10 +355,6 @@ const fields = [
               if (passwordError && !passwordError.textContent?.trim())
                 passwordError.textContent =
                   "Vuelve a introducir la contraseña inicial para reintentar.";
-            }
-            if (alert && !fieldFailure) {
-              alert.tabIndex = -1;
-              alert.focus();
             }
           } finally {
             delete form.dataset.pending;

@@ -56,10 +56,13 @@ test("admin can inline-edit only its persisted account name", async ({
     fieldErrors: {},
   });
   const formError = form.locator("[data-form-error]");
-  await expect(formError).toHaveText(
-    "La cuenta cambió. Recarga antes de continuar.",
-  );
-  await expect(formError).toBeFocused();
+  await expect(formError).toBeEmpty();
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toContainText("La cuenta cambió. Recarga antes de continuar.");
+  await expect(save).toBeFocused();
   await expect(name).toHaveValue(conflictingName);
   await expect(save).toBeEnabled();
   await expect(form.locator("[data-inline-value]")).toHaveText(updatedName);

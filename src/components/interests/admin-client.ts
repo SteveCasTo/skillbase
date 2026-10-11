@@ -217,16 +217,7 @@ export function initializeAdminInterests(): void {
             failure instanceof Error
               ? failure.message
               : "No pudimos confirmar el cambio. Revisa el estado antes de reintentar.";
-          if (rowError && row.isConnected) {
-            rowError.textContent = message;
-            rowError.hidden = false;
-          } else if (error) {
-            error.textContent = message;
-            error.hidden = false;
-          }
-          if ((rowError && row.isConnected) || error)
-            notifications.dismiss(notificationId);
-          else notifications.error({ id: notificationId, title: message });
+          notifications.error({ id: notificationId, title: message });
         } finally {
           releaseMutation();
           locks.delete(id);

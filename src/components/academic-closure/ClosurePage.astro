@@ -1,6 +1,7 @@
 ---
 import "sileo/styles.css";
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import DownloadFeedback from "@/components/DownloadFeedback.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
 import { buttonVariants } from "@/components/ui/button";
 import { ClosureActions } from "./ClosureActions";
@@ -44,6 +45,7 @@ const unavailable =
 <PrivateLayout
   title={version ? `Cierre académico · Versión ${version}` : "Cierre académico"}
 >
+  <DownloadFeedback />
   <ClosureBreadcrumbs
     {base}
     {courseId}
@@ -185,6 +187,7 @@ const unavailable =
             ].map(([suffix, label]) => (
               <a
                 href={`${base}/cierre/${selected.version}/${suffix}`}
+                data-feedback-download
                 data-astro-reload
                 class={buttonVariants({
                   variant: "outline",

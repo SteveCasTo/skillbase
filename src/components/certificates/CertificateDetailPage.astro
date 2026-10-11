@@ -1,5 +1,6 @@
 ---
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import DownloadFeedback from "@/components/DownloadFeedback.astro";
 import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
 import { buttonVariants } from "@/components/ui/button";
@@ -29,6 +30,7 @@ const editableDraft = draft && !record?.obsolete;
 ---
 
 <PrivateLayout {title}>
+  <DownloadFeedback />
   <CourseBreadcrumbs
     current="Certificado"
     parents={[
@@ -121,6 +123,7 @@ const editableDraft = draft && !record?.obsolete;
             <a
               data-astro-reload
               href={`${path}/generado.pdf`}
+              data-feedback-download
               class={buttonVariants({
                 variant: "outline",
                 className: "min-h-11",
@@ -133,6 +136,7 @@ const editableDraft = draft && !record?.obsolete;
             <a
               data-astro-reload
               href={`${path}/firmado.pdf`}
+              data-feedback-download
               class={buttonVariants({
                 variant: "outline",
                 className: "min-h-11",

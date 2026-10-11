@@ -233,7 +233,7 @@ test("ADMIN lifecycle preserves credentials on reactivation and denies existing 
   }
 });
 
-test("instructor lifecycle preserves inline error and shows pending feedback without submitting twice", async ({
+test("instructor lifecycle reports its error through Sileo and restores the trigger without submitting twice", async ({
   context,
   page,
 }) => {
@@ -279,11 +279,26 @@ test("instructor lifecycle preserves inline error and shows pending feedback wit
     .getByRole("button", { name: "Eliminar instructor", exact: true })
     .click();
   await expect(panel).toHaveAttribute("aria-busy", "true");
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="loading"][data-exiting="false"]',
+    ),
+  ).toBeVisible();
   release();
-  await expect(panel.locator("[data-lifecycle-error]")).toHaveText(
-    "El perfil cambió. Recarga antes de continuar.",
-  );
-  await expect(panel.locator("[data-lifecycle-error]")).toBeFocused();
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"] [data-sileo-description]',
+    ),
+  ).toHaveText("El perfil cambió. Recarga antes de continuar.");
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toBeVisible();
+  await expect(panel.locator("[data-lifecycle-error]")).toBeHidden();
+  await expect(
+    panel.locator("summary").filter({ hasText: /^Eliminar instructor$/u }),
+  ).toBeFocused();
   await expect(panel).not.toHaveAttribute("aria-busy", "true");
   expect(requests).toBe(1);
 });

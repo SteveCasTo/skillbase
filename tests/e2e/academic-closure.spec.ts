@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import { eq } from "drizzle-orm";
 import { users } from "@/server/db/schema";
@@ -57,16 +58,58 @@ async function downloadOfficialDocuments(
   path: string,
   version: ClosureVersionDto,
   privateCi: string,
+  enhanced = true,
 ) {
   let csv = "";
   for (const [artifact, label] of documents) {
     const url = `${path}/${version.version}/${artifact}`;
     const link = page.getByRole("link", { name: label, exact: true });
     await expect(link).toHaveAttribute("href", url);
+    const documentUrl = new URL(url, e2eSiteUrl()).href;
+    const documentResponse = enhanced
+      ? page.waitForResponse(
+          (response) =>
+            response.url() === documentUrl &&
+            response.request().method() === "GET",
+        )
+      : null;
+    const currentPage = page.url();
+    const previousNotices = await page
+      .locator("[data-sileo-id]")
+      .evaluateAll((nodes) =>
+        nodes.map((node) => node.getAttribute("data-sileo-id")!),
+      );
+    let browserDigest: string | undefined;
     const pending = page.waitForEvent("download");
     await link.click();
     const download = await pending;
-    expect(download.url()).toBe(new URL(url, e2eSiteUrl()).href);
+    if (documentResponse) {
+      const fetched = await documentResponse;
+      expect(fetched.status()).toBe(200);
+      expect(fetched.url()).toBe(documentUrl);
+      expect(new URL(download.url()).protocol).toBe("blob:");
+      expect(new URL(download.url()).origin).toBe(new URL(documentUrl).origin);
+      // Attachment bodies can be empty in the protocol inspector even though
+      // fetch/blob delivered bytes. Compare the browser's actual blob to disk.
+      browserDigest = await page.evaluate(async (url) => {
+        const bytes = await (await fetch(url)).arrayBuffer();
+        const digest = await crypto.subtle.digest("SHA-256", bytes);
+        return [...new Uint8Array(digest)]
+          .map((value) => value.toString(16).padStart(2, "0"))
+          .join("");
+      }, download.url());
+      await expect(page).toHaveURL(currentPage);
+      const resultNotice = page
+        .locator(
+          '[data-sileo-toast][data-state="success"][data-exiting="false"]' +
+            previousNotices
+              .map((id) => `:not([data-sileo-id="${id}"])`)
+              .join(""),
+        )
+        .filter({ hasText: "Descarga preparada." });
+      await expect(resultNotice).toHaveCount(1);
+      await expect(resultNotice).toBeVisible();
+    } else expect(download.url()).toBe(documentUrl);
     expect(await download.failure()).toBeNull();
     expect(download.suggestedFilename()).toBe(
       `cierre-v${version.version}-${artifact}`,
@@ -74,6 +117,10 @@ async function downloadOfficialDocuments(
     const file = await download.path();
     if (!file) throw new Error("Browser download missing");
     const bytes = await readFile(file);
+    if (browserDigest)
+      expect(
+        createHash("sha256").update(new Uint8Array(bytes)).digest("hex"),
+      ).toBe(browserDigest);
     const response = await page.request.get(url);
     expect(response.status()).toBe(200);
     expect(response.headers()["cache-control"]).toBe("private, no-store");
@@ -335,11 +382,31 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     await page
       .getByRole("button", { name: "Confirmar cierre", exact: true })
       .click();
-    expect((await stale).status()).toBe(409);
+    const staleResponse = await stale;
+    expect(staleResponse.status()).toBe(409);
+    const staleMessage = await page.evaluate(
+      (html) =>
+        new DOMParser()
+          .parseFromString(html, "text/html")
+          .querySelector("#closure-error")
+          ?.textContent?.trim() ?? "",
+      await staleResponse.text(),
+    );
+    expect(staleMessage).not.toBe("");
     await expect(
       page.getByRole("heading", { name: "Versión oficial 2" }),
     ).toBeVisible();
-    await expect(page.locator("#closure-error")).not.toBeEmpty();
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+      ),
+    ).toBeVisible();
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+      ),
+    ).toContainText(staleMessage);
+    await expect(page.locator("#closure-error")).toBeHidden();
     await page.getByRole("link", { name: "Versión 1", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "Versión 1", exact: true }),
@@ -562,6 +629,7 @@ test("HTML without JavaScript retains server validation and supports closing and
       path,
       (await read(page, path)).official!,
       participant.ci,
+      false,
     );
     await page.getByText("Reabrir grupo", { exact: true }).click();
     await page

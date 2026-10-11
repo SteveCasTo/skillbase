@@ -27,12 +27,17 @@ const recoverySent = Astro.url.searchParams.get("status") === "recovery_sent";
         Acceso al equipo
       </h1>
       {signedOut && (
-        <p class="mt-5 rounded-lg border bg-muted p-3 text-sm" role="status">
+        <p
+          data-login-notice="success"
+          class="mt-5 rounded-lg border bg-muted p-3 text-sm"
+          role="status"
+        >
           La sesión se cerró correctamente.
         </p>
       )}
       {error && (
         <p
+          data-login-notice="error"
           class="mt-5 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
           role="alert"
         >
@@ -51,6 +56,7 @@ const recoverySent = Astro.url.searchParams.get("status") === "recovery_sent";
         action="/auth/password"
         data-auth-form
         data-auth-enhanced
+        data-auth-success-title="Sesión iniciada."
         data-astro-reload
       >
         <input type="hidden" name="next" value={next} />
@@ -118,4 +124,22 @@ const recoverySent = Astro.url.searchParams.get("status") === "recovery_sent";
     </section>
   </main>
   <AuthFormPending />
+  <script>
+    import { notifications } from "@/lib/notifications";
+    const initializeLoginNotices = () => {
+      document
+        .querySelectorAll<HTMLElement>("[data-login-notice]")
+        .forEach((notice) => {
+          const title = notice.textContent?.trim();
+          if (!title || notice.dataset.notified) return;
+          notice.dataset.notified = "true";
+          notice.hidden = true;
+          if (notice.dataset.loginNotice === "error")
+            notifications.error({ title });
+          else notifications.success({ title });
+        });
+    };
+    initializeLoginNotices();
+    document.addEventListener("astro:page-load", initializeLoginNotices);
+  </script>
 </BaseLayout>

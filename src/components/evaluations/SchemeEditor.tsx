@@ -218,7 +218,7 @@ export function SchemeEditor({
               });
             } else {
               setIssues(result.issues);
-              setMessage(result.message);
+              setMessage("");
               if (result.currentData) {
                 setLatest(result.currentData);
                 onSaved(result.currentData);
@@ -231,7 +231,13 @@ export function SchemeEditor({
                 editingBaseline.current = component ? { ...component } : null;
                 setEditing(component?.id ?? null);
               }
-              notifications.dismiss(notificationId);
+              if (Object.keys(result.issues).length)
+                notifications.dismiss(notificationId);
+              else
+                notifications.error({
+                  id: notificationId,
+                  title: result.message,
+                });
               requestAnimationFrame(() =>
                 (
                   form.current?.querySelector<HTMLElement>(
@@ -242,10 +248,11 @@ export function SchemeEditor({
               );
             }
           } catch {
-            setMessage(
-              "No se pudo confirmar el guardado. Reintenta sin cambiar los valores para recuperar la misma operación.",
-            );
-            notifications.dismiss(notificationId);
+            notifications.error({
+              id: notificationId,
+              title:
+                "No se pudo confirmar el guardado. Reintenta sin cambiar los valores para recuperar la misma operación.",
+            });
           } finally {
             busy.current = false;
             setPending(false);

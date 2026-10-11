@@ -1117,6 +1117,18 @@ const currentArtworkUrl = publicArtworkUrl(
               return;
             }
             if (groupError) groupError.hidden = true;
+            form
+              .querySelectorAll<HTMLElement>("[data-async-field-error]")
+              .forEach((hint) => {
+                const control = form.elements.namedItem(
+                  hint.dataset.asyncFieldError ?? "",
+                );
+                if (control instanceof HTMLElement) {
+                  control.removeAttribute("aria-invalid");
+                  control.removeAttribute("aria-describedby");
+                }
+                hint.remove();
+              });
             saving = true;
             if (button) {
               button.disabled = true;
@@ -1128,12 +1140,34 @@ const currentArtworkUrl = publicArtworkUrl(
             error.classList.add("hidden");
             let draftExists = false;
             const showError = (caught: unknown) => {
-              error.textContent =
-                caught instanceof Error
-                  ? caught.message
-                  : "No se pudo guardar. Inténtalo nuevamente.";
-              error.classList.remove("hidden");
-              error.scrollIntoView({ block: "center" });
+              error.classList.add("hidden");
+              if (caught instanceof DefinitiveCreateError) {
+                for (const [name, message] of Object.entries(
+                  caught.fieldErrors,
+                )) {
+                  const control = form.elements.namedItem(name);
+                  if (!(control instanceof HTMLElement)) continue;
+                  if (
+                    control instanceof HTMLInputElement &&
+                    control.type === "hidden" &&
+                    name !== "artwork"
+                  )
+                    continue;
+                  const hint = document.createElement("p");
+                  hint.id = `create-error-${name}`;
+                  hint.dataset.asyncFieldError = name;
+                  hint.setAttribute("role", "alert");
+                  hint.className = "mt-1 text-sm text-destructive";
+                  hint.textContent = message;
+                  document.getElementById(hint.id)?.remove();
+                  control.parentElement?.append(hint);
+                  control.setAttribute("aria-invalid", "true");
+                  control.setAttribute("aria-describedby", hint.id);
+                }
+                form
+                  .querySelector<HTMLElement>('[aria-invalid="true"]')
+                  ?.focus({ preventScroll: true });
+              }
               if (draftExists) recovery.classList.remove("hidden");
               else if (!(caught instanceof DefinitiveCreateError)) {
                 createdDraft = true; // Creation is uncertain: only retry the exact request, never a changed draft.
@@ -1199,6 +1233,19 @@ const currentArtworkUrl = publicArtworkUrl(
             void notifyInlineOperation(attempt, {
               loading: { title: "Creando borrador…" },
               success: { title: "Borrador creado correctamente." },
+              isFieldFailure: (failure) =>
+                failure instanceof DefinitiveCreateError &&
+                Object.keys(failure.fieldErrors).some((name) => {
+                  const control = form.elements.namedItem(name);
+                  return (
+                    control instanceof HTMLElement &&
+                    !(
+                      control instanceof HTMLInputElement &&
+                      control.type === "hidden" &&
+                      name !== "artwork"
+                    )
+                  );
+                }),
             })
               .catch(showError)
               .finally(() => {
@@ -1237,6 +1284,7 @@ const currentArtworkUrl = publicArtworkUrl(
             form
               .querySelectorAll<HTMLElement>('[aria-invalid="true"]')
               .forEach((item) => item.removeAttribute("aria-invalid"));
+            let fieldFailure = false;
             void notifyInlineOperation(
               async () => {
                 try {
@@ -1302,12 +1350,7 @@ const currentArtworkUrl = publicArtworkUrl(
                   if (response.status === 409 && recovery)
                     recovery.hidden = false;
                   if (!response.ok || !isCourseSaveResult(result)) {
-                    if (error) {
-                      error.textContent =
-                        result.message ??
-                        "No se pudieron guardar los cambios. Inténtalo nuevamente.";
-                      error.hidden = false;
-                    }
+                    const operationalMessages: string[] = [];
                     for (const [name, message] of Object.entries(
                       result.errors ?? {},
                     )) {
@@ -1317,18 +1360,46 @@ const currentArtworkUrl = publicArtworkUrl(
                           element.getAttribute("name") === name,
                       );
                       if (!(control instanceof HTMLElement)) continue;
+                      if (
+                        control instanceof HTMLInputElement &&
+                        control.type === "hidden" &&
+                        name !== "artwork"
+                      ) {
+                        operationalMessages.push(message);
+                        if (name === "revision" && recovery)
+                          recovery.hidden = false;
+                        continue;
+                      }
                       const hint = document.createElement("p");
                       hint.dataset.asyncFieldError = name;
+                      hint.id = `save-error-${name}`;
+                      hint.setAttribute("role", "alert");
                       hint.className = "mt-1 text-sm text-destructive";
                       hint.textContent = message;
                       const wrapper =
-                        control.closest("label") ?? control.parentElement;
+                        name === "artwork"
+                          ? form.querySelector("[data-course-image-editor]")
+                          : (control.closest("label") ?? control.parentElement);
                       wrapper?.append(hint);
                       control.setAttribute("aria-invalid", "true");
+                      control.setAttribute("aria-describedby", hint.id);
+                      if (name === "artwork") {
+                        const picker =
+                          wrapper?.querySelector<HTMLButtonElement>("button");
+                        picker?.setAttribute("aria-invalid", "true");
+                        picker?.setAttribute("aria-describedby", hint.id);
+                      }
+                      fieldFailure = true;
                     }
-                    error?.scrollIntoView({ block: "center" });
+                    if (operationalMessages.length) fieldFailure = false;
                     throw new Error(
-                      result.message ?? "Revisa los campos del formulario.",
+                      [
+                        ...new Set(
+                          [result.message, ...operationalMessages].filter(
+                            Boolean,
+                          ),
+                        ),
+                      ].join(" ") || "Revisa los campos del formulario.",
                     );
                   }
                   if (!form.isConnected) return; // A late response must not update another course after navigation.
@@ -1368,16 +1439,11 @@ const currentArtworkUrl = publicArtworkUrl(
                   if (result.name)
                     document.title = `Editar ${result.name} | SkillBase`;
                 } catch (caught) {
-                  if (error) {
-                    error.textContent =
-                      caught instanceof Error
-                        ? caught.message
-                        : "No se pudieron guardar los cambios. Inténtalo nuevamente.";
-                    error.hidden = false;
-                    error.scrollIntoView({ block: "center" });
-                    error.tabIndex = -1;
-                    error.focus({ preventScroll: true });
-                  }
+                  form
+                    .querySelector<HTMLElement>(
+                      '[aria-invalid="true"]:not([type="hidden"]):not([aria-hidden="true"])',
+                    )
+                    ?.focus({ preventScroll: true });
                   throw caught;
                 } finally {
                   saving = false;
@@ -1395,6 +1461,7 @@ const currentArtworkUrl = publicArtworkUrl(
               {
                 loading: { title: "Guardando cambios…" },
                 success: { title: "Cambios guardados correctamente." },
+                isFieldFailure: () => fieldFailure,
               },
             ).catch(() => {});
             return;

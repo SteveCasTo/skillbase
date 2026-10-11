@@ -193,7 +193,12 @@ test("forgot password is confidential; invalid redirect, origin, passwords and r
   );
   await page.goto("/auth/recovery?code=invalid");
   await expect(page).toHaveURL("/login?error=recovery");
-  await expect(page.getByRole("alert")).not.toContainText("wrong");
+  await expect(
+    page.locator("[data-sileo-toast][data-state='error']"),
+  ).toBeVisible();
+  await expect(
+    page.locator("[data-sileo-toast][data-state='error']"),
+  ).not.toContainText("wrong");
 });
 
 test("dedicated recovery validates inline and locks submit until a neutral pending result", async ({

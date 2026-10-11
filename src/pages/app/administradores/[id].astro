@@ -18,9 +18,11 @@ if (editor.response) return editor.response;
   {editor.account ? (
     <>
       {Astro.url.searchParams.get("success") === "saved" && (
-        <p role="status" class="mt-5">
-          Cuenta guardada.
-        </p>
+        <noscript>
+          <p role="status" class="mt-5">
+            Cuenta guardada.
+          </p>
+        </noscript>
       )}
       <AdminAccountDetails
         account={editor.account}

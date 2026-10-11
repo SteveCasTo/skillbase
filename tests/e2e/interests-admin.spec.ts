@@ -165,9 +165,17 @@ test("filters replace only the authorized list, retain focus and handle history,
     route.fulfill({ status: 503, body: "Unavailable" }),
   );
   await active.click();
-  await expect(page.locator("[data-interests-error]")).toContainText(
-    "Reintenta",
-  );
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toContainText("Reintenta");
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toBeVisible();
+  await expect(page.locator("[data-interests-error]")).toBeHidden();
   await expect(all).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("[data-interest-id]")).toHaveCount(2);
   await expect(page.locator("[data-filter-skeleton]")).toBeHidden();
@@ -180,9 +188,11 @@ test("filters replace only the authorized list, retain focus and handle history,
     }),
   );
   await page.getByRole("button", { name: "Reintentar filtro" }).click();
-  await expect(page.locator("[data-interests-error]")).toContainText(
-    "validar el listado",
-  );
+  await expect(
+    page
+      .locator('[data-sileo-toast][data-state="error"][data-exiting="false"]')
+      .filter({ hasText: "validar el listado" }),
+  ).toContainText("validar el listado");
   await expect(page.locator("[data-interest-id]")).toHaveCount(2);
   await page.unroute(`**${course.path}?status=ACTIVE`);
   await page.getByRole("button", { name: "Reintentar filtro" }).click();
@@ -376,9 +386,17 @@ test("409 shows current state and revision without replaying the obsolete intent
       posts++;
   });
   await confirmAction(page, row, "Cancelar interés");
-  await expect(row.locator("[data-row-error]")).toContainText(
-    "El registro cambió",
-  );
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toContainText("El registro cambió");
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toBeVisible();
+  await expect(row.locator("[data-row-error]")).toBeHidden();
   await expect(row.locator("[data-interest-status]")).toHaveText("Cancelado");
   await expect(row.locator('input[name="revision"]')).toHaveValue(
     current.registration.updatedAt,
@@ -529,7 +547,17 @@ test("expired-session redirect is not reported as a successful mutation", async 
   });
   const row = rowFor(page);
   await confirmAction(page, row, "Cancelar interés");
-  await expect(row.locator("[data-row-error]")).toContainText("sesión");
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toContainText("sesión");
+  await expect(
+    page.locator(
+      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
+    ),
+  ).toBeVisible();
+  await expect(row.locator("[data-row-error]")).toBeHidden();
   await expect(
     page.getByRole("link", { name: "Iniciar sesión", exact: true }),
   ).toBeVisible();

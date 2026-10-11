@@ -34,9 +34,11 @@ try {
     parents={[{ label: "Resumen", href: "/app" }]}
   />
   {Astro.url.searchParams.get("success") === "deleted" && (
-    <p role="status" class="mt-5">
-      Cuenta eliminada.
-    </p>
+    <noscript>
+      <p role="status" class="mt-5">
+        Cuenta eliminada.
+      </p>
+    </noscript>
   )}
   <header class="mt-5 flex flex-wrap items-start justify-between gap-5">
     <div>

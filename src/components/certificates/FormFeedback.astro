@@ -119,15 +119,11 @@ const { feedback } = Astro.props;
                 await navigate(location.pathname, { history: "replace" });
                 return;
               }
-              notifications.dismiss(requestKey);
               const text =
                 "message" in result && typeof result.message === "string"
                   ? result.message
                   : "No se pudo confirmar la operación. Reintenta.";
-              if (message) {
-                message.textContent = text;
-                message.focus({ preventScroll: true });
-              }
+              let fieldFailure = false;
               if (
                 "issues" in result &&
                 result.issues &&
@@ -139,8 +135,10 @@ const { feedback } = Astro.props;
                       element instanceof HTMLElement &&
                       element.getAttribute("name") === name,
                   );
-                  if (field instanceof HTMLElement)
+                  if (field instanceof HTMLElement) {
                     field.setAttribute("aria-invalid", "true");
+                    fieldFailure = true;
+                  }
                   const target = [
                     ...form.querySelectorAll<HTMLElement>("[data-field-error]"),
                   ].find((element) => element.dataset.fieldError === name);
@@ -148,6 +146,12 @@ const { feedback } = Astro.props;
                     target.textContent = error;
                 }
               }
+              if (fieldFailure) {
+                notifications.dismiss(requestKey);
+                form
+                  .querySelector<HTMLElement>('[aria-invalid="true"]')
+                  ?.focus();
+              } else notifications.error({ id: requestKey, title: text });
               if (response.status === 409) {
                 requestKey = crypto.randomUUID();
                 const keyField = form.querySelector<HTMLInputElement>(
@@ -156,12 +160,11 @@ const { feedback } = Astro.props;
                 if (keyField) keyField.value = requestKey;
               }
             } catch {
-              notifications.dismiss(requestKey);
-              if (message) {
-                message.textContent =
-                  "No se pudo confirmar la operación. Conservamos tus datos; reintenta la misma solicitud.";
-                message.focus({ preventScroll: true });
-              }
+              notifications.error({
+                id: requestKey,
+                title:
+                  "No se pudo confirmar la operación. Conservamos tus datos; reintenta la misma solicitud.",
+              });
             } finally {
               pending = false;
               form.removeAttribute("aria-busy");
