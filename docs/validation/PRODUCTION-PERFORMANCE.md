@@ -156,6 +156,14 @@ slug was also excluded; the valid local detail was used for the comparison.
   or a retry of that failed admin case. Final results are recorded below.
 - Focused managed-stack integration passed **14 tests / 81 assertions**, 0
   failures, 163 filtered out, using existing public-projection/instructor cases.
+- Focused existing E2E (`public-courses.spec.ts` and `public-interest.spec.ts`,
+  Chromium, owned port 4347 and managed temporary stack) passed **14/14** in
+  2.4 minutes, without retries or test changes. It verifies publication/withdrawal,
+  assigned public names, artwork, public DTO presentation, interest forms,
+  deadline changes, progressive enhancement, keyboard/responsive surfaces and
+  fallback without JavaScript. The public-query source was unchanged throughout;
+  the branch was rebased onto Auth PR 337 during this local run, so native CI
+  remains the authoritative integrated-head gate.
 - Native PR CI must pass quality, integration and both isolated E2E shards before
   merge. The normal master release remains the orchestrator's responsibility.
 - Region alignment is encoded in Git only after confirming the active free Hobby
