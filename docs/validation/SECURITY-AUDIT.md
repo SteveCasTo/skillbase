@@ -160,5 +160,8 @@ otros advisories o de una librsvg instalada globalmente en otro entorno.
   foco del skip-link tras Tab; no fue un error de transformación de imagen.
   No se eliminó/modificó assertion, timeout ni test. No se atribuye todavía una
   causa raíz al fallo, ni se declara esa corrida verde.
-- Integración y checks remotos se registran al completarse, no se infieren de
-  la prueba del proveedor o del build.
+- `bun run test:integration`: 176 PASS, 0 FAIL, 1 skip preexistente de
+  `attendance-flow-fixture` condicionado al fin de semana; no se añadió skip ni
+  se modificaron pruebas. 1441 assertions, stack aislado limpiado.
+- Checks remotos se verifican en el PR antes del merge; no se infieren de la
+  prueba del proveedor o del build.
