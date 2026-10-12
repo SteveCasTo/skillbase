@@ -58,7 +58,10 @@ export function validateCertificateRenderInput(
   input: CertificateRenderInput,
   preview = false,
 ) {
-  if (input.templateVersion !== CERTIFICATE_PDF_TEMPLATE_VERSION)
+  if (
+    input.templateVersion !== 1 &&
+    input.templateVersion !== CERTIFICATE_PDF_TEMPLATE_VERSION
+  )
     throw new CertificatePdfError(
       "PDF_TEMPLATE_VERSION_UNSUPPORTED",
       "La versión de plantilla no está disponible.",

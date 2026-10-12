@@ -1,6 +1,6 @@
 /** Presentation adapter only. Eligibility, snapshots, issuance and final-file
  * hashing belong to the certificate application/domain, not this renderer. */
-export const CERTIFICATE_PDF_TEMPLATE_VERSION = 1;
+export const CERTIFICATE_PDF_TEMPLATE_VERSION = 2;
 
 export interface CertificateSignatory {
   readonly name: string;

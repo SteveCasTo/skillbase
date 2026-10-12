@@ -71,7 +71,7 @@ export const defaultCertificateConfiguration: CertificateConfiguration = {
   city: "Cochabamba",
   venue:
     "Laboratorio de Cómputo, Departamento de Informática y Sistemas de la Facultad de Ciencias y Tecnología",
-  templateVersion: "phase9-v1",
+  templateVersion: "phase9-v2",
   brandingVersion: "phase9-v1",
 };
 export function validateCertificateConfiguration(

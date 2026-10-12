@@ -883,3 +883,14 @@ los detalles de almacenamiento/ordinal que corresponderán al diseño técnico.
   ejecuciones futuras. El release/demo sintético no prueba firma institucional,
   ni cotejo de bytes privados cloud; esas limitaciones no modifican la decisión
   de negocio aceptada.
+
+### Ajuste aprobado de distribución PDF (2026-10-12)
+
+QR bajo el logo departamental y a la derecha del título, ID debajo del QR y
+más espacio sobre las tres firmas, en ambas orientaciones. Se identifica como
+`phase9-v2`, conservando branding/assets v1. El adaptador acepta exactamente
+v1/v2 y el renderer selecciona la distribución de la versión congelada; no
+amplía elegibilidad, permisos o campos imprimibles. La compatibilidad v1 evita
+necesitar borrado de datos seed para adoptar el nuevo diseño. Los ajustes
+persistidos se activan separadamente por la operación auditada existente;
+el cambio de código no los modifica silenciosamente.
