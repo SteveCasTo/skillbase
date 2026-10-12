@@ -28,27 +28,17 @@ const courseLinks = [
   },
   { href: "/app/formatos", label: "Formatos", icon: Layers3 },
 ];
-const sections = [
+const peopleLinks = [
+  { href: "/app/instructores", label: "Instructores", icon: UsersRound },
   {
-    id: "people",
-    label: "Personas",
-    links: [
-      { href: "/app/instructores", label: "Instructores", icon: UsersRound },
-      {
-        href: "/app/administradores",
-        label: "Administradores",
-        icon: UsersRound,
-      },
-    ],
+    href: "/app/administradores",
+    label: "Administradores",
+    icon: UsersRound,
   },
-  {
-    id: "administration",
-    label: "Administración",
-    links: [
-      { href: "/app/certificados", label: "Certificados", icon: FileBadge },
-      { href: "/app/configuracion", label: "Configuración", icon: Settings },
-    ],
-  },
+];
+const standaloneLinks = [
+  { href: "/app/certificados", label: "Certificados", icon: FileBadge },
+  { href: "/app/configuracion", label: "Configuración", icon: Settings },
 ];
 ---
 
@@ -108,35 +98,57 @@ const sections = [
         </details>
       </li>
     )}
+    {isAdmin && (
+      <li>
+        <details class="private-nav-group" open>
+          <summary
+            class:list={[
+              "private-nav-link",
+              peopleLinks.some(({ href }) => isActive(href)) &&
+                "private-parent-active",
+            ]}
+            title="Personas"
+            aria-label="Personas"
+          >
+            <UsersRound size={19} aria-hidden="true" />
+            <span class="private-label">Personas</span>
+            <ChevronDown
+              className="private-label private-chevron"
+              size={16}
+              aria-hidden="true"
+            />
+          </summary>
+          <ul class="private-subnav">
+            {peopleLinks.map(({ href, label, icon: Icon }) => (
+              <li>
+                <a
+                  href={href}
+                  class="private-subnav-link"
+                  aria-current={isActive(href) ? "page" : undefined}
+                >
+                  <Icon size={17} aria-hidden="true" />
+                  <span>{label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </details>
+      </li>
+    )}
+    {isAdmin &&
+      standaloneLinks.map(({ href, label, icon: Icon }) => (
+        <li>
+          <a
+            href={href}
+            class="private-nav-link"
+            title={label}
+            aria-label={label}
+            aria-current={isActive(href) ? "page" : undefined}
+          >
+            <Icon size={19} aria-hidden="true" />
+            <span class="private-label">{label}</span>
+          </a>
+        </li>
+      ))}
   </ul>
-  {isAdmin &&
-    sections.map(({ id, label, links }) => (
-      <section
-        class="private-nav-section"
-        aria-labelledby={`${mode}-${id}-title`}
-      >
-        <h2
-          id={`${mode}-${id}-title`}
-          class="private-nav-heading private-label"
-        >
-          {label}
-        </h2>
-        <ul class="private-nav-list">
-          {links.map(({ href, label, icon: Icon }) => (
-            <li>
-              <a
-                href={href}
-                class="private-nav-link"
-                title={label}
-                aria-label={label}
-                aria-current={isActive(href) ? "page" : undefined}
-              >
-                <Icon size={19} aria-hidden="true" />
-                <span class="private-label">{label}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </section>
-    ))}
 </nav>
