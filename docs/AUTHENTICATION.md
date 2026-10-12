@@ -303,3 +303,58 @@ compensación de alta solo apunta al UUID recién creado. PR 286 aplicó migrati
 0022 por el pipeline normal; ledger cloud/canónico es 23. La entrega real de
 Google OAuth y recovery/email cloud continúa sin verificarse. Contrato en
 [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
+
+## Aceptación nativa canónica local — 2026-10-12
+
+Supersede únicamente el estado anterior de «apply canónico pendiente». PR340 se
+integró como `3ca27c003b85b65ae546aed6077caf3afe9de862` tras revisión del source
+`1942a95acfbeb804ca3461d06215f4b74ed58a70` y CI38178212282 SUCCESS: 464 unit,
+176 integración más un skip previo, demos independientes 1/1 cada una y 145 E2E
+sin flakes/retries. El root hizo fast-forward a
+`33578fb1a3369b4f3cddd1a4516ad1c4495eb104` y frozen install preservando WIP y
+archivos privados; el helper coincidió exactamente con el source revisado.
+
+La ventana exclusiva autorizada instaló únicamente el literal nativo true
+readonly y reinició **el mismo Auth** v2.196.0, ID
+`65d0b33548c0cf99be3887a0b5d3014eed2515aa65789c622dd84556d6583d21`, usuario
+`supabase` UID/GID1000/label `skillbase`. No hubo stop/start de Supabase,
+recreación, reset, seed, migración ni reinicio de DB/Storage. Pre/post inmediato,
+antes de QA, coincidió por HMAC server-side en las 78 tablas observadas,
+configuración/IDs/volúmenes de contenedores y hashes de TOML/.env/.env.local.
+Baseline real: ledger24/certificados8/Auth11/internos20/user_roles12/bucket1/
+objetos15/ADMIN activos5. No se imprimieron secretos ni hashes de passwords sin
+protección; evidencia privada fuera de Git con ACL del operador.
+
+Las QA ficticias nuevas se aprovisionaron por el caso de uso administrativo y
+gateway Admin server-side autorizados. No se inició sesión como otro usuario ni
+se cambiaron passwords/roles preexistentes. Una validación estándar del campo
+actual sobre la primera QA confirmó enforcement con `current_password_invalid`.
+La expectativa inicial del script buscaba erróneamente el literal
+`current_password_mismatch`: en la definición oficial v2.196.0,
+`ErrorCodeCurrentPasswordMismatch` significa **`current_password_invalid`**. La
+incidencia se preservó y esa QA se eliminó por la acción lifecycle ofrecida,
+conservando tombstone/intención/auditoría. No se repitió la negativa en la
+aceptación UI siguiente ni se alteró producto para ocultar el resultado.
+
+La segunda QA propia verificó login/éxito Sileo, cambio normal con contraseña
+actual correcta, nuevo login del mismo UUID y auto-desactivación normal tras su
+actividad. El guard rechazó acceso posterior y se revocaron sus sesiones propias.
+Por política conserva Auth/cuenta DISABLED/rol/auditoría; no se borra historia
+para restaurar artificialmente conteos. Resultado: ledger24/certificados8,
+Auth12/internos22/user_roles13/bucket1/objetos15/ADMIN activos5. HMACs de todos
+los usuarios/roles/identidades/sesiones/tokens **preexistentes**, y de negocio,
+Storage y ledger, permanecieron iguales excluyendo solo las dos QA identificadas.
+Auditoría, intención de eliminación y buckets Auth tienen cambios esperados.
+**Refrescar seed PLAN después de esta operación**; no se aplicó ningún seed.
+
+Checkpoint final: app normal4321/PID32228/login200, API54321/DB55322 originales,
+helper verify PASS y WIP hash
+`BBF77E4251CD3CC2F2FF1DFD02FAC41C7B9C582D4C77F8C6DB6F6352F99444C2` intacto.
+Antes del lanzamiento4321 estaba libre; no se detuvo un proceso ajeno. La
+aceptación **local** AUTH-1 queda validada bajo la regla de identidad aprobada y
+los límites documentados; **no es cierre productivo**. Master permanece
+`07042f851c8d0fe6b133288c088051bad6973bb5`, sin la promoción combinada; cloud no
+se modificó. Recovery/primera contraseña Google mantienen evidencia aislada 8/8
+con control activo, no una nueva prueba canónica ni Google OAuth/SMTP reales.
+Rollback sigue siendo literal false, no ausencia física; no hay monitorización
+continua de operadores CLI alternativos.

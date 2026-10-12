@@ -649,3 +649,31 @@ inventario canónico ni comparación de hashes fila por fila. Es evidencia de
 compatibilidad local controlada, no configuración cloud/canónica ni cierre
 operacional AUTH-1. La ventana canónica debe revisar límites de owner1000,
 operación Docker exclusiva y rollback false antes de aplicar.
+
+## Ventana Auth canónica local completada — 2026-10-12
+
+Tras revisión/CI verdes del mismo source PR340 (`1942a95`, merge `3ca27c0`), root
+avanzó por fast-forward a `33578fb1` preservando el único WIP TOML, SHA256
+`BBF77E4251CD3CC2F2FF1DFD02FAC41C7B9C582D4C77F8C6DB6F6352F99444C2`, y archivos
+privados. El helper exacto revisado aplicó el literal nativo true y reinició solo
+el mismo Auth v2.196.0, no Supabase completo/DB/Storage. IDs/configs/volúmenes y
+API54321/DB55322 quedaron intactos. Pre/post inmediato comparó HMAC server-side de
+78 tablas y archivos/configs, baseline real ledger24/certificados8/Auth11/
+internos20/roles12/bucket1/objetos15/ADMIN activos5, sin diferencias.
+
+La QA nueva propia confirmó control nativo y flujo UI normal: login Sileo,
+contraseña actual correcta, login del mismo UUID y lifecycle/denegación tras
+desactivar. Una QA inicial nunca usada por la app se eliminó conservando
+tombstone/intención; la otra, con actividad, queda DISABLED/Auth/rol/auditoría según
+política. HMACs de cuentas/roles/identidades/sesiones/tokens preexistentes y negocio,
+certificados, finanzas, Storage/ledger permanecieron iguales. Baseline final:
+ledger24/certificados8/Auth12/internos22/roles13/bucket1/objetos15/ADMIN activos5.
+Auditoría/buckets técnicos cambian legítimamente: **refrescar PLAN antes de APPLY**.
+No seed ni migración; no rotación de credenciales existentes.
+
+La app normal se lanzó por `bun run dev` después de verify nativo, al estar4321
+libre: checkpoint PID32228/login200, API54321/healthv2.196.0 y DB55322. No es
+servidor E2E temporal y no se detuvo ningún proceso ajeno. Cloud/master
+`07042f851c8d0fe6b133288c088051bad6973bb5` no se modificaron; promoción combinada
+y gates de release siguen siendo del orquestador. Aceptación local AUTH-1 no
+certifica producción/Google/SMTP reales. Detalles en [`AUTHENTICATION.md`](AUTHENTICATION.md).

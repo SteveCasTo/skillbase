@@ -461,3 +461,25 @@ reciente para su propio formulario y prueba recovery ligada a sesión. La
 excepción del proveedor no se describe como una garantía de prueba OAuth de cinco
 minutos fuera de la app. Esta decisión y el fix no son certificación global ni
 cierre operacional: faltan los gates coordinados descritos en la auditoría.
+
+El 2026-10-12 se completó la aceptación operacional **local** autorizada de
+PR337/340 con el helper exacto revisado: control nativo true sobre el mismo
+GoTrue v2.196.0 y login Sileo/cambio normal con contraseña actual/login del mismo
+UUID, seguido de lifecycle/denegación sobre QA nuevas propias. Pre/post inmediato
+preservó HMACs de 78 tablas/configs/volúmenes; después de QA se preservaron
+cuentas/roles/sesiones/identidades/tokens preexistentes y negocio/Storage/ledger.
+Las dos QA conservan solo su evidencia lifecycle legítima (una eliminada con
+tombstone, otra DISABLED por actividad); nuevas filas de auditoría/buckets son
+esperadas y requieren nuevo seed PLAN. No se modificaron passwords/roles
+existentes, se fabricaron sesiones Google ni se hicieron procedimientos de
+bypass/conversión. El proveedor retornó el código oficial
+`current_password_invalid`, que el script inicial había confundido con el nombre
+del enum; se preservó esa incidencia sin presentar una primera corrida limpia.
+
+La evidencia local no cierra el estado productivo AUTH-1: master sigue en PR335,
+la promoción combinada corresponde al orquestador y cloud quedó sin cambios.
+Google OAuth/SMTP real y recovery canónico no se verificaron de nuevo; permanecen
+separados de los ocho E2E controlados con enforcement activo. Se conservan los
+límites de operador exclusivo/sin CAS externo, file owner1000/readonly no inmune
+a chmod, rollback false sin restaurar ausencia física y falta de vigilancia
+continua de CLI alternativo. No es una certificación global de seguridad.

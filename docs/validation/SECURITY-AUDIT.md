@@ -324,6 +324,51 @@ no una nueva corrida del HEAD con este guard. El nuevo HEAD requiere CI completo
 y aceptación específica de revisión antes de integrar; no usar el CI anterior
 para el merge ni aplicar al canónico.
 
+### AUTH-1: aceptación operacional canónica local (2026-10-12)
+
+Source root `33578fb1a3369b4f3cddd1a4516ad1c4495eb104`; helper idéntico a
+`1942a95` revisado/CI38178212282 verde y merge PR340 `3ca27c0`. Frozen install
+conservó lockfile/config WIP/archivos privados. Ventana exclusiva autorizada:
+solo literal nativo true/readonly y restart del mismo Auth v2.196.0/UID1000/
+labelskillbase; no Supabase stop/start, DB/Storage restart, reset, seed, migración,
+root exec ni modificación cloud/master. Preservación pre/post inmediata por HMAC
+server-side de 78 tablas/configs/volúmenes/archivos privados: PASS, ledger24,
+certificados8/Auth11/internos20/roles12/bucket1/objetos15/ADMIN activos5.
+
+QA nuevas por caso de uso administrativo autorizado, sin sesión/credencial ajena:
+enforcement nativo observado como `current_password_invalid` ante campo actual
+inválido propio. La expectativa inicial confundió el nombre del enum
+`ErrorCodeCurrentPasswordMismatch` con su valor; la definición oficial
+[`v2.196.0/errorcode.go`](https://github.com/supabase/auth/blob/v2.196.0/internal/api/apierrors/errorcode.go)
+confirma ese literal. Se conservó el fallo operacional; la QA inicial se eliminó
+con el lifecycle ofrecido, no se alteró producto ni se repitió la negativa en
+la siguiente aceptación UI. La segunda QA pasó login/éxito Sileo, cambio normal
+con password actual correcto, login del mismo UUID y auto-desactivación con
+denegación posterior/sesiones propias revocadas. No pruebas de bypass/proveedor
+Google no aprobado, no credenciales reales rotadas, no nuevos tests permanentes.
+
+QA1 internal `c1f93569-4ae6-4fa3-94cc-584a8c3fbfb6`, Auth
+`e4153ed7-a004-4992-b442-b3709407a706`: Auth eliminado, tombstone/intención/auditoría
+conservados. QA2 internal `e46a130a-39bd-4b11-bc3a-8037430afda6`, Auth
+`fc737684-902d-405c-a73f-1c1ac7b852d9`: DISABLED con historia/Auth/rol retenidos
+porque ya tuvo actividad. UUIDs exclusivos ficticios para acotar cleanup, no
+datos de usuarios reales. HMACs de filas preexistentes de usuarios/roles/identidades/
+sesiones/tokens, negocio/finanzas/certificados/Storage/ledger: PASS. Baseline final
+ledger24/certificados8/Auth12/internos22/roles13/bucket1/objetos15/ADMIN activos5;
+auditoría/buckets y evidencia QA son drift esperado. **Refrescar seed PLAN** antes
+de APPLY; no borrar historia para simular baseline íntegramente restaurado.
+
+App normal4321/PID32228/login200, API54321/DB55322 originales, helper verify PASS,
+WIP SHA256 `BBF77E4251CD3CC2F2FF1DFD02FAC41C7B9C582D4C77F8C6DB6F6352F99444C2` intacto.
+Antes del lanzamiento4321 estaba libre; no se mató un proceso ajeno. Evidencia
+HMAC/JSON privada en `Temp/opencode/auth-canonical-native-evidence`, ACL del
+operador; archivos temporales con passwords QA eliminados. La aceptación local
+AUTH-1 queda validada bajo la regla aprobada; estado **productivo pendiente** de
+promoción combinada a master, aún `07042f851c8d0fe6b133288c088051bad6973bb5`.
+Cloud no se modificó y no se repitieron Google OAuth/SMTP/recovery reales. Límites
+operador/CAS, readonlyowner1000, rollback false/no ausencia y CLI alternativo
+siguen explícitos; no se afirma ausencia universal de riesgos ni auditoría global.
+
 ### DEP-1: versiones corregidas fijadas
 
 Las APIs oficiales de GitHub confirmaron los advisories no retirados y las
