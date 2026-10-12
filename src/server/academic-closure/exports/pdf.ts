@@ -1,4 +1,5 @@
 import fontkit from "@pdf-lib/fontkit";
+import { participantFullName } from "@/domain/pre-registrations/participant-name";
 import { PDFDocument, type PDFPage, rgb } from "pdf-lib";
 import type { ClosureVersionDto } from "@/domain/academic-closure/types";
 import fontAsset from "@/server/pre-registrations/exports/fonts/noto-sans-regular.json";
@@ -104,7 +105,7 @@ export async function renderClosurePdf(
           )!.balanceCents
         : null;
     const values = [
-      `${p.firstName}\n${p.lastName}${ci}`,
+      `${participantFullName(p)}${ci}`,
       [...r.scheme.components]
         .sort((a, b) => a.order - b.order)
         .map(
@@ -140,7 +141,7 @@ export async function renderClosurePdf(
       if (offset < count) {
         newPage();
         tableHeading();
-        paragraph(`Continuación: ${p.firstName} ${p.lastName}`);
+        paragraph(`Continuación: ${participantFullName(p)}`);
       }
     }
     y -= 12;

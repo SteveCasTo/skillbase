@@ -84,7 +84,8 @@ async function interestCourse(page: Page, context: BrowserContext) {
       headers,
       form: {
         firstName: firstName!,
-        lastName: "Fixture",
+        paternalSurname: "Fixture",
+        maternalSurname: "Quispe",
         email: `${crypto.randomUUID()}@example.test`,
         preferredGroupId: preferredGroupId!,
       },

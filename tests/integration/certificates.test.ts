@@ -178,7 +178,7 @@ test("F9 generation freezes F8 identity and nominal metadata; public drafts are 
     data: {
       courseName: original.report.courseName,
       academicHours: 6,
-      recipientName: `${original.report.participants[0]!.firstName} ${original.report.participants[0]!.lastName}`,
+      recipientName: `${original.report.participants[0]!.firstName} ${original.report.participants[0]!.paternalSurname} ${original.report.participants[0]!.maternalSurname}`,
       instructorName: original.report.instructorName,
       endsOn: "2099-03-05",
       printedMonth: 3,
@@ -533,7 +533,7 @@ test("HTTP mutation and upload adapters validate origin, allowlist, purpose and 
   expect(result.status).toBe(422);
   expect((await repository.get(f.admin.id, row!.id)).hasSignedPdf).toBe(false);
 }, 30000);
-test("F9 tables are server-only with RLS and revoked Data API grants; ledger is 24", async () => {
+test("F9 tables are server-only with RLS and revoked Data API grants; ledger is 25", async () => {
   const tables = [
     "certificates",
     "certificate_artifacts",
@@ -556,7 +556,7 @@ test("F9 tables are server-only with RLS and revoked Data API grants; ledger is 
   const ledger = await db.execute(
     sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
   );
-  expect(ledger[0]!.count).toBe(24);
+  expect(ledger[0]!.count).toBe(25);
 });
 test("failed Storage upload preserves original unsigned file and completes scoped compensation", async () => {
   const f = await setup();

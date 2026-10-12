@@ -8,7 +8,8 @@ export const INTEREST_SUCCESS_MESSAGE =
 
 export const EMPTY_INTEREST_VALUES: InterestFormValues = {
   firstName: "",
-  lastName: "",
+  paternalSurname: "",
+  maternalSurname: "",
   email: "",
   phone: "",
   preferredGroupId: "",

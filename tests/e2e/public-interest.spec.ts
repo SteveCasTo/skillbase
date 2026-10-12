@@ -112,8 +112,9 @@ async function fillContact(
   email = `interest-${crypto.randomUUID()}@example.test`,
 ) {
   const form = page.getByRole("form", { name: submitName });
-  await form.getByLabel("Nombre", { exact: true }).fill("María José");
-  await form.getByLabel("Apellidos", { exact: true }).fill("Pérez García");
+  await form.getByLabel("Nombres", { exact: true }).fill("María José");
+  await form.getByLabel("Apellido paterno", { exact: true }).fill("Pérez");
+  await form.getByLabel("Apellido materno", { exact: true }).fill("García");
   await form.getByLabel("Email", { exact: true }).fill(email);
   return { form, email };
 }
@@ -203,7 +204,7 @@ test("interest is available before presencial opening; JS submits optional group
   await page.goto(path);
   const duplicate = await fillContact(page, email.toUpperCase());
   await duplicate.form
-    .getByLabel("Nombre", { exact: true })
+    .getByLabel("Nombres", { exact: true })
     .fill("Otro nombre declarado");
   await expect(duplicate.form).toHaveAttribute("novalidate", "");
   const secondResponse = page.waitForResponse(
@@ -238,12 +239,12 @@ test("contact entered before interest hydration remains valid after choosing a g
   await expect(form).not.toHaveAttribute("novalidate");
   release();
   await expect(form).toHaveAttribute("novalidate", "");
-  await expect(form.getByLabel("Nombre", { exact: true })).toHaveValue(
+  await expect(form.getByLabel("Nombres", { exact: true })).toHaveValue(
     "María José",
   );
-  await expect(form.getByLabel("Apellidos", { exact: true })).toHaveValue(
-    "Pérez García",
-  );
+  await expect(
+    form.getByLabel("Apellido paterno", { exact: true }),
+  ).toHaveValue("Pérez");
   await expect(form.getByLabel("Email", { exact: true })).toHaveValue(email);
   const group = form.getByRole("combobox", {
     name: "Preferencia de grupo (opcional)",
@@ -295,7 +296,7 @@ test("focused native preference survives hydration until blur, then enhances wit
     await expect(group).toHaveJSProperty("tagName", "SELECT");
     await expect(group).toBeFocused();
     await expect(group).toHaveValue(groupId!);
-    await form.getByLabel("Nombre", { exact: true }).focus();
+    await form.getByLabel("Nombres", { exact: true }).focus();
     await expect(group).toHaveJSProperty("tagName", "BUTTON");
     await expect(group).toContainText("Lunes a viernes, 18:00–19:30");
     await expect(form.locator('input[name="preferredGroupId"]')).toHaveValue(
@@ -400,7 +401,7 @@ test("without a registration window or selected preference, native HTML still pr
     await expect(
       form.getByLabel("Preferencia de grupo (opcional)"),
     ).toHaveValue("");
-    await form.getByLabel("Nombre", { exact: true }).fill("   ");
+    await form.getByLabel("Nombres", { exact: true }).fill("   ");
     const rejected = page.waitForResponse(
       (response) =>
         response.request().method() === "POST" &&
@@ -411,14 +412,14 @@ test("without a registration window or selected preference, native HTML still pr
     expect(rejection.status()).toBe(422);
     expect(rejection.headers()["cache-control"]).toContain("no-store");
     await expect(page.locator(".interest-error-summary")).toBeVisible();
-    await expect(form.getByLabel("Apellidos", { exact: true })).toHaveValue(
-      "Pérez García",
-    );
-    await expect(form.getByLabel("Nombre", { exact: true })).toHaveAttribute(
+    await expect(
+      form.getByLabel("Apellido paterno", { exact: true }),
+    ).toHaveValue("Pérez");
+    await expect(form.getByLabel("Nombres", { exact: true })).toHaveAttribute(
       "aria-invalid",
       "true",
     );
-    await form.getByLabel("Nombre", { exact: true }).fill("María José");
+    await form.getByLabel("Nombres", { exact: true }).fill("María José");
     const accepted = page.waitForResponse(
       (response) =>
         response.request().method() === "POST" &&
@@ -486,13 +487,13 @@ test("required validity gates submit; server field issues preserve input and foc
   const { form, email } = await fillContact(page);
   await expect(form).toHaveAttribute("novalidate", "");
   await expect(submit).toBeEnabled();
-  await form.getByLabel("Nombre", { exact: true }).fill("   ");
+  await form.getByLabel("Nombres", { exact: true }).fill("   ");
   await expect(submit).toBeDisabled();
   await expect(form.getByLabel("Email", { exact: true })).toHaveValue(email);
-  await form.getByLabel("Nombre", { exact: true }).fill("María José");
-  await form.getByLabel("Apellidos", { exact: true }).fill("   ");
+  await form.getByLabel("Nombres", { exact: true }).fill("María José");
+  await form.getByLabel("Apellido paterno", { exact: true }).fill("   ");
   await expect(submit).toBeDisabled();
-  await form.getByLabel("Apellidos", { exact: true }).fill("Pérez García");
+  await form.getByLabel("Apellido paterno", { exact: true }).fill("Pérez");
   await form.getByLabel("Email", { exact: true }).fill("not-an-email");
   await expect(submit).toBeDisabled();
   await form.getByLabel("Email", { exact: true }).fill(email);
@@ -597,7 +598,7 @@ test("pending is local, network failures preserve contact and can retry without 
   await expect(
     page.locator("[data-sileo-toast][data-state='error']"),
   ).toBeVisible();
-  await expect(form.getByLabel("Nombre", { exact: true })).toBeFocused();
+  await expect(form.getByLabel("Nombres", { exact: true })).toBeFocused();
   await expect(form.getByLabel("Email", { exact: true })).toHaveValue(email);
   await expect(form.getByRole("button", { name: submitName })).toBeEnabled();
   await page.unroute(`**${path}`);
@@ -731,12 +732,12 @@ keyboardTest(
         expect(
           Math.abs(formBounds!.width - submitBounds!.width),
         ).toBeLessThanOrEqual(1);
-        const firstName = form.getByLabel("Nombre", { exact: true });
+        const firstName = form.getByLabel("Nombres", { exact: true });
         await firstName.focus();
         await expect(firstName).toBeFocused();
         await firstName.press("Tab");
         await expect(
-          form.getByLabel("Apellidos", { exact: true }),
+          form.getByLabel("Apellido paterno", { exact: true }),
         ).toBeFocused();
         await expect(group).toBeEnabled();
         await group.focus();

@@ -1,4 +1,5 @@
 import { navigate } from "astro:transitions/client";
+import { participantFullName } from "@/domain/pre-registrations/participant-name";
 import {
   bindRegistrationMutation,
   initializeRegistrationForms,
@@ -70,7 +71,7 @@ async function refreshDetail(value: RegistrationHttpValue) {
     "[data-registration-person-name]",
   );
   if (personName)
-    personName.textContent = `${registration.participant.firstName} ${registration.participant.lastName}`;
+    personName.textContent = participantFullName(registration.participant);
   const groupLabel = document.querySelector<HTMLElement>(
     "[data-registration-course-group]",
   );
@@ -131,7 +132,7 @@ function bindForms() {
               "[data-registration-person-name]",
             );
             if (heading)
-              heading.textContent = `${value.participant.firstName} ${value.participant.lastName}`;
+              heading.textContent = participantFullName(value.participant);
             document
               .querySelectorAll<HTMLFormElement>("[data-participant-edit]")
               .forEach((peer) => {
@@ -145,7 +146,8 @@ function bindForms() {
                 for (const field of [
                   "ci",
                   "firstName",
-                  "lastName",
+                  "paternalSurname",
+                  "maternalSurname",
                   "email",
                   "phone",
                 ] as const) {
@@ -161,7 +163,12 @@ function bindForms() {
                   "[data-inline-value]",
                 );
                 const field = peer.dataset.editField as
-                  "ci" | "firstName" | "lastName" | "email" | "phone";
+                  | "ci"
+                  | "firstName"
+                  | "paternalSurname"
+                  | "maternalSurname"
+                  | "email"
+                  | "phone";
                 if (display)
                   display.textContent =
                     value.participant[field] || "No indicado";
@@ -198,7 +205,8 @@ function bindLookup() {
         const fields = {
           ci: "",
           firstName: person.firstName,
-          lastName: person.lastName,
+          paternalSurname: person.paternalSurname,
+          maternalSurname: person.maternalSurname,
           email: person.email,
           phone: person.phone ?? "",
         };
@@ -261,7 +269,8 @@ function bindLookup() {
           for (const name of [
             "ci",
             "firstName",
-            "lastName",
+            "paternalSurname",
+            "maternalSurname",
             "email",
             "phone",
             "sourceInterestId",
@@ -348,7 +357,7 @@ function bindLookup() {
             item.className = "min-w-0";
             const title = document.createElement("p");
             title.className = "break-words font-medium";
-            title.textContent = `${person.firstName} ${person.lastName}`;
+            title.textContent = participantFullName(person);
             const note = document.createElement("p");
             note.className = "mt-1 break-words text-sm text-muted-foreground";
             note.textContent = person.email;

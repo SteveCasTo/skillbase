@@ -43,7 +43,8 @@ async function exportParticipant(
       participant: {
         ci: person.ci,
         firstName: "=María Ñúñez",
-        lastName: "Álvarez",
+        paternalSurname: "Álvarez",
+        maternalSurname: "Quispe",
         email: person.email,
         phone: "+591 70000000",
       },

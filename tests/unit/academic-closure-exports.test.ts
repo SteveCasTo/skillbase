@@ -70,7 +70,7 @@ test("CSV escapes quotes, semicolons, newlines and disguised spreadsheet formula
   const v = closureExportFixture();
   v.report.courseName = ' \u200b=HYPERLINK("unsafe");\nQA';
   v.report.participants[0]!.firstName = "\t+formula";
-  v.report.participants[0]!.lastName = "@SUM(1)";
+  v.report.participants[0]!.paternalSurname = "@SUM(1)";
   const csv = new TextDecoder().decode(renderClosureCsv(v));
   expect(csv).toContain('"\' \u200b=HYPERLINK(""unsafe"");\nQA"');
   expect(csv).toContain('"\'\t+formula"');

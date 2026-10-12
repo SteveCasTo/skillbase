@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { compareParticipantNames } from "@/domain/pre-registrations/participant-name";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import * as s from "@/server/db/schema";
@@ -111,7 +112,8 @@ export async function loadEvaluationRoster(
       groupId: s.preRegistrations.groupId,
       state: s.preRegistrations.state,
       firstName: s.participants.firstName,
-      lastName: s.participants.lastName,
+      paternalSurname: s.participants.paternalSurname,
+      maternalSurname: s.participants.maternalSurname,
       ci: s.participants.ci,
       balance: sql<string>`${s.preRegistrations.totalPriceCents} - coalesce((select sum(l.amount_cents) from public.registration_ledger l where l.registration_id = ${s.preRegistrations.id} and l.kind = 'PAYMENT' and l.recorded_at <= ${now.toISOString()}::timestamptz), 0)`,
     })
@@ -281,8 +283,7 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
         participants: visiblePeople
           .sort(
             (a, b) =>
-              a.lastName.localeCompare(b.lastName) ||
-              a.firstName.localeCompare(b.firstName) ||
+              compareParticipantNames(a, b) ||
               a.participantId.localeCompare(b.participantId),
           )
           .map((p) => {
@@ -294,7 +295,8 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
               registrationId: p.id,
               groupId: p.groupId,
               firstName: p.firstName,
-              lastName: p.lastName,
+              paternalSurname: p.paternalSurname,
+              maternalSurname: p.maternalSurname,
               membershipStatus: p.membershipStatus,
               canGrade: p.membershipStatus === "INSCRITO" && items.length > 0,
               grades: items.map((c) => {
@@ -320,7 +322,8 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
             registrationId: p.registrationId,
             groupId: p.groupId,
             firstName: p.firstName,
-            lastName: p.lastName,
+            paternalSurname: p.paternalSurname,
+            maternalSurname: p.maternalSurname,
             membershipStatus: p.membershipStatus,
             canGrade: false,
             grades: p.grades.map((g) => ({

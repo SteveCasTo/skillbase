@@ -4,7 +4,8 @@ export const INTEREST_BODY_LIMIT = 8192;
 export function blankInterestValues(): InterestFormValues {
   return {
     firstName: "",
-    lastName: "",
+    paternalSurname: "",
+    maternalSurname: "",
     email: "",
     phone: "",
     preferredGroupId: "",

@@ -12,6 +12,11 @@ export function validateParticipant(raw: unknown): ParticipantData {
       "Introduce los datos de la persona.",
     );
   const input = raw as Record<string, unknown>;
+  if ("lastName" in input)
+    throw new RegistrationError(
+      "VALIDATION_FAILED",
+      "Introduce nombres, apellido paterno y apellido materno por separado.",
+    );
   const issues: Record<string, string> = {};
   const text = (field: string, max: number, optional = false): string => {
     const rawValue = input[field];
@@ -30,7 +35,8 @@ export function validateParticipant(raw: unknown): ParticipantData {
   if (!ci || [...ci].length > 64)
     issues.ci = "Introduce un CI de hasta 64 caracteres.";
   const firstName = text("firstName", 100);
-  const lastName = text("lastName", 150);
+  const paternalSurname = text("paternalSurname", 150);
+  const maternalSurname = text("maternalSurname", 150);
   const email = text("email", 254).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email))
     issues.email = "Introduce un email válido.";
@@ -43,5 +49,5 @@ export function validateParticipant(raw: unknown): ParticipantData {
       "Revisa los campos indicados.",
       issues,
     );
-  return { ci, firstName, lastName, email, phone };
+  return { ci, firstName, paternalSurname, maternalSurname, email, phone };
 }

@@ -91,7 +91,8 @@ async function fixture() {
         participant: {
           ci: `EV-${crypto.randomUUID()}`,
           firstName: "Synthetic",
-          lastName: crypto.randomUUID(),
+          paternalSurname: crypto.randomUUID(),
+          maternalSurname: "Quispe",
           email: "private-evaluation@test.invalid",
           phone: "12345678",
         },

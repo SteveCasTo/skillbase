@@ -46,7 +46,8 @@ test("isolated renewal preserves ADMIN identity/session and all accounts, reruns
     .values({
       ci: `GLOBAL-${crypto.randomUUID().toUpperCase()}`,
       firstName: "Global",
-      lastName: "Preserved",
+      paternalSurname: "Preserved",
+      maternalSurname: "Quispe",
       email: "global@example.invalid",
     })
     .returning();
@@ -265,7 +266,8 @@ test("isolated demo reset refuses CANCELLED cash history without changing legacy
       .values({
         ci: `PROTECTED-${crypto.randomUUID().toUpperCase()}`,
         firstName: "Protected",
-        lastName: "Person",
+        paternalSurname: "Person",
+        maternalSurname: "Quispe",
         email: "protected@example.invalid",
       })
       .returning();

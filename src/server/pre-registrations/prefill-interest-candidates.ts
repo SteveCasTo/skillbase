@@ -19,7 +19,7 @@ export function filterAvailableInterestCandidates(
     )
     .filter((interest) =>
       normalizeRegistrationSearch(
-        `${interest.firstName} ${interest.lastName} ${interest.email}`,
+        `${interest.firstName} ${interest.paternalSurname} ${interest.maternalSurname} ${interest.email}`,
       ).includes(normalizedQuery),
     )
     .filter((interest) => {

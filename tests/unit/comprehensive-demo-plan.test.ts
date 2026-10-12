@@ -32,7 +32,9 @@ test("bounded comprehensive plan uses independent deterministic identities, exac
       expect(sample.course.name).not.toContain("DEMO");
       expect(
         sample.registrations.every(
-          (registration) => registration.participant.lastName !== "Demo",
+          (registration) =>
+            registration.participant.paternalSurname !== "Demo" &&
+            Boolean(registration.participant.maternalSurname),
         ),
       ).toBe(true);
       if (sample.registrations.length)
@@ -65,7 +67,7 @@ test("bounded comprehensive plan uses independent deterministic identities, exac
     expect(plan.formats).toHaveLength(4);
   }
   expect(fingerprint(legacyComprehensiveDemoPlan("2026-10-08", 3, 25))).toBe(
-    "5d9a09defed910f009bde5279dd888b5711a13b46d26ec1d100d3add7266ddd5",
+    "f9b60d2b72babe0c8b84a3747ede4bc3ec8bf3bfb65579fe9b38e833463cdb6f",
   );
   expect(
     comprehensiveDemoPlan("2027-10-11", 3, 25)

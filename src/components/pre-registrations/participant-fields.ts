@@ -2,17 +2,24 @@ export const participantFields = [
   { name: "ci", label: "CI", type: "text", max: 80, autocomplete: "off" },
   {
     name: "firstName",
-    label: "Nombre",
+    label: "Nombres",
     type: "text",
     max: 100,
     autocomplete: "given-name",
   },
   {
-    name: "lastName",
-    label: "Apellidos",
+    name: "paternalSurname",
+    label: "Apellido paterno",
     type: "text",
     max: 150,
     autocomplete: "family-name",
+  },
+  {
+    name: "maternalSurname",
+    label: "Apellido materno",
+    type: "text",
+    max: 150,
+    autocomplete: "off",
   },
   {
     name: "email",
