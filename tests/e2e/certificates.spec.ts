@@ -309,7 +309,7 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
       .getByRole("button", { name: "Generar PDF", exact: true })
       .all())
       await expect(button).toBeDisabled();
-    await settings(page, fixture.course.id.slice(0, 8));
+    await settings(page, fixture.historyCourseId.slice(0, 8));
     await page.setViewportSize({ width: 1440, height: 1000 });
     await assertNoOverflow(page);
     await page.screenshot({
@@ -599,7 +599,7 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
     await instructor.clock.setFixedTime(fixture.now);
     instructorPage = await instructor.newPage();
     await closeOfficialGroup(page, fixture);
-    await settings(page, fixture.course.id.slice(0, 8));
+    await settings(page, fixture.historyCourseId.slice(0, 8));
     const approval = await generate(page, fixture);
     await uploadReviewIssue(page, approval, await signedFixture());
     const teacherCertificate = await generate(page, fixture, "INSTRUCTOR");
