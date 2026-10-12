@@ -17,6 +17,21 @@ test("desktop sidebar respects roles and marks nested courses and formats", asyn
   await expect(
     nav.getByRole("link", { name: "Cursos", exact: true }),
   ).toBeVisible();
+  await expect(nav.locator(".private-nav-group summary")).toHaveCount(2);
+  await expect(nav.locator(".private-nav-group summary").nth(1)).toHaveText(
+    /Personas/,
+  );
+  await expect(nav.getByRole("link", { name: "Instructores" })).toBeVisible();
+  await expect(
+    nav.getByRole("link", { name: "Administradores" }),
+  ).toBeVisible();
+  await expect(
+    nav.locator('.private-nav-list > li > a[href="/app/certificados"]'),
+  ).toBeVisible();
+  await expect(
+    nav.locator('.private-nav-list > li > a[href="/app/configuracion"]'),
+  ).toBeVisible();
+  await expect(nav.getByText("Administración", { exact: true })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Asistencia" })).toHaveCount(0);
   await nav.getByRole("link", { name: "Cursos", exact: true }).click();
   await expect(

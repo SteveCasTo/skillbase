@@ -145,15 +145,6 @@ main#main-content {
   flex-direction: column;
   gap: 0.25rem;
 }
-.private-nav-section {
-  margin-top: 1rem;
-}
-.private-nav-heading {
-  padding: 0.25rem 0.75rem 0.5rem;
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
 .private-nav-link,
 .private-subnav-link,
 .private-action {
