@@ -19,6 +19,10 @@ export const PRIVATE_ROUTE_POLICIES = {
   "/app/configuracion": { access: "ROLES", roles: ["ADMIN"] },
   "/app/configuracion/asistencia": { access: "ROLES", roles: ["ADMIN"] },
   "/app/configuracion/certificados": { access: "ROLES", roles: ["ADMIN"] },
+  "/app/configuracion/certificados/vista-previa.pdf": {
+    access: "ROLES",
+    roles: ["ADMIN"],
+  },
   "/app/certificados": { access: "ROLES", roles: ["ADMIN"] },
   "/app/perfil": { access: "ACTIVE_USER" },
   "/app/perfil/contrasena": { access: "ACTIVE_USER" },

@@ -9,7 +9,7 @@ import {
   CertificateError,
   validateCertificateConfiguration,
 } from "./rules";
-export function freezeCertificateData(input: {
+type CertificateDataInput = {
   type: CertificateType;
   publicCredentialId: string;
   verificationOrigin: string;
@@ -24,8 +24,46 @@ export function freezeCertificateData(input: {
   groupNumber: number;
   configuration: CertificateConfiguration;
   generatedAt: Date;
-}): CertificateTemplateData {
-  validateCertificateConfiguration(input.configuration, true, input.type);
+};
+export function freezeCertificateData(
+  input: CertificateDataInput,
+): CertificateTemplateData {
+  return composeCertificateData(input, true);
+}
+/** Non-credential sample; no identifier or verification link can escape this mode. */
+export function certificatePreviewData(
+  configuration: CertificateConfiguration,
+  type: CertificateType,
+): CertificateTemplateData {
+  const data = composeCertificateData(
+    {
+      type,
+      configuration,
+      publicCredentialId: "",
+      verificationOrigin: "https://preview.invalid",
+      recipientName:
+        type === "APPROVAL"
+          ? "Nombre del participante"
+          : "Nombre del instructor",
+      instructorName: "Nombre del instructor",
+      courseName: "Nombre del curso",
+      courseStartsAt: new Date("2026-07-23T15:30:00Z"),
+      courseEndsAt: new Date("2026-08-05T17:00:00Z"),
+      groupStartsAt: new Date("2026-07-23T15:30:00Z"),
+      groupEndsAt: new Date("2026-08-05T17:00:00Z"),
+      academicHours: 20,
+      groupNumber: 1,
+      generatedAt: new Date("2026-08-05T17:00:00Z"),
+    },
+    false,
+  );
+  return { ...data, publicCredentialId: "", verificationUrl: "" };
+}
+function composeCertificateData(
+  input: CertificateDataInput,
+  complete: boolean,
+): CertificateTemplateData {
+  validateCertificateConfiguration(input.configuration, complete, input.type);
   if (
     !Number.isSafeInteger(input.groupNumber) ||
     input.groupNumber < 1 ||

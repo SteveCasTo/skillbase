@@ -14,6 +14,9 @@ import {
   CERTIFICATE_PDF_MAX_BYTES,
 } from "@/server/certificates/upload";
 import { requireCertificateActor } from "@/server/certificates/http";
+import { previewCertificate } from "@/server/certificates/preview";
+import { updateCertificateSettingsField } from "@/application/certificates/update-settings-field";
+import { CertificateError } from "@/domain/certificates/rules";
 import { handlePublicCertificateGet } from "@/server/certificates/public-http";
 import {
   certificatePdfInput,
@@ -206,7 +209,7 @@ test("PDF upload rejects mismatched MIME extension sniff size purpose malformed 
       validateCertificatePdf(invalid, "scan.pdf", "application/pdf", "SIGNED"),
     ).rejects.toThrow();
 });
-test("HTTP session guard permits ADMIN peers but never inactive or instructor mutations", () => {
+test("HTTP session guard permits ADMIN peers but never inactive or instructor mutations", async () => {
   const actor = {
     id: crypto.randomUUID(),
     authUserId: crypto.randomUUID(),
@@ -225,6 +228,99 @@ test("HTTP session guard permits ADMIN peers but never inactive or instructor mu
   expect(() =>
     requireCertificateActor({ ...actor, roles: ["INSTRUCTOR"] }, false),
   ).not.toThrow();
+  let reads = 0;
+  const repository = {
+    async getSettings() {
+      reads++;
+      return {
+        revision: 0,
+        configuration: structuredClone(defaultCertificateConfiguration),
+      };
+    },
+  };
+  for (const denied of [
+    { ...actor, roles: ["INSTRUCTOR" as const] },
+    { ...actor, status: "DISABLED" as const },
+  ]) {
+    expect(
+      (await previewCertificate(denied, "APPROVAL", repository)).status,
+    ).toBe(403);
+  }
+  expect(reads).toBe(0);
+  expect(
+    (await previewCertificate(actor, "PARTICIPATION", repository)).status,
+  ).toBe(422);
+  expect(reads).toBe(0);
+  const preview = await previewCertificate(actor, "APPROVAL", repository);
+  expect(preview.status).toBe(200);
+  expect(preview.headers.get("Cache-Control")).toBe("private, no-store");
+  expect(preview.headers.get("Content-Disposition")).toStartWith("inline;");
+  expect(
+    (await PDFDocument.load(await preview.arrayBuffer())).getPageCount(),
+  ).toBe(1);
+  expect(reads).toBe(1);
+  let current = {
+    revision: 0,
+    configuration: structuredClone(defaultCertificateConfiguration),
+  };
+  let writes = 0;
+  const settingsRepository = {
+    async getSettings() {
+      return structuredClone(current);
+    },
+    async updateSettings(
+      _actor: string,
+      revision: number,
+      configuration: typeof current.configuration,
+    ) {
+      if (revision !== current.revision)
+        throw new CertificateError("CONCURRENT_UPDATE", "Conflict");
+      writes++;
+      current = { revision: revision + 1, configuration };
+      return structuredClone(current);
+    },
+  };
+  const unchanged = structuredClone(current.configuration);
+  const saved = await updateCertificateSettingsField(
+    settingsRepository,
+    actor.id,
+    0,
+    "director.name",
+    " Synthetic Director ",
+  );
+  expect(saved.configuration).toEqual({
+    ...unchanged,
+    director: { ...unchanged.director, name: "Synthetic Director" },
+  });
+  expect(saved.revision).toBe(1);
+  await expect(
+    updateCertificateSettingsField(
+      settingsRepository,
+      actor.id,
+      0,
+      "dean.name",
+      "Other",
+    ),
+  ).rejects.toMatchObject({ code: "CONCURRENT_UPDATE" });
+  await expect(
+    updateCertificateSettingsField(
+      settingsRepository,
+      actor.id,
+      1,
+      "organization",
+      "Other",
+    ),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  await expect(
+    updateCertificateSettingsField(
+      settingsRepository,
+      actor.id,
+      1,
+      "dean.role",
+      "",
+    ),
+  ).rejects.toMatchObject({ fields: { "dean.role": expect.any(String) } });
+  expect(writes).toBe(1);
 });
 test("public adapter limits before registry access and exposes only authoritative DTO", async () => {
   let reads = 0;

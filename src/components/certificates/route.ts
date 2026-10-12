@@ -49,6 +49,7 @@ export async function certificateMutation(
     if (
       operation === "settings" &&
       configuration &&
+      !("field" in fields) &&
       !("configuration" in fields)
     ) {
       const authorityKeys = ["director", "dean", "departmentHead"] as const;

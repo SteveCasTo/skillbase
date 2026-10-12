@@ -100,6 +100,7 @@ describe("certificate route policy", () => {
     for (const path of [
       "/app/certificados",
       "/app/configuracion/certificados",
+      "/app/configuracion/certificados/vista-previa.pdf",
       `/app/certificados/${id}`,
       `/app/certificados/${id}/generado.pdf`,
       `/app/certificados/${id}/firmado.pdf`,
@@ -129,6 +130,8 @@ describe("certificate route policy", () => {
       `/app/cursos/${id}/grupos/not-a-uuid/certificados`,
       `/app/certificados/${id}/firmado.pdf/extra`,
       "/app/mis-certificados",
+      "/app/configuracion/certificados/vista-previa.pdf/extra",
+      "/app/configuracion/certificados/preview.pdf",
     ])
       expect(getPrivateRoutePolicy(path)).toBeNull();
   });

@@ -29,6 +29,20 @@ grupo cerrado
 → verificación pública
 ```
 
+## Configuración y vista previa
+
+ADMIN edita cada nombre, cargo o afiliación desde Configuración → Certificados
+y autoridades. Cada guardado modifica solo el campo solicitado, valida la revisión
+vigente y conserva la auditoría; los PDFs históricos no cambian. La ruta antigua
+redirige a `#firmantes` en GET y conserva compatibilidad de POST.
+
+Las vistas previas de aprobación e instructor usan la configuración **guardada**
+y datos de curso/destinatario de muestra. El PDF se abre en un visor, con una sola
+marca «Vista previa», sin QR, folio ni enlace verificable. El endpoint ADMIN privado
+`/app/configuracion/certificados/vista-previa.pdf` responde inline y no-store:
+solo lee ajustes, incluso con revisión cero; no genera registros, artefactos,
+receipts, eventos ni escrituras en Storage. No añade un tipo de participación.
+
 ## IDENTIFICADORES
 
 Cada certificado debe tener:

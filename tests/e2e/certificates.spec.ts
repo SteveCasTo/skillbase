@@ -92,26 +92,60 @@ async function closeOfficialGroup(page: Page, fixture: Fixture) {
   expect(response.status()).toBe(200);
   return state(page, fixture);
 }
-async function settings(page: Page) {
+async function settings(page: Page, fixtureKey: string) {
   await page.goto("/app/configuracion/certificados");
+  await expect(page).toHaveURL(/\/app\/configuracion#firmantes$/);
   for (const [id, name] of [
-    ["departmentHead.name", "Jefatura ficticia QA"],
-    ["director.name", "Dirección ficticia QA"],
-    ["dean.name", "Decanato ficticio QA"],
-  ])
-    await page.locator(`[id="${id}"]`).fill(name!);
-  const saved = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      new URL(response.url()).pathname === "/app/configuracion/certificados",
+    ["departmentHead.name", `Jefatura ficticia QA ${fixtureKey}`],
+    ["director.name", `Dirección ficticia QA ${fixtureKey}`],
+    ["dean.name", `Decanato ficticio QA ${fixtureKey}`],
+  ]) {
+    const form = page.locator(
+      `[data-certificate-settings-field][data-edit-field="${id}"]`,
+    );
+    await form
+      .getByRole("button", { name: "Editar nombre completo", exact: true })
+      .click();
+    await form.locator(`[id="${id}"]`).fill(name!);
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === "/app/configuracion/certificados",
+    );
+    await form
+      .getByRole("button", { name: "Guardar nombre completo", exact: true })
+      .click();
+    expect((await saved).status()).toBe(200);
+    await expect(form.locator("[data-inline-value]")).toHaveText(name!);
+  }
+  const draft = page.locator(
+    '[data-edit-field="director.name"][data-certificate-settings-field]',
   );
-  await page
-    .getByRole("button", { name: "Guardar configuración", exact: true })
+  await draft
+    .getByRole("button", { name: "Editar nombre completo", exact: true })
     .click();
-  expect((await saved).status()).toBe(200);
-  await expect(page.locator('[id="director.name"]')).toHaveValue(
-    "Dirección ficticia QA",
-  );
+  await draft.locator('input[name="value"]').fill("Borrador sin guardar QA");
+  for (const label of [
+    "Previsualizar aprobación",
+    "Previsualizar instructor",
+  ]) {
+    const pdf = page.waitForResponse((response) =>
+      new URL(response.url()).pathname.endsWith("/vista-previa.pdf"),
+    );
+    await page.getByRole("button", { name: label, exact: true }).click();
+    expect((await pdf).status()).toBe(200);
+    await expect(page.getByRole("dialog").locator("iframe")).toBeVisible();
+    await page.getByRole("button", { name: "Cerrar", exact: true }).click();
+    await expect(draft.locator('input[name="value"]')).toHaveValue(
+      "Borrador sin guardar QA",
+    );
+  }
+  await draft
+    .getByRole("button", {
+      name: "Cancelar edición de nombre completo",
+      exact: true,
+    })
+    .click();
 }
 async function records(
   page: Page,
@@ -275,7 +309,7 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
       .getByRole("button", { name: "Generar PDF", exact: true })
       .all())
       await expect(button).toBeDisabled();
-    await settings(page);
+    await settings(page, fixture.historyCourseId.slice(0, 8));
     await page.setViewportSize({ width: 1440, height: 1000 });
     await assertNoOverflow(page);
     await page.screenshot({
@@ -500,6 +534,7 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
     });
     await replaceForm
       .getByRole("combobox", { name: "Titular del reemplazo" })
+      .and(replaceForm.locator("button"))
       .click();
     await page
       .getByRole("option", { name: record.data.recipientName, exact: true })
@@ -564,7 +599,7 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
     await instructor.clock.setFixedTime(fixture.now);
     instructorPage = await instructor.newPage();
     await closeOfficialGroup(page, fixture);
-    await settings(page);
+    await settings(page, fixture.historyCourseId.slice(0, 8));
     const approval = await generate(page, fixture);
     await uploadReviewIssue(page, approval, await signedFixture());
     const teacherCertificate = await generate(page, fixture, "INSTRUCTOR");

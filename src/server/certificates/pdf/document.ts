@@ -54,7 +54,10 @@ function text(value: string, maximum = 1024) {
     invalid();
 }
 
-export function validateCertificateRenderInput(input: CertificateRenderInput) {
+export function validateCertificateRenderInput(
+  input: CertificateRenderInput,
+  preview = false,
+) {
   if (input.templateVersion !== CERTIFICATE_PDF_TEMPLATE_VERSION)
     throw new CertificatePdfError(
       "PDF_TEMPLATE_VERSION_UNSUPPORTED",
@@ -64,24 +67,29 @@ export function validateCertificateRenderInput(input: CertificateRenderInput) {
   for (const value of [input.recipientName, input.courseName, input.city])
     text(value);
   if (input.instructorName !== null) text(input.instructorName);
-  if (!/^[A-Za-z0-9_-]{22,128}$/.test(input.publicCredentialId)) invalid();
-  if (input.verificationUrl.length > 512) invalid();
-  let url: URL;
-  try {
-    url = new URL(input.verificationUrl);
-  } catch {
-    invalid();
+  if (preview) {
+    if (input.publicCredentialId !== "" || input.verificationUrl !== "")
+      invalid();
+  } else {
+    if (!/^[A-Za-z0-9_-]{22,128}$/.test(input.publicCredentialId)) invalid();
+    if (input.verificationUrl.length > 512) invalid();
+    let url: URL;
+    try {
+      url = new URL(input.verificationUrl);
+    } catch {
+      invalid();
+    }
+    const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if (
+      (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname !== `/certificados/${input.publicCredentialId}`
+    )
+      invalid();
   }
-  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
-  if (
-    (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash ||
-    url.pathname !== `/certificados/${input.publicCredentialId}`
-  )
-    invalid();
   const start = civilDate(input.startsOn);
   const end = civilDate(input.endsOn);
   if (
@@ -107,7 +115,7 @@ export function validateCertificateRenderInput(input: CertificateRenderInput) {
   if (!Array.isArray(input.signatories) || input.signatories.length !== 3)
     invalid();
   for (const signer of input.signatories) {
-    text(signer.name, 300);
+    if (!preview || signer.name) text(signer.name, 300);
     text(signer.role, 300);
     text(signer.affiliation, 300);
   }
@@ -129,8 +137,11 @@ export function validateCertificateRenderInput(input: CertificateRenderInput) {
   return { start, end };
 }
 
-export function certificateDocument(input: CertificateRenderInput) {
-  const { start, end } = validateCertificateRenderInput(input);
+export function certificateDocument(
+  input: CertificateRenderInput,
+  preview = false,
+) {
+  const { start, end } = validateCertificateRenderInput(input, preview);
   const firstYear = start.year !== end.year ? ` de ${start.year}` : "";
   const range = `${start.day} de ${MONTHS[start.month - 1]}${firstYear} al ${end.day} de ${MONTHS[end.month - 1]} de ${end.year}`;
   const group =

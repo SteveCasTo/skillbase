@@ -93,6 +93,10 @@ function signatures(
       [signer.role, bold, 6.75],
       [signer.affiliation, regular, 6.75],
     ] as const) {
+      if (!value) {
+        top += 11;
+        continue;
+      }
       const fitted = drawCertificateText(page, value, font, {
         x,
         top,
@@ -111,8 +115,9 @@ function signatures(
  * live lookups, signatures, issuance or hash of the final scanned PDF here. */
 export async function renderCertificatePdf(
   input: CertificateRenderInput,
+  options: { preview?: boolean } = {},
 ): Promise<Uint8Array> {
-  const content = certificateDocument(input);
+  const content = certificateDocument(input, options.preview);
   const resources = await certificateResources();
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
@@ -269,14 +274,25 @@ export async function renderCertificatePdf(
   center(content.date, regular, approval ? 406 : 558, 24, 11, 10);
   signatures(page, input, regular, bold);
   const qrX = approval ? 112 : 42;
-  drawCertificateQr(doc, page, input.verificationUrl, qrX, 12);
-  drawCertificateText(page, `ID: ${input.publicCredentialId}`, regular, {
-    x: qrX + 83,
-    top: page.getHeight() - 51,
-    width: approval ? 474 : 434,
-    height: 34,
-    size: 8,
-    minimumSize: 7,
-  });
+  if (options.preview) {
+    drawCertificateText(page, "Vista previa", regular, {
+      x: qrX,
+      top: page.getHeight() - 35,
+      width: 160,
+      height: 20,
+      size: 9,
+      minimumSize: 9,
+    });
+  } else {
+    drawCertificateQr(doc, page, input.verificationUrl, qrX, 12);
+    drawCertificateText(page, `ID: ${input.publicCredentialId}`, regular, {
+      x: qrX + 83,
+      top: page.getHeight() - 51,
+      width: approval ? 474 : 434,
+      height: 34,
+      size: 8,
+      minimumSize: 7,
+    });
+  }
   return doc.save({ useObjectStreams: false });
 }
