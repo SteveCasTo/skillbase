@@ -117,6 +117,8 @@ El signup público por email/password permanece deshabilitado. El proveedor inte
 
 Las rutas privadas tienen políticas fail-closed: `/app` y `/app/perfil` permiten usuario interno activo; mantenimiento de cursos/formats/interesados/participantes/configuración exige `ADMIN`; `/app/mis-cursos` y páginas de sesiones requieren `INSTRUCTOR` más ownership del repositorio. Instructor solo accede a asistencia de sus propios grupos y no a finanzas, CI/email ni settings. Rutas futuras no declaradas bajo `/app` fallan cerradas.
 
+La URL compatible `/app` resuelve la entrada operativa después del guard existente: ADMIN tiene prioridad y redirige a `/app/cursos`; INSTRUCTOR redirige a `/app/mis-cursos`; ningún rol reconocido redirige a la denegación `forbidden`, nunca al propio resolver. No renderiza ni consume el feedback OAuth: la cookie de un uso llega intacta al layout del destino. Login password/Google, callbacks, `safeRelativeRedirect`, `next`, `returnTo` y enlaces profundos conservan sus contratos; solo la entrada genérica se resuelve por rol.
+
 ### Configuración cloud
 
 El proyecto `SkillBase` está enlazado con referencia `fvzxqlezdrlzykyoevub`. Google OAuth, Site URL y el callback `https://skillbase-alpha.vercel.app/auth/callback` están configurados. El primer administrador permanece como invitación `INVITED` hasta completar su primer acceso Google, momento en que se vinculará su UUID Auth y pasará a `ACTIVE`.

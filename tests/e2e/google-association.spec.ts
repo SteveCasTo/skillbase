@@ -28,6 +28,7 @@ async function authId(email: string): Promise<string> {
 async function login(
   page: Page,
   fixture: { email: string; password: string },
+  entryPath: "/app/cursos" | "/app/mis-cursos",
 ): Promise<void> {
   await page.goto("/login");
   await page
@@ -37,7 +38,7 @@ async function login(
   await page
     .getByRole("button", { name: "Iniciar sesión", exact: true })
     .click();
-  await expect(page).toHaveURL("/app");
+  await expect(page).toHaveURL(entryPath);
   await page.goto("/app/perfil");
 }
 async function startAssociation(
@@ -71,7 +72,7 @@ test("mismatched Google restores the owner; unsolicited attachment leaves passwo
   test.setTimeout(60_000);
   const fixture = AUTH_FIXTURES.associationOwner;
   const id = await authId(fixture.email);
-  await login(page, fixture);
+  await login(page, fixture, "/app/mis-cursos");
   const badOrigin = await context.request.post("/auth/link-google", {
     headers: { origin: "https://evil.example" },
     data: {},
@@ -158,7 +159,11 @@ test("mismatched Google restores the owner; unsolicited attachment leaves passwo
     .getByRole("button", { name: "Cerrar sesión", exact: true })
     .first()
     .click();
-  await login(page, { email: fixture.email, password: replacement });
+  await login(
+    page,
+    { email: fixture.email, password: replacement },
+    "/app/mis-cursos",
+  );
   await expect(
     page.getByRole("button", { name: "Asociar Google" }),
   ).toHaveCount(0);
@@ -230,7 +235,7 @@ test("switched password sessions and forged link cookies cannot approve Google o
   test.setTimeout(60_000);
   const fixture = AUTH_FIXTURES.associationStale;
   const id = await authId(fixture.email);
-  await login(page, fixture);
+  await login(page, fixture, "/app/mis-cursos");
   const redirect = await startAssociation(context, baseURL!);
   await context.request.post("/auth/password", {
     headers: { origin: new URL(baseURL!).origin },
@@ -335,7 +340,11 @@ test("Google-only ADMIN creates a password with recent approved OAuth, then reco
       .getByRole("button", { name: "Cerrar sesión", exact: true })
       .first()
       .click();
-    await login(page, { email: fixture.email, password: recoveredPassword });
+    await login(
+      page,
+      { email: fixture.email, password: recoveredPassword },
+      "/app/cursos",
+    );
     await expect(
       page
         .getByRole("form", { name: "Editar nombre" })

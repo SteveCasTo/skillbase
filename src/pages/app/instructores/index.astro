@@ -38,7 +38,7 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
   <div class="mb-5">
     <PrivateBreadcrumbs
       current="Instructores"
-      parents={[{ label: "Resumen", href: "/app" }]}
+      parents={[{ label: "Inicio", href: "/app" }]}
     />
   </div>
   {Astro.url.searchParams.get("success") === "deleted" && (

@@ -2,7 +2,6 @@
 import {
   BookOpen,
   ChevronDown,
-  LayoutDashboard,
   Layers3,
   UsersRound,
   Settings,
@@ -17,14 +16,40 @@ interface Props {
 }
 
 const { mode, currentPath, isAdmin, isInstructor } = Astro.props;
-const courseActive =
-  currentPath === "/app/cursos" || currentPath.startsWith("/app/cursos/");
-const formatActive =
-  currentPath === "/app/formatos" || currentPath.startsWith("/app/formatos/");
-const interestActive =
-  currentPath === "/app/interesados" ||
-  currentPath.startsWith("/app/interesados/");
-const registrationActive = currentPath.startsWith("/app/preinscripciones");
+const isActive = (path: string) =>
+  currentPath === path || currentPath.startsWith(`${path}/`);
+const courseLinks = [
+  { href: "/app/cursos", label: "Cursos", icon: BookOpen },
+  { href: "/app/interesados", label: "Interesados", icon: UsersRound },
+  {
+    href: "/app/preinscripciones",
+    label: "Preinscripciones",
+    icon: UsersRound,
+  },
+  { href: "/app/formatos", label: "Formatos", icon: Layers3 },
+];
+const sections = [
+  {
+    id: "people",
+    label: "Personas",
+    links: [
+      { href: "/app/instructores", label: "Instructores", icon: UsersRound },
+      {
+        href: "/app/administradores",
+        label: "Administradores",
+        icon: UsersRound,
+      },
+    ],
+  },
+  {
+    id: "administration",
+    label: "Administración",
+    links: [
+      { href: "/app/certificados", label: "Certificados", icon: FileBadge },
+      { href: "/app/configuracion", label: "Configuración", icon: Settings },
+    ],
+  },
+];
 ---
 
 <nav
@@ -32,75 +57,31 @@ const registrationActive = currentPath.startsWith("/app/preinscripciones");
   aria-label={mode === "desktop" ? "Navegación privada" : "Navegación móvil"}
 >
   <ul class="private-nav-list">
-    {isAdmin && (
-      <li>
-        <a
-          class="private-nav-link"
-          href="/app/administradores"
-          title="Administradores"
-          aria-current={
-            currentPath.startsWith("/app/administradores") ? "page" : undefined
-          }
-        >
-          <UsersRound size={19} aria-hidden="true" />
-          <span class="private-label">Administradores</span>
-        </a>
-      </li>
-    )}
-    {isAdmin && (
-      <li>
-        <a
-          class="private-nav-link"
-          href="/app/instructores"
-          title="Instructores"
-          aria-current={
-            currentPath.startsWith("/app/instructores") ? "page" : undefined
-          }
-        >
-          <UsersRound size={19} aria-hidden="true" />
-          <span class="private-label">Instructores</span>
-        </a>
-      </li>
-    )}
     {isInstructor && (
       <li>
         <a
           class="private-nav-link"
           href="/app/mis-cursos"
           title="Mis cursos"
-          aria-current={
-            currentPath.startsWith("/app/mis-cursos") ? "page" : undefined
-          }
+          aria-label="Mis cursos"
+          aria-current={isActive("/app/mis-cursos") ? "page" : undefined}
         >
           <BookOpen size={19} aria-hidden="true" />
           <span class="private-label">Mis cursos</span>
         </a>
       </li>
     )}
-    <li>
-      <a
-        class="private-nav-link"
-        href="/app"
-        aria-current={currentPath === "/app" ? "page" : undefined}
-        title="Resumen"
-      >
-        <LayoutDashboard size={19} aria-hidden="true" />
-        <span class="private-label">Resumen</span>
-      </a>
-    </li>
     {isAdmin && (
       <li>
         <details class="private-nav-group" open>
           <summary
             class:list={[
               "private-nav-link",
-              (courseActive ||
-                formatActive ||
-                interestActive ||
-                registrationActive) &&
+              courseLinks.some(({ href }) => isActive(href)) &&
                 "private-parent-active",
             ]}
             title="Cursos"
+            aria-label="Cursos"
           >
             <BookOpen size={19} aria-hidden="true" />
             <span class="private-label">Cursos</span>
@@ -111,79 +92,51 @@ const registrationActive = currentPath.startsWith("/app/preinscripciones");
             />
           </summary>
           <ul class="private-subnav">
-            <li>
-              <a
-                href="/app/preinscripciones"
-                aria-current={registrationActive ? "page" : undefined}
-                class="private-subnav-link"
-              >
-                <UsersRound size={17} aria-hidden="true" />
-                <span>Preinscripciones</span>
-              </a>
-            </li>
-            <li>
-              <a
-                href="/app/interesados"
-                aria-current={interestActive ? "page" : undefined}
-                class="private-subnav-link"
-              >
-                <UsersRound size={17} aria-hidden="true" />
-                <span>Interesados</span>
-              </a>
-            </li>
-            <li>
-              <a
-                href="/app/cursos"
-                aria-current={courseActive ? "page" : undefined}
-                class="private-subnav-link"
-              >
-                <BookOpen size={17} aria-hidden="true" />
-                <span>Cursos</span>
-              </a>
-            </li>
-            <li>
-              <a
-                href="/app/formatos"
-                aria-current={formatActive ? "page" : undefined}
-                class="private-subnav-link"
-              >
-                <Layers3 size={17} aria-hidden="true" />
-                <span>Formatos</span>
-              </a>
-            </li>
+            {courseLinks.map(({ href, label, icon: Icon }) => (
+              <li>
+                <a
+                  href={href}
+                  class="private-subnav-link"
+                  aria-current={isActive(href) ? "page" : undefined}
+                >
+                  <Icon size={17} aria-hidden="true" />
+                  <span>{label}</span>
+                </a>
+              </li>
+            ))}
           </ul>
         </details>
       </li>
     )}
-    {isAdmin && (
-      <li>
-        <a
-          href="/app/configuracion"
-          class="private-nav-link"
-          title="Configuración"
-          aria-current={
-            currentPath.startsWith("/app/configuracion") ? "page" : undefined
-          }
-        >
-          <Settings size={19} aria-hidden="true" />
-          <span class="private-label">Configuración</span>
-        </a>
-      </li>
-    )}
-    {isAdmin && (
-      <li>
-        <a
-          href="/app/certificados"
-          class="private-nav-link"
-          title="Certificados"
-          aria-current={
-            currentPath.startsWith("/app/certificados") ? "page" : undefined
-          }
-        >
-          <FileBadge size={19} aria-hidden="true" />
-          <span class="private-label">Certificados</span>
-        </a>
-      </li>
-    )}
   </ul>
+  {isAdmin &&
+    sections.map(({ id, label, links }) => (
+      <section
+        class="private-nav-section"
+        aria-labelledby={`${mode}-${id}-title`}
+      >
+        <h2
+          id={`${mode}-${id}-title`}
+          class="private-nav-heading private-label"
+        >
+          {label}
+        </h2>
+        <ul class="private-nav-list">
+          {links.map(({ href, label, icon: Icon }) => (
+            <li>
+              <a
+                href={href}
+                class="private-nav-link"
+                title={label}
+                aria-label={label}
+                aria-current={isActive(href) ? "page" : undefined}
+              >
+                <Icon size={19} aria-hidden="true" />
+                <span class="private-label">{label}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))}
 </nav>

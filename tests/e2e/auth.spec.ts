@@ -128,7 +128,7 @@ test("cross-origin auth actions are rejected without clearing the session", asyn
   expect(oauth.status()).toBe(403);
   await page.goto("/app");
   await expect(
-    page.getByRole("heading", { name: /Hola, Omar Origin/u }),
+    page.getByRole("heading", { level: 1, name: "Cursos" }),
   ).toBeVisible();
 });
 
@@ -146,7 +146,7 @@ test("logout revokes only the current browser session", async ({ browser }) => {
   await expect(firstPage).toHaveURL(/\/login\?next=/u);
   await secondPage.goto("/app");
   await expect(
-    secondPage.getByRole("heading", { name: /Hola, Lara Logout/u }),
+    secondPage.getByRole("heading", { level: 1, name: "Cursos" }),
   ).toBeVisible();
   await firstContext.close();
   await secondContext.close();

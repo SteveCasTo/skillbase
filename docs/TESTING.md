@@ -345,6 +345,10 @@ La carga pública cuenta con unit tests deterministas para los tres intentos má
 
 ### Cobertura de formatos, catálogo y navegación
 
+La eliminación de la pantalla Resumen adapta únicamente expectativas existentes: login/entrada genérica llegan a Cursos o Mis cursos según rol; rail/router/toasts regresan a Cursos; `/app` no genera skeleton propio. No se añaden suites, specs ni casos para este ajuste. Los destinos explícitos y assertions de denegación/Auth permanecen. La ejecución E2E local dirigida del 2026-10-12 no inició por Docker Desktop no disponible; no se declara PASS local de integración/E2E ni se reinicia el stack compartido.
+
+La evidencia remota vigente está en los [checks del PR 344](https://github.com/SteveCasTo/skillbase/pull/344/checks). En el primer run `38294092322`, quality, integración y shard E2E 2 pasaron; el shard 1 falló en dos escenarios de asociación Google porque el helper esperaba Cursos para fixtures INSTRUCTOR. La corrección exige explícitamente Mis cursos para esos actores y Cursos para el fixture ADMIN, sin ampliar los destinos aceptados, cambiar timeouts/retries ni modificar Auth. Ese fallo no se clasifica como flakiness.
+
 - `tests/unit/course-markdown.test.ts` cubre la conversión a nodos permitidos y el rechazo de destinos de enlaces peligrosos.
 - Las pruebas unitarias del Markdown verifican niveles de encabezado, bloques de código, citas, separadores, selección del toolbar y enlaces seguros; `public-courses.spec.ts` comprueba la representación real de estos elementos en el detalle publicado. Los E2E de cursos comprueban la vista previa y la foto persistida dentro del bloque de información general en desktop y mobile.
 - Los E2E de administración mantienen un marcador de `window` entre alta de formato/curso, cambios editoriales y eliminación con ClientRouter, verifican los diálogos de confirmación (teclado/Escape/foco), errores de servidor y reintentos de foto sin duplicar borradores. La suite sin JavaScript sigue probando POST/redirect y confirmaciones HTML.

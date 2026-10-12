@@ -104,7 +104,7 @@ test("collapsed rail expands on hover without shifting main and persists across 
   await expect(sidebar.getByText("Expandir menú")).toHaveCount(0);
   const brand = await sidebar.locator(".private-brand").boundingBox();
   const firstLink = await sidebar
-    .locator(".private-nav-list a")
+    .locator(".private-nav-list summary, .private-nav-list > li > a")
     .first()
     .boundingBox();
   expect(brand).not.toBeNull();
@@ -114,7 +114,7 @@ test("collapsed rail expands on hover without shifting main and persists across 
     page
       .getByRole("navigation", { name: "Navegación privada" })
       .locator(".private-parent-active"),
-  ).toHaveCount(0);
+  ).toHaveCount(1);
   const main = page.locator(".private-main-scroll");
   const railWidth = (await main.boundingBox())?.width;
   await main.hover();
@@ -147,7 +147,7 @@ test("collapsed rail expands on hover without shifting main and persists across 
   );
   const inactiveWeight = await page
     .getByRole("navigation", { name: "Navegación privada" })
-    .getByRole("link", { name: "Resumen" })
+    .getByRole("link", { name: "Instructores" })
     .evaluate((element) => getComputedStyle(element).fontWeight);
   expect(activeWeight).not.toBe(inactiveWeight);
   await expect(
@@ -205,9 +205,9 @@ test("sidebar toggle supports Enter and Space and preserves its state across Ast
 
   await page
     .getByRole("navigation", { name: "Navegación privada" })
-    .getByRole("link", { name: "Resumen" })
+    .getByRole("link", { name: "Cursos", exact: true })
     .click();
-  await expect(page).toHaveURL(/\/app$/);
+  await expect(page).toHaveURL(/\/app\/cursos$/);
   await expect(shell).toHaveAttribute("data-collapsed", "false");
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
 });

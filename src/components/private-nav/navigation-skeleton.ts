@@ -37,8 +37,6 @@ export function navigationSkeletonVariant(path: string) {
   if (/^\/app\/instructores\/(nuevo|[^/]+\/editar)$/.test(normalized))
     return "form";
   if (/^\/app\/mis-cursos\/[^/]+$/.test(normalized)) return "detail";
-  if (normalized === "/app" || normalized === "/app/asistencia")
-    return "summary";
   if (/^\/app\/(cursos|formatos)$/.test(normalized)) return "list";
   if (normalized === "/app/interesados") return "list";
   if (/^\/app\/interesados\/[^/]+$/.test(normalized)) return "interests";

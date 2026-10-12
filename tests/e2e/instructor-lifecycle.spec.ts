@@ -172,7 +172,7 @@ test("ADMIN lifecycle preserves credentials on reactivation and denies existing 
     await instructor
       .getByRole("button", { name: "Iniciar sesión", exact: true })
       .click();
-    await expect(instructor).toHaveURL(/\/app$/u);
+    await expect(instructor).toHaveURL(/\/app\/mis-cursos$/u);
     const panel = page.locator("[data-instructor-lifecycle]");
     await expect(panel).toHaveAttribute("data-ready", "true");
     await expect(
@@ -222,7 +222,7 @@ test("ADMIN lifecycle preserves credentials on reactivation and denies existing 
     await instructor
       .getByRole("button", { name: "Iniciar sesión", exact: true })
       .click();
-    await expect(instructor).toHaveURL(/\/app$/u);
+    await expect(instructor).toHaveURL(/\/app\/mis-cursos$/u);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
