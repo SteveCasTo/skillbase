@@ -607,6 +607,59 @@ control local esté en `false` ni verificado. La configuración nativa cloud
 `true` documentada arriba no implica sincronización/configuración del Supabase
 local.
 
+## Release combinado PR 342 — Auth, navegación y refresh demo — 2026-10-12
+
+PR 342 se integró a `master` en
+`4e3c827e8cc5f7b05df182e90b450d256f2c85aa`, promoviendo el `development`
+`317260a74ffbdae1b335b12baf7ab941f96ecb93`, el guard Auth de PR 337, el launcher
+local de PR 340 y los cambios de navegación. No hubo migraciones nuevas ni cambio
+de schema. CI del PR `38209427441` y push/deploy de `master` `38210161355`
+pasaron en el primer intento: 464 unit/4.167 assertions; 177 integration/1.452;
+F8 seed 1/906; F9 seed 1/142; 145 E2E en shards 76+69, sin retry/flake. El run
+final reportó 177 PASS sin skip; el conteo anterior 176 PASS + 1 skip pertenece
+a un run previo y no se normaliza con este. Quality, build, migraciones y deploy
+pasaron. El deployment `dpl_6RhZNN7sus7B8jo36TRPmMqsHYgP` quedó `READY` para el
+SHA exacto, alias `https://skillbase-alpha.vercel.app`; la función desplegada
+reporta `gru1` y runtime `nodejs22.x` (la fuente/build usa Node 24).
+
+Una lectura full de cloud de solo lectura antes/después del deploy comparó 77
+tablas/1.957 filas y ledger 24 completo sin diferencias. No hubo migración, seed
+ni escritura de aplicación por el deploy. El boolean Auth
+`security_update_password_require_current_password` fue leído como `true`, sin
+modificar configuración cloud. Después, una sesión temporal autorizada verificó
+login PASSWORD y navegación privada normal con la misma identidad/UUID/roles y
+hash de credencial; la actividad legítima cambió metadata de sesión/Auth y
+bucket de login (lectura posterior 77 tablas/1.960 filas). El resto de tablas
+de negocio/Storage/ledger preservó hashes. Una primera medición de navegador
+interrumpida no se cuenta como login/logout limpio; la sesión de la cohorte
+corregida terminó por logout normal. No se probaron cambio autenticado,
+recovery, primera contraseña Google, consentimiento Google real o entrega SMTP.
+La excepción nativa autorizada para la primera contraseña de la misma cuenta
+Google legítima no otorga acceso a otra identidad ni roles; AUTH-1 queda validado
+según la regla aprobada, sin afirmar certificación global ni verificación de
+todos los flujos externos. Ver [`AUTHENTICATION.md`](AUTHENTICATION.md) y
+[`SECURITY.md`](SECURITY.md).
+
+Después de READY y la navegación, el workflow manual protegido ejecutó PLAN
+`38211279482` y APPLY `38212358637` (`refresh_scenarios=true`, certificados
+opt-in `false`). APPLY concluyó SUCCESS al primer intento en 9m26s; preservó
+1.900 filas originales y 60 cambios autorizados de filas poseídas, con replay
+de cero escrituras y ledger 24 intacto. Las cuentas/roles/Auth preexistentes,
+ocho certificados y tres versiones congeladas se conservaron; no se regeneraron
+certificados. Los dos cambios de nombre a formatos cloud fueron dos acciones
+ADMIN de aplicación independientes después del APPLY y dejaron exactamente dos
+auditorías. Las páginas de los cuatro cursos añadidos y los ocho certificados
+del registro devolvieron 200; GET de verificación puede escribir buckets
+técnicos. No se descargaron bytes de PDFs ni se afirma verificación de sus hashes
+en esta ejecución. Los conteos exactos, hashes aprobados y preservación están en
+[`DEMO_SEED.md`](DEMO_SEED.md); evidencia row-level/privada permanece fuera de
+Git.
+
+La observación de navegación post-release fue una cohorte baja y no controló
+cold starts; ver [`validation/PRODUCTION-PERFORMANCE.md`](validation/PRODUCTION-PERFORMANCE.md).
+La medición observada no garantiza p95/SLO ni que todas las rutas privadas o
+cold starts hayan quedado resueltos.
+
 ## Launcher nativo Auth local (candidato; operación canónica pendiente)
 
 PR 337 integró en `development` el guard de identidad común como

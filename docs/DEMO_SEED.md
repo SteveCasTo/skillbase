@@ -1,12 +1,12 @@
 # Demo integral F1–F8
 
-## Extensión F9 opt-in (integrada en development; ejecución canónica/cloud pendiente)
+## Extensión F9 opt-in (liberada y ejecutada en producción)
 
 El usuario autorizó datos ficticios de todas las secciones, incluidos certificados,
-en local/QA/producción. El soporte F9 está implementado e integrado en
-`development`; **la ejecución canónica y productiva queda retenida hasta el release
-F9 completo**, CI first-pass sin retries y deployment READY del mismo SHA. Las
-ejecuciones F1–F8 históricas de este documento no cambian ni se atribuyen a F9.
+en local/QA/producción. El soporte F9 se liberó y la carga protegida F9 se ejecutó
+en cloud en 2026-10-09; el estado actual del refresh realista, que preserva los
+certificados ya existentes sin regenerarlos, se registra al final de este
+documento. Las ejecuciones F1–F8 históricas no se reatribuyen a F9.
 La extensión implementada usa el modelo/renderer/operaciones reales del módulo y
 no añade una vía SQL que fabrique registros o artefactos de certificado.
 
@@ -61,7 +61,10 @@ no añade una vía SQL que fabrique registros o artefactos de certificado.
 - Reintentar no borra reservas ni artefactos: una reserva abandonada/bloqueada
   exige revisión del operador, no sleeps, claves aleatorias o reintentos ciegos.
 
-Comandos manuales (no ejecutados sobre canónico/cloud):
+Los comandos locales abajo describen el flujo local-only de desarrollo. La nota
+«no ejecutados» que acompañaba a esta sección era anterior al release F9 y quedó
+supersedida por la evidencia de operación de 2026-10-09 y el refresh del 12 de
+octubre registrados al final.
 
 ```text
 bun scripts/comprehensive-demo.ts --target local --project local --include-certificates
@@ -76,7 +79,8 @@ config existente incompleta bloqueada y preservación PK/SHA-256 de filas comple
 con multiplicidad en todas las tablas public/Auth/Storage/Drizzle. Primer APPLY
 preserva baseline F8 y Storage original; repetición exige cero cambios. La prueba
 unitaria verifica además el texto de sello en streams PDF, no solo metadata.
-No se despachó el workflow real ni se liberó F9 como parte de esta implementación.
+Esta nota describe el stage de implementación previo al release; el workflow real
+y el release posterior están documentados más abajo.
 
 ### Cobertura obligatoria en CI
 
@@ -105,11 +109,12 @@ cada fixture en su propio stack gestionado; no se duplicó la suite completa loc
 Esta evidencia es de `development`, no de `master` ni de producción. CI/plan y
 límites de release en [`PLAN.md`](PLAN.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-La migración candidata `0023_phase9_certificates.sql` tiene journal `idx: 23`,
+La migración `0023_phase9_certificates.sql` tiene journal `idx: 23`,
 timestamp `1791500766703` y SHA-256
 `4c78ed1735b0cd3cb34d2bdc5f1f2c0d15b51dcc31568136839d706649489ee1`; ledger
-resultante 24. No se ha aplicado a canónico ni cloud, cuyo último ledger
-documentado es 23.
+resultante 24. Se aplicó por el pipeline normal de release; los estados locales
+y cloud actuales se detallan en `DEPLOYMENT.md` y la sección de operación más
+reciente al final.
 
 #### QA aislada de la extensión F9
 
@@ -419,6 +424,61 @@ privado fuera del repositorio; no registrar su valor en ningún artefacto.
 La carga local anterior permanece como ejecución independiente: baseline 70
 tablas/2,906 filas originales, preservadas por hash y APPLY repetido con cero
 cambios. No comparar el tamaño local con cloud ni tratarlo como el baseline de la
-ejecución protegida. Ambas operaciones son F1–F8: no generaron certificados,
-QR, firmas ni nuevas tablas de Fase 9; ledger/canónico/cloud sigue en 23 hasta el
-release futuro aprobado de F9.
+ejecución protegida. En el límite de esas operaciones F1–F8 no se generaron
+certificados, QR, firmas ni tablas F9 y ledger/canónico/cloud seguía en 23. El
+release F9 posterior y el refresh vigente se registran en las secciones siguientes.
+
+### Refresh realista local y cloud — 2026-10-12
+
+Esta actualización supersede el estado pendiente anterior para el refresh
+`realistic-v2`; no modifica la herramienta ni automatiza la carga en deploy. El
+source combinado se liberó por PR 342 a `master` como
+`4e3c827e8cc5f7b05df182e90b450d256f2c85aa`. El CI del release `38210161355`
+pasó los gates requeridos en primer intento y el Vercel deployment
+`dpl_6RhZNN7sus7B8jo36TRPmMqsHYgP` quedó `READY` para ese SHA. PR 342 no añadió
+migraciones ni cambió schema; ledger local/cloud sigue en 24.
+
+**Local canónico:** el APPLY aprobado se ejecutó sobre el source
+`317260a74ffbdae1b335b12baf7ab941f96ecb93`, con hash base y ownership
+verificados. La comparación completa pasó de 75 tablas/1.592 filas a 75/1.797
+tras APPLY; el replay no escribió. Se agregaron cuatro cursos, ocho grupos, 34
+participantes y 35 preinscripciones; el inventario final incluye 31 intereses,
+siete formatos/revisiones, 146 sesiones, ocho certificados y tres versiones de
+cierre. El principal local quedó solo con rol `ADMIN` según la acción autorizada;
+las dos cuentas QA Auth propias y su evidencia lifecycle no se borraron ni se
+confundieron con el seed. Se preservaron los ocho registros completos de
+certificado, las tres versiones congeladas y metadata de Storage. Los bytes PDF
+no se volvieron a descargar/rehashear. La evidencia también registra únicamente
+las ediciones locales aprobadas de texto/nombre por operaciones de aplicación y
+la preservación del resto; no se hizo limpieza genérica de datos antiguos.
+
+**Cloud protegido:** tras el release y el flujo legítimo de navegación, el
+workflow `production-comprehensive-demo.yml` ejecutó PLAN `38211279482` y APPLY
+`38212358637` con `refresh_scenarios=true` y certificados opt-in desactivados.
+El PLAN aprobado fue `416684977ebea10a97b4edc634c6bdfbebd523a0f66e4950054802cda6378ae1`.
+APPLY terminó SUCCESS al primer intento (9m26s): 77 tablas/1.960 filas antes y
+2.166 filas después, preservando 1.900 filas originales y aplicando solo 60
+cambios explícitamente poseídos en filas aprobadas; el replay generó cero
+escrituras. Ledger 24 y sus checksums quedaron intactos. Conteos cloud
+curso/grupo/participante/preinscripción/interés/formato
+pasaron de 19/32/40/41/47/8 a 23/40/48/49/63/9. Usuarios, roles, perfiles y
+certificados no se modificaron por APPLY. Permanecieron los ocho certificados y
+las tres versiones congeladas; sus bytes PDF no se revalidaron en esta operación.
+
+Después del APPLY se renombraron los dos formatos cloud originales mediante dos
+acciones ADMIN normales de la aplicación, con revisión inmediata de cada fila y
+exactamente dos eventos `COURSE_TYPE_RENAMED`; no fue parte del seed. Los nuevos
+cursos 2027 responden 200 en sus páginas públicas. Las ocho páginas del registro
+histórico devolvieron 200/`no-store` con los estados esperados; esa lectura
+actualizó buckets de verificación, por lo que no se afirma cero escrituras para
+todo el smoke. No se descargó PDF privado ni se exportaron datos personales.
+
+Los datos y nombres usados son ficticios; las firmas/documentos de demo siguen
+identificados como no institucionales. Se conservan nombres/etiquetas históricos
+de certificados emitidos y namespaces no poseídos. La operación no elimina ni
+reconstruye registros antiguos por coincidencia de nombre. Evidencia de filas,
+snapshot y credenciales permanece en handoffs privados fuera del repositorio;
+consultar [`validation/SEED-SCENARIOS.md`](validation/SEED-SCENARIOS.md) para la
+matriz de escenarios y límites. No repetir APPLY con el hash anterior ni
+reutilizar snapshots/planes previos: la siguiente operación requiere un PLAN
+fresco y revisión/autorización separada.

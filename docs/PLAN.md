@@ -830,6 +830,10 @@ El runner es aditivo/idempotente y sin reset general. Después del release se ap
 
 El workflow protegido ejecutó PLAN `37854318652` y APPLY `37854790028` sobre el proyecto cloud; hash del plan `2bb8db152ff4ce2a4088ee372c632c17767dd5928c6d2ac28db9655f2b5c09ab`. Baseline: 72 tablas/899 filas originales, preservadas por hashes SHA-256 completos de fila+PK; ledger 23 y settings N=3/mínimo de pago 25 sin cambios. Total 1,850 filas; replay cero cambios. Agregó 8 cursos, 10 grupos, 26 registros/25 participantes, 12 intereses, 4 instructores, 5 ADMIN demo (uno eliminado por lifecycle/Auth, tombstone/outbox completado), 3 versiones de cierre y 1 reapertura; siete GET públicos respondieron 200. No se cambiaron credenciales Auth originales ni se enviaron correos. Baseline local independiente: 70 tablas/2,906 filas originales preservadas; replay cero.
 
+#### Refresh realista post-release — 2026-10-12
+
+Después del release combinado PR 342 (`master` `4e3c827e8cc5f7b05df182e90b450d256f2c85aa`, CI `38210161355`, Vercel `READY`), se completaron el APPLY local aprobado y el workflow cloud protegido del perfil `realistic-v2`. Local: 14 cursos, 18 grupos, 34 participantes, 35 preinscripciones, 31 intereses, siete formatos/revisiones y ocho certificados/tres versiones preservados; el replay no escribió. Cloud: PLAN `38211279482`, APPLY `38212358637`, 1.900 filas originales preservadas y 60 cambios únicamente en filas poseídas/aprobadas; replay de cero escrituras; conteos finales 23 cursos, 40 grupos, 48 participantes, 49 preinscripciones, 63 intereses y nueve formatos/revisiones. Ledger local/cloud permaneció en 24. Los formatos cloud originales se renombraron después mediante dos acciones ADMIN de aplicación separadas y auditadas. No se reemitieron ni regeneraron certificados; bytes PDF no se rehashearon. Handoffs seguros y matriz de escenarios están en [`DEMO_SEED.md`](DEMO_SEED.md) y [`validation/SEED-SCENARIOS.md`](validation/SEED-SCENARIOS.md); la evidencia row-level queda fuera de Git.
+
 El alcance funcional Fase 9 fue aprobado en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y ADR-028. Su implementación se integró en `development` mediante PR 294 (CORE), PR 297 (UI) y PR 298 (extensión de seed F9); PR 295 (búsqueda/resultados) y PR 296 (calendario) también forman parte de la fuente combinada. El CI integrado de Fase 9 está registrado más abajo. El seed F1–F8 original no se reescribe ni se convierte en un seed F9; la extensión F9 es explícita y opt-in. Las decisiones de negocio sobre tipo, elegibilidad, privacidad, reapertura/reemplazo y verificación están resueltas; no se agrega número institucional ni boleta/valorado/condición financiera. Mantener inmutables los snapshots F8.
 
 En el boundary previo al release, el UI que antes se documentaba en `feat/certificate-interface` (`a450987`) acababa de integrarse en `development` por PR 297; la UI y el seed F9 quedaron después liberados por PR 299/301. Esta nota es histórica y está supersedida por el estado post-release de Fase 9 abajo.
@@ -864,7 +868,7 @@ La interfaz no cambia reglas aprobadas ni autoriza generación desde versiones n
 - [x] Ejecutar por separado la operación F9 protegida en cloud tras release y deployment READY; la operación no forma parte de CI/deploy.
 - [x] Reconstruir la instancia Supabase local canónica con reset expresamente autorizado por el usuario, dado el origen/hash no identificados del ledger anterior (0003/0005/0008); reaplicar el source completo hasta ledger 24. Los datos previos quedaron reemplazados, no preservados. El demo validado y los límites están en [`TESTING.md`](TESTING.md).
 - [x] Preparar el proyecto aislado `skillbase_demo_f9_clean_20261009` (API 60421, DB 60422) como fallback; su app permanece pausada y no es la instancia del demo principal.
-- [ ] Verificar login real con cuenta interna preaprovisionada y autorizada. La identidad previa vinculada a Google se eliminó durante el reset local autorizado; no crear ni elevar un ADMIN por conveniencia. El usuario/operador debe coordinar la invitación/cuenta de prueba y OAuth antes de declarar login end-to-end completo.
+- [x] Verificar login PASSWORD normal y navegación privada de identidades sintéticas internas autorizadas en la aceptación local y en producción posterior a PR 342; se preservaron identidad/UUID y roles existentes. Esto no es OAuth Google real ni valida delivery/recovery, que siguen pendientes por separado.
 - [x] El operador reportó pausar la app previa durante la operación local e iniciar de nuevo Bun en `127.0.0.1:4321`; no se capturó el PID del proceso Bun y no se afirma quién posee hoy el puerto. La instancia Supabase local reconstruida usa API 54321/DB 55322; el ajuste de puerto es local y no constituye un cambio de código/release. No modificar `source.env` ni volver a conectar al proyecto fallback por error.
 
 Límites relevantes de la interfaz actual: no se inventan un instante público de emisión ni un enlace/ID de reemplazo ausentes del DTO; la verificación presenta la fecha nominal de finalización definida por el contrato. El índice global histórico de instructores no existe; la navegación disponible es por grupo y acceso directo autorizado. El archivo elegido para comparar SHA-256 no se transmite ni persiste. Los fixtures PDF sintéticos de QA no representan documentos institucionales firmados. Reglas aprobadas, seguridad y evidencia están en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md), [`CERTIFICATES.md`](CERTIFICATES.md), [`DESIGN.md`](DESIGN.md) y [`TESTING.md`](TESTING.md).
@@ -914,6 +918,14 @@ documentado.
   para futura definición. Ninguna autoriza por sí sola una pantalla, módulo,
   exportación o formato; no implementar hasta recibir definición/aprobación.
 
+Estado posterior a PR 342: el bloque de rendimiento ya tiene medición
+diagnóstica antes/después en producción para navegación pública y privada, y la
+región desplegada se verificó alineada con Supabase. Esto no sustituye el
+baseline Lighthouse reproducible que exige el checklist ni permite afirmar una
+garantía de latencia; el punto Lighthouse sigue pendiente. AUTH-1 se validó bajo
+la regla de identidad aprobada y quedó en el release, pero la aceptación real de
+Google OAuth, recovery y entrega de correo continúa separada y pendiente.
+
 ### Bloques aprobados
 
 1. **Auditoría y corrección de feedback Sileo.** Revisar todas las secciones,
@@ -952,11 +964,14 @@ implementación; preferir reutilizar superficies existentes cuando proceda.
       aplicar remediaciones bajo esta autorización.
 - [ ] Coordinar y realizar la verificación de Google OAuth real y recovery ya
       pendientes, sin declarar éxito hasta tener evidencia del flujo completo.
-      El release PR 335 activó por separado el control nativo cloud de contraseña
-      actual tras desplegar la fuente compatible; no ejecutó flujos autenticados
-      de cambio/recovery/primera contraseña Google ni cierra AUTH-1, cuya frontera
-      Google-only a nivel proveedor sigue pendiente (ver `AUTHENTICATION.md` y
-      `DEPLOYMENT.md`).
+      El release PR 342 desplegó el guard común de identidad aprobado; se verificó
+      navegación PASSWORD de una cuenta sintética autorizada con UUID Auth,
+      credencial, identidad y roles preservados. El boolean nativo cloud sigue
+      activo. La primera contraseña Google de esa misma identidad legítima es la
+      excepción aprobada del proveedor, no una concesión de acceso. AUTH-1 queda
+      validado bajo esa regla; esta evidencia no incluye OAuth Google real,
+      recovery/cambio autenticado ni entrega SMTP, que siguen pendientes como
+      verificaciones independientes (ver `AUTHENTICATION.md`/`DEPLOYMENT.md`).
 - [ ] Mantener el rediseño específico F9 en espera; el trabajo transversal de
       Sileo sí incluye F9.
 
