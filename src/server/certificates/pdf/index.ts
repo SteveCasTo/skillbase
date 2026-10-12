@@ -3,7 +3,7 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { certificateResources } from "./resources";
 import { certificateDocument } from "./document";
 import { drawCertificateText } from "./text";
-import { drawCertificateQr } from "./qr";
+import { CERTIFICATE_QR_SIZE, drawCertificateQr } from "./qr";
 import type { CertificateRenderInput } from "./types";
 
 export { CERTIFICATE_PDF_TEMPLATE_VERSION, CertificatePdfError } from "./types";
@@ -77,7 +77,8 @@ function signatures(
   const left = approval ? 116 : 42;
   const width = approval ? 620 : 528;
   const cell = width / 3;
-  const lineY = approval ? 154 : 164;
+  const lineY =
+    input.templateVersion === 1 ? (approval ? 154 : 164) : approval ? 80 : 120;
   for (const [index, signer] of input.signatories.entries()) {
     const x = left + index * cell + 10;
     const innerWidth = cell - 20;
@@ -144,6 +145,7 @@ export async function renderCertificatePdf(
   doc.setModificationDate(new Date(input.generatedAt));
   const page = doc.addPage([...CERTIFICATE_PAGE_SIZES[input.type]]);
   const approval = input.type === "APPROVAL";
+  const currentLayout = input.templateVersion === 2;
   decoration(page, approval);
   const x = approval ? 116 : 76;
   const width = approval ? 620 : 460;
@@ -176,8 +178,20 @@ export async function renderCertificatePdf(
       minimumSize,
       align: "center",
     });
+  // The header's right column belongs to verification, not to the recipient or
+  // signature area. Keep the institutional logos and body widths unchanged.
+  const heading = (text: string, top: number, height: number, size: number) =>
+    drawCertificateText(page, text, display, {
+      x,
+      top,
+      width: currentLayout && !approval ? 376 : width,
+      height,
+      size,
+      minimumSize: size,
+      align: "center",
+    });
   if (approval) {
-    center("CERTIFICADO", display, 111, 47, 32);
+    heading("CERTIFICADO", 111, 47, 32);
     const badgeWidth = 125;
     const badgeX = x + (width - badgeWidth) / 2;
     page.drawLine({
@@ -204,23 +218,25 @@ export async function renderCertificatePdf(
       color: rgb(1, 1, 1),
     });
   } else {
-    center("CERTIFICADO", display, 161, 43, 28);
-    center("DE", display, 201, 30, 18);
+    heading("CERTIFICADO", 161, 43, 28);
+    heading("DE", 201, 30, 18);
+    const headingOffset = currentLayout ? -42 : 0;
     page.drawLine({
-      start: { x: 180, y: 578 },
-      end: { x: 278, y: 578 },
+      start: { x: 180 + headingOffset, y: 578 },
+      end: { x: 278 + headingOffset, y: 578 },
       thickness: 0.8,
       color: rgb(0, 0, 0),
     });
     page.drawLine({
-      start: { x: 334, y: 578 },
-      end: { x: 432, y: 578 },
+      start: { x: 334 + headingOffset, y: 578 },
+      end: { x: 432 + headingOffset, y: 578 },
       thickness: 0.8,
       color: rgb(0, 0, 0),
     });
-    center("INSTRUCTOR", display, 227, 44, 28);
+    heading("INSTRUCTOR", 227, 44, 28);
   }
-  const recipientTop = approval ? 206 : 295;
+  const approvalOffset = currentLayout ? 44 : 0;
+  const recipientTop = approval ? 206 + approvalOffset : 295;
   const labelWidth = approval ? 116 : 28;
   drawCertificateText(page, approval ? "OTORGADO A:" : "A:", regular, {
     x,
@@ -248,7 +264,7 @@ export async function renderCertificatePdf(
   center(
     content.introduction,
     regular,
-    approval ? 264 : 351,
+    approval ? 264 + approvalOffset : 351,
     31,
     approval ? 11.2 : 10.5,
     10,
@@ -258,20 +274,27 @@ export async function renderCertificatePdf(
   center(
     content.course,
     bold,
-    approval ? 291 : 381,
+    approval ? 291 + approvalOffset : 381,
     approval ? 54 : 77,
     approval ? 26 : 25,
     15,
   );
   drawCertificateText(page, content.body, regular, {
     x,
-    top: approval ? 349 : 476,
+    top: approval ? 349 + approvalOffset : 476,
     width,
     height: approval ? 53 : 83,
     size: approval ? 11 : 10.5,
     minimumSize: 9.5,
   });
-  center(content.date, regular, approval ? 406 : 558, 24, 11, 10);
+  center(
+    content.date,
+    regular,
+    approval ? 406 + approvalOffset : 558,
+    24,
+    11,
+    10,
+  );
   signatures(page, input, regular, bold);
   const qrX = approval ? 112 : 42;
   if (options.preview) {
@@ -282,6 +305,26 @@ export async function renderCertificatePdf(
       height: 20,
       size: 9,
       minimumSize: 9,
+    });
+  } else if (currentLayout) {
+    const verification = approval
+      ? { x: 538, top: 105, width: 220, codeHeight: 60 }
+      : { x: 414, top: 140, width: 180, codeHeight: 70 };
+    drawCertificateQr(
+      doc,
+      page,
+      input.verificationUrl,
+      verification.x + (verification.width - CERTIFICATE_QR_SIZE) / 2,
+      page.getHeight() - verification.top - CERTIFICATE_QR_SIZE,
+    );
+    drawCertificateText(page, `ID: ${input.publicCredentialId}`, regular, {
+      x: verification.x,
+      top: verification.top + CERTIFICATE_QR_SIZE + 6,
+      width: verification.width,
+      height: verification.codeHeight,
+      size: 8,
+      minimumSize: 7,
+      align: "center",
     });
   } else {
     drawCertificateQr(doc, page, input.verificationUrl, qrX, 12);

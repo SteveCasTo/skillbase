@@ -352,7 +352,13 @@ test("public adapter limits before registry access and exposes only authoritativ
 test("merged renderer adapter maps version, frozen generation instant and exact signature tuple", async () => {
   const approval = certificatePdfInput(freezeCertificateData(input));
   expect(approval.type).toBe("APPROVAL");
-  expect(approval.templateVersion).toBe(1);
+  expect(approval.templateVersion).toBe(2);
+  expect(
+    certificatePdfInput({
+      ...freezeCertificateData(input),
+      templateVersion: "phase9-v1",
+    }).templateVersion,
+  ).toBe(1);
   expect(approval.generatedAt).toBe("2099-03-06T12:00:00.000Z");
   expect(approval.signatories).toHaveLength(3);
   expect(approval).not.toHaveProperty("groupNumber");
@@ -380,6 +386,12 @@ test("merged renderer adapter maps version, frozen generation instant and exact 
     certificatePdfInput({
       ...freezeCertificateData(input),
       templateVersion: "unsupported",
+    }),
+  ).toThrow();
+  expect(() =>
+    certificatePdfInput({
+      ...freezeCertificateData(input),
+      brandingVersion: "phase9-v2",
     }),
   ).toThrow();
   await expect(

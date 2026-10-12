@@ -124,6 +124,23 @@ El QR apunta a `https://<dominio>/certificados/<publicCredentialId>` y no lleva
 PII ni otro dato del certificado codificado. No se imprime necesariamente una
 URL larga.
 
+La plantilla `phase9-v2` conserva branding `phase9-v1` y los tres logos. En ambas
+orientaciones coloca el QR vectorial de 72 pt (incluida su zona de silencio)
+debajo del logo departamental, a la derecha del título, y el ID completo debajo
+del QR. El ID admite 22–128 caracteres con ajuste acotado y fuente mínima de 7 pt;
+no se recorta. Las tres líneas de firma bajan para liberar espacio manuscrito;
+el bloque de verificación ya no ocupa el pie. Las vistas previas ADMIN siguen
+sin QR, ID ni enlace verificable.
+
+La versión se congela en cada nueva generación. El renderer conserva v1 para
+fuentes históricas; no reinterpreta metadata v1 como v2 ni reescribe artefactos.
+El valor predeterminado para configuración ausente es v2. Una configuración
+persistida v1 requiere activación administrativa explícita mediante el repositorio
+de ajustes existente (revisión vigente y auditoría), cambiando **solo**
+`templateVersion` a `phase9-v2`; se mantienen autoridades, branding y demás campos.
+No requiere migración ni regeneración/borrado de certificados. Esta entrega de
+código no ejecuta esa operación ni altera Storage o datos locales/cloud.
+
 Orden institucional y logos: UMSS → FCyT → Departamento de Informática y
 Sistemas. Usar los PNG transparentes provistos, sin redibujarlos, alterar
 proporciones, sustituirlos por SVG externo ni usar una captura completa de
