@@ -55,7 +55,7 @@ export function assertDemoCertificateConfiguration(
   ] as const)
     if (configuration[key] !== defaultCertificateConfiguration[key])
       throw new Error(
-        "PLAN BLOCK: existing configuration is incompatible with phase9-v1; do not overwrite it.",
+        "PLAN BLOCK: existing configuration is incompatible with the current certificate template; do not overwrite it.",
       );
 }
 /** This is a synthetic final fixture, NOT a signed scan. Stamp actual page content. */

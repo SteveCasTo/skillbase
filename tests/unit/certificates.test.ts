@@ -353,12 +353,12 @@ test("merged renderer adapter maps version, frozen generation instant and exact 
   const approval = certificatePdfInput(freezeCertificateData(input));
   expect(approval.type).toBe("APPROVAL");
   expect(approval.templateVersion).toBe(2);
-  expect(
+  expect(() =>
     certificatePdfInput({
       ...freezeCertificateData(input),
       templateVersion: "phase9-v1",
-    }).templateVersion,
-  ).toBe(1);
+    }),
+  ).toThrow();
   expect(approval.generatedAt).toBe("2099-03-06T12:00:00.000Z");
   expect(approval.signatories).toHaveLength(3);
   expect(approval).not.toHaveProperty("groupNumber");
