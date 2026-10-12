@@ -25,6 +25,9 @@ import {
   drawCertificateQr,
 } from "@/server/certificates/pdf/qr";
 import { certificateResources } from "@/server/certificates/pdf/resources";
+import { certificatePreviewData } from "@/domain/certificates/metadata";
+import { defaultCertificateConfiguration } from "@/domain/certificates/rules";
+import { certificatePdfInput } from "@/server/certificates/renderer";
 
 function fixture(
   type: "APPROVAL" | "INSTRUCTOR" = "APPROVAL",
@@ -271,6 +274,27 @@ test("real vector QR matches every library matrix module, axis orientation, whit
   expect(action.lookup(PDFName.of("URI"), PDFString).decodeText()).toBe(
     input.verificationUrl,
   );
+  for (const type of ["APPROVAL", "INSTRUCTOR"] as const) {
+    const sample = certificatePdfInput(
+      certificatePreviewData(defaultCertificateConfiguration, type),
+    );
+    const preview = await PDFDocument.load(
+      await renderCertificatePdf(sample, { preview: true }),
+    );
+    expect(preview.getPageCount()).toBe(1);
+    expect(preview.getPage(0).getSize()).toEqual({
+      width: CERTIFICATE_PAGE_SIZES[type][0],
+      height: CERTIFICATE_PAGE_SIZES[type][1],
+    });
+    const lines = extractedLines(preview);
+    expect(lines.filter((line) => line === "Vista previa")).toHaveLength(1);
+    expect(lines.join(" ")).not.toContain("ID:");
+    expect(lines.join(" ")).not.toContain("DEMO");
+    expect(preview.getPage(0).node.Annots()?.size() ?? 0).toBe(0);
+    await expect(renderCertificatePdf(sample)).rejects.toMatchObject({
+      code: "PDF_INVALID_INPUT",
+    });
+  }
 });
 
 test("long identities, course names and signatories wrap without truncation or a second page", async () => {

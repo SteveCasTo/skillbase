@@ -7,6 +7,7 @@ import { requestHasExpectedOrigin } from "@/server/auth/redirects";
 import { readInterestRequest } from "@/server/interests/request";
 import { InterestError } from "@/domain/interests/rules";
 import { CERTIFICATE_PDF_MAX_BYTES, validateCertificatePdf } from "./upload";
+import { updateCertificateSettingsField } from "@/application/certificates/update-settings-field";
 
 export const certificateHeaders = {
   "Cache-Control": "private, no-store",
@@ -167,12 +168,23 @@ export async function handleCertificatePost(input: {
     const actorId = input.actor.id;
     let value: unknown;
     if (input.operation === "settings") {
-      allow(raw, ["revision", "configuration"]);
-      value = await input.repository.updateSettings(
-        actorId,
-        number(raw.revision),
-        configuration(raw.configuration),
-      );
+      if ("field" in raw) {
+        allow(raw, ["revision", "field", "value"]);
+        value = await updateCertificateSettingsField(
+          input.repository,
+          actorId,
+          number(raw.revision),
+          text(raw.field),
+          text(raw.value),
+        );
+      } else {
+        allow(raw, ["revision", "configuration"]);
+        value = await input.repository.updateSettings(
+          actorId,
+          number(raw.revision),
+          configuration(raw.configuration),
+        );
+      }
     } else if (input.operation === "generate") {
       allow(raw, [
         "requestKey",

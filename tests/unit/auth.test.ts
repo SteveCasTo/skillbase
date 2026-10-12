@@ -101,6 +101,7 @@ describe("private route policies and caching", () => {
       "/app/configuracion",
       "/app/configuracion/asistencia",
       "/app/configuracion/certificados",
+      "/app/configuracion/certificados/vista-previa.pdf",
       "/app/cursos",
       "/app/cursos/imagen",
       "/app/cursos/nuevo",

@@ -94,24 +94,58 @@ async function closeOfficialGroup(page: Page, fixture: Fixture) {
 }
 async function settings(page: Page) {
   await page.goto("/app/configuracion/certificados");
+  await expect(page).toHaveURL(/\/app\/configuracion#firmantes$/);
   for (const [id, name] of [
     ["departmentHead.name", "Jefatura ficticia QA"],
     ["director.name", "Dirección ficticia QA"],
     ["dean.name", "Decanato ficticio QA"],
-  ])
-    await page.locator(`[id="${id}"]`).fill(name!);
-  const saved = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      new URL(response.url()).pathname === "/app/configuracion/certificados",
+  ]) {
+    const form = page.locator(
+      `[data-certificate-settings-field][data-edit-field="${id}"]`,
+    );
+    await form
+      .getByRole("button", { name: "Editar nombre completo", exact: true })
+      .click();
+    await form.locator(`[id="${id}"]`).fill(name!);
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === "/app/configuracion/certificados",
+    );
+    await form
+      .getByRole("button", { name: "Guardar nombre completo", exact: true })
+      .click();
+    expect((await saved).status()).toBe(200);
+    await expect(form.locator("[data-inline-value]")).toHaveText(name!);
+  }
+  const draft = page.locator(
+    '[data-edit-field="director.name"][data-certificate-settings-field]',
   );
-  await page
-    .getByRole("button", { name: "Guardar configuración", exact: true })
+  await draft
+    .getByRole("button", { name: "Editar nombre completo", exact: true })
     .click();
-  expect((await saved).status()).toBe(200);
-  await expect(page.locator('[id="director.name"]')).toHaveValue(
-    "Dirección ficticia QA",
-  );
+  await draft.locator('input[name="value"]').fill("Borrador sin guardar QA");
+  for (const label of [
+    "Previsualizar aprobación",
+    "Previsualizar instructor",
+  ]) {
+    const pdf = page.waitForResponse((response) =>
+      new URL(response.url()).pathname.endsWith("/vista-previa.pdf"),
+    );
+    await page.getByRole("button", { name: label, exact: true }).click();
+    expect((await pdf).status()).toBe(200);
+    await expect(page.getByRole("dialog").locator("iframe")).toBeVisible();
+    await page.getByRole("button", { name: "Cerrar", exact: true }).click();
+    await expect(draft.locator('input[name="value"]')).toHaveValue(
+      "Borrador sin guardar QA",
+    );
+  }
+  await draft
+    .getByRole("button", {
+      name: "Cancelar edición de nombre completo",
+      exact: true,
+    })
+    .click();
 }
 async function records(
   page: Page,
