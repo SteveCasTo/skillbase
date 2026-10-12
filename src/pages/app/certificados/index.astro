@@ -1,16 +1,18 @@
 ---
 import { listAdminCourses } from "@/application/courses/manage-courses";
-import { listGroups } from "@/application/groups/manage-groups";
+import { listClosedAcademicGroups } from "@/application/academic-closure/manage-closure";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
-import type { Group } from "@/domain/groups/types";
+import { normalizeRegistrationSearch } from "@/domain/pre-registrations/search";
+import type { ClosedAcademicGroup } from "@/application/academic-closure/closure-repository";
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
 import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
 import { buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { requireInternalUser } from "@/server/auth/context";
 import { getDatabase } from "@/server/db/client";
+import { DrizzleClosureRepository } from "@/server/db/repositories/academic-closure-repository";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
-import { DrizzleGroupRepository } from "@/server/db/repositories/group-repository";
 import {
   certificateMethodNotAllowed,
   setCertificateHeaders,
@@ -19,7 +21,13 @@ setCertificateHeaders(Astro);
 void certificateMethodNotAllowed;
 if (Astro.request.method !== "GET") return certificateMethodNotAllowed("GET");
 const actor = requireInternalUser(Astro.locals);
-let courses: { id: string; name: string; groups: readonly Group[] }[] = [];
+const search = Astro.url.searchParams.get("search") ?? "";
+const query = normalizeRegistrationSearch(search);
+let courses: {
+  id: string;
+  name: string;
+  groups: readonly ClosedAcademicGroup[];
+}[] = [];
 let error = false;
 try {
   const database = getDatabase();
@@ -27,17 +35,30 @@ try {
     new DrizzleCourseRepository(database),
     actor,
   );
-  const groupRepository = new DrizzleGroupRepository(database);
-  for (const course of source)
-    courses.push({
-      id: course.id,
-      name: course.name,
-      groups: await listGroups(groupRepository, actor, course.id),
-    });
+  const closedGroups = await listClosedAcademicGroups(
+    new DrizzleClosureRepository(database),
+    actor,
+    source.map(({ id }) => id),
+  );
+  const groupsByCourse = new Map<string, ClosedAcademicGroup[]>();
+  for (const group of closedGroups) {
+    const groups = groupsByCourse.get(group.courseId) ?? [];
+    groups.push(group);
+    groupsByCourse.set(group.courseId, groups);
+  }
+  courses = source.flatMap((course) => {
+    const groups = groupsByCourse.get(course.id) ?? [];
+    return groups.length ? [{ id: course.id, name: course.name, groups }] : [];
+  });
 } catch {
   error = true;
   Astro.response.status = 503;
 }
+const entries = courses.map((course) => ({
+  course,
+  searchable: normalizeRegistrationSearch(course.name),
+}));
+const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
 ---
 
 <PrivateLayout title="Certificados">
@@ -45,40 +66,72 @@ try {
     current="Certificados"
     parents={[{ label: "Inicio", href: "/app" }]}
   />
-  <header class="mt-5 flex flex-wrap items-start justify-between gap-4">
-    <div>
-      <h1 class="text-3xl font-semibold tracking-tight">Certificados</h1>
-      <p class="mt-3 leading-7 text-muted-foreground">
-        Selecciona el grupo para preparar y gestionar sus certificados.
-      </p>
-    </div>
-    <a
-      href="/app/configuracion/certificados"
-      class={buttonVariants({ variant: "outline", className: "min-h-11" })}
-    >
-      Configurar firmantes
-    </a>
+  <header class="mt-5">
+    <h1 class="text-3xl font-semibold tracking-tight">Certificados</h1>
   </header>
+  {!error && courses.length > 0 && (
+    <form
+      data-certificate-course-search
+      method="get"
+      class="mt-8 flex min-w-0 flex-col gap-2"
+      role="search"
+      aria-label="Buscar cursos"
+    >
+      <label for="certificate-course-search" class="text-sm font-medium">
+        Buscar cursos
+      </label>
+      <Input
+        id="certificate-course-search"
+        name="search"
+        type="search"
+        autoComplete="off"
+        defaultValue={search}
+        className="min-h-11 min-w-0 w-full"
+      />
+      <noscript>
+        <button
+          type="submit"
+          class={buttonVariants({
+            variant: "outline",
+            className: "min-h-11 self-end",
+          })}
+        >
+          Buscar
+        </button>
+      </noscript>
+    </form>
+  )}
   {error ? (
     <RegistrationPageError
-      message="No se pudieron cargar los grupos. Intenta de nuevo."
+      message="No se pudieron cargar los grupos cerrados. Intenta de nuevo."
       retryHref="/app/certificados"
     />
   ) : !courses.length ? (
     <p role="status" class="mt-8 rounded-xl border border-dashed p-6">
-      Todavía no hay cursos. La certificación comienza con el cierre oficial de
-      un grupo.
+      No hay grupos cerrados disponibles para gestionar certificados.
     </p>
   ) : (
-    <ul class="mt-8 flex min-w-0 flex-col gap-6">
-      {courses.map((course) => (
-        <li class="min-w-0">
-          <h2 class="break-words text-xl font-semibold">{course.name}</h2>
-          {!course.groups.length ? (
-            <p class="mt-3 text-sm text-muted-foreground">
-              Este curso todavía no tiene grupos.
-            </p>
-          ) : (
+    <>
+      <p
+        data-certificate-course-search-empty
+        role="status"
+        hidden={hasMatches}
+        class="mt-8 text-muted-foreground"
+      >
+        No hay cursos que coincidan con la búsqueda.
+      </p>
+      <ul
+        data-certificate-course-search-results
+        hidden={!hasMatches}
+        class="mt-8 flex min-w-0 flex-col gap-6"
+      >
+        {entries.map(({ course, searchable }) => (
+          <li
+            data-certificate-course-search-entry={searchable}
+            hidden={!searchable.includes(query)}
+            class="min-w-0"
+          >
+            <h2 class="break-words text-xl font-semibold">{course.name}</h2>
             <ul class="mt-3 grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {course.groups.map((group) => (
                 <li class="min-w-0">
@@ -93,9 +146,82 @@ try {
                 </li>
               ))}
             </ul>
-          )}
-        </li>
-      ))}
-    </ul>
+          </li>
+        ))}
+      </ul>
+    </>
   )}
 </PrivateLayout>
+
+<script>
+  import { normalizeRegistrationSearch } from "@/domain/pre-registrations/search";
+
+  let dispose: (() => void) | undefined;
+  const init = () => {
+    dispose?.();
+    const form = document.querySelector<HTMLFormElement>(
+      "[data-certificate-course-search]",
+    );
+    const input = form?.querySelector<HTMLInputElement>('input[name="search"]');
+    const results = document.querySelector<HTMLElement>(
+      "[data-certificate-course-search-results]",
+    );
+    const empty = document.querySelector<HTMLElement>(
+      "[data-certificate-course-search-empty]",
+    );
+    if (!form || !input || !results || !empty) return;
+
+    const entries = [
+      ...results.querySelectorAll<HTMLElement>(
+        "[data-certificate-course-search-entry]",
+      ),
+    ];
+    const controller = new AbortController();
+    const apply = (updateUrl: boolean) => {
+      const query = normalizeRegistrationSearch(input.value);
+      let count = 0;
+      for (const entry of entries) {
+        entry.hidden =
+          !entry.dataset.certificateCourseSearchEntry?.includes(query);
+        if (!entry.hidden) count++;
+      }
+      results.hidden = count === 0;
+      empty.hidden = count > 0;
+      if (updateUrl) {
+        const url = new URL(window.location.href);
+        if (query) url.searchParams.set("search", input.value);
+        else url.searchParams.delete("search");
+        window.history.replaceState(window.history.state, "", url);
+      }
+    };
+    input.addEventListener("input", () => apply(true), {
+      signal: controller.signal,
+    });
+    form.addEventListener(
+      "submit",
+      (event) => {
+        event.preventDefault();
+        apply(true);
+      },
+      { signal: controller.signal },
+    );
+    window.addEventListener(
+      "popstate",
+      () => {
+        input.value =
+          new URL(window.location.href).searchParams.get("search") ?? "";
+        apply(false);
+      },
+      { signal: controller.signal },
+    );
+    apply(false);
+    dispose = () => controller.abort();
+  };
+
+  document.addEventListener("astro:page-load", init);
+  document.addEventListener("astro:before-swap", () => {
+    dispose?.();
+    dispose = undefined;
+  });
+  init();
+</script>

@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import * as s from "@/server/db/schema";
-import type { ClosureRepository } from "@/application/academic-closure/closure-repository";
+import type {
+  ClosedAcademicGroupRepository,
+  ClosureRepository,
+} from "@/application/academic-closure/closure-repository";
 import {
   ClosureError,
   closureBlockers,
@@ -93,11 +96,45 @@ async function context(
     state: state ?? { groupId, revision: 0, closed: false, lastVersion: 0 },
   };
 }
-export class DrizzleClosureRepository implements ClosureRepository {
+export class DrizzleClosureRepository
+  implements ClosureRepository, ClosedAcademicGroupRepository
+{
   constructor(
     private readonly db: AttendanceDatabase,
     private readonly clock: () => Date = () => new Date(),
   ) {}
+
+  async listClosedGroups(courseIds: readonly string[]) {
+    if (!courseIds.length) return [];
+    return this.db
+      .select({
+        id: s.groups.id,
+        courseId: s.groups.courseId,
+        startsAt: s.groups.startsAt,
+        endsAt: s.groups.endsAt,
+      })
+      .from(s.academicGroupStates)
+      .innerJoin(s.groups, eq(s.groups.id, s.academicGroupStates.groupId))
+      .innerJoin(
+        s.academicClosureVersions,
+        and(
+          eq(s.academicClosureVersions.courseId, s.groups.courseId),
+          eq(s.academicClosureVersions.groupId, s.groups.id),
+          eq(
+            s.academicClosureVersions.version,
+            s.academicGroupStates.lastVersion,
+          ),
+        ),
+      )
+      .where(
+        and(
+          eq(s.academicGroupStates.closed, true),
+          inArray(s.groups.courseId, [...courseIds]),
+        ),
+      )
+      .orderBy(asc(s.groups.createdAt), asc(s.groups.id));
+  }
+
   async getGroup(
     actorId: string,
     courseId: string,

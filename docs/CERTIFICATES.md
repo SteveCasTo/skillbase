@@ -150,7 +150,7 @@ La ruta de verificación debe consultar el registro actual del certificado.
 
 La interfaz conectada al backend disponible en esta rama incluye:
 
-- Administración de certificados en `/app/certificados`, ajustes en `/app/configuracion/certificados` y acceso a certificados del grupo desde las vistas ADMIN e INSTRUCTOR.
+- Administración de certificados en `/app/certificados` lista solo cursos con al menos un grupo cuyo cierre oficial está `CLOSED`; permite buscar esos cursos por nombre. Los ajustes de firmantes están en `/app/configuracion#firmantes` (la ruta anterior `/app/configuracion/certificados` redirige allí), y las vistas ADMIN e INSTRUCTOR conservan el acceso a certificados del grupo.
 - Detalle privado ADMIN y detalle histórico readonly del instructor en `/app/mis-certificados/[certificateId]`; descargas PDF privadas usan rutas autenticadas.
 - Generación, revisión/carga del archivo firmado, emisión y revocación mediante las operaciones server-side existentes. Los formularios SSR conservan los errores y valores recuperables; la autorización y las transiciones las decide el servidor.
 - Página pública `/certificados/[publicCredentialId]` y formulario de búsqueda en `/certificados`. La respuesta pública es una proyección mínima; no expone snapshots privados ni ofrece descarga anónima del PDF.

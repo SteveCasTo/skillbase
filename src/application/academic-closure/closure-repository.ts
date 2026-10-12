@@ -5,6 +5,20 @@ import type {
   ClosureVersionDto,
   ReopenGroupInput,
 } from "@/domain/academic-closure/types";
+
+export interface ClosedAcademicGroup {
+  readonly id: string;
+  readonly courseId: string;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+}
+
+export interface ClosedAcademicGroupRepository {
+  listClosedGroups(
+    courseIds: readonly string[],
+  ): Promise<ClosedAcademicGroup[]>;
+}
+
 export interface ClosureRepository {
   getGroup(
     actorId: string,

@@ -301,7 +301,36 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
     await anonymous.clock.setFixedTime(fixture.now);
     const publicPage = await anonymous.newPage();
     await closeOfficialGroup(page, fixture);
+    await page.goto("/app/certificados?search=attendance");
+    const courseSearch = page.getByRole("search", { name: "Buscar cursos" });
+    await expect(courseSearch).toBeVisible();
+    await expect(courseSearch.getByLabel("Buscar cursos")).toHaveValue(
+      "attendance",
+    );
+    const groupCertificateLink = page.locator(
+      `a[href="${groupPath(fixture)}/certificados"]`,
+    );
+    await expect(groupCertificateLink).toBeVisible();
+    await expect(
+      page.locator(
+        `a[href="/app/cursos/${fixture.courseId}/grupos/${fixture.groupId}/certificados"]`,
+      ),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Configurar firmantes" }),
+    ).toHaveCount(0);
+    await courseSearch.getByLabel("Buscar cursos").fill("sin-coincidencia");
+    await expect(
+      page.getByText("No hay cursos que coincidan con la búsqueda."),
+    ).toBeVisible();
+    await courseSearch.getByLabel("Buscar cursos").fill("ATTENDANCE");
+    await expect(groupCertificateLink).toBeVisible();
+    await courseSearch.getByLabel("Buscar cursos").fill("");
+    await expect(groupCertificateLink).toBeVisible();
     await page.goto(`${groupPath(fixture)}/certificados`);
+    await expect(
+      page.getByRole("link", { name: "Configurar firmantes" }),
+    ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Generar PDF", exact: true }),
     ).toHaveCount(2);
