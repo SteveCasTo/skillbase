@@ -59,7 +59,6 @@ export function validateCertificateRenderInput(
   preview = false,
 ) {
   if (
-    input.templateVersion !== 1 &&
     input.templateVersion !== CERTIFICATE_PDF_TEMPLATE_VERSION
   )
     throw new CertificatePdfError(

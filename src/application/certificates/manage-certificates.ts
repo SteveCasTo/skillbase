@@ -69,7 +69,17 @@ export class ManageCertificates {
       throw new Error("Artifact reservation abandoned; use a new request key");
     try {
       await this.storage.put(reservation.path, bytes);
-      return await this.repository.attachArtifact(actorId, reservation);
+      const result = await this.repository.attachArtifact(actorId, reservation);
+      // The replacement is committed before any old object is removed. Cleanup
+      // failure never rolls back a valid current document; its outbox survives.
+      try {
+        const retired = await this.repository.cleanupCandidates(actorId, new Date(0), command.certificateId);
+        for (const artifact of retired) {
+          await this.storage.remove(artifact.path);
+          await this.repository.cleanedArtifact(artifact.id);
+        }
+      } catch { /* durable cleanup_pending */ }
+      return result;
     } catch (error) {
       // Mark before deleting; a failed deletion leaves a durable outbox item.
       const claimed = await this.repository.abandonArtifact(reservation.id);

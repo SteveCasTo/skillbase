@@ -1,0 +1,7 @@
+---
+import { prepareCertificateRecipient } from "@/components/certificates/recipient-route";
+import CertificateRecipientPage from "@/components/certificates/CertificateRecipientPage.astro";
+const props = await prepareCertificateRecipient(Astro, false);
+if (props instanceof Response) return props;
+---
+<CertificateRecipientPage {...props} />

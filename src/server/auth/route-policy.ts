@@ -79,7 +79,7 @@ export function getPrivateRoutePolicy(
     return { access: "ROLES", roles: ["INSTRUCTOR"] };
   if (
     new RegExp(
-      `^/app/(cursos|mis-cursos)/${certificateUuid}/grupos/${certificateUuid}/certificados$`,
+      `^/app/(cursos|mis-cursos)/${certificateUuid}/grupos/${certificateUuid}/certificados(?:/(?:approval|instructor)/${certificateUuid})?$`,
       "iu",
     ).test(normalizedPath)
   )

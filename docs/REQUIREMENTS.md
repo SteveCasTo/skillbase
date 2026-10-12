@@ -457,8 +457,14 @@ instructor, fechas/horario nominal del grupo. Ambos usan duración nominal de la
 revisión de formato. Estos valores se congelan separados de cierre, generación
 y emisión. Si el grupo se reabre, certificados ya emitidos no se revocan
 automáticamente; nuevas generaciones/emisiones requieren la última versión
-cerrada. Se conserva reemplazo/revocación explícita y como máximo un certificado
-activo por curso/tipo/destinatario.
+cerrada. Se conserva revocación explícita y como máximo un certificado actual por
+grupo/tipo/destinatario en todos los estados. Se genera solo desde detalle
+individual con POST explícito, sin selección masiva ni ordinal editable.
+Regenerar un borrador cambia su ID público e invalida el anterior; guardar un
+PDF con atestación ADMIN publica el firmado atómicamente. Después solo se
+descarga el firmado y se puede sustituir su archivo conservando ID y metadata,
+con hash actualizado, auditoría mínima y limpieza después del commit. No hay
+versiones ni historial de certificados en UI.
 
 ## CIERRE
 

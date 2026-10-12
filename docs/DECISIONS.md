@@ -894,3 +894,25 @@ amplía elegibilidad, permisos o campos imprimibles. La compatibilidad v1 evita
 necesitar borrado de datos seed para adoptar el nuevo diseño. Los ajustes
 persistidos se activan separadamente por la operación auditada existente;
 el cambio de código no los modifica silenciosamente.
+
+### Ajuste aprobado: certificado actual por destinatario (2026-10-12)
+
+El flujo individual sustituye la selección masiva y las cadenas de versiones.
+La identidad vigente es grupo/tipo/destinatario, con índice único incluso para
+borradores. Cada tarjeta deriva únicamente del cierre oficial elegible; GET no
+crea documentos. Primer PDF requiere POST explícito. El ordinal procede siempre
+de `groups.createdAt/id` en servidor.
+
+Antes de firmar, regenerar actualiza el registro con nueva metadata y nuevo ID
+público, invalidando el anterior. Guardar firmado exige PDF válido y atestación
+ADMIN, y confirma hash/path/estado en una sola transacción. Después solo se sirve
+el firmado; sustituir su archivo conserva ID y metadata. No se almacenan clones
+completos/versiones de certificados. Auditoría/receipts/reservas conservan
+evidencia mínima, y objetos retirados se limpian después del commit con outbox.
+Revocación explícita permanece disponible con autorización y motivo.
+
+0025 requiere dataset de certificados vacío y falla cerrada ante credenciales
+existentes. El reset sintético fue aprobado separadamente y lo ejecuta el owner
+operativo, nunca este flujo ni la migración. No altera snapshots F8, controles
+de sesión/ownership ni la allowlist pública. La UI usa «Para firmar»/«Firmado»,
+sin historial, revisión/emisión separadas ni ordinal editable.

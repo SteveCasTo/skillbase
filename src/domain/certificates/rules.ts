@@ -1,4 +1,4 @@
-import type { ClosureReportDto } from "@/domain/academic-closure/types";
+import type { AuthorizedClosureReportDto } from "@/domain/academic-closure/types";
 import type {
   CertificateConfiguration,
   CertificateState,
@@ -111,7 +111,7 @@ export function validateCertificateConfiguration(
   );
 }
 export function certificateRecipients(
-  report: ClosureReportDto,
+  report: AuthorizedClosureReportDto,
   type: CertificateType,
 ) {
   if (!report.instructorId || !report.instructorName?.trim())

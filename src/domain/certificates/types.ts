@@ -56,6 +56,7 @@ export interface CertificateDto {
   id: string;
   courseId: string;
   groupId: string;
+  recipientId: string;
   versionId: string;
   version: number;
   type: CertificateType;
@@ -108,6 +109,8 @@ export interface GenerateCertificatesInput {
   groupNumber?: number;
   replacementForId?: string;
   reason?: string;
+  regenerate?: boolean;
+  certificateRevision?: number;
 }
 export interface CertificateProvenance {
   configurationRevision: number;

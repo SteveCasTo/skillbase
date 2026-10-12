@@ -68,7 +68,9 @@ const { feedback } = Astro.props;
                 : "Ningún archivo seleccionado";
             const error = selected ? localPdfError(selected) : "";
             file.setCustomValidity(error);
-            if (message) message.textContent = error;
+            const fileError = form.querySelector<HTMLElement>('[data-field-error="file"]');
+            if (fileError) fileError.textContent = error;
+            file.setAttribute("aria-invalid", error ? "true" : "false");
             sync();
           },
           { signal },
@@ -80,7 +82,7 @@ const { feedback } = Astro.props;
             event.preventDefault();
             if (pending || !form.reportValidity()) return;
             const formData = new FormData(form);
-            // Review confirmation is a local affordance, not an invented API field.
+            // The signed-document attestation is also validated by the server.
             pending = true;
             sync();
             form.setAttribute("aria-busy", "true");

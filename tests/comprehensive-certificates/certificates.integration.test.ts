@@ -74,7 +74,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
       createHash("sha256").update(bytes).digest("hex"),
     );
     const before = await captureDemoSnapshot(db);
-    expect(before.ledger).toHaveLength(24);
+    expect(before.ledger).toHaveLength(25);
     const options = {
       actorId: original!.id,
       auth,
@@ -208,14 +208,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
           ).ok,
         ).toBe(false);
       }
-      if (row.state === "replaced") {
-        const replacement = certificates.find(
-          (r) => r.id === row.replacedById,
-        )!;
-        expect(replacement.state).toBe("issued");
-        expect(replacement.replacementForId).toBe(row.id);
-        expect(replacement.recipientId).toBe(row.recipientId);
-      }
+      expect(certificates.filter(r => r.groupId === row.groupId && r.type === row.type && r.recipientId === row.recipientId)).toHaveLength(1);
     }
     await runComprehensiveCertificates(db, { ...options, apply: true });
     const repeat = await captureDemoSnapshot(db);
