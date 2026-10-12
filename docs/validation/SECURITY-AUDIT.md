@@ -413,3 +413,23 @@ otros advisories o de una librsvg instalada globalmente en otro entorno.
   se modificaron pruebas. 1441 assertions, stack aislado limpiado.
 - Checks remotos se verifican en el PR antes del merge; no se infieren de la
   prueba del proveedor o del build.
+
+### Seguimiento posterior — release combinado PR 342 (2026-10-12)
+
+El guard común de identidad de PR 337 se desplegó dentro del release PR 342
+(`master` `4e3c827e8cc5f7b05df182e90b450d256f2c85aa`). La regla autorizada
+acepta la primera contraseña nativa únicamente para la misma identidad Google
+legítima ya vinculada, verificada y habilitada internamente; no concede acceso a
+otra identidad ni roles. Se verificó en producción login/navegación PASSWORD
+normal de una cuenta sintética autorizada y se preservaron UUID Auth, hash de
+credencial, identidad y roles. El boolean cloud de contraseña actual seguía
+`true`. Esto resuelve la aceptación AUTH-1 bajo la regla acordada; no constituye
+certificación global.
+
+No se ejecutaron en producción cambio autenticado de contraseña, recovery,
+primera contraseña Google, consentimiento OAuth ni entrega SMTP. Las pruebas
+controladas de proveedor y la aceptación local no sustituyen esas comprobaciones.
+La auditoría base continúa siendo estática/acotada y no se debe presentar como
+un análisis exhaustivo del sistema. El seguimiento operativo de PR 342 y sus
+límites se documentan en [`AUTHENTICATION.md`](../AUTHENTICATION.md) y
+[`DEPLOYMENT.md`](../DEPLOYMENT.md).

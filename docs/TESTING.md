@@ -816,3 +816,26 @@ del boolean cloud, Google OAuth real, entrega SMTP ni flujos autenticados de
 cambio/recovery/primera contraseña en producción. El smoke productivo fue
 anónimo. El detalle de configuración nativa y el estado parcial de AUTH-1 está
 en [`DEPLOYMENT.md`](DEPLOYMENT.md) y [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md).
+
+### Gate de release combinado PR 342 (2026-10-12)
+
+El CI del PR `38209427441` y el CI de push/deploy a `master` `38210161355`
+pasaron en primer intento para el source combinado exacto. El run final informó
+464 unit/4.167 assertions, 177 integration/1.452, fixture F8 1/906, fixture F9
+1/142, y 145 E2E en dos shards (76+69), sin flake ni retry; quality,
+formatter/typecheck/build, migraciones, agregador y deploy pasaron. El run final
+reportó 177 integration PASS sin skip; el resultado de un skip preexistente
+pertenece a la ejecución previa y se conserva como dato histórico. La deployment
+`dpl_6RhZNN7sus7B8jo36TRPmMqsHYgP` quedó `READY` para `master`
+`4e3c827e8cc5f7b05df182e90b450d256f2c85aa`.
+
+No se añadieron ni modificaron tests en el trabajo documental. No se volvieron a
+ejecutar suites locales completas por esta sincronización; el CI remoto anterior
+es la evidencia para el release. La aceptación Auth de producción consistió en
+navegación PASSWORD legítima acotada, no en una nueva prueba de cambio/recovery,
+Google OAuth real o SMTP. El refresh del seed se validó por su workflow protegido
+y evidencia de preservación independiente; no debe interpretarse como suite de
+tests ni como un test de carga. Ver los detalles/límites en
+[`DEPLOYMENT.md`](DEPLOYMENT.md), [`AUTHENTICATION.md`](AUTHENTICATION.md),
+[`DEMO_SEED.md`](DEMO_SEED.md) y
+[`validation/PRODUCTION-PERFORMANCE.md`](validation/PRODUCTION-PERFORMANCE.md).

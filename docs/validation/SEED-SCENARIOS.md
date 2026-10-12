@@ -2,9 +2,11 @@
 
 ## Estado y límites
 
-Perfil `realistic-v2`. Código y QA aislada; **APPLY canónico/local y cloud pendiente
-de revisión del PLAN por el coordinador**. No hay reset, migración, promoción ROOT,
-OAuth fabricado, cambio de configuración del proveedor ni rotación de passwords.
+Perfil `realistic-v2`. El código y QA aislada precedieron los APPLY canónico/local
+y cloud, completados de forma protegida el 2026-10-12 después del release PR 342.
+El estado anterior a esos APPLY se conserva como cronología más abajo; el resumen
+actual está al final. No hubo reset, migración, promoción ROOT, OAuth fabricado,
+cambio de configuración del proveedor ni rotación de passwords.
 Los nombres son combinaciones ficticias; todos los contactos usan `example.test`.
 No se atribuyen títulos profesionales, instituciones o retratos a personas reales.
 El perfil de instructor actual no tiene campos de cualificaciones/biografía;
@@ -202,8 +204,47 @@ read-only, **no comprobación visual de los datos nuevos todavía no aplicados**
   PLAN normal para ligar el mismo alcance al master/CI/deployment/baseline vigentes.
   No se cambia ni evita ese guard de release para hacer APPLY desde development.
 
-No se aplicaron los planes ni se modificaron roles, Auth, datos, configuración,
-ledger o Storage de ninguna instancia canónica. No se iniciaron sesiones OAuth
-ni se hicieron restarts. Los campos manuales locales que siguen sin renombrar
-están identificados como `skipped`; requieren decisión explícita del coordinador,
-no reinterpretar cualquier nombre desconocido como propiedad sintética nueva.
+Este inventario y PLAN read-only del 2026-10-11 son históricos y fueron
+supersedidos por los APPLY aprobados del 2026-10-12. No deben reutilizarse sus
+hashes/snapshots para otra operación; el resultado actual se resume a continuación.
+
+### Resultado de los APPLY realistas — 2026-10-12
+
+El release protegido PR 342 (`master` `4e3c827e8cc5f7b05df182e90b450d256f2c85aa`,
+CI `38210161355`, deployment Vercel `READY`) habilitó el refresh por el workflow
+manual existente. No se aplicó migración: ledger 24 siguió igual. Local y cloud
+usaron anchors existentes distintos (local 2026-10-09, cloud 2026-10-08); las
+cuatro cohortes nuevas tienen fechas 2027-01-18, 2027-04-12, 2027-06-14 y
+2027-09-06. No se desplazaron fechas de historia existente.
+
+- **Local:** APPLY preservó las filas originales según los hashes completos
+  aprobados, aplicó solo el scope del plan y el replay fue de cero escrituras.
+  Quedaron 14 cursos, 18 grupos, 34 participantes, 35 preinscripciones, 31
+  intereses, siete formatos/revisiones, ocho certificados y tres versiones
+  congeladas. La operación autorizada dejó el principal solo con rol ADMIN; dos
+  identidades QA nuevas mantienen sus resultados lifecycle legítimos. Las
+  ediciones manuales aprobadas de campos conocidos se limitaron a filas propias;
+  desconocidos/anteriores permanecen preservados. Los bytes de PDF no fueron
+  rehasheados.
+- **Cloud:** PLAN `38211279482` y APPLY `38212358637` (9m26s, primer intento)
+  preservaron 1.900 filas originales y aplicaron 60 cambios explícitos de filas
+  poseídas; el replay escribió cero. Conteos finales: 23 cursos, 40 grupos, 48
+  participantes, 49 preinscripciones, 63 intereses y nueve formatos/revisiones.
+  Los ocho certificados y las tres versiones congeladas permanecieron iguales
+  según la evidencia de filas/metadata; los bytes PDF no se revalidaron. Dos
+  formatos originales se renombraron después por acciones ADMIN normales
+  separadas del APPLY, con exactamente dos eventos de auditoría.
+- **UI pública/registro:** las cuatro nuevas páginas de curso y ocho páginas del
+  registro de certificados respondieron 200; las páginas del registro usaron
+  `no-store` y los estados esperados. El GET de verificación actualiza buckets
+  técnicos; no se afirma que todos esos GET fueran cero escrituras. No se descargó
+  PDF privado, ni se exportó PII, ni se hicieron procedimientos de firma real.
+
+Todos los nombres/datos de demostración son ficticios. Los PDFs existentes y
+nuevos siguen sujetos a sus marcas de seguridad; los documentos históricos pueden
+conservar nombres originales como snapshots congelados. No hacer una limpieza
+amplia ni reinterpretar campos manuales/unknowns como propiedad del seed. Para
+repetición o nuevas ediciones, generar y revisar un PLAN nuevo mediante el canal
+autorizado, no reutilizar hashes anteriores. Los detalles operacionales y
+preservación están en [`../DEMO_SEED.md`](../DEMO_SEED.md); handoffs con evidencia
+por fila permanecen privados fuera de Git.
