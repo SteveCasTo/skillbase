@@ -202,13 +202,11 @@ try {
       {certificateSettings.available && <CertificatePreview client:load />}
     </header>
     {certificateSettings.available ? (
-      <div class="rounded-xl border bg-card p-5 sm:p-7">
-        <SettingsFields
-          configuration={certificateSettings.data.configuration}
-          revision={certificateSettings.data.revision}
-          feedback={emptyFeedback()}
-        />
-      </div>
+      <SettingsFields
+        configuration={certificateSettings.data.configuration}
+        revision={certificateSettings.data.revision}
+        feedback={emptyFeedback()}
+      />
     ) : (
       <p role="alert" class="text-sm text-destructive">
         {certificateSettings.unavailableReason}{" "}

@@ -26,20 +26,32 @@ const labels = {
 };
 ---
 
-<div class="grid min-w-0 gap-x-8 gap-y-7 md:grid-cols-2">
+<div class="certificate-settings grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
   {positions.map(({ key, title }) => (
     <section
-      class="flex min-w-0 flex-col gap-4"
+      class:list={[
+        "grid min-w-0 content-start gap-4 rounded-xl border bg-card p-5 text-card-foreground",
+        key === "approvalInstructor" &&
+          "md:col-span-2 md:grid-cols-2 xl:col-span-3 xl:grid-cols-3",
+      ]}
       aria-labelledby={`${key}-heading`}
     >
-      <h3 id={`${key}-heading`} class="font-semibold">
-        {title}
-      </h3>
-      {key === "approvalInstructor" && (
-        <p class="text-sm text-muted-foreground">
-          El nombre se toma del instructor en el cierre oficial de cada grupo.
-        </p>
-      )}
+      <header
+        class:list={[
+          "flex min-w-0 flex-col gap-2 border-b pb-3",
+          key === "approvalInstructor" &&
+            "md:col-span-2 xl:col-span-1 xl:border-b-0 xl:pb-0",
+        ]}
+      >
+        <h3 id={`${key}-heading`} class="font-semibold text-balance">
+          {title}
+        </h3>
+        {key === "approvalInstructor" && (
+          <p class="text-sm text-muted-foreground">
+            Nombre del instructor al cierre de cada grupo.
+          </p>
+        )}
+      </header>
       {certificateSettingsFields
         .filter((name) => name.startsWith(`${key}.`))
         .map((name) => {
@@ -111,4 +123,9 @@ const labels = {
     </section>
   ))}
 </div>
+<style>
+  .certificate-settings :global([data-inline-display] > div:last-child) {
+    width: auto;
+  }
+</style>
 <script src="./settings-field-client.ts"></script>
