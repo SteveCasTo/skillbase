@@ -139,29 +139,36 @@ function revisionFor(row: Row, found: Map<string, Revision>): Revision {
   return revision;
 }
 
-async function assignedNames(
-  db: Database | Transaction,
-  rows: readonly Row[],
-): Promise<Row[]> {
-  const ids = rows.flatMap((row) =>
-    row.instructorId ? [row.instructorId] : [],
-  );
-  if (!ids.length) return [...rows];
-  const profiles = await db
-    .select({
-      id: schema.instructorProfiles.id,
-      firstName: schema.instructorProfiles.firstName,
-      lastName: schema.instructorProfiles.lastName,
-    })
-    .from(schema.instructorProfiles)
-    .where(inArray(schema.instructorProfiles.id, ids));
-  const names = new Map(
-    profiles.map((p) => [p.id, `${p.firstName} ${p.lastName}`]),
-  );
-  return rows.map((row) =>
-    row.instructorId
-      ? { ...row, instructorName: names.get(row.instructorId) ?? null }
-      : row,
+const publicCourseSelection = {
+  course: schema.courses,
+  revision: schema.courseTypeRevisions,
+  // Only the public instructor name is needed, never contact information.
+  instructor: {
+    firstName: schema.instructorProfiles.firstName,
+    lastName: schema.instructorProfiles.lastName,
+  },
+};
+
+function joinedPublicDto(
+  row: {
+    course: Row;
+    revision: Revision | null;
+    instructor: { firstName: string; lastName: string } | null;
+  },
+  now: Date,
+): PublicCourseDto {
+  if (!row.revision) throw new Error("Course revision missing");
+  return publicDto(
+    {
+      ...row.course,
+      instructorName: row.course.instructorId
+        ? row.instructor
+          ? `${row.instructor.firstName} ${row.instructor.lastName}`
+          : null
+        : row.course.instructorName,
+    },
+    row.revision,
+    now,
   );
 }
 
@@ -745,14 +752,22 @@ export class DrizzleCourseRepository implements CourseRepository {
   async listPublic(now = new Date()): Promise<readonly PublicCourseDto[]> {
     return persistence("listPublic", async () => {
       const rows = await this.db
-        .select()
+        .select(publicCourseSelection)
         .from(schema.courses)
+        .leftJoin(
+          schema.courseTypeRevisions,
+          eq(
+            schema.courseTypeRevisions.id,
+            schema.courses.courseTypeRevisionId,
+          ),
+        )
+        .leftJoin(
+          schema.instructorProfiles,
+          eq(schema.instructorProfiles.id, schema.courses.instructorId),
+        )
         .where(eq(schema.courses.status, "PUBLISHED"))
         .orderBy(desc(schema.courses.featured), asc(schema.courses.startsAt));
-      const found = await revisions(this.db, rows);
-      return (await assignedNames(this.db, rows)).map((row) =>
-        publicDto(row, revisionFor(row, found), now),
-      );
+      return rows.map((row) => joinedPublicDto(row, now));
     });
   }
   async getPublic(
@@ -768,8 +783,19 @@ export class DrizzleCourseRepository implements CourseRepository {
     }
     return persistence("getPublic", async () => {
       const [row] = await this.db
-        .select()
+        .select(publicCourseSelection)
         .from(schema.courses)
+        .leftJoin(
+          schema.courseTypeRevisions,
+          eq(
+            schema.courseTypeRevisions.id,
+            schema.courses.courseTypeRevisionId,
+          ),
+        )
+        .leftJoin(
+          schema.instructorProfiles,
+          eq(schema.instructorProfiles.id, schema.courses.instructorId),
+        )
         .where(
           and(
             eq(schema.courses.slug, normalized),
@@ -777,13 +803,7 @@ export class DrizzleCourseRepository implements CourseRepository {
           ),
         )
         .limit(1);
-      return row
-        ? publicDto(
-            (await assignedNames(this.db, [row]))[0]!,
-            revisionFor(row, await revisions(this.db, [row])),
-            now,
-          )
-        : null;
+      return row ? joinedPublicDto(row, now) : null;
     });
   }
 }

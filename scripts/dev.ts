@@ -2,6 +2,7 @@ import { dev } from "astro";
 import { parseArgs } from "node:util";
 
 import { getLocalSupabaseEnvironment } from "./supabase-local-env";
+import { verifyLocalAuthConfiguration } from "./local-auth-config";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is required in .env before starting Astro.");
@@ -17,6 +18,9 @@ if (supabaseUrl && new URL(supabaseUrl).hostname === "127.0.0.1") {
       "PUBLIC_SUPABASE_URL does not match the local Supabase stack.",
     );
   }
+  // A direct CLI recreation loses the native process file. Never start local QA
+  // with an unenforced replacement; the coordinated start launcher reapplies it.
+  await verifyLocalAuthConfiguration();
   // The running local stack is authoritative, including after a local rebuild.
   process.env.SUPABASE_SERVICE_ROLE_KEY = local.serviceRoleKey;
 }

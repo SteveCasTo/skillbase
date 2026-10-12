@@ -143,6 +143,7 @@ La configuración SMTP cloud está comprobada por lectura de Admin API, pero la 
 - Después de que Supabase Auth confirma el cambio, la aplicación registra `PASSWORD_CHANGED` en `audit_events` con actor/entidad internos y sin password, token ni metadata sensible. Auth y PostgreSQL no comparten transacción: si falla esa escritura, el cambio ya aplicado no se reporta como fallido y se emite únicamente `PASSWORD_CHANGE_AUDIT_WRITE_FAILED` con el ID interno del actor.
 - El usuario puede solicitar asociación Google explícita desde `/app/perfil`. El intento se liga por cookie firmada y `HttpOnly`, nonce aleatorio almacenado como hash de un uso y expiración de cinco minutos, usuario interno, ID de sesión y `flowId` PKCE. La callback comprueba la sesión original, la identidad Auth resultante, OAuth vigente, Google verificado y coincidencia de email normalizada. Email/Supabase puede asociar automáticamente identidades Google de correo verificado y coincidente; Supabase no ofrece aquí una garantía de impedir esa asociación a nivel proveedor. Por ello la aplicación conserva `approved_google_identity_id` y **deniega autenticación OAuth** por Google no aprobada. En asociación rechazada intenta quitar únicamente la nueva identidad Google y restaura la sesión original; identidad ya asociada en Auth no constituye por sí sola autorización de la aplicación. No se auto-fusionan usuarios internos ni se cambia identidad primaria por una coincidencia de email.
 - Para una identidad interna preexistente `auth_primary_provider=GOOGLE`, el login Google vigente se conserva y la contraseña puede añadirse opcionalmente desde perfil. Cuenta provisionada con `auth_primary_provider=EMAIL` requiere asociación explícita aprobada para que OAuth funcione; el login por password sigue siendo independiente y válido aunque Auth haya añadido una identidad Google no aprobada.
+- La aprobación de la identidad de cuenta se revalida también para PASSWORD y confirmación/recovery: una cuenta primaria GOOGLE conserva su único Google verificado y coincidente aun después de añadir password/identidad email; una cuenta EMAIL conserva su provenance interno y correo de cuenta verificado coincidente, aunque se quite la identidad email del proveedor. Ningún método sustituye el UUID Auth vinculado, correo verificado, estado ACTIVE ni roles internos. Una asociación Google automática no bloquea password/recovery legítimo de EMAIL ni autoriza su OAuth.
 - Se mantienen guards, rol/estado internos y rutas fail-closed. ADMIN gestiona perfiles desde `/app/instructores`; un instructor puede editar su nombre/apellidos/teléfono (email de solo lectura) en la sección profesional de `/app/perfil`, consultar `/app/mis-cursos` y operar asistencia solo en grupos propios. Los listados/consultas siempre filtran por `users.id` autenticado, además del guard exacto `INSTRUCTOR`; una URL directa ajena no otorga acceso. Instructor no obtiene acceso a edición de cursos/grupos, formatos, interesados, participantes, settings ni finanzas.
 - Desde PR 222, un ADMIN **sin rol INSTRUCTOR** puede editar en `/app/perfil` únicamente `users.name`; el email se muestra solo lectura. La mutación revalida actor activo/rol y origen en servidor, exige la revisión observada, actualiza bajo bloqueo y audita `USER_PROFILE_UPDATED` con `fields: name`. No introduce apellidos, teléfono ni perfil profesional para ADMIN puro. Un usuario multirol que también tiene `INSTRUCTOR` usa los campos de su perfil profesional de instructor (nombre, apellidos y teléfono; email readonly), no el editor exclusivo de ADMIN puro.
 - Los campos profesionales de INSTRUCTOR y las acciones lifecycle se editan por acción/campo desde PR 222; ciclo de vida se restringe según exclusividad de rol, asignaciones e historial. Estos cambios se liberaron junto con las correcciones mediante PR 228.
@@ -164,12 +165,119 @@ Al cierre inicial de PR 126 no había acción de baja ni esta política. La corr
 - Eliminación disponible solo si la persona nunca fue asignada, tiene exclusivamente el rol `INSTRUCTOR` y no tiene dependencias de dominio. La operación ADMIN hace transición a `DISABLED`/deletion-pending en PostgreSQL, luego elimina la identidad mediante Supabase Auth Admin y finaliza con perfil/rol removidos y tombstone interno mínimo para conservar referencias/auditoría. Si falla Auth o el paso final, no se reactiva: queda bloqueada y el mismo flujo permite reintentar. Registro y sesión ADMIN se verifican en servidor.
 - Todas las rutas/acciones revalidan estado interno; cookie ya emitida no mantiene acceso para instructor desactivado. Reactivación recupera la identidad preservada y la autorización sin recrear ni resetear credenciales.
 - La página de cambio de contraseña es independiente de `/app/perfil`. Cuenta password exige validar password actual en servidor, además de nueva/confirmación. La acción «Crear contraseña» de Google-only exige claims firmados de sesión OAuth Google aprobada, `getUser()`/cuenta live y prueba OAuth reciente (menos de 5 minutos); no depende de metadata, de una identidad histórica aislada ni añade verificación por correo en ese formulario. Una prueba de recuperación válida es un camino distinto desde recovery. Auth vuelve a comprobar actor/sesión antes de escribir. Error de password igual a anterior se muestra de forma específica/recuperable. El recovery «Olvidaste tu contraseña» está en página independiente con validez del email y respuesta neutra.
-- El cambio normal transmite además la contraseña actual validada como `current_password` a `auth.updateUser`; recovery y primera contraseña Google aprobada omiten esa propiedad, aunque el formulario envíe un valor. El gateway conserva esta separación fuera de presentación. Los códigos del proveedor `current_password_required`/`current_password_mismatch` se convierten al error seguro del campo actual; no se muestran detalles crudos ni se registran credenciales. Esto prepara compatibilidad con el control nativo, pero no lo activa ni acredita enforcement por sí solo.
-- Supabase JS/auth-js 2.116.0 tipa el parámetro; el GoTrue local observado v2.196.0 lo implementa con excepciones para sesión recovery y cuenta sin contraseña previa. CLI 2.117.0 no ofrece una clave TOML para activar `UpdatePasswordRequireCurrentPassword`; no inventar una. `auth.email.secure_password_change` es reautenticación/nonce, no contraseña actual. La activación cloud de «Require current password when changing password» y su verificación corresponden al release coordinado, no a este cambio de source. No se modifican configuración/puertos/env del runtime local existente, bootstrap ADMIN Google ni configuración cloud. La frontera de primera contraseña Google a nivel proveedor sigue pendiente en AUTH-1.
+- El cambio normal transmite además la contraseña actual validada como `current_password` a `auth.updateUser`; recovery y primera contraseña Google aprobada omiten esa propiedad, aunque el formulario envíe un valor. El gateway conserva esta separación fuera de presentación. Los códigos del proveedor `current_password_required`/`current_password_mismatch` se convierten al error seguro del campo actual; no se muestran detalles crudos ni se registran credenciales. La fuente fue liberada en PR 335; la configuración cloud nativa se activó después del deploy, según `docs/DEPLOYMENT.md`.
+- Supabase JS/auth-js 2.116.0 tipa el parámetro; GoTrue implementa excepciones para sesión recovery y cuenta sin contraseña previa. CLI 2.117.0 no ofrece una clave TOML para activar `UpdatePasswordRequireCurrentPassword`; `auth.email.secure_password_change` es reautenticación/nonce, no contraseña actual. El release coordinado confirmó el boolean nativo cloud activo; no se alteró la configuración local ni se reinició el runtime local existente. El proveedor no conoce la aprobación Google interna: la frontera de primera contraseña Google sigue pendiente en AUTH-1.
+
 - SMTP cloud/local está configurado; el usuario confirmó recepción de un correo de prueba local. No equivale a recovery/cambio completo ni a entrega cloud, que permanecen sin verificar. La verificación manual de Google OAuth/allowlist continúa pendiente de forma independiente.
 - La fuente final `8735d676fe0d96e7230b4636efa8cb51045d1eca` (base `ddd0f3de`) pasó 178 unit, 98 integration y full E2E 120/120, además de lint/format/typecheck/build/Drizzle/diff checks; se integró en `development` por PR 136 (`8cdb38f`). Después, PR 211 liberó Fase 6 y PR 228 liberó las correcciones/profile UI. SMTP recovery y Google OAuth real mantienen verificaciones independientes pendientes.
 
+### Estado post-release de enforcement nativo (2026-10-11)
+
+PR 334 integró el envío de `current_password` en `development`; PR 335 liberó el árbol completo de desarrollo a `master` (`07042f851c8d0fe6b133288c088051bad6973bb5`). Después de CI exitoso y Vercel `READY` para ese SHA, se activó en Supabase cloud el boolean nativo `security_update_password_require_current_password` (`false` → `true`), y una lectura filtrada posterior confirmó que seguía activo. El cambio normal valida y envía la contraseña actual. Las sesiones de recovery y el alta de primera contraseña Google aprobada conservan la omisión semántica.
+
+No se ejecutó un flujo autenticado de cambio/recovery/primera contraseña en producción ni se probaron Google OAuth o entrega SMTP real en este release. El usuario había confirmado anteriormente una asociación manual de recovery; esa observación es previa y no acredita compatibilidad con este último release. AUTH-1 permanece abierto/parcial por la frontera del proveedor en la primera contraseña Google y la falta de validación de esos flujos reales. No solicitar/repetir la asociación anterior salvo que se vaya a afirmar compatibilidad de ese flujo.
+
+En el checkout local canónico, `development` está sincronizado con `dbf7f3158f24dccf9f2f271ab8d6a24e715ab291`; el proceso existente (PID 37512) conserva la app en `http://127.0.0.1:4321`, login HTTP 200 y el toast «Solicitud rechazada» al probar una clave inválida. La instancia Auth local observada es GoTrue v2.196.0 y no tiene asignación explícita de `GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD`; esto **no** demuestra que el boolean esté en `false` ni que el control nativo local esté aplicado. El runtime y el WIP de `supabase/config.toml` no se reiniciaron ni modificaron para este release.
+
 La migración aditiva 0014 vincula el perfil profesional con el ID interno estable y añade `courses.instructor_id`, preservando `instructor_name` histórico sin backfill automático. PRs 118–123 integraron Auth, instructores, seed local, auditoría de password y guard de formato; PR 126 los desplegó a producción.
+
+### Seguimiento de identidad autorizada AUTH-1 (2026-10-11)
+
+La regla autorizada no exige que toda primera contraseña se cree exclusivamente
+desde una pantalla de SkillBase. Se acepta la excepción nativa del proveedor para
+una cuenta Google legítima, con correo realmente verificado/coincidente, UUID Auth
+ya vinculado y usuario interno ACTIVE con roles. Esa aprobación debe conservarse
+en todos los accesos posteriores, incluidos PASSWORD y recovery; la credencial
+nueva no autoriza otra identidad ni concede roles. Bootstrap continúa siendo
+invitación ADMIN por correo, sin ROOT y sin fabricar verificación Google desde el
+seed. El formulario de aplicación mantiene su prueba Google reciente de cinco
+minutos y sus revalidaciones live; recovery conserva su prueba acotada separada.
+
+`requireApprovedProviders` aplica esta frontera común desde
+`loadRequestAuthContext`, usado por middleware, login, recovery y gateway de
+password. Para GOOGLE, añadir una identidad email no elimina la aprobación del
+Google primario verificado. Para EMAIL, el acceso password/recovery mantiene la
+propiedad de cuenta verificada y provenance EMAIL internos, independiente de un
+Google autoasociado no aprobado o del unlink nativo de la identidad email.
+No cambia el provisioning, hook, roles, schema, SMTP, Sileo ni secretos.
+
+Esta implementación aislada no acredita enforcement nativo local ni un flujo
+autenticado con ese control activo en producción. La CLI fijada 2.117.0 sigue sin
+mapear una clave TOML al boolean nativo; no se inventa una ni se reinicia el stack
+compartido mientras el seed paralelo está trabajando. AUTH-1 permanece pendiente
+de cierre operacional coordinado, con evidencia de configuración y flujos normales
+autorizados; no repetir procedimientos de bypass del proveedor. Resultados y
+límites en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md).
+
+### Configuración nativa local reproducible (candidata; sin apply canónico)
+
+`scripts/local-auth-config.ts` prepara/verifica únicamente la propiedad nativa
+`GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD=true` para el proceso
+GoTrue v2.196.0. No copia el `.env` de la aplicación ni las credenciales Auth:
+el archivo y su receipt, fuera de Git, contienen una sola clave literal y IDs/hash
+no secretos. El helper exige proyecto/puertos locales conocidos, imagen fijada,
+proceso y cwd esperados, ausencia de conflicto de entorno, archivo regular sin
+symlink y hash exacto. Un archivo/configuración ajenos se rechazan sin sobrescribir.
+
+La CLI 2.117.0 y la 2.120.0 inspeccionadas no ofrecen el mapeo TOML. GoTrue sí
+soporta cargar `.env` desde su cwd `/` cuando no hay flags de configuración: ese
+loader nativo se utiliza bajo ownership explícito y reinicio del mismo contenedor
+Auth, nunca recreación de DB/Storage ni edición de secretos. Es una integración
+del launcher local, **no un hook oficial de Supabase CLI**. El cambio normal sigue
+enviando `current_password`; recovery y primera contraseña siguen las excepciones
+nativas. No introduce una exigencia de contraseña actual inexistente para Google.
+
+El wrapper `scripts/start-local-supabase.ts` reaplica/verifica después del start
+normal mediante `supabase:start`; `supabase:auth:local` ofrece PLAN/apply/verify/
+rollback explícitos. `scripts/dev.ts` exige la verificación antes de servir QA local. Una
+recreación por CLI pierde el archivo de la capa writable: el wrapper debe ejecutarse
+de nuevo. Un CLI alternativo o cambios de contenedor mientras Astro ya corre no
+están monitorizados continuamente; no declarar enforcement perpetuo ni usar ese
+runtime para QA hasta pasar otra vez el launcher. Los runners generales de tests
+no se modifican ni aplican este control implícitamente. Integración de entradas
+package se limita a esas dos entradas; PERF no modifica package en su rama
+inspeccionada. El apply/reinicio canónico y cierre AUTH-1 requieren una ventana
+operativa posterior del orquestador; no ocurrieron durante esta implementación.
+
+La instalación del archivo es operator-owned mediante Docker archive (`docker
+cp --archive -`) de un tar fijo de una sola entrada `.env`, UID/GID 1000 y modo 0444
+independientes de ACLs Windows; se valida también el literal readonly host.
+El proceso Auth permanece como `supabase` y
+no se ejecuta como root ni se modifica su USER, imagen o privilegios. Hash,
+owner/group `1000:1000` y permisos `0444` legibles se verifican antes del restart,
+junto con el UID/GID originales del proceso `supabase`. No se afirma propiedad
+root: Docker instala con el usuario del servicio; ownership significa gestión
+exclusiva del operador y receipt del helper, no resistencia al propietario host
+ni al propio servicio con capacidad de chmod sobre su archivo.
+El helper serializa sus operadores por lock y revalida container ID/archivo
+inmediatamente antes de copiar; Docker archive no ofrece compare-and-swap entre
+operadores ajenos, por lo que exige ventana exclusiva sin otras operaciones
+Docker. No confiar en esta cooperación como control contra el propietario host.
+Rollback sustituye solo su literal por `...=false`, reinicia el mismo Auth y
+mantiene receipt `rolledback` que bloquea QA; no elimina archivos como root. Ese
+rollback restaura el boolean, **no la ausencia física original del archivo**.
+
+La QA temporal propia `skillbase_test_75b42dad4f824a0f` confirmó enforcement
+nativo: cuenta QA recién creada con password conocido recibió
+`current_password_required` al omitirlo; el cambio normal correcto y login
+posterior conservaron UUID. Con el control activo pasaron los ocho E2E Auth
+existentes, retries=0, incluidos primera contraseña Google-only ADMIN y recovery
+acotado. No se añadieron casos/specs/suites. El proveedor Google es fixture
+controlado; no prueba consentimiento Google ni SMTP reales.
+
+Antes/después de apply, recreación CLI propia y rollback se conservaron conteos
+observados y nombres de volúmenes: ledger 24, certificados **0**, un usuario Auth,
+un usuario interno/rol, un bucket y cero objetos antes de preparar la suite. Son
+conteos **del stack aislado**, no los ocho certificados ni cuentas canónicos.
+No fue comparación por hash de todas las filas. Recreación eliminó el archivo y
+el consumidor falló cerrado; reapply recuperó la configuración antes de QA.
+Rollback al literal false conservó su snapshot y bloqueó el consumidor.
+El runner limpió solo su proyecto propio. Esta prueba no activa ni cierra AUTH-1
+en el runtime canónico, que sigue pendiente de revisión/ventana del orquestador.
+Una comprobación separada en `skillbase_test_ab08e1bf1a7e3515` ejecutó el wrapper
+real, comprobó el bloqueo tras recreación CLI directa y reaplicó mediante el
+mismo wrapper antes de habilitar el consumidor. También fue limpiada por el
+runner estricto, sin repetir la suite Auth.
 
 El full E2E Auth PR 118 pasó 104/104 y PR 120 había pasado 107/107 antes de cambios posteriores. Tras restaurar la dependencia opcional Astro Sharp con `bun install --frozen-lockfile`, la fuente final pasó full E2E 107/107 en `127.0.0.1:4321`; el smoke público/privado pasó y el release CI/deploy de PR 126 se completó. Google OAuth real y SMTP/recovery no estaban probados en ese release histórico. El estado operacional vigente de SMTP (configuración cloud/local y receipt local confirmada, límites de recovery/cloud pendientes) está arriba y en `docs/DEPLOYMENT.md`.
 
@@ -195,3 +303,58 @@ compensación de alta solo apunta al UUID recién creado. PR 286 aplicó migrati
 0022 por el pipeline normal; ledger cloud/canónico es 23. La entrega real de
 Google OAuth y recovery/email cloud continúa sin verificarse. Contrato en
 [`ADMIN_ACCOUNTS_CONTRACT.md`](ADMIN_ACCOUNTS_CONTRACT.md).
+
+## Aceptación nativa canónica local — 2026-10-12
+
+Supersede únicamente el estado anterior de «apply canónico pendiente». PR340 se
+integró como `3ca27c003b85b65ae546aed6077caf3afe9de862` tras revisión del source
+`1942a95acfbeb804ca3461d06215f4b74ed58a70` y CI38178212282 SUCCESS: 464 unit,
+176 integración más un skip previo, demos independientes 1/1 cada una y 145 E2E
+sin flakes/retries. El root hizo fast-forward a
+`33578fb1a3369b4f3cddd1a4516ad1c4495eb104` y frozen install preservando WIP y
+archivos privados; el helper coincidió exactamente con el source revisado.
+
+La ventana exclusiva autorizada instaló únicamente el literal nativo true
+readonly y reinició **el mismo Auth** v2.196.0, ID
+`65d0b33548c0cf99be3887a0b5d3014eed2515aa65789c622dd84556d6583d21`, usuario
+`supabase` UID/GID1000/label `skillbase`. No hubo stop/start de Supabase,
+recreación, reset, seed, migración ni reinicio de DB/Storage. Pre/post inmediato,
+antes de QA, coincidió por HMAC server-side en las 78 tablas observadas,
+configuración/IDs/volúmenes de contenedores y hashes de TOML/.env/.env.local.
+Baseline real: ledger24/certificados8/Auth11/internos20/user_roles12/bucket1/
+objetos15/ADMIN activos5. No se imprimieron secretos ni hashes de passwords sin
+protección; evidencia privada fuera de Git con ACL del operador.
+
+Las QA ficticias nuevas se aprovisionaron por el caso de uso administrativo y
+gateway Admin server-side autorizados. No se inició sesión como otro usuario ni
+se cambiaron passwords/roles preexistentes. Una validación estándar del campo
+actual sobre la primera QA confirmó enforcement con `current_password_invalid`.
+La expectativa inicial del script buscaba erróneamente el literal
+`current_password_mismatch`: en la definición oficial v2.196.0,
+`ErrorCodeCurrentPasswordMismatch` significa **`current_password_invalid`**. La
+incidencia se preservó y esa QA se eliminó por la acción lifecycle ofrecida,
+conservando tombstone/intención/auditoría. No se repitió la negativa en la
+aceptación UI siguiente ni se alteró producto para ocultar el resultado.
+
+La segunda QA propia verificó login/éxito Sileo, cambio normal con contraseña
+actual correcta, nuevo login del mismo UUID y auto-desactivación normal tras su
+actividad. El guard rechazó acceso posterior y se revocaron sus sesiones propias.
+Por política conserva Auth/cuenta DISABLED/rol/auditoría; no se borra historia
+para restaurar artificialmente conteos. Resultado: ledger24/certificados8,
+Auth12/internos22/user_roles13/bucket1/objetos15/ADMIN activos5. HMACs de todos
+los usuarios/roles/identidades/sesiones/tokens **preexistentes**, y de negocio,
+Storage y ledger, permanecieron iguales excluyendo solo las dos QA identificadas.
+Auditoría, intención de eliminación y buckets Auth tienen cambios esperados.
+**Refrescar seed PLAN después de esta operación**; no se aplicó ningún seed.
+
+Checkpoint final: app normal4321/PID32228/login200, API54321/DB55322 originales,
+helper verify PASS y WIP hash
+`BBF77E4251CD3CC2F2FF1DFD02FAC41C7B9C582D4C77F8C6DB6F6352F99444C2` intacto.
+Antes del lanzamiento4321 estaba libre; no se detuvo un proceso ajeno. La
+aceptación **local** AUTH-1 queda validada bajo la regla de identidad aprobada y
+los límites documentados; **no es cierre productivo**. Master permanece
+`07042f851c8d0fe6b133288c088051bad6973bb5`, sin la promoción combinada; cloud no
+se modificó. Recovery/primera contraseña Google mantienen evidencia aislada 8/8
+con control activo, no una nueva prueba canónica ni Google OAuth/SMTP reales.
+Rollback sigue siendo literal false, no ausencia física; no hay monitorización
+continua de operadores CLI alternativos.

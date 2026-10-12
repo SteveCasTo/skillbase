@@ -128,6 +128,45 @@ AUTH-1 sigue **abierto/parcial**: enviar el campo no activa enforcement y la
 frontera nativa de primera contraseña Google sigue sin cerrar. No se declara
 remediación completa ni validación productiva.
 
+### AUTH-1: estado tras release coordinado (2026-10-11)
+
+PR 334 se integró en `development` y PR 335 promovió el árbol completo de
+`development` a `master`, SHA
+`07042f851c8d0fe6b133288c088051bad6973bb5`. El CI de PR 334 (`38114811017`),
+PR 335 (`38115248716`) y push/deploy a `master` (`38115724400`) pasó en intento
+
+1. El deployment Vercel `dpl_6uHo1tyU3KPR75whcmWETJDo1Anz` quedó `READY` para el
+   SHA exacto. Solo después se activó el boolean cloud
+   `security_update_password_require_current_password` de `false` a `true`; una
+   lectura filtrada posterior confirmó `true`. Los demás campos cloud comparados
+   permanecieron idénticos. No hubo migración nueva ni reset, seed, cambio de
+   credenciales o contraseña, envío de recovery, ni modificación de Auth local.
+
+El gate CI registró 464 unit/4,036 assertions; 176 integración PASS y 1 skip
+preexistente; suites F8/F9 independientes 1 PASS cada una; y 145 E2E (76+69),
+sin retries/flakes. Estas suites con proveedor controlado no verifican Google o
+SMTP reales ni el enforcement del control cloud. El smoke de producción fue
+anónimo. No se hicieron flujos autenticados de password/recovery/primera
+contraseña Google. La confirmación manual anterior del usuario sobre asociación
+de recovery precede a este release y no se presenta como comprobación de
+compatibilidad actual.
+
+El control nativo activo hace que GoTrue exija la contraseña actual para cuentas
+con password en cambio normal, con excepciones para recovery y cuentas sin
+password previo. Como GoTrue no conoce la aprobación Google de SkillBase, la
+primera contraseña Google aprobada permanece en el boundary AUTH-1 sin resolver
+en el proveedor. El hallazgo queda **abierto/parcial**; no afirmar cierre
+completo ni ausencia de riesgo. Si se revierte el source a una versión que no
+envía `current_password`, restaurar primero el boolean cloud previo `false`.
+
+Estado local observado tras sincronizar el checkout raíz con `development`
+(`dbf7f3158f24dccf9f2f271ab8d6a24e715ab291`): la app preexistente sigue activa en
+`http://127.0.0.1:4321` (PID 37512), login HTTP 200 y feedback de contraseña
+inválida «Solicitud rechazada». Auth local es GoTrue v2.196.0 y la variable
+`GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD` no tiene asignación
+explícita observada. Esto no prueba que el boolean sea `false` ni enforcement
+local; no se reinició el proceso ni se alteró el WIP de configuración local.
+
 Validación local de esta implementación:
 
 - Frozen install, lint, format global, typecheck (0 errores/0 warnings/354 hints),
@@ -146,6 +185,189 @@ Validación local de esta implementación:
   API/config versionadas conservan `55321`; el WIP original `54321` queda fuera
   de este worktree y no se modifica. CI/merge se verifican en el PR antes de
   integrarlo; no se promueve a master desde esta implementación.
+
+### AUTH-1: regla autorizada y guard común de identidad (2026-10-11)
+
+Fuente aislada `fix/auth-identity-authorization`, desde `origin/development`
+`e850190bb96728dd54a05186fe0de42bdf8959ea`. El responsable acepta la primera
+contraseña nativa de una cuenta Google legítima ya vinculada/autorizada, sin exigir
+exclusividad de la pantalla de SkillBase. Sigue exigiendo la misma identidad
+autorizada para cada acceso posterior. No se acepta que un password nuevo sustituya
+la aprobación interna, correo verificado coincidente, UUID vinculado, estado o
+roles. El formulario mantiene prueba Google reciente; la excepción nativa no
+ofrece esa prueba de cinco minutos fuera de la app. Bootstrap ADMIN permanece
+sin ROOT; seed no constituye verificación de identidad Google.
+
+El cambio mínimo en `src/domain/auth/identity.ts` elimina el retorno incondicional
+de PASSWORD/EMAIL_CONFIRMATION: cuentas GOOGLE requieren su Google aprobado,
+verificado y coincidente también después de crear password; una aprobación Google
+explícita registrada no puede sustituirse por el fallback primario legado. Cuentas EMAIL
+conservan provenance interno y correo de cuenta verificado coincidente, incluso
+si se quita la identidad email del proveedor, y conservan password/recovery
+legítimos aunque Auth adjunte Google no aprobado. Añadir identidad email a GOOGLE
+no invalida por sí solo la identidad primaria autorizada. La política se reutiliza
+desde el contexto server-side común; gateway de perfil mantiene `current_password`
+normal, excepciones legítimas y comprobación de sesión live sin modificación.
+No hay migración ni provenance de password nueva; no se cambian hook, provider
+policy cloud, credenciales, roles, seed, Sileo o dependencias.
+
+Validación segura realizada sin requests al proveedor: comprobación manual de la
+política con DTOs íntegramente sintéticos aceptó cinco combinaciones legítimas
+(Google primario tras añadir email en los tres métodos; EMAIL con Google adjunto
+en password/recovery) y rechazó 24 combinaciones de UUID/email/verificación Google
+incompatibles, Google ausente, usuario DISABLED y roles vacíos en los tres métodos.
+La comprobación adicional rechazó tres mismatches del ID Google aprobado
+registrado, uno por cada método. No demuestra una sesión Google real ni una
+operación nativa de password. Las
+464 unitarias existentes pasaron con 4.036 assertions sin añadir/modificar
+tests/casos/suites. La primera integración no llegó a ejecutar tests por fallo de
+arranque del stack temporal; no se atribuye causa no demostrada ni se oculta como
+PASS.
+
+La segunda integración ejecutó 175 PASS/1 FAIL/1 skip preexistente. El fallo
+existente mostró que exigir la presencia actual de identidad email bloqueaba
+password legítimo de una cuenta EMAIL tras unlink nativo, aun conservando su
+provenance interno, UUID y correo de cuenta verificado. Se corrigió el guard para
+conservar esa autorización independiente; no se modificó/eliminó el test ni se
+debilitó su rechazo OAuth no aprobado. Ese resultado fallido no se presenta como
+gate verde; se requiere validación posterior de la fuente corregida.
+
+Los E2E Auth existentes (`dual-auth`, `google-association`,
+`password-hydration`) pasaron 8/8 en Astro aislado `4347`, retries=0, con provider
+controlado y SMTP externo eliminado. Incluyen primera contraseña Google-only
+ADMIN, login posterior y recovery acotado, linking aprobado/no aprobado, password
+actual y fallback sin JavaScript. No se activó el control nativo en ese stack;
+no acredita enforcement cloud/local ni consentimiento Google o entrega SMTP real.
+Frozen install, lint/format global, typecheck (0 errores/0 warnings/354 hints),
+build con placeholders públicos sintéticos y `git diff --check` pasaron. El build
+no conectó a la DB compartida. El ajuste final del fallback registrado se verificó
+de nuevo con las 464 unitarias; el gate remoto y cierre operacional siguen
+separados.
+
+La repetición focal posterior obtuvo 7 PASS/1 FAIL, retries=0: el test de login
+falló antes de autenticar, en el toggle por teclado del campo password (esperaba
+`type=text`, permaneció `password`). No se atribuye todavía causa ni se modifica
+UI/test ajenos para ocultarlo. Una invocación de build posterior alcanzó timeout
+de shell durante el bundling Vercel; los builds previos sí finalizaron. Esos
+resultados no se presentan como nueva corrida final verde.
+
+La fuente corregida `8c05b83` pasó después integración completa **176 PASS/0
+FAIL/1 skip preexistente**, 1.441 assertions, y E2E Auth focal **8/8 PASS** en
+`4347` con retries=0. No se cambió el toggle ni su test; el pase posterior no
+establece causa raíz de la failure anterior. El build dedicado con timeout
+suficiente finalizó PASS y `git diff --check` pasó. Los runners limpiaron sus
+stacks propios; no usaron el stack canónico. Estas validaciones preservan la
+compatibilidad funcional con proveedor controlado, no demuestran el boolean
+nativo activo en ese proveedor ni cierran el gate operacional pendiente.
+
+Estado: **pendiente de cierre operacional**, no resuelto por esta inspección.
+Cloud conserva el control nativo previamente confirmado activo, sin cambios en
+esta tarea. La documentación oficial y GoTrue v2.196.0 confirman campo y
+excepciones; CLI 2.117.0 no tiene mapeo TOML del control. No se reinició ni modificó
+el runtime/configuración WIP local compartido. Antes de cerrar, coordinar con el
+orquestador una vía local soportada, comprobar el control efectivo y demostrar
+flujos normales autorizados con QA propia y el control activo. Consentimiento
+Google/SMTP real requiere autorización manual independiente. No reproducir
+procedimientos de bypass del proveedor ni rotar passwords de cuentas existentes.
+
+### AUTH-1: helper nativo local y aceptación aislada (candidata)
+
+PR337 se integró en development como `2bd5d052` con CI38175262811 SUCCESS;
+145 E2E tuvieron 1 flaky/2 retries. Se recuperó la evidencia: courses.spec.ts:913
+falló primer intento/retry1 por selector genérico de error Sileo que encontró dos
+avisos legítimos activos. La corrección candidata restringe únicamente esa
+expectativa existente al mensaje de respuesta de guardado inválida, sin borrar
+avisos, escoger `.first()`, cambiar duración/timeouts/retries ni tocar Sileo.
+La prueba existente afectada pasó una vez, aislada en `4347`, **1/1 PASS** con
+retries=0. No se añadió ningún test/caso/suite ni se repitió el full gate local.
+
+La candidata `fix/local-native-auth-control` implementa literal nativo único,
+imagen/process/user/cwd fijados, hash/archivo regular sin symlink, owner1000:1000
+readonly0444, receipt/lock exclusivos y launcher start+guard dev. Docker archive
+gestiona el archivo como operador, no ejecuta Auth/root ni copia secretos. Su
+API no ofrece CAS ante operadores host ajenos: exige ventana exclusiva. El
+servicio/host que puede chmod el archivo no queda protegido por esa propiedad;
+no existe monitorización continua después del inicio de Astro. Rollback restaura
+false en el archivo propio, no ausencia física, y bloquea QA. No hay clave TOML
+inventada, upgrade CLI, nuevas dependencias ni casos/specs/suites permanentes.
+
+Después de fallos acotados de precondición/instalación (sin activación), la QA
+propia `skillbase_test_75b42dad4f824a0f` confirmó nativamente
+`current_password_required` sobre cuenta nueva conocida al omitir contraseña
+actual, cambio correcto y login con el mismo UUID. Con el control activo pasaron
+8/8 E2E Auth existentes, retries=0, incluidas primera contraseña Google-only
+ADMIN y recovery acotado. Apply, recreación CLI propia/reapply y rollback
+conservaron snapshots de conteos y volúmenes; el consumidor rechazó configuración
+ausente/rollback. Baseline aislado: ledger24, certificados0, Auth users1, internal
+users1, roles1, buckets1, objects0. No es inventario canónico ni hash de todas las
+filas. Stacks propios limpiados por runner estricto, no reset/seed canónico.
+El wrapper real se verificó además en proyecto aislado independiente
+`skillbase_test_ab08e1bf1a7e3515`: start verificado, consumer rechazado tras
+recreación CLI alternativa y wrapper reaplicado antes de QA. No se repitieron
+tests Auth para esa comprobación operacional manual.
+
+Estado sigue **parcial operacional**: no se aplicó/reinició Auth canónico ni cloud,
+no se rotaron cuentas existentes ni se probaron consentimiento Google/SMTP reales.
+La revisión del orquestador y la ventana canónica siguen siendo gates separados.
+
+La revisión independiente exigió comprobar además la etiqueta oficial
+`Config.Labels["com.supabase.cli.project"]` contra el proyecto esperado. El
+helper ahora falla cerrado con etiqueta ausente/null/vacía/diferente en la
+inspección inicial, la revalidación antes de archive copy, inmediatamente antes
+del restart y después del restart. No basta el nombre del contenedor. La lectura
+filtrada canónica confirmó etiqueta `skillbase`, sin mutación. Una comprobación
+manual temporal del mismo source con adaptador spawn sustituido por fixtures
+sintéticos rechazó las cuatro variantes antes de exec/mutación y aceptó la
+etiqueta correcta; no añadió tests/casos/suites permanentes ni ejecutó requests
+al proveedor. Los ocho E2E nativos previos son evidencia del source anterior,
+no una nueva corrida del HEAD con este guard. El nuevo HEAD requiere CI completo
+y aceptación específica de revisión antes de integrar; no usar el CI anterior
+para el merge ni aplicar al canónico.
+
+### AUTH-1: aceptación operacional canónica local (2026-10-12)
+
+Source root `33578fb1a3369b4f3cddd1a4516ad1c4495eb104`; helper idéntico a
+`1942a95` revisado/CI38178212282 verde y merge PR340 `3ca27c0`. Frozen install
+conservó lockfile/config WIP/archivos privados. Ventana exclusiva autorizada:
+solo literal nativo true/readonly y restart del mismo Auth v2.196.0/UID1000/
+labelskillbase; no Supabase stop/start, DB/Storage restart, reset, seed, migración,
+root exec ni modificación cloud/master. Preservación pre/post inmediata por HMAC
+server-side de 78 tablas/configs/volúmenes/archivos privados: PASS, ledger24,
+certificados8/Auth11/internos20/roles12/bucket1/objetos15/ADMIN activos5.
+
+QA nuevas por caso de uso administrativo autorizado, sin sesión/credencial ajena:
+enforcement nativo observado como `current_password_invalid` ante campo actual
+inválido propio. La expectativa inicial confundió el nombre del enum
+`ErrorCodeCurrentPasswordMismatch` con su valor; la definición oficial
+[`v2.196.0/errorcode.go`](https://github.com/supabase/auth/blob/v2.196.0/internal/api/apierrors/errorcode.go)
+confirma ese literal. Se conservó el fallo operacional; la QA inicial se eliminó
+con el lifecycle ofrecido, no se alteró producto ni se repitió la negativa en
+la siguiente aceptación UI. La segunda QA pasó login/éxito Sileo, cambio normal
+con password actual correcto, login del mismo UUID y auto-desactivación con
+denegación posterior/sesiones propias revocadas. No pruebas de bypass/proveedor
+Google no aprobado, no credenciales reales rotadas, no nuevos tests permanentes.
+
+QA1 internal `c1f93569-4ae6-4fa3-94cc-584a8c3fbfb6`, Auth
+`e4153ed7-a004-4992-b442-b3709407a706`: Auth eliminado, tombstone/intención/auditoría
+conservados. QA2 internal `e46a130a-39bd-4b11-bc3a-8037430afda6`, Auth
+`fc737684-902d-405c-a73f-1c1ac7b852d9`: DISABLED con historia/Auth/rol retenidos
+porque ya tuvo actividad. UUIDs exclusivos ficticios para acotar cleanup, no
+datos de usuarios reales. HMACs de filas preexistentes de usuarios/roles/identidades/
+sesiones/tokens, negocio/finanzas/certificados/Storage/ledger: PASS. Baseline final
+ledger24/certificados8/Auth12/internos22/roles13/bucket1/objetos15/ADMIN activos5;
+auditoría/buckets y evidencia QA son drift esperado. **Refrescar seed PLAN** antes
+de APPLY; no borrar historia para simular baseline íntegramente restaurado.
+
+App normal4321/PID32228/login200, API54321/DB55322 originales, helper verify PASS,
+WIP SHA256 `BBF77E4251CD3CC2F2FF1DFD02FAC41C7B9C582D4C77F8C6DB6F6352F99444C2` intacto.
+Antes del lanzamiento4321 estaba libre; no se mató un proceso ajeno. Evidencia
+HMAC/JSON privada en `Temp/opencode/auth-canonical-native-evidence`, ACL del
+operador; archivos temporales con passwords QA eliminados. La aceptación local
+AUTH-1 queda validada bajo la regla aprobada; estado **productivo pendiente** de
+promoción combinada a master, aún `07042f851c8d0fe6b133288c088051bad6973bb5`.
+Cloud no se modificó y no se repitieron Google OAuth/SMTP/recovery reales. Límites
+operador/CAS, readonlyowner1000, rollback false/no ausencia y CLI alternativo
+siguen explícitos; no se afirma ausencia universal de riesgos ni auditoría global.
 
 ### DEP-1: versiones corregidas fijadas
 

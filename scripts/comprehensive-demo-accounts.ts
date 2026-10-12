@@ -17,16 +17,18 @@ import * as s from "@/server/db/schema";
 import {
   COMPREHENSIVE_DEMO_OWNER,
   comprehensiveDemoId,
+  realisticInstructorNames,
+  realisticAdminNames,
 } from "./comprehensive-demo-plan";
 
-const definitions = [
+const naturalDefinitions = [
   ...Array.from({ length: 4 }, (_, i) => ({
     key: `instructor-${i}`,
-    name: `[DEMO] Docente ${i + 1}`,
+    name: realisticInstructorNames[i]!.join(" "),
     role: "INSTRUCTOR" as const,
   })),
   ...["operator", "unused", "disabled", "reactivated", "deleted"].map(
-    (key) => ({ key, name: `[DEMO] ADMIN ${key}`, role: "ADMIN" as const }),
+    (key) => ({ key, name: realisticAdminNames[key]!, role: "ADMIN" as const }),
   ),
 ];
 const emailFor = (key: string) => `comprehensive.v1.${key}@example.test`;
@@ -50,7 +52,16 @@ export async function provisionComprehensiveAccounts(
   actor: InternalUser,
   password: string,
   apply: boolean,
+  legacyLabels = false,
 ) {
+  const definitions = naturalDefinitions.map((definition) => ({
+    ...definition,
+    name: legacyLabels
+      ? definition.role === "INSTRUCTOR"
+        ? `[DEMO] Docente ${Number(definition.key.slice(-1)) + 1}`
+        : `[DEMO] ADMIN ${definition.key}`
+      : definition.name,
+  }));
   if (apply) requirePassword(password);
   const identities = await ownedIdentities(auth);
   const authRepo = new DrizzleAuthUserRepository(db);
@@ -242,8 +253,16 @@ export async function provisionComprehensiveAccounts(
             name: definition.name,
             password,
             profile: {
-              firstName: "Docente",
-              lastName: `Demo ${definition.key.slice(-1)}`,
+              firstName: legacyLabels
+                ? "Docente"
+                : realisticInstructorNames[
+                    Number(definition.key.slice(-1))
+                  ]![0],
+              lastName: legacyLabels
+                ? `Demo ${definition.key.slice(-1)}`
+                : realisticInstructorNames[
+                    Number(definition.key.slice(-1))
+                  ]![1],
               phone: null,
             },
           },
@@ -329,7 +348,11 @@ export async function provisionComprehensiveAccounts(
           repo,
           own,
           id,
-          `${definition.name} · con actividad`,
+          legacyLabels
+            ? `${definition.name} · con actividad`
+            : definition.key === "disabled"
+              ? "Isabel Alcázar Molina Rojas"
+              : "Tomás Rivero Salinas Vega",
           row.revision,
         );
         const disabled = await mutateAdminAccount(

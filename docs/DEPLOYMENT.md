@@ -562,3 +562,118 @@ de Google y recovery end-to-end local/cloud se coordinan con el usuario en Fase
 documental. El handoff de credenciales está en
 `Temp/opencode/skillbase-demo-access/original-local-f9-credentials.json`, ACL
 privada; no copiar secretos a Git/documentación.
+
+## Release de enforcement nativo de contraseña actual — PR 334/335 (2026-10-11)
+
+PR 334 (`d4714a08ac0a473aed888a23f316b7287a5529bc`) integró en `development`
+la transmisión de `current_password` para cambios normales. PR 335 promovió el
+árbol completo de desarrollo (no solo Auth) a `master` como
+`07042f851c8d0fe6b133288c088051bad6973bb5`; PR 334 se integró mediante merge
+`dbf7f3158f24dccf9f2f271ab8d6a24e715ab291`. No hubo migraciones nuevas; el
+ledger cloud siguió en 24, sin reset ni seed.
+
+Los CI de PR 334 (`38114811017`), PR 335 (`38115248716`) y push/deploy a master
+(`38115724400`) fueron SUCCESS en primer intento: 464 unit (4,036 assertions),
+176 integration PASS más un skip preexistente, F8 1/1 y F9 1/1 en runners
+independientes, y 145 E2E (76+69), sin retries ni flakes. El deployment Vercel
+`dpl_6uHo1tyU3KPR75whcmWETJDo1Anz` quedó `READY` para el SHA exacto con alias
+`https://skillbase-alpha.vercel.app`.
+
+Después de verificar deployment y gates se activó únicamente el boolean Auth
+cloud `security_update_password_require_current_password` (`false` → `true`);
+una lectura filtrada posterior confirmó que continuaba activo y que los demás
+campos comparados no cambiaron. No se ejecutó rollback. Si se revierte a código
+que no reenvía `current_password`, restaurar primero el valor nativo previo
+`false`. No usar `supabase config push` para revertir o activar este control.
+
+El smoke productivo fue anónimo: GET `/`, `/cursos`, `/login` y
+`/recuperar-contrasena` dieron 200; `/app`, `/app/perfil/contrasena` y
+`/app/administradores` redirigieron 303 a login con `private, no-store`. No se
+probó en producción un cambio autenticado, recovery, primera contraseña Google,
+Google OAuth real ni entrega SMTP. El usuario había confirmado antes una
+asociación manual de recovery; no se repitió y no se usa como evidencia de
+compatibilidad con este release. AUTH-1 queda abierto/parcial por el boundary de
+primera contraseña Google y la ausencia de ejecución real de los flujos. Ver
+[`AUTHENTICATION.md`](AUTHENTICATION.md) y el detalle de límites en
+[`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md).
+
+El checkout local canónico quedó en `development` sincronizado con merge
+`dbf7f3158f24dccf9f2f271ab8d6a24e715ab291`. El proceso de desarrollo existente
+(PID 37512) sigue sirviendo `http://127.0.0.1:4321` (login HTTP 200); no se
+reinició ni se cambió el WIP local de `supabase/config.toml`. GoTrue local
+observado es v2.196.0 y no presenta asignación explícita de
+`GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD`; no inferir que el
+control local esté en `false` ni verificado. La configuración nativa cloud
+`true` documentada arriba no implica sincronización/configuración del Supabase
+local.
+
+## Launcher nativo Auth local (candidato; operación canónica pendiente)
+
+PR 337 integró en `development` el guard de identidad común como
+`2bd5d05244fb151501dfe8cda8249cb0d0b8fe40`; CI `38175262811` pasó quality,
+integration y ambas shards E2E, además del agregador requerido. La cohorte tuvo
+145 casos, **1 flaky y 2 retries**; no fue first-pass limpio. Deploy se omitió por
+ser PR a development; no se promovió a master ni cambió cloud.
+
+La candidata local añade un helper/launcher limitado a GoTrue v2.196.0 y una
+verificación antes del nuevo `dev`. CLI 2.117.0 y 2.120.0 no tienen mapeo TOML del
+boolean nativo: `secure_password_change` sigue siendo nonce/reautenticación. El
+helper utiliza el loader oficial de archivo de GoTrue, no una clave inventada ni
+`config push`. Su archivo de una clave y receipt quedan fuera de Git y no incluyen
+secretos. La capa writable no sobrevive recreación de contenedor; reapply/verify
+es parte obligatoria del launcher normal, no una promesa de monitorización
+continua ni soporte oficial del lifecycle CLI para ese archivo.
+
+La operación canónica sigue bloqueada hasta revisión y ventana del orquestador:
+preservar WIP por hash, API runtime 54321, DB 55322, identidad/imagen Auth,
+volúmenes DB/Storage y snapshot vigente de ledger/certificados/usuarios. No usar
+los conteos del stack aislado como conteos canónicos. Apply reinicia únicamente
+Auth, no la app/otros servicios, y conserva el mismo container ID; después deben
+comprobarse salud, preservación y flujos QA autorizados. No reset, seed, migración,
+cambio cloud ni rotación de una cuenta existente. Rollback restaura exclusivamente
+el boolean previo con literal `false` en el archivo propio (no su ausencia física)
+y reinicia el mismo Auth bajo coordinación, sin exec root ni USER/privilegios
+nuevos. Instalación operator-owned readonly vía Docker archive exige ventana
+exclusiva: su API no tiene CAS frente a comandos Docker ajenos. AUTH-1
+permanece parcial hasta configurar/verificar el runtime canónico y completar su
+aceptación; una prueba aislada no acredita OAuth Google/SMTP reales.
+
+La verificación aislada del helper confirmó control nativo efectivo sobre una
+cuenta nueva propia, cambio normal con password actual conocido y login posterior
+con el mismo UUID. Los ocho E2E Auth existentes pasaron con ese control activo,
+sin retries, preservando primera contraseña Google aprobada y recovery acotado.
+La recreación CLI propia exigió reapply y bloqueó el consumidor sin archivo;
+apply/rollback conservaron conteos/volúmenes del stack aislado. Baseline observado:
+ledger24/certificados0/Auth users1/internal users1/roles1/buckets1/objects0, no
+inventario canónico ni comparación de hashes fila por fila. Es evidencia de
+compatibilidad local controlada, no configuración cloud/canónica ni cierre
+operacional AUTH-1. La ventana canónica debe revisar límites de owner1000,
+operación Docker exclusiva y rollback false antes de aplicar.
+
+## Ventana Auth canónica local completada — 2026-10-12
+
+Tras revisión/CI verdes del mismo source PR340 (`1942a95`, merge `3ca27c0`), root
+avanzó por fast-forward a `33578fb1` preservando el único WIP TOML, SHA256
+`BBF77E4251CD3CC2F2FF1DFD02FAC41C7B9C582D4C77F8C6DB6F6352F99444C2`, y archivos
+privados. El helper exacto revisado aplicó el literal nativo true y reinició solo
+el mismo Auth v2.196.0, no Supabase completo/DB/Storage. IDs/configs/volúmenes y
+API54321/DB55322 quedaron intactos. Pre/post inmediato comparó HMAC server-side de
+78 tablas y archivos/configs, baseline real ledger24/certificados8/Auth11/
+internos20/roles12/bucket1/objetos15/ADMIN activos5, sin diferencias.
+
+La QA nueva propia confirmó control nativo y flujo UI normal: login Sileo,
+contraseña actual correcta, login del mismo UUID y lifecycle/denegación tras
+desactivar. Una QA inicial nunca usada por la app se eliminó conservando
+tombstone/intención; la otra, con actividad, queda DISABLED/Auth/rol/auditoría según
+política. HMACs de cuentas/roles/identidades/sesiones/tokens preexistentes y negocio,
+certificados, finanzas, Storage/ledger permanecieron iguales. Baseline final:
+ledger24/certificados8/Auth12/internos22/roles13/bucket1/objetos15/ADMIN activos5.
+Auditoría/buckets técnicos cambian legítimamente: **refrescar PLAN antes de APPLY**.
+No seed ni migración; no rotación de credenciales existentes.
+
+La app normal se lanzó por `bun run dev` después de verify nativo, al estar4321
+libre: checkpoint PID32228/login200, API54321/healthv2.196.0 y DB55322. No es
+servidor E2E temporal y no se detuvo ningún proceso ajeno. Cloud/master
+`07042f851c8d0fe6b133288c088051bad6973bb5` no se modificaron; promoción combinada
+y gates de release siguen siendo del orquestador. Aceptación local AUTH-1 no
+certifica producción/Google/SMTP reales. Detalles en [`AUTHENTICATION.md`](AUTHENTICATION.md).

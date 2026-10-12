@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as s from "@/server/db/schema";
 import type { RegistrationDatabase } from "@/server/db/repositories/registration-support";
@@ -113,10 +113,17 @@ async function planCertificates(
       .select()
       .from(s.users)
       .where(eq(s.users.id, actorId));
+    const [operatorMarker] = await tx
+      .select()
+      .from(s.auditEvents)
+      .where(eq(s.auditEvents.id, comprehensiveDemoId("account:operator")));
     if (
       !actor ||
       actor.email !== "comprehensive.v1.operator@example.test" ||
-      !actor.name.toLowerCase().includes("demo") ||
+      operatorMarker?.entityId !== actorId ||
+      operatorMarker?.actorId !== options.actorId ||
+      operatorMarker?.metadata.seedOwner !== COMPREHENSIVE_DEMO_OWNER ||
+      operatorMarker?.action !== "DEMO_SEEDED" ||
       actor.status !== "ACTIVE"
     )
       throw new Error("Known fictitious F8 operator required");
@@ -163,12 +170,21 @@ async function planCertificates(
         .select()
         .from(s.groups)
         .where(eq(s.groups.id, groupId));
+      const [courseMarker] = await tx
+        .select()
+        .from(s.auditEvents)
+        .where(
+          eq(s.auditEvents.id, comprehensiveDemoId(`course-marker:${key}`)),
+        );
       if (
         !state?.closed ||
         !version ||
         !course ||
         !group ||
-        !version.report.courseName.includes("[DEMO]") ||
+        courseMarker?.entityId !== owned.courseId ||
+        courseMarker?.actorId !== options.actorId ||
+        courseMarker?.metadata.seedOwner !== COMPREHENSIVE_DEMO_OWNER ||
+        courseMarker?.action !== "DEMO_SEEDED" ||
         !context.instructors.includes(version.report.instructorId ?? "") ||
         version.report.instructorId !== course.instructorId
       )
@@ -176,10 +192,32 @@ async function planCertificates(
           "PLAN BLOCK: current closed F8 DEMO source with assigned snapshot instructor required",
         );
       sources.push({ state, version, course, group });
+      const registrations = await tx
+        .select()
+        .from(s.preRegistrations)
+        .where(
+          inArray(
+            s.preRegistrations.id,
+            Object.entries(context.registrations)
+              .filter(([registrationKey]) =>
+                registrationKey.startsWith(`${key}:`),
+              )
+              .map(([, id]) => id),
+          ),
+        );
+      const participantIds = new Set(
+        registrations
+          .filter((registration) => registration.courseId === course.id)
+          .map((registration) => registration.participantId),
+      );
       for (const type of ["APPROVAL", "INSTRUCTOR"] as const) {
         for (const recipient of certificateRecipients(version.report, type)) {
-          if (!recipient.name.toLowerCase().includes("demo"))
-            throw new Error("Real recipient forbidden");
+          if (
+            type === "APPROVAL"
+              ? !participantIds.has(recipient.id)
+              : !context.instructors.includes(recipient.id)
+          )
+            throw new Error("Unowned recipient forbidden");
           const fixtureKey = `${key}:${type}:${recipient.id}`;
           fixtures.push({
             key: fixtureKey,

@@ -446,4 +446,40 @@ PR 332 fija únicamente las correcciones transitivas Sharp 0.35.5/devalue 5.9.3
 mediante overrides/lockfile, conservando Astro y el patch Sileo. Validaciones y
 límites están en el seguimiento del documento de auditoría.
 
-La implementación defensiva posterior transmite `current_password` en el cambio normal después de la verificación server-side existente. Recovery validado y primera contraseña Google aprobada no transmiten contraseña actual. No se activa ni se desactiva ningún control nativo desde la aplicación y no se cambian secretos, roles, sesiones, migraciones, provisioning ni configuración cloud/local. GoTrue v2.196.0 soporta el parámetro, pero su comprobación requiere activar por separado el control de contraseña actual; `secure_password_change` no es equivalente y CLI 2.117.0 no lo expone en TOML. AUTH-1 permanece abierto: el envío del campo no prueba enforcement desplegado y el proveedor exime cuentas sin contraseña previa sin conocer la aprobación Google interna. El gate de release debe verificar configuración compatible y flujos legítimos; no declarar solucionada esa frontera de primera contraseña.
+La implementación defensiva transmite `current_password` en el cambio normal después de la verificación server-side existente. Recovery validado y primera contraseña Google aprobada no transmiten contraseña actual. Tras el release de PR 335, el boolean nativo cloud `security_update_password_require_current_password` se cambió de `false` a `true` y se confirmó activo por lectura filtrada. No se cambiaron secretos, roles, sesiones, migraciones, provisioning, configuración local ni otros campos de configuración cloud. El envío del campo más el control nativo protegen el cambio normal con contraseña previa, pero el proveedor exime cuentas sin password y no conoce la aprobación Google interna. No se probaron en producción cambios autenticados, recovery, primera contraseña Google ni OAuth/SMTP real; AUTH-1 sigue **abierto/parcial**, no completamente remediado. Evidencia y límites constan en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md) y [`AUTHENTICATION.md`](AUTHENTICATION.md).
+
+El seguimiento de identidad autorizada acepta explícitamente que una primera
+contraseña de la misma cuenta Google legítima pueda establecerse por el mecanismo
+nativo soportado, no exclusivamente por la pantalla de la app. No acepta acceso de
+otro UUID, correo no verificado/diferente, usuario deshabilitado/sin roles ni
+Google no aprobado. El guard común revalida identidad de cuenta también en
+PASSWORD y EMAIL_CONFIRMATION: GOOGLE conserva su Google verificado coincidente
+tras añadir email/password; EMAIL conserva provenance interno y propiedad de
+cuenta verificada aun con unlink nativo de la identidad email, y OAuth
+sigue requiriendo asociación Google aprobada. La app mantiene prueba Google
+reciente para su propio formulario y prueba recovery ligada a sesión. La
+excepción del proveedor no se describe como una garantía de prueba OAuth de cinco
+minutos fuera de la app. Esta decisión y el fix no son certificación global ni
+cierre operacional: faltan los gates coordinados descritos en la auditoría.
+
+El 2026-10-12 se completó la aceptación operacional **local** autorizada de
+PR337/340 con el helper exacto revisado: control nativo true sobre el mismo
+GoTrue v2.196.0 y login Sileo/cambio normal con contraseña actual/login del mismo
+UUID, seguido de lifecycle/denegación sobre QA nuevas propias. Pre/post inmediato
+preservó HMACs de 78 tablas/configs/volúmenes; después de QA se preservaron
+cuentas/roles/sesiones/identidades/tokens preexistentes y negocio/Storage/ledger.
+Las dos QA conservan solo su evidencia lifecycle legítima (una eliminada con
+tombstone, otra DISABLED por actividad); nuevas filas de auditoría/buckets son
+esperadas y requieren nuevo seed PLAN. No se modificaron passwords/roles
+existentes, se fabricaron sesiones Google ni se hicieron procedimientos de
+bypass/conversión. El proveedor retornó el código oficial
+`current_password_invalid`, que el script inicial había confundido con el nombre
+del enum; se preservó esa incidencia sin presentar una primera corrida limpia.
+
+La evidencia local no cierra el estado productivo AUTH-1: master sigue en PR335,
+la promoción combinada corresponde al orquestador y cloud quedó sin cambios.
+Google OAuth/SMTP real y recovery canónico no se verificaron de nuevo; permanecen
+separados de los ocho E2E controlados con enforcement activo. Se conservan los
+límites de operador exclusivo/sin CAS externo, file owner1000/readonly no inmune
+a chmod, rollback false sin restaurar ausencia física y falta de vigilancia
+continua de CLI alternativo. No es una certificación global de seguridad.
