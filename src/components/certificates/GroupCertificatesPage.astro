@@ -4,7 +4,6 @@ import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
 import GenerationForm from "./GenerationForm.astro";
 import { certificateStateLabel, certificateTypeLabel } from "./presentation";
-import { buttonVariants } from "@/components/ui/button";
 import type { GroupCertificateProps } from "./group-route";
 type Props = GroupCertificateProps;
 const {
@@ -40,7 +39,7 @@ const base = `${prefix}/${courseId}/grupos/${groupId}`;
       },
     ]}
   />
-  <header class="mt-5 flex flex-wrap items-start justify-between gap-4">
+  <header class="mt-5">
     <div class="min-w-0">
       <h1 class="text-3xl font-semibold tracking-tight">
         Certificados del grupo
@@ -50,14 +49,6 @@ const base = `${prefix}/${courseId}/grupos/${groupId}`;
         {groupName ? ` · ${groupName}` : ""}
       </p>
     </div>
-    {!instructorRoute && (
-      <a
-        href="/app/configuracion/certificados"
-        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
-      >
-        Configurar firmantes
-      </a>
-    )}
   </header>
   {!load.available ? (
     <RegistrationPageError
