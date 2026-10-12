@@ -92,13 +92,13 @@ async function closeOfficialGroup(page: Page, fixture: Fixture) {
   expect(response.status()).toBe(200);
   return state(page, fixture);
 }
-async function settings(page: Page) {
+async function settings(page: Page, fixtureKey: string) {
   await page.goto("/app/configuracion/certificados");
   await expect(page).toHaveURL(/\/app\/configuracion#firmantes$/);
   for (const [id, name] of [
-    ["departmentHead.name", "Jefatura ficticia QA"],
-    ["director.name", "Dirección ficticia QA"],
-    ["dean.name", "Decanato ficticio QA"],
+    ["departmentHead.name", `Jefatura ficticia QA ${fixtureKey}`],
+    ["director.name", `Dirección ficticia QA ${fixtureKey}`],
+    ["dean.name", `Decanato ficticio QA ${fixtureKey}`],
   ]) {
     const form = page.locator(
       `[data-certificate-settings-field][data-edit-field="${id}"]`,
@@ -309,7 +309,7 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
       .getByRole("button", { name: "Generar PDF", exact: true })
       .all())
       await expect(button).toBeDisabled();
-    await settings(page);
+    await settings(page, fixture.course.id.slice(0, 8));
     await page.setViewportSize({ width: 1440, height: 1000 });
     await assertNoOverflow(page);
     await page.screenshot({
@@ -534,6 +534,7 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
     });
     await replaceForm
       .getByRole("combobox", { name: "Titular del reemplazo" })
+      .and(replaceForm.locator("button"))
       .click();
     await page
       .getByRole("option", { name: record.data.recipientName, exact: true })
@@ -598,7 +599,7 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
     await instructor.clock.setFixedTime(fixture.now);
     instructorPage = await instructor.newPage();
     await closeOfficialGroup(page, fixture);
-    await settings(page);
+    await settings(page, fixture.course.id.slice(0, 8));
     const approval = await generate(page, fixture);
     await uploadReviewIssue(page, approval, await signedFixture());
     const teacherCertificate = await generate(page, fixture, "INSTRUCTOR");

@@ -9,6 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/private-nav/Skeleton";
+import { notifications } from "@/lib/notifications";
 
 function Preview({
   type,
@@ -26,6 +27,8 @@ function Preview({
     if (!open) return;
     const abort = new AbortController();
     let objectUrl = "";
+    const id = `certificate-preview-${crypto.randomUUID()}`;
+    notifications.loading({ id, title: "Cargando vista previa…" });
     void (async () => {
       try {
         const response = await fetch(endpoint, {
@@ -44,17 +47,21 @@ function Preview({
         if (abort.signal.aborted) return;
         objectUrl = URL.createObjectURL(blob);
         setUrl(objectUrl);
+        notifications.dismiss(id);
       } catch (failure) {
-        if (!abort.signal.aborted)
-          setError(
+        if (!abort.signal.aborted) {
+          const message =
             failure instanceof Error
               ? failure.message
-              : "No se pudo cargar la vista previa.",
-          );
+              : "No se pudo cargar la vista previa.";
+          setError("Vista previa no disponible.");
+          notifications.error({ id, title: message });
+        }
       }
     })();
     return () => {
       abort.abort();
+      notifications.dismiss(id);
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [open, endpoint, attempt]);
@@ -76,8 +83,7 @@ function Preview({
             {label.replace("Previsualizar", "Vista previa de")}
           </DialogTitle>
           <DialogDescription>
-            Configuración guardada. Los datos del curso y destinatario son de
-            muestra; no se emite un certificado.
+            Vista previa con la configuración guardada.
           </DialogDescription>
         </DialogHeader>
         {error ? (

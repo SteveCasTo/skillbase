@@ -68,10 +68,10 @@ function initialize() {
         if (!response.ok || !payload.ok || !payload.value) {
           const fieldError = payload.issues?.[form.dataset.editField!];
           error.textContent = fieldError ?? "";
-          general.textContent = fieldError ? "" : payload.message;
           input.setAttribute("aria-invalid", String(Boolean(fieldError)));
           if (payload.code === "CONCURRENT_UPDATE") refresh.hidden = false;
-          notifications.dismiss(id);
+          if (fieldError) notifications.dismiss(id);
+          else notifications.error({ id, title: payload.message });
           return;
         }
         for (const peer of forms) {
@@ -95,10 +95,12 @@ function initialize() {
         notifications.success({ id, title: "Configuración guardada." });
         saved = true;
       } catch {
-        general.textContent =
-          "No se pudo confirmar el guardado. Recarga los valores vigentes antes de reintentar.";
         refresh.hidden = false;
-        notifications.dismiss(id);
+        notifications.error({
+          id,
+          title:
+            "No se pudo confirmar el guardado. Recarga los valores vigentes antes de reintentar.",
+        });
       } finally {
         delete form.dataset.pending;
         form.removeAttribute("aria-busy");

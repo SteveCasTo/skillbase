@@ -30,7 +30,6 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
 const actor = requireInternalUser(Astro.locals);
 if (!actor.roles.includes("ADMIN"))
   return Astro.redirect("/unauthorized?reason=forbidden", 303);
-const certificateSettings = await loadCertificateSettings({ actor });
 
 const repository = createRegistrationRepository();
 const wantsJson =
@@ -106,6 +105,7 @@ if (!settings) {
     pageError = "No se pudo cargar la configuración. Inténtalo nuevamente.";
   }
 }
+const certificateSettings = await loadCertificateSettings({ actor });
 Astro.response.status = pageStatus;
 const success = Astro.url.searchParams.get("success") === "saved";
 let attendanceSettings: AttendanceSettingsDto | null = null;
