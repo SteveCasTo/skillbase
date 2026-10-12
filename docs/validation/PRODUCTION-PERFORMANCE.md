@@ -187,14 +187,14 @@ CPU/network throttling. It was not a controlled function-cold test: prior
 requests may have warmed functions, and network/startup variance remains
 uncontrolled.
 
-| Surface | Baseline n | Baseline remaining HTML (ms) | After remaining HTML (ms) |
-| --- | ---: | --- | --- |
-| Landing, browser-first | 1 | 2165 | 295 (not function-cold) |
-| Landing, subsequent | 2 | 1918 / 1908 | 126 / 107 |
-| Catalog | 2 | 1996 / 1910 | 141 / 160 |
-| Published detail | 2 | 2699 / 2644 | 185 / 148 |
-| Instructor courses | 2 | 2123 / 2085 | 227 / 208 |
-| Instructor profile | 1 | 2444 | 191 |
+| Surface                | Baseline n | Baseline remaining HTML (ms) | After remaining HTML (ms) |
+| ---------------------- | ---------: | ---------------------------- | ------------------------- |
+| Landing, browser-first |          1 | 2165                         | 295 (not function-cold)   |
+| Landing, subsequent    |          2 | 1918 / 1908                  | 126 / 107                 |
+| Catalog                |          2 | 1996 / 1910                  | 141 / 160                 |
+| Published detail       |          2 | 2699 / 2644                  | 185 / 148                 |
+| Instructor courses     |          2 | 2123 / 2085                  | 227 / 208                 |
+| Instructor profile     |          1 | 2444                         | 191                       |
 
 The observed cohort was faster. First-byte timings, DOM-ready, and actual
 ClientRouter requests were also captured in the private acceptance record; the
