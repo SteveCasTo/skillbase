@@ -53,7 +53,7 @@ async function loginPassword(page: Page, email: string, password: string) {
   await page
     .getByRole("button", { name: "Iniciar sesión", exact: true })
     .click();
-  await expect(page).toHaveURL(/\/app$/u);
+  await expect(page).toHaveURL(/\/app\/cursos$/u);
 }
 
 test("ADMIN creates, independently renames and deletes an unused ADMIN from its mobile card", async ({

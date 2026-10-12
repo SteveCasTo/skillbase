@@ -37,7 +37,7 @@ async function login(
   await page
     .getByRole("button", { name: "Iniciar sesión", exact: true })
     .click();
-  await expect(page).toHaveURL("/app");
+  await expect(page).toHaveURL("/app/cursos");
   await page.goto("/app/perfil");
 }
 async function startAssociation(
