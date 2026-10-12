@@ -132,14 +132,23 @@ no se recorta. Las tres líneas de firma bajan para liberar espacio manuscrito;
 el bloque de verificación ya no ocupa el pie. Las vistas previas ADMIN siguen
 sin QR, ID ni enlace verificable.
 
-La versión se congela en cada nueva generación. El renderer conserva v1 para
-fuentes históricas; no reinterpreta metadata v1 como v2 ni reescribe artefactos.
-El valor predeterminado para configuración ausente es v2. Una configuración
-persistida v1 requiere activación administrativa explícita mediante el repositorio
-de ajustes existente (revisión vigente y auditoría), cambiando **solo**
-`templateVersion` a `phase9-v2`; se mantienen autoridades, branding y demás campos.
-No requiere migración ni regeneración/borrado de certificados. Esta entrega de
-código no ejecuta esa operación ni altera Storage o datos locales/cloud.
+La versión se congela en cada nueva generación. Solo está disponible la plantilla
+`phase9-v2` (versión numérica 2 del renderer); v1 se rechaza, nunca se reinterpreta
+silenciosamente como v2. Branding `phase9-v1` identifica los assets conservados,
+no una segunda distribución PDF. Una configuración persistida v1 requiere
+activación ADMIN explícita mediante el repositorio existente, con revisión y
+auditoría. El valor predeterminado para configuración ausente es v2.
+
+El usuario autorizó sustituir los certificados de los namespaces **seed** local
+y cloud para que todos usen v2. Esa operación excepcional requiere PLAN con
+ownership/UUIDs/rutas/hashes/dependencias y aprobación antes de APPLY; no concede
+un permiso general de borrar certificados reales, no debilita guards permanentes
+ni altera migraciones históricas. Los PDFs nuevos se generan por los servicios
+normales desde la versión oficial actual. Si los nombres de los snapshots F8
+seed son antiguos, se obtiene una nueva versión de cierre mediante reapertura y
+cierre normales; no se reescribe el informe inmutable ni se cambia el resultado
+académico para corregir un nombre. La implementación de plantilla única no
+ejecuta por sí sola mantenimiento, cambios de ajustes, release o escrituras Storage.
 
 Orden institucional y logos: UMSS → FCyT → Departamento de Informática y
 Sistemas. Usar los PNG transparentes provistos, sin redibujarlos, alterar
