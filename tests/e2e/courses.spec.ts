@@ -710,7 +710,11 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     page.locator("[data-sileo-toast]").filter({ hasText: "Borrador creado" }),
   ).toBeVisible();
   const savedCourseEditUrl = page.url();
-  await page.goto("/app/cursos");
+  await page
+    .getByRole("navigation", { name: "Ruta de navegación" })
+    .getByRole("link", { name: "Cursos", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/app\/cursos\?status=DRAFT$/);
   const savedCourseCard = page.getByRole("article").filter({
     has: page.getByRole("heading", { name: courseName, exact: true }),
   });
@@ -720,6 +724,12 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     "href",
     `/app/cursos/${createdIds[0]}/editar`,
   );
+  await page
+    .getByRole("combobox", { name: "Filtrar por estado: Borradores" })
+    .click();
+  await page.getByRole("option", { name: "Publicados", exact: true }).click();
+  await expect(savedCourseCard).toBeHidden();
+  await expect(page).toHaveURL(/status=PUBLISHED/);
   await page.goto(savedCourseEditUrl);
   const save = page
     .locator(".course-form")

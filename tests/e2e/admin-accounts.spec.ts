@@ -97,6 +97,17 @@ test("ADMIN creates, independently renames and deletes an unused ADMIN from its 
     name: `${updated} ${account.email} Cuenta activa`,
     exact: true,
   });
+  await expect(
+    page.getByRole("combobox", { name: "Filtrar por estado: Activos" }),
+  ).toBeEnabled();
+  await page
+    .getByRole("combobox", { name: "Filtrar por estado: Activos" })
+    .click();
+  await page.getByRole("option", { name: "Desactivados", exact: true }).click();
+  await expect(card).toBeHidden();
+  await page.getByRole("link", { name: "Ver todos", exact: true }).click();
+  await expect(card).toBeVisible();
+  await expect(page).toHaveURL(/status=ALL/u);
   await card.focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(new RegExp(`${account.endpoint}$`, "u"));

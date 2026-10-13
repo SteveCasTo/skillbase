@@ -1,36 +1,71 @@
 ---
-import { Input } from "@/components/ui/input";
+import SearchToolbar from "@/components/lists/SearchToolbar.astro";
+import ListSearchEmpty from "@/components/lists/ListSearchEmpty.astro";
+import {
+  accountFilters,
+  matchesListFilter,
+  selectedListFilter,
+} from "@/components/lists/filters";
+import { normalizeRegistrationSearch } from "@/domain/pre-registrations/search";
 import type { AdminAccountDto } from "@/domain/admin-accounts/types";
 import { adminAccountStatus } from "./presentation";
 interface Props {
   accounts: readonly AdminAccountDto[];
 }
 const { accounts } = Astro.props;
+const search = Astro.url.searchParams.get("search") ?? "";
+const query = normalizeRegistrationSearch(search);
+const status = selectedListFilter(
+  Astro.url.searchParams.get("status"),
+  accountFilters,
+);
+const entries = accounts.map((account) => ({
+  account,
+  searchable: normalizeRegistrationSearch(`${account.name} ${account.email}`),
+}));
+const hasMatches = entries.some(
+  ({ account, searchable }) =>
+    searchable.includes(query) && matchesListFilter(account.status, status),
+);
 ---
 
 <section
-  class="mt-8 flex min-w-0 flex-col gap-5"
+  class="min-w-0"
+  data-search-list="administradores"
   data-admin-account-list
   aria-label="Cuentas de administradores"
 >
-  <div class="hidden min-w-0 flex-col gap-2" data-admin-search-control>
-    <label for="admin-search" class="text-sm font-medium">
-      Buscar por nombre o correo
-    </label>
-    <Input
-      id="admin-search"
-      type="search"
-      autoComplete="off"
-      className="min-h-11"
-    />
-  </div>
-  <p data-admin-search-count role="status" class="sr-only"></p>
-  <ul class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-    {accounts.map((account) => (
+  <SearchToolbar
+    id="admin-search"
+    label="Buscar por nombre o correo"
+    {search}
+    {status}
+    options={accountFilters}
+  />
+  <ListSearchEmpty
+    hidden={hasMatches}
+    message={
+      query
+        ? "No hay cuentas que coincidan. Prueba otro nombre o correo."
+        : `No hay administradores en «${accountFilters.find((option) => option.value === status)?.label}».`
+    }
+    resetHref="/app/administradores?status=ALL"
+  />
+  <ul
+    data-list-results
+    hidden={!hasMatches}
+    class="mt-8 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+  >
+    {entries.map(({ account, searchable }) => (
       <li
         class="min-w-0"
         data-admin-card
-        data-search={`${account.name} ${account.email}`}
+        data-list-entry={searchable}
+        data-list-status={account.status}
+        hidden={
+          !searchable.includes(query) ||
+          !matchesListFilter(account.status, status)
+        }
       >
         <a
           href={`/app/administradores/${account.id}`}
@@ -43,41 +78,4 @@ const { accounts } = Astro.props;
       </li>
     ))}
   </ul>
-  <p data-admin-no-results hidden class="text-muted-foreground">
-    No hay cuentas que coincidan. Prueba otro nombre o correo.
-  </p>
 </section>
-<script>
-  function initialize() {
-    document
-      .querySelectorAll<HTMLElement>("[data-admin-account-list]")
-      .forEach((list) => {
-        if (list.dataset.bound) return;
-        list.dataset.bound = "true";
-        list
-          .querySelector<HTMLElement>("[data-admin-search-control]")
-          ?.classList.replace("hidden", "flex");
-        const input = list.querySelector<HTMLInputElement>("input")!;
-        const cards = [
-          ...list.querySelectorAll<HTMLElement>("[data-admin-card]"),
-        ];
-        input.addEventListener("input", () => {
-          const term = input.value.trim().toLocaleLowerCase("es");
-          let count = 0;
-          cards.forEach((card) => {
-            card.hidden = !card.dataset.search
-              ?.toLocaleLowerCase("es")
-              .includes(term);
-            if (!card.hidden) count++;
-          });
-          list.querySelector<HTMLElement>("[data-admin-no-results]")!.hidden =
-            count !== 0;
-          list.querySelector<HTMLElement>(
-            "[data-admin-search-count]",
-          )!.textContent = `${count} cuentas encontradas.`;
-        });
-      });
-  }
-  initialize();
-  document.addEventListener("astro:page-load", initialize);
-</script>
