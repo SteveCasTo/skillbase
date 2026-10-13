@@ -399,9 +399,11 @@ probada en stacks aislados, pero no aplicada a canónico/cloud; en este boundary
 `master` conserva ledger 23. El schema incluye ajustes singleton, certificados,
 eventos, receipts idempotentes y reservas/metadata de artefactos, todos con RLS.
 La tabla `certificates` conserva tipo/estado, destinatario, versión oficial F8,
-datos/procedencia congelados, actor, paths/hash de artefactos y vínculos de
-reemplazo; los índices/constraints limitan IDs públicos y un único certificado
-`issued` por curso/tipo/destinatario. Detalle normativo en
+datos/procedencia congelados, actor y paths/hash de artefactos. La migración
+forward 0025 elimina las relaciones de reemplazo y garantiza un único registro
+por grupo/tipo/destinatario en todos los estados. Regeneración unsigned actualiza
+ese registro con ID público nuevo; sustitución signed conserva ID/metadata y
+actualiza el artefacto con reserva exacta y revisión optimista. Detalle normativo en
 [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). El estado de release y
 evidencia QA están en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 
@@ -421,13 +423,16 @@ evidencia QA están en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 - reason
 - unsignedPath / signedPath / signedSha256
 - reviewed
-- replacementForId / replacedById
 
 Related tables: `certificate_settings` is a revisioned singleton whose default
 projection is read-only until an ADMIN explicitly saves it; `certificate_events`
 and `certificate_receipts` preserve append-only audit/idempotency evidence;
 `certificate_artifacts` records reserved/attached/cleanup states and exact file
-hashes. The private Storage bucket is `certificate-documents`.
+hashes, not copies of prior credential entities. Retired objects move to
+`cleanup_pending` only after no current path references them, then are removed
+after commit. 0025 fails closed on nonempty certificates and requires the
+reviewed synthetic reset; it does not migrate issued credentials implicitly.
+The private Storage bucket is `certificate-documents`.
 
 ### AuditEvent
 

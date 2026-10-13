@@ -1,110 +1,70 @@
 import type { AstroGlobal } from "astro";
 import { requireInternalUser } from "@/server/auth/context";
-import {
-  loadCertificates,
-  loadCertificateSettings,
-} from "@/server/certificates/loaders";
+import { loadCertificates } from "@/server/certificates/loaders";
 import { loadAcademicClosure } from "@/server/academic-closure/loaders";
-import {
-  certificateRecipients,
-  validateCertificateConfiguration,
-} from "@/domain/certificates/rules";
-import type { CertificateType } from "@/domain/certificates/types";
-import {
-  certificateMutation,
-  certificateMethodNotAllowed,
-  emptyFeedback,
-  setCertificateHeaders,
-} from "./route";
+import { certificateRecipients } from "@/domain/certificates/rules";
+import { certificateMethodNotAllowed, setCertificateHeaders } from "./route";
 
 export async function prepareGroupCertificates(
   astro: AstroGlobal,
   instructorRoute: boolean,
 ) {
   setCertificateHeaders(astro);
-  if (
-    !["GET", ...(instructorRoute ? [] : ["POST"])].includes(
-      astro.request.method,
-    )
-  )
-    return certificateMethodNotAllowed(instructorRoute ? "GET" : "GET, POST");
+  if (astro.request.method !== "GET") return certificateMethodNotAllowed("GET");
   const actor = requireInternalUser(astro.locals);
   const courseId = astro.params.id ?? "",
     groupId = astro.params.groupId ?? "";
   const context = { actor, courseId, groupId };
-  let feedback = emptyFeedback();
-  if (astro.request.method === "POST") {
-    const result = await certificateMutation(astro, "generate");
-    if (result instanceof Response) return result;
-    feedback = result;
-  }
   const load = await loadCertificates(context);
   if (!load.available) astro.response.status = load.status;
-  const closure =
-    !instructorRoute && load.available
-      ? await loadAcademicClosure(context)
-      : null;
-  const settings =
-    !instructorRoute && load.available
-      ? await loadCertificateSettings({ actor })
-      : null;
+  const closure = load.available ? await loadAcademicClosure(context) : null;
   const current =
     closure?.available && closure.data.status === "CLOSED"
       ? closure.data.official
       : null;
   const report =
     current?.report ?? (closure?.available ? closure.data.provisional : null);
-  const title =
-    report?.courseName ??
-    (load.available ? load.data[0]?.data.courseName : null) ??
-    "Certificados del grupo";
-  const selectedReplacement = load.available
-    ? load.data.find(
-        (record) =>
-          record.id === astro.url.searchParams.get("reemplazar") &&
-          (record.state === "issued" || record.state === "revoked"),
-      )
-    : undefined;
-  const generation: {
-    type: CertificateType;
-    recipients: { id: string; name: string }[];
-    blocked: string;
-  }[] = [];
-  if (current?.report.access === "ADMIN" && settings?.available) {
-    for (const type of ["APPROVAL", "INSTRUCTOR"] as const) {
-      if (selectedReplacement && selectedReplacement.type !== type) continue;
-      let recipients: { id: string; name: string }[] = [],
-        blocked = "";
+  const sections = (["APPROVAL", "INSTRUCTOR"] as const).map((type) => {
+    let recipients: { id: string; name: string }[] = [];
+    if (current) {
       try {
         recipients = certificateRecipients(current.report, type);
-        validateCertificateConfiguration(
-          settings.data.configuration,
-          true,
-          type,
-        );
-      } catch (error) {
-        blocked =
-          error instanceof Error
-            ? error.message
-            : "Revisa los datos necesarios antes de generar.";
+      } catch {
+        /* empty official eligibility */
       }
-      generation.push({ type, recipients, blocked });
+    } else if (instructorRoute && load.available) {
+      // Historical certificate ownership survives a later live reassignment.
+      // These recipients were validated against their immutable official source.
+      recipients = load.data
+        .filter((row) => row.type === type)
+        .map((row) => ({ id: row.recipientId, name: row.data.recipientName }));
     }
-  }
+    return {
+      type,
+      recipients: recipients.map((recipient) => ({
+        ...recipient,
+        record: load.available
+          ? load.data.find(
+              (row) => row.type === type && row.recipientId === recipient.id,
+            )
+          : undefined,
+      })),
+    };
+  });
   return {
     load,
     closure,
-    settings,
     current,
-    title,
-    groupName: report?.groupName ?? "",
-    selectedReplacement,
-    generation,
-    feedback,
+    title: report?.courseName ?? "Certificados",
+    groupName:
+      report?.groupName ??
+      (load.available && load.data[0]
+        ? `${load.data[0].data.groupStartsAt}–${load.data[0].data.groupEndsAt}`
+        : ""),
+    sections,
     courseId,
     groupId,
     instructorRoute,
-    path: astro.url.pathname,
   };
 }
 export type GroupCertificateProps = Exclude<

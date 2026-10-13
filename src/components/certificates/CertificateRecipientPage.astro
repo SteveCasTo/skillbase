@@ -1,0 +1,70 @@
+---
+import PrivateLayout from "@/layouts/PrivateLayout.astro";
+import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { certificateTypeLabel } from "./presentation";
+import FormFeedback from "./FormFeedback.astro";
+import type { CertificateRecipientProps } from "./recipient-route";
+type Props = CertificateRecipientProps;
+const {
+  type,
+  recipient,
+  current,
+  closureRevision,
+  settings,
+  feedback,
+  instructorRoute,
+  courseId,
+  groupId,
+  path,
+} = Astro.props;
+const title = certificateTypeLabel[type];
+const groupPath = `${instructorRoute ? "/app/mis-cursos" : "/app/cursos"}/${courseId}/grupos/${groupId}/certificados`;
+---
+
+<PrivateLayout {title}>
+  <CourseBreadcrumbs
+    current="Certificado"
+    parents={[{ label: "Certificados", href: groupPath }]}
+  />
+  <header class="mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-2">
+    <h1 class="text-3xl font-semibold tracking-tight">{title}</h1>
+    <p class="break-words text-lg text-muted-foreground">{recipient.name}</p>
+  </header>
+  <section class="mt-7 flex flex-col gap-4" aria-label="Documento">
+    {!instructorRoute && settings?.available ? (
+      <form
+        method="post"
+        action={path}
+        data-certificate-form
+        data-pending-label="Generando PDF…"
+        data-success-label="PDF listo para firmar."
+        class="flex flex-col gap-4"
+      >
+        <input type="hidden" name="type" value={type} />
+        <input type="hidden" name="recipientId" value={recipient.id} />
+        <input type="hidden" name="versionId" value={current.id} />
+        <input type="hidden" name="closureRevision" value={closureRevision} />
+        <input
+          type="hidden"
+          name="configurationRevision"
+          value={settings.data.revision}
+        />
+        <input type="hidden" name="requestKey" value={crypto.randomUUID()} />
+        <FormFeedback {feedback} />
+        <button
+          type="submit"
+          class={buttonVariants({ className: "min-h-11 self-start" })}
+        >
+          Generar PDF
+        </button>
+      </form>
+    ) : (
+      <p role="status" class="text-sm text-muted-foreground">
+        {settings && !settings.available
+          ? settings.unavailableReason
+          : "Administración prepara el PDF para firmar."}
+      </p>
+    )}
+  </section>
+</PrivateLayout>

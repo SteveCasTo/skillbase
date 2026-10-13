@@ -5,12 +5,10 @@ import type {
 } from "@/domain/certificates/types";
 
 export const certificateStateLabel: Record<CertificateState, string> = {
-  pending: "Pendiente de generar",
-  generated: "PDF generado",
-  awaiting_signature: "Pendiente de emisión",
-  issued: "Emitido",
+  pending: "Para firmar",
+  generated: "Para firmar",
+  issued: "Firmado",
   revoked: "Revocado",
-  replaced: "Reemplazado",
 };
 export const certificateTypeLabel: Record<CertificateType, string> = {
   APPROVAL: "Certificado de aprobación",
@@ -25,10 +23,8 @@ export const publicStateLabel = {
 } satisfies Record<PublicCertificateDto["state"], string>;
 
 export function civilDateLabel(value: string) {
-  return new Intl.DateTimeFormat("es-BO", {
-    dateStyle: "long",
-    timeZone: "UTC",
-  }).format(new Date(`${value}T12:00:00Z`));
+  const [year, month, day] = value.split("-");
+  return `${day}/${month}/${year}`;
 }
 export const certificateEventLabel: Readonly<Record<string, string>> = {
   PREPARED: "Documento preparado",

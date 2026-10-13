@@ -8,25 +8,25 @@ import type { CertificateDetailProps } from "./detail-route";
 import {
   certificateStateLabel,
   certificateTypeLabel,
-  certificateEventLabel,
   civilDateLabel,
-  instantLabel,
 } from "./presentation";
 import FormFeedback from "./FormFeedback.astro";
 import CertificateFilePicker from "./CertificateFilePicker.astro";
 import RevokeCertificate from "./RevokeCertificate";
 type Props = CertificateDetailProps;
-const { load, history, feedback, instructorRoute, path, requestKey } =
+const { load, closure, settings, feedback, instructorRoute, path, requestKey } =
   Astro.props;
 const record = load.available ? load.data : null;
 const title = record ? certificateTypeLabel[record.type] : "Certificado";
 const groupPath = record
   ? `${instructorRoute ? "/app/mis-cursos" : "/app/cursos"}/${record.courseId}/grupos/${record.groupId}/certificados`
   : "/app/certificados";
-const draft =
-  record &&
-  ["pending", "generated", "awaiting_signature"].includes(record.state);
-const editableDraft = draft && !record?.obsolete;
+const current =
+  closure?.available && closure.data.status === "CLOSED"
+    ? closure.data.official
+    : null;
+const signed = record?.hasSignedPdf;
+const editable = record && record.state !== "revoked" && !record.obsolete;
 ---
 
 <PrivateLayout {title}>
@@ -34,35 +34,21 @@ const editableDraft = draft && !record?.obsolete;
   <CourseBreadcrumbs
     current="Certificado"
     parents={[
-      { label: "Resumen", href: "/app" },
-      { label: "Certificados del grupo", href: groupPath },
+      { label: "Inicio", href: "/app" },
+      { label: "Certificados", href: groupPath },
     ]}
   />
   {record ? (
     <article class="mt-5 flex min-w-0 flex-col gap-7">
-      <header class="flex flex-wrap items-start justify-between gap-3">
-        <div class="min-w-0">
-          <h1 class="text-3xl font-semibold tracking-tight">{title}</h1>
-          <p class="mt-3 break-words text-xl font-medium">
-            {record.data.recipientName}
-          </p>
-          <p class="mt-2 break-words text-muted-foreground">
-            {record.data.courseName}
-          </p>
-        </div>
-        <p class="rounded-lg bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground">
+      <header class="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+        <h1 class="text-3xl font-semibold tracking-tight">{title}</h1>
+        <p class="min-w-0 break-words text-lg text-muted-foreground">
+          {record.data.recipientName}
+        </p>
+        <span class="text-sm font-medium">
           {certificateStateLabel[record.state]}
-        </p>
+        </span>
       </header>
-      {draft && record.obsolete && (
-        <p role="status" class="text-sm leading-6">
-          Este borrador pertenece a un cierre que ya no está vigente. No se
-          puede cargar, revisar ni emitir.{" "}
-          <a href={groupPath} class="underline underline-offset-4">
-            Regenera desde la última versión oficial de un grupo cerrado.
-          </a>
-        </p>
-      )}
       <dl class="grid gap-x-8 gap-y-5 border-b pb-6 sm:grid-cols-2 xl:grid-cols-4">
         <div>
           <dt class="text-sm text-muted-foreground">Fechas nominales</dt>
@@ -78,10 +64,8 @@ const editableDraft = draft && !record?.obsolete;
           </dd>
         </div>
         <div>
-          <dt class="text-sm text-muted-foreground">Grupo y cierre</dt>
-          <dd class="mt-1 font-medium">
-            Grupo {record.data.groupNumber} · Versión {record.version}
-          </dd>
+          <dt class="text-sm text-muted-foreground">Grupo</dt>
+          <dd class="mt-1 font-medium">{record.data.groupNumber}</dd>
         </div>
         <div>
           <dt class="text-sm text-muted-foreground">Horario nominal</dt>
@@ -90,81 +74,98 @@ const editableDraft = draft && !record?.obsolete;
           </dd>
         </div>
       </dl>
-      <details class="border-b pb-5">
-        <summary class="min-h-11 cursor-pointer font-medium focus-visible:outline-2 focus-visible:outline-ring">
-          Firmantes y lugar del documento
-        </summary>
-        <p class="mt-3 text-sm leading-6 text-muted-foreground">
-          {record.data.venue} · {record.data.city}
+      {!signed && record.obsolete && (
+        <p role="status" class="text-sm">
+          El cierre cambió. Regenera el PDF desde el cierre oficial vigente
+          antes de firmarlo.
         </p>
-        <ul class="mt-4 grid gap-4 sm:grid-cols-3">
-          {record.data.signatories.map((person) => (
-            <li class="flex min-w-0 flex-col gap-1 text-sm">
-              <span class="break-words font-medium">{person.name}</span>
-              <span class="break-words text-muted-foreground">
-                {person.role}
-              </span>
-              <span class="break-words text-muted-foreground">
-                {person.affiliation}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </details>
-      <section
-        aria-labelledby="certificate-files-title"
-        class="flex flex-col gap-4"
-      >
-        <h2 id="certificate-files-title" class="text-xl font-semibold">
-          Documentos
-        </h2>
-        <div class="flex flex-wrap gap-3">
-          {record.hasUnsignedPdf && (
-            <a
-              data-astro-reload
-              href={`${path}/generado.pdf`}
-              data-feedback-download
-              class={buttonVariants({
-                variant: "outline",
-                className: "min-h-11",
-              })}
-            >
-              Descargar PDF para firmas
-            </a>
-          )}
-          {record.hasSignedPdf && (
+      )}
+      <section aria-label="Documento" class="flex min-w-0 flex-col gap-5">
+        <div class="flex flex-wrap items-start gap-3">
+          {signed ? (
             <a
               data-astro-reload
               href={`${path}/firmado.pdf`}
               data-feedback-download
-              class={buttonVariants({
-                variant: "outline",
-                className: "min-h-11",
-              })}
+              class={buttonVariants({ className: "min-h-11" })}
             >
-              Descargar PDF firmado
+              Descargar firmado
             </a>
+          ) : (
+            record.hasUnsignedPdf && (
+              <a
+                data-astro-reload
+                href={`${path}/generado.pdf`}
+                data-feedback-download
+                class={buttonVariants({ className: "min-h-11" })}
+              >
+                Descargar para firmar
+              </a>
+            )
           )}
+          {!instructorRoute &&
+            !signed &&
+            record.state !== "revoked" &&
+            current &&
+            settings?.available && (
+              <form
+                method="post"
+                action={`${groupPath}/${record.type.toLowerCase()}/${record.recipientId}`}
+                data-certificate-form
+                data-pending-label="Regenerando PDF…"
+                data-success-label="PDF regenerado."
+                class="flex flex-col gap-3"
+              >
+                <input type="hidden" name="type" value={record.type} />
+                <input
+                  type="hidden"
+                  name="recipientId"
+                  value={record.recipientId}
+                />
+                <input type="hidden" name="versionId" value={current.id} />
+                <input
+                  type="hidden"
+                  name="closureRevision"
+                  value={closure?.available ? closure.data.revision : 0}
+                />
+                <input
+                  type="hidden"
+                  name="configurationRevision"
+                  value={settings.data.revision}
+                />
+                <input
+                  type="hidden"
+                  name="requestKey"
+                  value={crypto.randomUUID()}
+                />
+                <input type="hidden" name="regenerate" value="true" />
+                <input
+                  type="hidden"
+                  name="certificateRevision"
+                  value={record.revision}
+                />
+                <button
+                  type="submit"
+                  class={buttonVariants({
+                    variant: "outline",
+                    className: "min-h-11",
+                  })}
+                >
+                  Regenerar PDF
+                </button>
+                <FormFeedback {feedback} />
+              </form>
+            )}
         </div>
-        {record.signedSha256 && (
-          <dl class="min-w-0">
-            <dt class="text-sm text-muted-foreground">
-              SHA-256 del PDF firmado cargado
-            </dt>
-            <dd class="mt-2 break-all font-mono text-xs leading-6">
-              {record.signedSha256}
-            </dd>
-          </dl>
-        )}
-        {!instructorRoute && editableDraft && record.hasUnsignedPdf && (
+        {!instructorRoute && editable && (signed || record.hasUnsignedPdf) && (
           <form
             method="post"
             action={`${path}/cargar`}
             enctype="multipart/form-data"
             data-certificate-form
-            data-pending-label="Cargando PDF firmado…"
-            data-success-label="PDF cargado. Revisa el archivo antes de emitir."
-            class="flex flex-col gap-4"
+            data-pending-label="Guardando firmado…"
+            data-success-label="Certificado firmado guardado."
+            class="flex w-full min-w-0 flex-col gap-4"
           >
             <input type="hidden" name="revision" value={record.revision} />
             <input type="hidden" name="requestKey" value={requestKey} />
@@ -173,12 +174,7 @@ const editableDraft = draft && !record?.obsolete;
               id="signed-pdf"
               name="file"
               required
-              title={
-                record.hasSignedPdf
-                  ? "Sustituir archivo para revisión"
-                  : "Cargar PDF firmado"
-              }
-              description="Escanea el documento con las firmas manuscritas. Una nueva carga requiere otra revisión; el archivo anterior se conserva."
+              title={signed ? "Sustituir firmado" : "PDF firmado"}
               describedby="signed-file-error"
             />
             <p
@@ -186,122 +182,54 @@ const editableDraft = draft && !record?.obsolete;
               data-field-error="file"
               class="text-sm text-destructive empty:hidden"
             ></p>
+            <label class="flex min-h-11 items-center gap-3">
+              <input
+                type="checkbox"
+                name="attestation"
+                value="true"
+                required
+                data-review-confirmation
+                aria-describedby="attestation-error"
+                class="size-5 shrink-0 accent-primary"
+              />
+              <span class="text-sm">
+                Confirmo que es el certificado firmado.
+              </span>
+            </label>
+            <p
+              id="attestation-error"
+              data-field-error="attestation"
+              class="text-sm text-destructive empty:hidden"
+            ></p>
             <FormFeedback />
             <button
               type="submit"
               class={buttonVariants({ className: "min-h-11 self-start" })}
             >
-              Cargar PDF firmado
+              {signed ? "Sustituir firmado" : "Guardar firmado"}
             </button>
           </form>
         )}
       </section>
-      {!instructorRoute &&
-        editableDraft &&
-        record.hasSignedPdf &&
-        record.state === "awaiting_signature" && (
-          <section
-            aria-labelledby="certificate-review-title"
-            class="flex flex-col gap-4 border-t pt-6"
-          >
-            <h2 id="certificate-review-title" class="text-xl font-semibold">
-              Revisión y emisión
-            </h2>
-            {record.reviewed ? (
-              <>
-                <p class="text-sm">
-                  PDF firmado revisado. La emisión publica el registro de
-                  verificación, no el archivo privado.
-                </p>
-                <form
-                  method="post"
-                  action={`${path}?operation=issue`}
-                  data-certificate-form
-                  data-success-label="Certificado emitido."
-                  class="flex flex-col gap-4"
-                >
-                  <input
-                    type="hidden"
-                    name="revision"
-                    value={record.revision}
-                  />
-                  <input
-                    type="hidden"
-                    name="requestKey"
-                    value={crypto.randomUUID()}
-                  />
-                  <FormFeedback {feedback} />
-                  <button
-                    type="submit"
-                    class={buttonVariants({ className: "min-h-11 self-start" })}
-                  >
-                    Emitir certificado
-                  </button>
-                </form>
-              </>
-            ) : (
-              <form
-                method="post"
-                action={`${path}?operation=review`}
-                data-certificate-form
-                data-success-label="Revisión confirmada. Ya puedes emitir."
-                class="flex flex-col gap-4"
-              >
-                <input type="hidden" name="revision" value={record.revision} />
-                <input
-                  type="hidden"
-                  name="requestKey"
-                  value={crypto.randomUUID()}
-                />
-                <p class="max-w-prose text-sm leading-6 text-muted-foreground">
-                  Descarga y comprueba que el PDF corresponde al titular y al
-                  curso, que sus datos son correctos y que contiene las firmas
-                  manuscritas. Esta revisión no es una firma digital.
-                </p>
-                <label class="flex min-h-11 items-start gap-3">
-                  <input
-                    type="checkbox"
-                    required
-                    data-review-confirmation
-                    class="mt-1 size-5 shrink-0 accent-primary"
-                  />
-                  <span class="text-sm leading-6">
-                    He revisado el documento firmado y confirmo que corresponde
-                    a este certificado.
-                  </span>
-                </label>
-                <FormFeedback {feedback} />
-                <button
-                  type="submit"
-                  class={buttonVariants({ className: "min-h-11 self-start" })}
-                >
-                  Confirmar revisión
-                </button>
-              </form>
-            )}
-          </section>
-        )}
-      {record.issuedAt && (
+      {signed && (
         <section
-          aria-labelledby="certificate-sharing-title"
-          class="flex flex-col gap-4 border-t pt-6"
+          aria-label="Credencial pública"
+          class="flex min-w-0 flex-col gap-3 border-t pt-6"
         >
-          <h2 id="certificate-sharing-title" class="text-xl font-semibold">
-            Credencial pública
-          </h2>
-          <p class="text-sm">
-            Emisión:{" "}
-            <time datetime={record.issuedAt}>
-              {instantLabel(record.issuedAt)}
-            </time>{" "}
-            (Bolivia). La fecha impresa corresponde al fin nominal del curso.
-          </p>
           <a
             href={`/certificados/${record.publicCredentialId}`}
             class="inline-flex min-h-11 items-center self-start text-sm underline underline-offset-4"
           >
             Consultar estado público
           </a>
+          <dl class="min-w-0">
+            <dt class="text-sm text-muted-foreground">
+              SHA-256 del PDF firmado
+            </dt>
+            <dd class="mt-2 break-all font-mono text-xs leading-6">
+              {record.signedSha256}
+            </dd>
+          </dl>
           {record.state === "issued" && (
             <>
               <label for="credential-share" class="text-sm font-medium">
@@ -310,9 +238,9 @@ const editableDraft = draft && !record?.obsolete;
               <textarea
                 id="credential-share"
                 readonly
-                rows={6}
+                rows={5}
                 class="w-full rounded-lg border bg-card p-4 text-sm leading-6 focus-visible:outline-2 focus-visible:outline-ring"
-              >{`${record.data.courseName}\n${record.data.organization}\nTitular: ${record.data.recipientName}\nEmisión: ${instantLabel(record.issuedAt)} (Bolivia)\nID: ${record.publicCredentialId}\nURL: ${record.data.verificationUrl}`}</textarea>
+              >{`${record.data.courseName}\n${record.data.organization}\nTitular: ${record.data.recipientName}\nFinalización: ${civilDateLabel(record.data.endsOn)}\nID: ${record.publicCredentialId}\nURL: ${record.data.verificationUrl}`}</textarea>
               <button
                 type="button"
                 data-copy-credential
@@ -332,92 +260,16 @@ const editableDraft = draft && !record?.obsolete;
           )}
         </section>
       )}
-      {record.reason && (
-        <p class="break-words text-sm">
-          <span class="font-medium">Motivo: </span>
-          {record.reason}
-        </p>
-      )}
-      {!instructorRoute &&
-        (record.state === "issued" || record.state === "revoked") && (
-          <section
-            aria-label="Gestión de vigencia"
-            class="flex flex-wrap items-start gap-3 border-t pt-6"
-          >
-            {record.state === "issued" && (
-              <RevokeCertificate
-                client:load
-                {path}
-                requestKey={crypto.randomUUID()}
-                revision={record.revision}
-                initialReason={feedback.values.reason}
-                initialError={feedback.success ? "" : feedback.message}
-              />
-            )}
-            <a
-              href={`${groupPath}?reemplazar=${record.id}`}
-              class={buttonVariants({
-                variant: "outline",
-                className: "min-h-11",
-              })}
-            >
-              Preparar reemplazo
-            </a>
-          </section>
-        )}
-      {(record.replacementForId || record.replacedById) && (
-        <nav aria-label="Cadena de reemplazo" class="flex flex-wrap gap-4">
-          {record.replacementForId && (
-            <a
-              href={`${instructorRoute ? "/app/mis-certificados" : "/app/certificados"}/${record.replacementForId}`}
-              class="min-h-11 text-sm underline underline-offset-4"
-            >
-              Certificado anterior
-            </a>
-          )}
-          {record.replacedById && (
-            <a
-              href={`${instructorRoute ? "/app/mis-certificados" : "/app/certificados"}/${record.replacedById}`}
-              class="min-h-11 text-sm underline underline-offset-4"
-            >
-              Certificado sustituto
-            </a>
-          )}
-        </nav>
-      )}
-      {!instructorRoute && history && (
-        <section
-          aria-labelledby="certificate-history-title"
-          class="border-t pt-6"
-        >
-          <h2 id="certificate-history-title" class="text-xl font-semibold">
-            Historial
-          </h2>
-          {history.available ? (
-            <ol class="mt-4 flex flex-col divide-y">
-              {history.data.map((entry) => (
-                <li class="flex flex-col gap-2 py-4 text-sm">
-                  <p>
-                    {certificateEventLabel[entry.action] ??
-                      "Operación registrada"}{" "}
-                    · {entry.actorName}
-                  </p>
-                  <time
-                    datetime={entry.createdAt}
-                    class="text-muted-foreground"
-                  >
-                    {instantLabel(entry.createdAt)} (Bolivia)
-                  </time>
-                  {entry.reason && <p class="break-words">{entry.reason}</p>}
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <RegistrationPageError
-              message={history.unavailableReason}
-              retryHref={path}
-            />
-          )}
+      {!instructorRoute && record.state === "issued" && (
+        <section aria-label="Gestión de vigencia" class="border-t pt-6">
+          <RevokeCertificate
+            client:load
+            {path}
+            requestKey={crypto.randomUUID()}
+            revision={record.revision}
+            initialReason={feedback.values.reason}
+            initialError={feedback.success ? "" : feedback.message}
+          />
         </section>
       )}
     </article>
@@ -439,21 +291,17 @@ const editableDraft = draft && !record?.obsolete;
       document.querySelector<HTMLTextAreaElement>("#credential-share");
     const status = document.querySelector<HTMLElement>("[data-copy-status]");
     if (!button || !text || !status) return;
-    button.addEventListener(
-      "click",
-      async () => {
-        try {
-          await navigator.clipboard.writeText(text.value);
-          status.textContent = "Datos copiados.";
-        } catch {
-          text.focus();
-          text.select();
-          status.textContent =
-            "Seleccionamos los datos. Cópialos con el teclado.";
-        }
-      },
-      { once: false },
-    );
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(text.value);
+        status.textContent = "Datos copiados.";
+      } catch {
+        text.focus();
+        text.select();
+        status.textContent =
+          "Seleccionamos los datos. Cópialos con el teclado.";
+      }
+    });
   }
   document.addEventListener("astro:page-load", enableCredentialCopy);
 </script>

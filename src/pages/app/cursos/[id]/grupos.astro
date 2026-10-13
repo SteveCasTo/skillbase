@@ -276,7 +276,7 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
             current="Grupos"
             parents={[
               { label: "Inicio", href: "/app" },
-              { label: "Cursos", href: "/app/cursos" },
+              { label: "Cursos", href: `/app/cursos?status=${course.status}` },
               { label: course.name, href: `/app/cursos/${course.id}/editar` },
             ]}
           />

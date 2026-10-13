@@ -1,11 +1,5 @@
 export type CertificateType = "APPROVAL" | "INSTRUCTOR";
-export type CertificateState =
-  | "pending"
-  | "generated"
-  | "awaiting_signature"
-  | "issued"
-  | "revoked"
-  | "replaced";
+export type CertificateState = "pending" | "generated" | "issued" | "revoked";
 export interface CertificateSignatory {
   readonly name: string;
   readonly role: string;
@@ -56,6 +50,7 @@ export interface CertificateDto {
   id: string;
   courseId: string;
   groupId: string;
+  recipientId: string;
   versionId: string;
   version: number;
   type: CertificateType;
@@ -72,8 +67,6 @@ export interface CertificateDto {
   issuedAt: string | null;
   revokedAt: string | null;
   reason: string | null;
-  replacementForId: string | null;
-  replacedById: string | null;
 }
 export type PublicCertificateDto =
   | { state: "not_found" | "not_issued"; valid: false }
@@ -103,11 +96,10 @@ export interface GenerateCertificatesInput {
   configurationRevision: number;
   requestKey: string;
   type: CertificateType;
-  /** null means all eligible snapshot recipients, atomically. */
+  /** One official snapshot recipient; null is rejected by the server. */
   recipientId: string | null;
-  groupNumber?: number;
-  replacementForId?: string;
-  reason?: string;
+  regenerate?: boolean;
+  certificateRevision?: number;
 }
 export interface CertificateProvenance {
   configurationRevision: number;

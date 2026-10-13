@@ -94,12 +94,6 @@ export async function certificateMutation(
         },
       };
     }
-    // Optional ordinal is omitted, letting the authoritative core compute it.
-    if (operation === "generate" && fields.groupNumber === "") {
-      const { groupNumber: _emptyOrdinal, ...rest } = fields;
-      void _emptyOrdinal;
-      body = rest;
-    }
     const headers = new Headers(astro.request.headers);
     headers.set("Content-Type", "application/json");
     headers.delete("Content-Length");
@@ -119,6 +113,10 @@ export async function certificateMutation(
             service: getCertificateService(),
             courseId: astro.params.id ?? "",
             groupId: astro.params.groupId ?? "",
+            ...(astro.params.recipientId
+              ? { recipientId: astro.params.recipientId }
+              : {}),
+            ...(astro.params.type ? { type: astro.params.type } : {}),
           }
         : {}),
       ...(operation === "review" ||
