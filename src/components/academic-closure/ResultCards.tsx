@@ -11,23 +11,29 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { AuthorizedClosureReportDto } from "@/domain/academic-closure/types";
 import { gradeLabel } from "@/components/evaluations/presentation";
-import { formatMoney } from "@/components/pre-registrations/presentation";
 
 type Person = AuthorizedClosureReportDto["participants"][number];
 type Props = { report: AuthorizedClosureReportDto };
 type PersonProps = Props & { person: Person };
 
 function ResultStatus({ person }: { person: Person }) {
+  const pending = person.result.status === "PENDING";
   return (
-    <span className="bg-secondary text-secondary-foreground w-fit rounded-md px-2 py-1 text-xs font-semibold">
-      {person.result.status === "PENDING"
+    <Badge
+      variant={
+        pending ? "secondary" : person.result.passed ? "default" : "destructive"
+      }
+    >
+      {pending
         ? "Pendiente"
-        : person.academicallyPassed
+        : person.result.passed
           ? "Aprobado"
           : "No aprobado"}
-    </span>
+    </Badge>
   );
 }
 
@@ -72,18 +78,82 @@ function Grades({ report, person }: PersonProps) {
   );
 }
 
-function Attendance({ person }: { person: Person }) {
+function Attendance({ report, person }: PersonProps) {
   const attendance = person.attendance;
+  const categories = [
+    { label: "presentes", count: attendance.present, color: "bg-primary" },
+    { label: "ausentes", count: attendance.absent, color: "bg-destructive" },
+    {
+      label: "justificadas",
+      count: attendance.excused,
+      color: "bg-muted border border-border",
+    },
+    ...(attendance.pending
+      ? [
+          {
+            label: "pendientes",
+            count: attendance.pending,
+            color: "bg-background border border-border",
+          },
+        ]
+      : []),
+  ];
+  const total = categories.reduce((sum, category) => sum + category.count, 0);
+  const blockedByStreak =
+    !attendance.academicallyEligible &&
+    attendance.maximumConsecutiveAbsences >
+      report.attendanceSettings.consecutiveAbsenceLimit;
   return (
-    <span className="text-muted-foreground flex flex-wrap gap-x-2 gap-y-1 text-xs">
-      <span>
-        Asistencia: {attendance.present} presentes · {attendance.absent}{" "}
-        ausentes · {attendance.excused} justificadas
-        {attendance.pending ? ` · ${attendance.pending} pendientes` : ""}
+    <span className="flex min-w-0 flex-col gap-2">
+      <span className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm font-medium">Asistencia</span>
+        <Badge
+          variant={attendance.academicallyEligible ? "outline" : "destructive"}
+          className="max-w-full whitespace-normal"
+        >
+          {attendance.academicallyEligible
+            ? "Asistencia elegible"
+            : "Asistencia no elegible"}
+          {blockedByStreak
+            ? ` · racha de ${attendance.maximumConsecutiveAbsences}`
+            : ""}
+        </Badge>
       </span>
-      <span>
-        {attendance.academicallyEligible ? "Elegible" : "No elegible"} · Racha
-        máxima: {attendance.maximumConsecutiveAbsences}
+      <span
+        role="img"
+        aria-label={
+          total
+            ? `Asistencia: ${categories.map((category) => `${category.count} ${category.label}`).join(", ")}; ${total} sesiones en total.`
+            : "Asistencia: sin sesiones computables."
+        }
+        className="bg-muted flex h-2.5 w-full overflow-hidden rounded-full"
+      >
+        {categories
+          .filter((category) => category.count > 0)
+          .map((category) => (
+            <span
+              key={category.label}
+              aria-hidden="true"
+              className={category.color}
+              style={{ width: `${(category.count / total) * 100}%` }}
+            />
+          ))}
+      </span>
+      <span
+        className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums"
+        aria-hidden="true"
+      >
+        {categories.map((category) => (
+          <span
+            key={category.label}
+            className="inline-flex items-center gap-1.5"
+          >
+            <span
+              className={cn("size-2 shrink-0 rounded-full", category.color)}
+            />
+            {category.count}/{total} {category.label}
+          </span>
+        ))}
       </span>
     </span>
   );
@@ -98,21 +168,6 @@ function PrivateIdentity({ report, person }: PersonProps) {
     <span className="text-muted-foreground text-xs break-words">
       CI: {privatePerson.ci}
     </span>
-  ) : null;
-}
-
-function PrivateBalance({ report, person }: PersonProps) {
-  if (report.access !== "ADMIN") return null;
-  const privatePerson = report.participants.find(
-    (entry) => entry.registrationId === person.registrationId,
-  );
-  return privatePerson ? (
-    <p className="text-muted-foreground text-xs">
-      Saldo informativo:{" "}
-      {privatePerson.balanceCents === null
-        ? "No disponible"
-        : formatMoney(privatePerson.balanceCents)}
-    </p>
   ) : null;
 }
 
@@ -147,7 +202,7 @@ function Summary({ report, person }: PersonProps) {
           />
         </span>
       )}
-      <Attendance person={person} />
+      <Attendance report={report} person={person} />
     </span>
   );
 }
@@ -167,7 +222,6 @@ function DetailCard({ report, person }: PersonProps) {
         </summary>
         <div className="mt-4 flex flex-col gap-4">
           <Grades report={report} person={person} />
-          <PrivateBalance report={report} person={person} />
         </div>
       </details>
     );
@@ -187,11 +241,15 @@ function DetailCard({ report, person }: PersonProps) {
         showCloseButton={false}
       >
         <DialogHeader className="pr-10 text-left">
-          <DialogTitle className="leading-snug break-words">
-            {participantFullName(person)}
-          </DialogTitle>
-          <PrivateIdentity report={report} person={person} />
-          <DialogDescription>Notas y asistencia</DialogDescription>
+          <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+            <DialogTitle className="leading-snug break-words">
+              {participantFullName(person)}
+            </DialogTitle>
+            <PrivateIdentity report={report} person={person} />
+          </span>
+          <DialogDescription className="sr-only">
+            Desglose de calificaciones y asistencia.
+          </DialogDescription>
         </DialogHeader>
         <DialogClose asChild>
           <Button
@@ -210,8 +268,7 @@ function DetailCard({ report, person }: PersonProps) {
             <FinalGrade report={report} person={person} />
           </div>
           <Grades report={report} person={person} />
-          <Attendance person={person} />
-          <PrivateBalance report={report} person={person} />
+          <Attendance report={report} person={person} />
         </div>
       </DialogContent>
     </Dialog>
