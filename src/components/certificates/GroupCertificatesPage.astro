@@ -47,13 +47,13 @@ const base = `${prefix}/${courseId}/grupos/${groupId}/certificados`;
     />
   ) : (
     <div class="mt-7 flex min-w-0 flex-col gap-8">
-      {closure && !closure.available && (
+      {!instructorRoute && closure && !closure.available && (
         <RegistrationPageError
           message={closure.unavailableReason}
           retryHref={Astro.url.pathname}
         />
       )}
-      {!current && (
+      {!current && !instructorRoute && (
         <p role="status" class="text-sm text-muted-foreground">
           Los destinatarios estarán disponibles cuando el grupo tenga un cierre
           oficial vigente.

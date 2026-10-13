@@ -537,6 +537,35 @@ test("HTTP mutation and upload adapters validate origin, allowlist, purpose and 
   });
   expect(result.status).toBe(422);
   expect((await repository.get(f.admin.id, row!.id)).hasSignedPdf).toBe(false);
+  form.set("file", new File([signed], "qa.pdf", { type: "application/pdf" }));
+  form.delete("attestation");
+  const unconfirmed = await handleCertificateUpload({
+    request: new Request(`${siteUrl}upload`, {
+      method: "POST",
+      headers: { Origin: siteUrl.origin },
+      body: form,
+    }),
+    actor,
+    siteUrl,
+    certificateId: row!.id,
+    service: f.service,
+  });
+  expect(unconfirmed.status).toBe(422);
+  expect((await repository.get(f.admin.id, row!.id)).hasSignedPdf).toBe(false);
+  const { courseId: _course, groupId: _group, ...generation } = f.input;
+  void _course;
+  void _group;
+  const forgedOrdinal = await handleCertificatePost({
+    request: request({ ...generation, groupNumber: 1 }),
+    actor,
+    siteUrl,
+    repository,
+    service: f.service,
+    operation: "generate",
+    courseId: f.course.id,
+    groupId: f.groupId,
+  });
+  expect(forgedOrdinal.status).toBe(422);
 }, 30000);
 test("F9 tables are server-only with RLS and revoked Data API grants; current-flow ledger is applied", async () => {
   const tables = [

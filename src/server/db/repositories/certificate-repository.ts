@@ -266,7 +266,7 @@ export class DrizzleCertificateRepository implements CertificateRepository {
       }));
     });
   }
-  prepare(
+  async prepare(
     actorId: string,
     input: GenerateCertificatesInput,
     verificationOrigin: string,

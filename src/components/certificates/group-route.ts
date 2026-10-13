@@ -32,6 +32,12 @@ export async function prepareGroupCertificates(
       } catch {
         /* empty official eligibility */
       }
+    } else if (instructorRoute && load.available) {
+      // Historical certificate ownership survives a later live reassignment.
+      // These recipients were validated against their immutable official source.
+      recipients = load.data
+        .filter((row) => row.type === type)
+        .map((row) => ({ id: row.recipientId, name: row.data.recipientName }));
     }
     return {
       type,
@@ -50,7 +56,11 @@ export async function prepareGroupCertificates(
     closure,
     current,
     title: report?.courseName ?? "Certificados",
-    groupName: report?.groupName ?? "",
+    groupName:
+      report?.groupName ??
+      (load.available && load.data[0]
+        ? `${load.data[0].data.groupStartsAt}–${load.data[0].data.groupEndsAt}`
+        : ""),
     sections,
     courseId,
     groupId,

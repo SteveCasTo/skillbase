@@ -104,7 +104,7 @@ export interface GenerateCertificatesInput {
   configurationRevision: number;
   requestKey: string;
   type: CertificateType;
-  /** null means all eligible snapshot recipients, atomically. */
+  /** One official snapshot recipient; null is rejected by the server. */
   recipientId: string | null;
   groupNumber?: number;
   replacementForId?: string;

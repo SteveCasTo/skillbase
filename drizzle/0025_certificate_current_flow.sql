@@ -16,6 +16,8 @@ ALTER TABLE public.certificates DROP CONSTRAINT certificates_values_check;
 --> statement-breakpoint
 ALTER TABLE public.certificates ADD CONSTRAINT certificates_values_check CHECK (type IN ('APPROVAL','INSTRUCTOR') AND state IN ('pending','generated','issued','revoked') AND version > 0 AND revision >= 0 AND public_credential_id ~ '^[A-Za-z0-9_-]{32}$' AND (signed_sha256 IS NULL OR signed_sha256 ~ '^[0-9a-f]{64}$'));
 --> statement-breakpoint
+ALTER TABLE public.certificates ADD CONSTRAINT certificates_draft_check CHECK (state NOT IN ('pending','generated') OR (signed_path IS NULL AND signed_sha256 IS NULL AND issued_at IS NULL AND NOT reviewed AND ((state = 'pending' AND unsigned_path IS NULL AND generated_at IS NULL) OR (state = 'generated' AND unsigned_path IS NOT NULL AND generated_at IS NOT NULL))));
+--> statement-breakpoint
 CREATE OR REPLACE FUNCTION public.certificate_record_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
 DECLARE source public.academic_closure_versions; official public.academic_group_states;
 BEGIN

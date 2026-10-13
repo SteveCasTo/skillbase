@@ -105,6 +105,10 @@ export const certificates = pgTable(
       "certificates_issued_check",
       sql`${t.state} not in ('issued','revoked','replaced') or (${t.signedPath} is not null and ${t.signedSha256} is not null and ${t.issuedAt} is not null and ${t.reviewed})`,
     ),
+    check(
+      "certificates_draft_check",
+      sql`${t.state} not in ('pending','generated') or (${t.signedPath} is null and ${t.signedSha256} is null and ${t.issuedAt} is null and not ${t.reviewed} and ((${t.state} = 'pending' and ${t.unsignedPath} is null and ${t.generatedAt} is null) or (${t.state} = 'generated' and ${t.unsignedPath} is not null and ${t.generatedAt} is not null)))`,
+    ),
   ],
 ).enableRLS();
 export const certificateEvents = pgTable(

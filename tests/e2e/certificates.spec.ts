@@ -7,7 +7,8 @@ import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
 import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
-import { readApprovedDemoMigrations } from "../../scripts/approved-demo-migration-ledger";
+import { readMigrationFiles } from "drizzle-orm/migrator";
+import { resolve } from "node:path";
 import type { ClosureStateDto } from "@/domain/academic-closure/types";
 import type { CertificateDto } from "@/domain/certificates/types";
 import { courses } from "@/server/db/schema";
@@ -200,7 +201,9 @@ async function generate(
   expect(loaded.available).toBe(true);
   return loaded.data;
 }
-async function signedFixture(notice = "SYNTHETIC QA: lifecycle upload evidence only") {
+async function signedFixture(
+  notice = "SYNTHETIC QA: lifecycle upload evidence only",
+) {
   const pdf = await PDFDocument.create();
   pdf.setTitle(
     "SYNTHETIC QA uploaded PDF — not institutional handwritten signatures",
@@ -260,7 +263,11 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     const ledger = await fixture.database.db.execute<{ count: number }>(
       sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
     );
-    expect(ledger[0]!.count).toBe(readApprovedDemoMigrations().length);
+    expect(ledger[0]!.count).toBe(
+      readMigrationFiles({
+        migrationsFolder: resolve(process.cwd(), "drizzle"),
+      }).length,
+    );
     console.info(
       "Certificate UI isolated QA",
       process.env.TEST_SUPABASE_PROJECT_ID,
@@ -532,7 +539,9 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       path: testInfo.outputPath("public-mobile.png"),
       fullPage: true,
     });
-    const replacementBytes = await signedFixture("SYNTHETIC QA: replacement file, no institutional signature");
+    const replacementBytes = await signedFixture(
+      "SYNTHETIC QA: replacement file, no institutional signature",
+    );
     const currentSigned = await page.request.get(
       `/app/certificados/${record.id}`,
       { headers },
@@ -549,7 +558,9 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     expect(substituted.id).toBe(record.id);
     expect(substituted.publicCredentialId).toBe(record.publicCredentialId);
     expect(substituted.signedSha256).toBe(
-      createHash("sha256").update(replacementBytes).digest("hex"),
+      createHash("sha256")
+        .update(new Uint8Array(replacementBytes))
+        .digest("hex"),
     );
     await page.goto(`${groupPath(fixture)}/certificados`);
     expect(
