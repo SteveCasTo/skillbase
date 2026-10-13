@@ -166,11 +166,58 @@ export async function seedCurrentValidationCertificates(
   );
   const result = [];
   for (const fixture of fixtures) {
-    const existing = await db.select({id:s.certificates.id}).from(s.certificates)
-      .where(and(eq(s.certificates.groupId,fixture.groupId),eq(s.certificates.type,fixture.type),eq(s.certificates.recipientId,fixture.recipientId)));
-    if(existing.length>1)throw new Error("Current-recipient invariant violated; do not adopt duplicate certificates");
-    let row = existing[0] ? await repository.get(options.actorId,existing[0].id) : undefined;
-    if (!row) {
+    const existing = await db
+      .select({ id: s.certificates.id })
+      .from(s.certificates)
+      .where(
+        and(
+          eq(s.certificates.groupId, fixture.groupId),
+          eq(s.certificates.type, fixture.type),
+          eq(s.certificates.recipientId, fixture.recipientId),
+        ),
+      );
+    if (existing.length > 1)
+      throw new Error(
+        "Current-recipient invariant violated; do not adopt duplicate certificates",
+      );
+    if (existing.length) {
+      const [owned] = await db
+        .select({ id: s.certificateReceipts.id })
+        .from(s.certificateReceipts)
+        .where(
+          and(
+            eq(s.certificateReceipts.actorId, options.actorId),
+            eq(
+              s.certificateReceipts.requestKey,
+              requestId(`${options.operationId}:generate:${fixture.key}`),
+            ),
+          ),
+        );
+      if (!owned)
+        throw new Error(
+          "Unowned current recipient record appeared; no adoption or overwrite",
+        );
+    }
+    let row = existing[0]
+      ? await repository.get(options.actorId, existing[0].id)
+      : undefined;
+    if (!row || (!row.hasUnsignedPdf && !row.hasSignedPdf)) {
+      if (row) {
+        const artifacts = await db
+          .select()
+          .from(s.certificateArtifacts)
+          .where(eq(s.certificateArtifacts.certificateId, row.id));
+        if (
+          artifacts.some(
+            (artifact) =>
+              artifact.status === "reserved" ||
+              artifact.status === "cleanup_pending",
+          )
+        )
+          throw new Error(
+            "Generation artifact recovery requires inspection; no blind upload retry",
+          );
+      }
       const generated = await service.generate(options.actorId, {
         courseId: fixture.courseId,
         groupId: fixture.groupId,

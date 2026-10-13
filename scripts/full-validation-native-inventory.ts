@@ -80,6 +80,11 @@ export interface NativeInventory {
   readonly objects: readonly { id: string; bucket: string; name: string }[];
   readonly buckets: readonly { id: string; public: boolean }[];
   readonly columns: readonly Record<string, unknown>[];
+  readonly settings: readonly {
+    relation: string;
+    record: Record<string, unknown>;
+  }[];
+  readonly accounts: readonly Record<string, unknown>[];
   readonly triggers: readonly {
     relation: string;
     name: string;
@@ -130,7 +135,11 @@ export function readNativeInventory(output: unknown): NativeInventory {
     !("triggers" in inventory) ||
     !Array.isArray(inventory.triggers) ||
     !("foreignKeys" in inventory) ||
-    !Array.isArray(inventory.foreignKeys)
+    !Array.isArray(inventory.foreignKeys) ||
+    !("accounts" in inventory) ||
+    !Array.isArray(inventory.accounts) ||
+    !("settings" in inventory) ||
+    !Array.isArray(inventory.settings)
   )
     throw new Error(
       "Native schema inventory changed; review exact scope first",

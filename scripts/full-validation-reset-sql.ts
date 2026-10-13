@@ -145,7 +145,8 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.users u JOIN public.user_roles r ON r.user_id=u.id
     JOIN auth.users a ON a.id=u.auth_user_id
     WHERE u.id=${quote(plan.actorId)}::uuid AND u.status='ACTIVE' AND u.auth_user_id IS NOT NULL
-    AND r.role_code='ADMIN' AND a.email_confirmed_at IS NOT NULL AND lower(a.email)=u.email)
+    AND r.role_code='ADMIN' AND (SELECT count(*) FROM public.user_roles own_roles WHERE own_roles.user_id=u.id)=1
+    AND a.email_confirmed_at IS NOT NULL AND lower(a.email)=u.email)
     THEN RAISE EXCEPTION 'Existing confirmed linked active ADMIN required'; END IF;
   actual := ${expression};
   IF (actual - 'tables') IS DISTINCT FROM (approved - 'tables')

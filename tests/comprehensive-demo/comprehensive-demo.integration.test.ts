@@ -39,6 +39,12 @@ import { DrizzleAdminAccountRepository } from "@/server/db/repositories/admin-ac
 import { DrizzleEvaluationRepository } from "@/server/db/repositories/evaluation-repository";
 import { DrizzleRegistrationRepository } from "@/server/db/repositories/registration-repository";
 import { DrizzleInterestRepository } from "@/server/db/repositories/interest-repository";
+import { FULL_VALIDATION_BUSINESS_TABLES } from "../../scripts/full-validation-reset-plan";
+import { seedFullValidationBusiness } from "../../scripts/full-validation-business-seed";
+import { seedCurrentValidationCertificates } from "../../scripts/full-validation-certificates";
+import { defaultCertificateConfiguration } from "@/domain/certificates/rules";
+import { DrizzleCertificateRepository } from "@/server/db/repositories/certificate-repository";
+import { FULL_VALIDATION_AUTHORITIES } from "../../scripts/full-validation-seed-matrix";
 
 test("real owned Auth/domain fixtures fill F8, preserve every original row, remain idempotent and retain edits", async () => {
   const environment = getTestSupabaseEnvironment();
@@ -599,6 +605,133 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
         canonicalOrCloudWrites: false,
       }),
     );
+    // Same managed case: after proving insert-only preservation, deliberately
+    // reset ONLY this disposable fixture's business relations for the approved
+    // full-recreation path. The runtime target was verified by the managed
+    // runner above; no Auth/roles/settings/provider rows are truncated.
+    const resetId = crypto.randomUUID();
+    const retainedRoles = await db.select().from(s.userRoles);
+    await db.transaction(async (tx) => {
+      await tx.execute(
+        sql.raw(
+          `TRUNCATE TABLE ${FULL_VALIDATION_BUSINESS_TABLES.map((table) => `public.${table}`).join(", ")} RESTRICT`,
+        ),
+      );
+      await tx.insert(s.auditEvents).values({
+        id: resetId,
+        actorId: actor!.id,
+        entityType: "BUSINESS_MAINTENANCE",
+        entityId: resetId,
+        action: "VALIDATION_BUSINESS_RESET",
+        metadata: { owner: "skillbase-validation-v3", isolatedFixture: true },
+      });
+    });
+    expect(await db.select().from(s.userRoles)).toEqual(retainedRoles);
+    const credentialsStillValid = await sessionClient.auth.getUser();
+    expect(credentialsStillValid.error).toBeNull();
+    const fullOptions = {
+      actorId: actor!.id,
+      operationId: resetId,
+      anchorDay: currentAnchor(),
+      accounts: {
+        instructors: context!.instructors,
+        operatorId: context!.admins.operator!,
+      },
+      apply: false,
+    };
+    const fullPlan = await seedFullValidationBusiness(db, auth, fullOptions);
+    expect(fullPlan.mode).toBe("PLAN");
+    expect(await db.select().from(s.courses)).toHaveLength(0);
+    await expect(
+      seedFullValidationBusiness(db, auth, {
+        ...fullOptions,
+        apply: true,
+        reviewedPlanSha256: "0".repeat(64),
+      }),
+    ).rejects.toThrow("plan changed");
+    const fullSeed = await seedFullValidationBusiness(db, auth, {
+      ...fullOptions,
+      apply: true,
+      reviewedPlanSha256: fullPlan.planSha256,
+    });
+    if (fullSeed.mode !== "APPLIED")
+      throw new Error("Expected fresh full validation seed");
+    expect(await db.select().from(s.courses)).toHaveLength(12);
+    expect(await db.select().from(s.groups)).toHaveLength(18);
+    expect(await db.select().from(s.preRegistrations)).toHaveLength(34);
+    const fullStudents = await db.select().from(s.participants);
+    expect(fullStudents).toHaveLength(33);
+    for (const student of fullStudents) {
+      expect(student.paternalSurname).toBeTruthy();
+      expect(student.maternalSurname).toBeTruthy();
+      expect(
+        `${student.firstName} ${student.paternalSurname} ${student.maternalSurname}`,
+      ).not.toMatch(/demo|fictici|ejemplo/i);
+    }
+    for (const course of await db.select().from(s.courses))
+      expect(
+        `${course.name} ${course.slug} ${course.description} ${course.contentMarkdown}`,
+      ).not.toMatch(/demo|fictici|ejemplo/i);
+    for (const entry of await db.select().from(s.registrationLedger))
+      expect(entry.reason ?? "").not.toMatch(/demo|fictici|ejemplo/i);
+    for (const version of await db.select().from(s.academicClosureVersions))
+      expect(JSON.stringify(version.report)).not.toMatch(
+        /demo|fictici|ejemplo/i,
+      );
+    const certRepo = new DrizzleCertificateRepository(db);
+    const settings = await certRepo.getSettings(actor!.id);
+    const cfg = structuredClone(defaultCertificateConfiguration);
+    cfg.director = {
+      ...cfg.director,
+      name: FULL_VALIDATION_AUTHORITIES.director,
+    };
+    cfg.dean = { ...cfg.dean, name: FULL_VALIDATION_AUTHORITIES.dean };
+    cfg.departmentHead = {
+      ...cfg.departmentHead,
+      name: FULL_VALIDATION_AUTHORITIES.departmentHead,
+    };
+    await certRepo.updateSettings(actor!.id, settings.revision, cfg);
+    const certificateOptions = {
+      actorId: actor!.id,
+      operationId: resetId,
+      context: fullSeed.context,
+      verificationOrigin: "https://example.test",
+      apply: false,
+    };
+    const certPlan = await seedCurrentValidationCertificates(
+      db,
+      auth,
+      certificateOptions,
+    );
+    const certSeed = await seedCurrentValidationCertificates(db, auth, {
+      ...certificateOptions,
+      apply: true,
+      reviewedPlanSha256: certPlan.planSha256,
+      allowSyntheticFinal: true,
+    });
+    if (certSeed.mode !== "APPLIED")
+      throw new Error("Expected current certificate seed");
+    expect(certSeed.records.some((c) => c.hasSignedPdf)).toBe(true);
+    expect(certSeed.records.some((c) => !c.hasSignedPdf)).toBe(true);
+    for (const record of certSeed.records)
+      expect(record.templateVersion).toBe("phase9-v2");
+    const fullBeforeReplay = await captureDemoSnapshot(db);
+    expect(
+      (
+        await seedFullValidationBusiness(db, auth, {
+          ...fullOptions,
+          apply: true,
+          reviewedPlanSha256: fullPlan.planSha256,
+        })
+      ).mode,
+    ).toBe("NOOP");
+    await seedCurrentValidationCertificates(db, auth, {
+      ...certificateOptions,
+      apply: true,
+      reviewedPlanSha256: certPlan.planSha256,
+      allowSyntheticFinal: true,
+    });
+    assertDemoNoChanges(fullBeforeReplay, await captureDemoSnapshot(db));
   } finally {
     await connection.close();
   }

@@ -1,6 +1,14 @@
 import { comprehensiveDemoPlan } from "./comprehensive-demo-plan";
 import { currentAnchor, validateAnchor } from "./financial-demo-plan";
 import type { ComprehensiveDemoPlan } from "./comprehensive-demo-plan";
+import { comprehensiveDemoId } from "./comprehensive-demo-plan";
+import { shiftedDay } from "./financial-demo-plan";
+import { planCourseDates } from "@/domain/courses/weekday-schedule";
+import {
+  boliviaCivilToInstant,
+  instantToBoliviaCivil,
+} from "@/domain/courses/bolivia-time";
+import { groupPlan } from "@/domain/groups/rules";
 
 /** Planning vocabulary, not a substitute for the current application services.
  * The operator freezes this inventory before RESET/APPLY; no rolling replay. */
@@ -182,7 +190,7 @@ export function fullValidationSeedMatrix(
   minimumPaymentPercent: number,
 ) {
   validateAnchor(anchorDay);
-  const source = comprehensiveDemoPlan(
+  const source = validationCalendarPlan(
     anchorDay,
     consecutiveAbsenceLimit,
     minimumPaymentPercent,
@@ -303,7 +311,7 @@ export function fullValidationBusinessPlan(
   consecutiveAbsenceLimit: number,
   minimumPaymentPercent: number,
 ): ComprehensiveDemoPlan {
-  const source = comprehensiveDemoPlan(
+  const source = validationCalendarPlan(
     anchorDay,
     consecutiveAbsenceLimit,
     minimumPaymentPercent,
@@ -326,6 +334,146 @@ export function fullValidationBusinessPlan(
         throw new Error("Reviewed registration missing from validation matrix");
       registration.participant = { ...expected.participant };
     }
+  }
+  return source;
+}
+
+const program: Readonly<Record<string, readonly string[]>> = {
+  closed: [
+    "Organización de hojas y referencias",
+    "Funciones, filtros y tablas dinámicas",
+    "Reportes para decisiones administrativas",
+  ],
+  reclosed: [
+    "Preparación y limpieza de datos",
+    "Análisis con pandas y visualización",
+    "Comunicación de resultados reproducibles",
+  ],
+  pending: [
+    "Jerarquía visual y navegación",
+    "Contraste, etiquetas y teclado",
+    "Prototipado y evaluación de accesibilidad",
+  ],
+  current: [
+    "Escucha activa y acuerdos de equipo",
+    "Retroalimentación y resolución de conflictos",
+    "Presentaciones breves y coordinación de tareas",
+  ],
+  future: [
+    "Objetivos, alcance y cronograma",
+    "Asignación de responsabilidades",
+    "Seguimiento de riesgos y entregables",
+  ],
+  free: [
+    "Estructura semántica con HTML",
+    "Estilos responsivos con CSS",
+    "Interacción básica con JavaScript",
+  ],
+  draft: [
+    "Protección de cuentas y dispositivos",
+    "Copias de seguridad y control de acceso",
+    "Respuesta organizada ante incidentes",
+  ],
+  archived: [
+    "Organización documental y colaboración",
+    "Hojas de cálculo para el trabajo diario",
+    "Automatización de tareas repetitivas",
+  ],
+  "next-open-data": [
+    "Selección de indicadores y fuentes",
+    "Gráficos y paneles comprensibles",
+    "Narración visual para decisiones",
+  ],
+  "next-open-web": [
+    "Funciones y estructuras de datos",
+    "Eventos y componentes de interfaz",
+    "Consumo de servicios y manejo de errores",
+  ],
+  "next-upcoming-projects": [
+    "Diagnóstico y objetivos comunitarios",
+    "Presupuesto, calendario y alianzas",
+    "Evaluación de resultados e impacto",
+  ],
+  "next-upcoming-security": [
+    "Inventario y clasificación de información",
+    "Permisos, respaldos y buenas prácticas",
+    "Continuidad y recuperación del trabajo",
+  ],
+};
+
+/** The normal calendar planner recomputes dates/intervals, rather than printing
+ * hours that disagree with the actual sessions. No old cohort is moved: this
+ * function is exclusively for the freshly reset validation dataset. */
+function validationCalendarPlan(
+  anchorDay: string,
+  limit: number,
+  minimumPaymentPercent: number,
+): ComprehensiveDemoPlan {
+  const source = comprehensiveDemoPlan(anchorDay, limit, minimumPaymentPercent);
+  const labels = [
+    "Taller de formación aplicada",
+    "Laboratorio abierto",
+    "Seminario de herramientas digitales",
+    "Clínica de proyectos",
+  ];
+  source.formats.forEach((format, index) => {
+    format.totalHours =
+      index === 1 || index === 3
+        ? Math.max(30, limit + 2)
+        : Math.max(20, limit + 2);
+    format.sessionMinutes = 60;
+    format.name = `${labels[index]} · ${format.totalHours} horas`;
+  });
+  const pastOffsets: Readonly<Record<string, number>> = {
+    closed: -90,
+    reclosed: -60,
+    pending: -35,
+    archived: -120,
+  };
+  for (const sample of source.samples) {
+    const format = source.formats.find(
+      (f) =>
+        comprehensiveDemoId(`revision:${f.id}`) ===
+        sample.course.courseTypeRevisionId,
+    );
+    if (!format)
+      throw new Error("Reviewed format missing for validation calendar");
+    let start =
+      pastOffsets[sample.key] === undefined
+        ? instantToBoliviaCivil(sample.course.startsAt).slice(0, 10)
+        : shiftedDay(anchorDay, pastOffsets[sample.key]!);
+    while ([0, 6].includes(new Date(`${start}T00:00:00Z`).getUTCDay()))
+      start = shiftedDay(start, 1);
+    const dates = planCourseDates({
+      startDate: start,
+      weekdaysMask: 31,
+      totalHours: format.totalHours,
+      sessionMinutes: format.sessionMinutes,
+    });
+    Object.assign(sample.course, dates);
+    sample.course.registrationEndAt = boliviaCivilToInstant(
+      `${shiftedDay(start, -1)}T00:00`,
+    );
+    if (!sample.key.startsWith("next-")) {
+      sample.course.registrationStartAt = boliviaCivilToInstant(
+        `${shiftedDay(start < anchorDay ? start : anchorDay, -14)}T00:00`,
+      );
+      sample.fixtureClock =
+        start < anchorDay
+          ? boliviaCivilToInstant(`${shiftedDay(start, -2)}T12:00`)
+          : source.now;
+    }
+    for (const group of sample.groups) {
+      const time = instantToBoliviaCivil(group.startsAt).slice(11);
+      Object.assign(
+        group,
+        groupPlan({ ...dates, weekdaysMask: 31 }, format, time),
+      );
+    }
+    const modules = program[sample.key];
+    if (!modules)
+      throw new Error("Course program missing from reviewed validation matrix");
+    sample.course.contentMarkdown = `## Programa\n\n${modules.map((module) => `- ${module}`).join("\n")}\n\n## Aplicación\n\nTrabajo guiado y una entrega final relacionada con el curso.`;
   }
   return source;
 }

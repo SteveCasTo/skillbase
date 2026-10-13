@@ -159,6 +159,8 @@ test("production cannot run from an unreleased feature tree or a dirty/unapprove
       .slice(0, 24)
       .map((m, i) => ({ id: i + 1, hash: m.hash, createdAt: String(m.when) })),
     objects: [],
+    settings: [],
+    accounts: [],
     buckets: [],
     columns: [],
     triggers: [],

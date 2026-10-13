@@ -191,9 +191,20 @@ export async function seedFullValidationBusiness(
         );
     }
     const audit = await tx.select().from(s.auditEvents);
-    const permittedPreparation = new Set(["USER_PROFILE_UPDATED","INSTRUCTOR_UPDATED","CERTIFICATE_SETTINGS_UPDATED"]);
-    if (audit.some((event) => event.id !== options.operationId &&
-      (event.actorId!==actor.id||!permittedPreparation.has(event.action))))
+    const permittedPreparation = new Set([
+      "USER_PROFILE_UPDATED",
+      "INSTRUCTOR_UPDATED",
+      "CERTIFICATE_SETTINGS_UPDATED",
+      "VALIDATION_PREPARED",
+    ]);
+    if (
+      audit.some(
+        (event) =>
+          event.id !== options.operationId &&
+          (event.actorId !== actor.id ||
+            !permittedPreparation.has(event.action)),
+      )
+    )
       throw new Error("Unexpected application evidence before fresh seed");
     const [freshAttendance] = await tx
       .select()
