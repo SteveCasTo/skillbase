@@ -537,7 +537,10 @@ test("HTTP mutation and upload adapters validate origin, allowlist, purpose and 
   });
   expect(result.status).toBe(422);
   expect((await repository.get(f.admin.id, row!.id)).hasSignedPdf).toBe(false);
-  form.set("file", new File([signed], "qa.pdf", { type: "application/pdf" }));
+  form.set(
+    "file",
+    new File([new Uint8Array(signed)], "qa.pdf", { type: "application/pdf" }),
+  );
   form.delete("attestation");
   const unconfirmed = await handleCertificateUpload({
     request: new Request(`${siteUrl}upload`, {
