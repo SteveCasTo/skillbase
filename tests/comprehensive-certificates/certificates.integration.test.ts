@@ -227,11 +227,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
         after: demoSnapshotSummary(repeat),
         certificates: certificates.length,
         states: Object.fromEntries(
-          [
-            "generated",
-            "issued",
-            "revoked",
-          ].map((state) => [
+          ["generated", "issued", "revoked"].map((state) => [
             state,
             certificates.filter((r) => r.state === state).length,
           ]),
