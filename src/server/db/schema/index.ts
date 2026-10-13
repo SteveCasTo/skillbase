@@ -994,14 +994,14 @@ export const academicGroupReopenings = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     actorName: text("actor_name").notNull(),
-    reason: text("reason").notNull(),
+    reason: text("reason"),
   },
   (t) => [
     uniqueIndex("academic_group_reopenings_version_unique").on(t.versionId),
     index("academic_group_reopenings_actor_idx").on(t.actorId),
     check(
       "academic_group_reopenings_reason_check",
-      sql`char_length(btrim(${t.reason})) between 1 and 500 and ${t.reason} !~ '[[:cntrl:]]' and char_length(btrim(${t.actorName})) > 0`,
+      sql`(${t.reason} is null or (char_length(btrim(${t.reason})) between 1 and 500 and ${t.reason} !~ '[[:cntrl:]]')) and char_length(btrim(${t.actorName})) > 0`,
     ),
   ],
 ).enableRLS();

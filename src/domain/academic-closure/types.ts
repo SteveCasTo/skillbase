@@ -14,7 +14,7 @@ export interface ClosureCommand {
   revision: number;
 }
 export interface ReopenGroupInput extends ClosureCommand {
-  reason: string;
+  reason?: string | null;
 }
 export type ClosureBlocker =
   "SESSIONS_UNFINISHED" | "GRADES_PENDING" | "ATTENDANCE_PENDING";
@@ -127,7 +127,7 @@ export interface ClosureStateDto {
     reopenedAt: string;
     actorId: string;
     actorName: string;
-    reason: string;
+    reason: string | null;
   }[];
 }
 export interface ClosureCommandResult {

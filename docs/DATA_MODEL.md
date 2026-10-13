@@ -241,8 +241,13 @@ schema Drizzle:
   `ClosureReportDto` completo (roster, notas/resultados, umbral, asistencia y
   elegibilidad). Sus FK de grupo/curso y actor usan `RESTRICT`.
 - `academic_group_reopenings`: evento append-only con referencia a versión,
-  instante, actor UUID/name y razón obligatoria de 1–500 caracteres; unique por
+  instante, actor UUID/name y razón opcional (`null` o 1–500 caracteres sin
+  controles); unique por
   versión reabierta.
+  `0026_optional_academic_reopening_reason.sql` permite `null` sin reescribir
+  eventos existentes ni cambiar los triggers de inmutabilidad, RLS o grants.
+  Su snapshot deriva de 0025 y conserva el esquema de certificados actuales y
+  los apellidos separados de 0024; el journal completo contiene 27 entradas.
 - `academic_closure_receipts`: resultado append-only con actor, UUID request key,
   fingerprint SHA-256 y comando result; unique `(actor_id, request_key)`.
 

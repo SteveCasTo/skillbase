@@ -209,7 +209,7 @@ test("academic closure lifecycle validates blockers, permissions and immutable h
     code: "FORBIDDEN",
   });
   await expect(
-    repo.reopen(f.admin.id, { ...reopen, reason: " " }),
+    repo.reopen(f.admin.id, { ...reopen, reason: "bad\nreason" }),
   ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
   await db
     .update(s.users)
@@ -421,12 +421,33 @@ test("academic closure privacy projects open, official and historical loaders us
       },
     },
   });
-  await repo.reopen(f.admin2.id, {
+  const privacyReopen = {
     ...f.command,
     requestKey: crypto.randomUUID(),
     revision: 1,
-    reason: "Synthetic privacy correction",
-  });
+    reason: "   ",
+  };
+  const reopening = await repo.reopen(f.admin2.id, privacyReopen);
+  expect(
+    await repo.reopen(f.admin2.id, { ...privacyReopen, reason: null }),
+  ).toEqual(reopening);
+  expect(
+    (await repo.getGroup(f.admin.id, f.course.id, f.groupId)).reopenings[0]!
+      .reason,
+  ).toBeNull();
+  expect(
+    (
+      await db
+        .select()
+        .from(s.auditEvents)
+        .where(
+          and(
+            eq(s.auditEvents.entityId, f.groupId),
+            eq(s.auditEvents.action, "ACADEMIC_GROUP_REOPENED"),
+          ),
+        )
+    )[0]!.metadata,
+  ).toMatchObject({ reason: null });
   privateOutput(await loadAcademicClosure(instructor));
   const historical = await loadAcademicClosureVersion({
     ...instructor,

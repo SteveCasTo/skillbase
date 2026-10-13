@@ -511,6 +511,25 @@ La UI liberada conserva SSR, teclado, foco, privacidad e idempotencia conforme a
 
 El contrato funcional/técnico aprobado está en [`docs/EVALUATIONS_CONTRACT.md`](EVALUATIONS_CONTRACT.md). PRs 230/232 integraron backend y las cuatro páginas de esquema/notas para ADMIN/INSTRUCTOR; PR 235 liberó Fase 7. La UI distingue estado pendiente/decisión 0.00 de una nota completa 0, conserva drafts individuales y expone el historial de correcciones ADMIN. El local QA cubrió 132 escenarios mediante corridas separadas, no una sola corrida full; el master CI sí pasó el full E2E 132/132. Migration 0020 está aplicada local/cloud, con verificación cloud de solo lectura y límites en [`DEPLOYMENT.md`](DEPLOYMENT.md). La liberación F7 no incorpora cierre/planilla de Fase 8 ni certificados de Fase 9.
 
+### Resumen de cierre académico
+
+- Tarjetas y diálogos separan aprobación por nota de elegibilidad por asistencia;
+  las badges usan variantes semánticas del sistema, no verde/rojo fijo.
+- El diálogo mantiene nombre y CI ADMIN en la misma fila flexible, con cierre a
+  la derecha; no repite «Notas y asistencia». Instructor no recibe CI ni finanzas.
+- Asistencia muestra barra segmentada y fracciones por categoría: presentes
+  `primary`, ausentes `destructive`, justificadas `muted` y pendientes, cuando
+  existen, como segmento sin relleno con borde. La racha solo aparece junto a
+  inelegibilidad causada por superar el umbral, nunca para una nota insuficiente.
+- Se retira el saldo de todas las tarjetas y diálogos académicos. El encabezado
+  conserva «Cierre del grupo» y fecha/hora numérica de Bolivia; historial muestra
+  fechas y motivos presentes, sin ordinales de versión ni nombres de actores.
+  Snapshots, actor y versiones permanecen íntegros en servidor.
+- Reabrir abre un diálogo breve con input de motivo opcional en una línea,
+  Cancelar y Confirmar; omite explicación y ayuda visibles redundantes y mantiene
+  una descripción accesible para el diálogo, Escape, retorno de foco y formulario
+  HTML sin JavaScript.
+
 ## CONSISTENCIA
 
 Antes de crear un componente:

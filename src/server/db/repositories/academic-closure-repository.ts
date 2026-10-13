@@ -233,6 +233,7 @@ export class DrizzleClosureRepository
   ): Promise<ClosureCommandResult> {
     validateClosureCommand(input);
     if (operation === "REOPEN") validateReopen(input as ReopenGroupInput);
+    const reason = "reason" in input ? input.reason?.trim() || null : null;
     return this.db.transaction(async (tx) => {
       const ctx = await context(
         tx,
@@ -249,7 +250,7 @@ export class DrizzleClosureRepository
             courseId: input.courseId,
             groupId: input.groupId,
             revision: input.revision,
-            reason: "reason" in input ? input.reason.trim() : null,
+            reason,
           }),
         )
         .digest("hex");
@@ -329,7 +330,7 @@ export class DrizzleClosureRepository
           reopenedAt: ctx.now,
           actorId,
           actorName: ctx.actor.name,
-          reason: (input as ReopenGroupInput).reason.trim(),
+          reason,
         });
       }
       const closed = operation === "CLOSE";
@@ -366,7 +367,7 @@ export class DrizzleClosureRepository
           version,
           revision,
           actorName: ctx.actor.name,
-          ...("reason" in input ? { reason: input.reason.trim() } : {}),
+          ...(operation === "REOPEN" ? { reason } : {}),
         },
       });
       return result;

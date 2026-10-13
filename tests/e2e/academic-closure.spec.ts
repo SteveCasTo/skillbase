@@ -259,7 +259,7 @@ async function prepare(
 test("ADMIN closes, reopens and preserves the immutable official version with readonly academic surfaces", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   const fixture = await createAttendanceFlowFixture("2020-05-04");
   const base = basePath(fixture.historyCourseId, fixture.historyGroupId),
     path = `${base}/cierre`;
@@ -290,7 +290,40 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     });
     await expect(resultDetail).toBeVisible();
     await expect(resultDetail).toContainText(participant.ci);
+    await expect(resultDetail).not.toContainText("Saldo informativo");
+    await expect(
+      resultDetail.getByRole("img", { name: /^Asistencia:/ }),
+    ).toBeVisible();
     await expect(resultDetail).toContainText("Componente 6");
+    const originalViewport = page.viewportSize()!;
+    for (const theme of ["light", "dark"]) {
+      for (const width of [375, 768, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        await page.evaluate(
+          (dark) => document.documentElement.classList.toggle("dark", dark),
+          theme === "dark",
+        );
+        expect(
+          await resultDetail.evaluate(
+            (element) => element.scrollWidth <= element.clientWidth,
+          ),
+        ).toBe(true);
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        ).toBe(true);
+        if (process.env.E2E_EVIDENCE_DIR)
+          await page.screenshot({
+            path: testInfo.outputPath(`academic-results-${theme}-${width}.png`),
+            animations: "disabled",
+          });
+      }
+    }
+    await page.setViewportSize(originalViewport);
+    await page.evaluate(() =>
+      document.documentElement.classList.remove("dark"),
+    );
     await resultDetail
       .getByRole("button", { name: "Cerrar", exact: true })
       .click();
@@ -316,7 +349,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
       .click();
     expect((await closed).status()).toBe(200);
     await expect(
-      page.getByRole("heading", { name: "Versión oficial 1" }),
+      page.getByRole("heading", { name: "Cierre del grupo", exact: true }),
     ).toBeVisible();
     const official = (await read(page, path)).official!;
     expect(official.report.participants[0]!.result.finalGrade).toBe("80.00");
@@ -350,18 +383,33 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
       page.getByRole("button", { name: /Editar|Cancelar sesión|Reprogramar/ }),
     ).toHaveCount(0);
     await page.goto(path);
-    await page.getByText("Reabrir grupo", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "Reabrir grupo", exact: true })
+      .click();
+    await expect(
+      page.getByRole("dialog", { name: "Reabrir grupo" }),
+    ).toBeVisible();
+    if (process.env.E2E_EVIDENCE_DIR)
+      await page.screenshot({
+        path: testInfo.outputPath("academic-reopen-dialog.png"),
+        animations: "disabled",
+      });
+    await page.keyboard.press("Escape");
+    await expect(
+      page.getByRole("button", { name: "Reabrir grupo", exact: true }),
+    ).toBeFocused();
+    await page
+      .getByRole("button", { name: "Reabrir grupo", exact: true })
+      .click();
     await expect(
       page.getByRole("button", { name: "Confirmar reapertura" }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     await page
-      .getByRole("textbox", { name: "Motivo de reapertura (obligatorio)" })
+      .getByRole("textbox", { name: "Motivo de reapertura (opcional)" })
       .fill("Corrección académica documentada");
     await page.getByRole("button", { name: "Confirmar reapertura" }).click();
     await expect(
-      page.getByRole("heading", {
-        name: "Grupo abierto · Resultado provisional",
-      }),
+      page.getByText("Grupo abierto", { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByText("Corrección académica documentada", { exact: false }),
@@ -395,7 +443,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     );
     expect(staleMessage).not.toBe("");
     await expect(
-      page.getByRole("heading", { name: "Versión oficial 2" }),
+      page.getByRole("heading", { name: "Cierre del grupo", exact: true }),
     ).toBeVisible();
     await expect(
       page.locator(
@@ -408,9 +456,9 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
       ),
     ).toContainText(staleMessage);
     await expect(page.locator("#closure-error")).toBeHidden();
-    await page.getByRole("link", { name: "Versión 1", exact: true }).click();
+    await page.locator(`a[href="${path}/1"]`).click();
     await expect(
-      page.getByRole("heading", { name: "Versión 1", exact: true }),
+      page.getByRole("heading", { name: "Cierre académico", exact: true }),
     ).toBeVisible();
     const history = await page.request.get(`${path}/1`, { headers });
     const historicLoad = await history.json();
@@ -494,7 +542,7 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
       .getByRole("button", { name: "Confirmar cierre", exact: true })
       .click();
     await expect(
-      page.getByRole("heading", { name: "Versión oficial 1" }),
+      page.getByRole("heading", { name: "Cierre del grupo", exact: true }),
     ).toBeVisible();
     await expect(page.getByText("Reabrir grupo", { exact: true })).toHaveCount(
       0,
@@ -623,7 +671,7 @@ test("HTML without JavaScript retains server validation and supports closing and
       .getByRole("button", { name: "Confirmar cierre", exact: true })
       .click();
     await expect(
-      page.getByRole("heading", { name: "Versión oficial 1" }),
+      page.getByRole("heading", { name: "Cierre del grupo", exact: true }),
     ).toBeVisible();
     await downloadOfficialDocuments(
       page,
@@ -634,8 +682,8 @@ test("HTML without JavaScript retains server validation and supports closing and
     );
     await page.getByText("Reabrir grupo", { exact: true }).click();
     await page
-      .getByRole("textbox", { name: "Motivo de reapertura (obligatorio)" })
-      .fill("   ");
+      .getByRole("textbox", { name: "Motivo de reapertura (opcional)" })
+      .fill("Motivo\u0007no válido");
     const invalid = page.waitForResponse(
       (r) =>
         r.request().method() === "POST" && r.url().includes("operation=reopen"),
@@ -643,20 +691,21 @@ test("HTML without JavaScript retains server validation and supports closing and
     await page.getByRole("button", { name: "Confirmar reapertura" }).click();
     expect((await invalid).status()).toBe(422);
     await expect(
-      page.getByRole("textbox", { name: "Motivo de reapertura (obligatorio)" }),
-    ).toHaveValue("   ");
+      page.getByRole("textbox", { name: "Motivo de reapertura (opcional)" }),
+    ).toHaveValue("Motivo\u0007no válido");
     await expect(
-      page.getByText("Introduce un motivo de 1 a 500 caracteres."),
+      page.getByText(
+        "Usa hasta 500 caracteres, sin saltos de línea ni caracteres de control.",
+      ),
     ).toBeVisible();
     await page
-      .getByRole("textbox", { name: "Motivo de reapertura (obligatorio)" })
-      .fill("Corrección desde formulario HTML");
+      .getByRole("textbox", { name: "Motivo de reapertura (opcional)" })
+      .fill("");
     await page.getByRole("button", { name: "Confirmar reapertura" }).click();
     await expect(
-      page.getByRole("heading", {
-        name: "Grupo abierto · Resultado provisional",
-      }),
+      page.getByText("Grupo abierto", { exact: true }),
     ).toBeVisible();
+    expect((await read(page, path)).reopenings[0]!.reason).toBeNull();
     expect(
       (
         await page.request.post(`${path}/1`, {
