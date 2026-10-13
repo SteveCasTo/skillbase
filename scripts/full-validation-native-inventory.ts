@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import type postgres from "postgres";
 import {
   FULL_VALIDATION_BUSINESS_TABLES,
   FULL_VALIDATION_RETAINED_TABLES,
@@ -147,6 +148,7 @@ export function readNativeInventory(output: unknown): NativeInventory {
       typeof value.count !== "number" ||
       !Number.isSafeInteger(value.count) ||
       value.count < 0 ||
+      typeof value.fullRowsSha256 !== "string" ||
       !/^[a-f0-9]{64}$/u.test(value.fullRowsSha256) ||
       !Array.isArray(value.primaryKeys) ||
       value.primaryKeys.length !== value.count
@@ -221,6 +223,26 @@ export function readNativeInventory(output: unknown): NativeInventory {
       throw new Error("Native FK inventory incomplete");
   }
   return inventory as NativeInventory;
+}
+
+/** Direct local/managed-test transport uses the SAME JSON/hash contract as the
+ * authenticated cloud CLI. No duplicate inventory or hashing implementation. */
+export async function captureFullValidationResetInventory(
+  client: postgres.Sql,
+) {
+  return client.begin(async (tx) => {
+    await tx`set transaction isolation level repeatable read read only`;
+    const sql = fullValidationNativeReadSql();
+    const start = sql.indexOf("select jsonb_build_object(");
+    const end = sql.lastIndexOf(") as inventory;");
+    if (start < 0 || end < start)
+      throw new Error("Inventory statement unavailable");
+    const rows = await tx.unsafe<{ inventory: unknown }[]>(
+      sql.slice(start, end + ") as inventory;".length),
+    );
+    const inventory = readNativeInventory({ rows: Array.from(rows) });
+    return { inventory, inventorySha256: fullValidationPlanHash(inventory) };
+  });
 }
 
 /** Generates a SQL file in the private evidence directory, and reads ONLY. */

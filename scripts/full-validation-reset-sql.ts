@@ -135,6 +135,7 @@ export function fullValidationResetSql(
   return `BEGIN;
 SET LOCAL lock_timeout = '10s';
 SET LOCAL statement_timeout = '60s';
+SET LOCAL standard_conforming_strings = on;
 SELECT pg_advisory_xact_lock(20260915, 3);
 SELECT pg_advisory_xact_lock(20260915, 1);
 LOCK TABLE ${locked} IN ACCESS EXCLUSIVE MODE;
@@ -142,8 +143,10 @@ DO ${delimiter}
 DECLARE actual jsonb; approved jsonb := ${quote(JSON.stringify(plan.inventory))}::jsonb;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.users u JOIN public.user_roles r ON r.user_id=u.id
+    JOIN auth.users a ON a.id=u.auth_user_id
     WHERE u.id=${quote(plan.actorId)}::uuid AND u.status='ACTIVE' AND u.auth_user_id IS NOT NULL
-    AND r.role_code='ADMIN') THEN RAISE EXCEPTION 'Existing linked active ADMIN required'; END IF;
+    AND r.role_code='ADMIN' AND a.email_confirmed_at IS NOT NULL AND lower(a.email)=u.email)
+    THEN RAISE EXCEPTION 'Existing confirmed linked active ADMIN required'; END IF;
   actual := ${expression};
   IF (actual - 'tables') IS DISTINCT FROM (approved - 'tables')
     OR (SELECT jsonb_agg(t ORDER BY t->>'table') FROM jsonb_array_elements(actual->'tables') t

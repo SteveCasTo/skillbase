@@ -359,7 +359,9 @@ export async function createBusinessFixtures(
             ? {
                 amountCents: amount,
                 effectiveDate: null,
-                reason: "[DEMO] Efectivo ficticio autorizado",
+                reason: legacyLabels
+                  ? "[DEMO] Efectivo ficticio autorizado"
+                  : "Abono de inscripción",
               }
             : null,
         },
@@ -375,7 +377,9 @@ export async function createBusinessFixtures(
               requestKey: comprehensiveDemoId(`cancel:${fixture.key}`),
               registrationId: row.id,
               revision: row.revision,
-              reason: "[DEMO] Cancelación de inscripción",
+              reason: legacyLabels
+                ? "[DEMO] Cancelación de inscripción"
+                : "Cancelación voluntaria de inscripción",
               refundedNow: null,
             },
             sample.fixtureClock,
@@ -392,7 +396,9 @@ export async function createBusinessFixtures(
               cash: {
                 amountCents: amount,
                 effectiveDate: null,
-                reason: "[DEMO] Devolución ficticia registrada",
+                reason: legacyLabels
+                  ? "[DEMO] Devolución ficticia registrada"
+                  : "Devolución de inscripción cancelada",
               },
             },
             sample.fixtureClock,
@@ -416,7 +422,9 @@ export async function createBusinessFixtures(
             cash: {
               amountCents: total - amount,
               effectiveDate: null,
-              reason: "[DEMO] Segundo abono ficticio",
+              reason: legacyLabels
+                ? "[DEMO] Segundo abono ficticio"
+                : "Segundo abono de inscripción",
             },
           },
           sample.fixtureClock,

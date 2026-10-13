@@ -1,5 +1,6 @@
 import { comprehensiveDemoPlan } from "./comprehensive-demo-plan";
 import { currentAnchor, validateAnchor } from "./financial-demo-plan";
+import type { ComprehensiveDemoPlan } from "./comprehensive-demo-plan";
 
 /** Planning vocabulary, not a substitute for the current application services.
  * The operator freezes this inventory before RESET/APPLY; no rolling replay. */
@@ -228,8 +229,8 @@ export function fullValidationSeedMatrix(
         scenario: registration.scenario,
         participant: {
           ...identity,
-          ci: registration.participant.ci,
-          email: registration.participant.email,
+          ci: `${8700000 + FULL_VALIDATION_STUDENT_IDENTITIES.indexOf(identity) + 1}LP`,
+          email: `${publicSlug(identity.firstName)}.${publicSlug(identity.paternalSurname)}@example.test`,
           phone: registration.participant.phone,
         },
       };
@@ -293,4 +294,38 @@ export function fullValidationSeedMatrix(
 
 export function currentFullValidationAnchor(): string {
   return currentAnchor();
+}
+
+/** Feed established real finance/attendance/grade/closure fixture services with
+ * the explicitly reviewed three-part identities and natural public slugs. */
+export function fullValidationBusinessPlan(
+  anchorDay: string,
+  consecutiveAbsenceLimit: number,
+  minimumPaymentPercent: number,
+): ComprehensiveDemoPlan {
+  const source = comprehensiveDemoPlan(
+    anchorDay,
+    consecutiveAbsenceLimit,
+    minimumPaymentPercent,
+  );
+  const matrix = fullValidationSeedMatrix(
+    anchorDay,
+    consecutiveAbsenceLimit,
+    minimumPaymentPercent,
+  );
+  for (const sample of source.samples) {
+    const planned = matrix.courses.find((course) => course.key === sample.key);
+    if (!planned)
+      throw new Error("Reviewed course missing from validation matrix");
+    sample.course.slug = planned.slug;
+    for (const registration of sample.registrations) {
+      const expected = planned.registrations.find(
+        (r) => r.key === registration.key,
+      );
+      if (!expected)
+        throw new Error("Reviewed registration missing from validation matrix");
+      registration.participant = { ...expected.participant };
+    }
+  }
+  return source;
 }
