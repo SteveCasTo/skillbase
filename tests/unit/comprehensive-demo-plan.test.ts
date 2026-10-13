@@ -28,6 +28,7 @@ import {
   type ReviewedBusinessReset,
 } from "../../scripts/full-validation-reset-sql";
 import { readApprovedDemoMigrations } from "../../scripts/approved-demo-migration-ledger";
+import { readFileSync } from "node:fs";
 
 test("bounded comprehensive plan uses independent deterministic identities, exact weights and Bolivia calendars", () => {
   for (const limit of [1, 3, 10, 20]) {
@@ -157,6 +158,12 @@ test("production cannot run from an unreleased feature tree or a dirty/unapprove
     assertComprehensiveRelease("master", sha, "", "b".repeat(40)),
   ).toThrow();
   expect(() => assertComprehensiveRelease("master", sha, "", "")).toThrow();
+  const operatorSource = readFileSync(
+    new URL("../../scripts/full-validation-reset.ts", import.meta.url),
+    "utf8",
+  );
+  expect(operatorSource).toMatch(/"--experimental",\s*"--yes"/u);
+  expect(operatorSource).toContain("do not record false completion");
   const names = [
     ...FULL_VALIDATION_BUSINESS_TABLES,
     ...FULL_VALIDATION_RETAINED_TABLES,

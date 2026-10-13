@@ -373,7 +373,14 @@ async function main() {
               "Approved object disappeared immediately before removal",
             );
           assertReviewedStorageObject(object, immediateObject);
-          const args = ["x", "supabase", "storage", "rm"];
+          const args = [
+            "x",
+            "supabase",
+            "storage",
+            "rm",
+            "--experimental",
+            "--yes",
+          ];
           if (target === "production")
             args.push("--linked", "--project-ref", project!);
           else
@@ -387,6 +394,20 @@ async function main() {
           if (remove.status !== 0)
             throw new Error(
               "Object removal acknowledgment unavailable; inspect receipt/object before retry",
+            );
+          const confirmed = connection
+            ? await captureFullValidationResetInventory(connection)
+            : await captureNativeCloudValidationInventory(
+                project!,
+                `${output}.removal-confirmation.sql`,
+              );
+          if (
+            confirmed.inventory.objects.some(
+              (row) => row.bucket === object.bucket && row.name === object.name,
+            )
+          )
+            throw new Error(
+              "Native Storage command returned success without removing the object; do not record false completion",
             );
           completed.add(key);
           await Bun.write(
