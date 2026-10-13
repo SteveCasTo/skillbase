@@ -200,14 +200,18 @@ async function interests(
               paternalSurname: legacyLabels
                 ? "Demo Interés"
                 : [
-                    "Varela Durán",
-                    "Rivas Toledo",
-                    "Zamora Téllez",
-                    "Beltrán Orellana",
-                    "Figueroa Montes",
-                    "Palacios Ugarte",
+                    "Varela",
+                    "Rivas",
+                    "Zamora",
+                    "Beltrán",
+                    "Figueroa",
+                    "Palacios",
                   ][n % 6]!,
-              maternalSurname: "Quispe",
+              maternalSurname: legacyLabels
+                ? "Quispe"
+                : ["Durán", "Toledo", "Téllez", "Orellana", "Montes", "Ugarte"][
+                    n % 6
+                  ]!,
               email: `comprehensive.v1.interest.${interestKey}.${n}@example.test`,
               phone: null,
             };
