@@ -12,6 +12,21 @@ import { validateEvaluationComponents } from "@/domain/evaluations/rules";
 import { PRODUCTION_PROJECT } from "../../scripts/financial-demo-plan";
 import { fingerprint } from "../../scripts/financial-demo-plan";
 import { reviewedComprehensiveLocalTarget } from "../../scripts/comprehensive-demo-local-target";
+import { fullValidationSeedMatrix } from "../../scripts/full-validation-seed-matrix";
+import {
+  FULL_VALIDATION_BUSINESS_TABLES,
+  FULL_VALIDATION_RETAINED_TABLES,
+  fullValidationPlanHash,
+} from "../../scripts/full-validation-reset-plan";
+import {
+  fullValidationNativeReadSql,
+  type NativeInventory,
+} from "../../scripts/full-validation-native-inventory";
+import {
+  fullValidationResetSql,
+  type ReviewedBusinessReset,
+} from "../../scripts/full-validation-reset-sql";
+import { readApprovedDemoMigrations } from "../../scripts/approved-demo-migration-ledger";
 
 test("bounded comprehensive plan uses independent deterministic identities, exact weights and Bolivia calendars", () => {
   for (const limit of [1, 3, 10, 20]) {
@@ -76,6 +91,28 @@ test("bounded comprehensive plan uses independent deterministic identities, exac
   expect(() => comprehensiveDemoPlan("2026-10-08", 21, 25)).toThrow();
   expect(() => comprehensiveDemoPlan("2026-10-08", 3, 0)).toThrow();
   expect(() => comprehensiveDemoPlan("2026-02-30", 3, 25)).toThrow();
+  const validation = fullValidationSeedMatrix("2026-10-12", 3, 25);
+  expect(validation.mode).toBe("MATRIX_ONLY_NO_WRITES");
+  expect(validation.courses).toHaveLength(12);
+  expect(validation.studentIdentityCount).toBe(33);
+  expect(new Set(validation.courses.map(({ slug }) => slug)).size).toBe(12);
+  for (const course of validation.courses) {
+    expect(`${course.name} ${course.slug}`).not.toMatch(
+      /demo|fictici|ejemplo/i,
+    );
+    for (const { participant } of course.registrations) {
+      expect(participant.firstName).toBeTruthy();
+      expect(participant.paternalSurname).toBeTruthy();
+      expect(participant.maternalSurname).toBeTruthy();
+      expect(participant).not.toHaveProperty("lastName");
+    }
+  }
+  expect(fullValidationPlanHash(validation)).toBe(
+    fullValidationPlanHash(fullValidationSeedMatrix("2026-10-12", 3, 25)),
+  );
+  expect(fullValidationPlanHash({ a: 1, b: 2 })).toBe(
+    fullValidationPlanHash({ b: 2, a: 1 }),
+  );
 });
 
 test("production cannot run from an unreleased feature tree or a dirty/unapproved source", () => {
@@ -98,6 +135,93 @@ test("production cannot run from an unreleased feature tree or a dirty/unapprove
     assertComprehensiveRelease("master", sha, "", "b".repeat(40)),
   ).toThrow();
   expect(() => assertComprehensiveRelease("master", sha, "", "")).toThrow();
+  const names = [
+    ...FULL_VALIDATION_BUSINESS_TABLES,
+    ...FULL_VALIDATION_RETAINED_TABLES,
+  ].sort();
+  const inventory: NativeInventory = {
+    mode: "READ_ONLY_INVENTORY_NOT_APPLYABLE",
+    hashScheme: "postgres-jsonb-sha256-v1",
+    database: "postgres",
+    publicTables: names,
+    tables: names.map((table) => ({
+      table,
+      classification: FULL_VALIDATION_BUSINESS_TABLES.some((t) => t === table)
+        ? "business"
+        : "retained",
+      count: 0,
+      fullRowsSha256: "a".repeat(64),
+      primaryKeys: [],
+    })),
+    ledger: readApprovedDemoMigrations()
+      .slice(0, 24)
+      .map((m, i) => ({ id: i + 1, hash: m.hash, createdAt: String(m.when) })),
+    objects: [],
+    buckets: [],
+    columns: [],
+    triggers: [],
+    foreignKeys: [],
+  };
+  const reset: ReviewedBusinessReset = {
+    mode: "PRE_MIGRATION_DISPOSABLE_BUSINESS_RESET",
+    actorId: "00000000-0000-4000-8000-000000000001",
+    operationId: "00000000-0000-4000-8000-000000000002",
+    sourceSha: sha,
+    target: "local",
+    project: "skillbase",
+    inventory,
+    inventorySha256: fullValidationPlanHash(inventory),
+  };
+  const resetHash = fullValidationPlanHash(reset);
+  const resetSql = fullValidationResetSql(reset, resetHash);
+  const truncate = resetSql
+    .split("\n")
+    .find((line) => line.startsWith("TRUNCATE TABLE"))!;
+  expect(truncate).toEndWith(" RESTRICT;");
+  expect(truncate).not.toMatch(
+    /CASCADE|users|user_roles|roles|settings|auth_|storage|drizzle/,
+  );
+  expect(resetSql).not.toMatch(
+    /DISABLE TRIGGER|session_replication_role|DROP SCHEMA/,
+  );
+  expect(resetSql).toContain("Reviewed reset inventory changed; nothing reset");
+  expect(() => fullValidationResetSql(reset, "0".repeat(64))).toThrow();
+  const extra = {
+    ...reset,
+    inventory: {
+      ...inventory,
+      publicTables: [...names, "unknown_business_table"],
+    },
+  };
+  expect(() =>
+    fullValidationResetSql(extra, fullValidationPlanHash(extra)),
+  ).toThrow();
+  const referenced = {
+    ...inventory,
+    foreignKeys: [
+      {
+        schema: "auth",
+        relation: "sessions",
+        referencedSchema: "public",
+        referencedRelation: "courses",
+      },
+    ],
+  };
+  const external = {
+    ...reset,
+    inventory: referenced,
+    inventorySha256: fullValidationPlanHash(referenced),
+  };
+  expect(() =>
+    fullValidationResetSql(external, fullValidationPlanHash(external)),
+  ).toThrow("external dependency");
+  const readOnlySql = fullValidationNativeReadSql();
+  expect(readOnlySql).toStartWith(
+    "begin transaction isolation level repeatable read read only;",
+  );
+  expect(readOnlySql).not.toMatch(
+    /TRUNCATE|DELETE FROM|UPDATE public|INSERT INTO|auth\.users|service_role_key/i,
+  );
 });
 
 test("certificate verification origin defaults to the local app and preserves production origin", () => {
