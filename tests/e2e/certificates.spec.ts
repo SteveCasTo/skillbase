@@ -382,6 +382,18 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         await page.request.get(`/app/certificados/${record.id}/generado.pdf`)
       ).status(),
     ).toBe(404);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await assertNoOverflow(page);
+    await page.screenshot({
+      path: testInfo.outputPath("signed-detail-mobile.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await assertNoOverflow(page);
+    await page.screenshot({
+      path: testInfo.outputPath("signed-detail-desktop.png"),
+      fullPage: true,
+    });
     const privateFile = await page.request.get(
       `/app/certificados/${record.id}/firmado.pdf`,
     );
@@ -567,6 +579,16 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       (await records(page, fixture)).filter((r) => r.type === "APPROVAL"),
     ).toHaveLength(1);
     await expect(page.getByText(/Versión|Historial/)).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath("group-desktop.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await assertNoOverflow(page);
+    await page.screenshot({
+      path: testInfo.outputPath("group-mobile.png"),
+      fullPage: true,
+    });
     await page.goto(`/app/certificados/${record.id}`);
     await page
       .getByRole("button", { name: "Revocar certificado", exact: true })
