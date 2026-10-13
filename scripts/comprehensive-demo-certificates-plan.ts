@@ -9,7 +9,7 @@ import type { CertificateConfiguration } from "@/domain/certificates/types";
 export const CERTIFICATE_DEMO_OWNER = "skillbase-comprehensive-certificates-v1";
 export const DEMO_PDF_NOTICE = "[DEMO - SIN FIRMA INSTITUCIONAL]";
 export const DEMO_CERTIFICATE_REASON =
-  "[DEMO] Fixture de revisión/emisión sintética; no acredita firma física ni institucional.";
+  "[DEMO] Documento de prueba sin firma institucional; atestación técnica sintética.";
 export function certificateDemoId(key: string) {
   const h = createHash("sha256")
     .update(`${CERTIFICATE_DEMO_OWNER}:${key}`)

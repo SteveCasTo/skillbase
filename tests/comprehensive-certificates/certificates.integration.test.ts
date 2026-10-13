@@ -22,6 +22,7 @@ import {
   demoSnapshotSummary,
 } from "../../scripts/comprehensive-demo-preservation";
 import { fingerprint } from "../../scripts/financial-demo-plan";
+import { readApprovedDemoMigrations } from "../../scripts/approved-demo-migration-ledger";
 
 test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and all original full rows; repeat has zero changes", async () => {
   const env = getTestSupabaseEnvironment();
@@ -74,7 +75,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
       createHash("sha256").update(bytes).digest("hex"),
     );
     const before = await captureDemoSnapshot(db);
-    expect(before.ledger).toHaveLength(25);
+    expect(before.ledger).toHaveLength(readApprovedDemoMigrations().length);
     const options = {
       actorId: original!.id,
       auth,
@@ -109,15 +110,17 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
       }),
     ).rejects.toThrow("Reviewed certificate plan changed");
     assertDemoNoChanges(before, await captureDemoSnapshot(db));
-    // Inject only a lost response AFTER the real issue committed. A retry must
+    // Inject only a lost response AFTER the real signed attach committed. A retry must
     // use current records/receipts, not re-render or upload this issued PDF.
-    const actualIssue = DrizzleCertificateRepository.prototype.issue;
+    const actualIssue = DrizzleCertificateRepository.prototype.attachArtifact;
     const lostAcknowledgment = spyOn(
       DrizzleCertificateRepository.prototype,
-      "issue",
+      "attachArtifact",
     ).mockImplementation(async (actorId, command) => {
-      await actualIssue.call(repo, actorId, command);
-      throw new Error("Synthetic lost issue acknowledgment");
+      const result = await actualIssue.call(repo, actorId, command);
+      if (command.purpose === "SIGNED")
+        throw new Error("Synthetic lost issue acknowledgment");
+      return result;
     });
     try {
       await expect(
@@ -142,13 +145,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
     const certificates = await db.select().from(s.certificates);
     expect(certificates).toHaveLength(plan.plannedCount);
     expect(new Set(certificates.map((r) => r.state))).toEqual(
-      new Set([
-        "generated",
-        "awaiting_signature",
-        "issued",
-        "revoked",
-        "replaced",
-      ]),
+      new Set(["generated", "issued", "revoked"]),
     );
     const settings = await db.select().from(s.certificateSettings);
     expect(settings[0]!.updatedBy).toBe(context!.admins.operator!);
@@ -173,7 +170,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
       expect(publicDto).not.toHaveProperty("signedPath");
       expect(publicDto).not.toHaveProperty("data");
       expect(publicDto).not.toHaveProperty("demoFlag");
-      if (["generated", "awaiting_signature"].includes(row.state))
+      if (row.state === "generated")
         expect(publicDto).toEqual({ state: "not_issued", valid: false });
       else
         expect(publicDto).toMatchObject({
