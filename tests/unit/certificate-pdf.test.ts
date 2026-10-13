@@ -253,20 +253,11 @@ for (const type of ["APPROVAL", "INSTRUCTOR"] as const) {
       );
     }
     expect(bytes).toEqual(await renderCertificatePdf(input));
-    // Frozen v1 sources retain the original footer layout and metadata.
-    const historical = await PDFDocument.load(
-      await renderCertificatePdf({ ...input, templateVersion: 1 }),
-    );
-    expect(historical.getCreator()).toBe("Certificados / plantilla 1");
-    const historicalQr = historical
-      .getPage(0)
-      .node.Annots()!
-      .lookup(0, PDFDict)
-      .lookup(PDFName.of("Rect"), PDFArray);
-    const historicalX = type === "APPROVAL" ? 112 : 42;
-    expect(
-      historicalQr.asArray().map((value) => Number(value.toString())),
-    ).toEqual([historicalX, 12, historicalX + 72, 84]);
+    expect(doc.getCreator()).toBe("Certificados / plantilla 2");
+    // Old frozen metadata is rejected, never silently reinterpreted as v2.
+    await expect(
+      renderCertificatePdf({ ...input, templateVersion: 1 }),
+    ).rejects.toMatchObject({ code: "PDF_TEMPLATE_VERSION_UNSUPPORTED" });
   });
 }
 
