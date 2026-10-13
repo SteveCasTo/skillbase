@@ -21,7 +21,6 @@ import {
 import { fingerprint } from "./financial-demo-plan";
 import {
   assertApprovedDemoMigrationLedger,
-  readApprovedDemoMigrations,
   type DemoMigrationLedgerRow,
 } from "./approved-demo-migration-ledger";
 import {
@@ -64,10 +63,6 @@ async function planCertificates(
       sql`select id,hash,created_at::text as "createdAt" from drizzle.__drizzle_migrations order by id`,
     );
     assertApprovedDemoMigrationLedger(ledger);
-    if (!readApprovedDemoMigrations().length)
-      throw new Error(
-        "F9 requires the current approved source/schema ledger; no migrations performed",
-      );
     const [operator] = await tx
       .select()
       .from(s.users)

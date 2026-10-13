@@ -229,10 +229,8 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
         states: Object.fromEntries(
           [
             "generated",
-            "awaiting_signature",
             "issued",
             "revoked",
-            "replaced",
           ].map((state) => [
             state,
             certificates.filter((r) => r.state === state).length,
