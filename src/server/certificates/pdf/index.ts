@@ -182,7 +182,7 @@ export async function renderCertificatePdf(
     drawCertificateText(page, text, display, {
       x,
       top,
-      width: !approval ? 376 : width,
+      width: approval ? width : 376,
       height,
       size,
       minimumSize: size,

@@ -888,10 +888,10 @@ los detalles de almacenamiento/ordinal que corresponderán al diseño técnico.
 
 QR bajo el logo departamental y a la derecha del título, ID debajo del QR y
 más espacio sobre las tres firmas, en ambas orientaciones. Se identifica como
-`phase9-v2`, conservando branding/assets v1. El adaptador acepta exactamente
-v1/v2 y el renderer selecciona la distribución de la versión congelada; no
-amplía elegibilidad, permisos o campos imprimibles. La compatibilidad v1 evita
-necesitar borrado de datos seed para adoptar el nuevo diseño. Los ajustes
+`phase9-v2`, conservando branding/assets v1. El adaptador y el renderer aceptan
+únicamente v2 tras la autorización posterior de retirar la distribución antigua.
+No amplía elegibilidad, permisos o campos imprimibles ni trata metadata v1 como
+v2. Branding v1 se conserva porque los assets son los mismos. Los ajustes
 persistidos se activan separadamente por la operación auditada existente;
 el cambio de código no los modifica silenciosamente.
 
@@ -916,3 +916,9 @@ existentes. El reset sintético fue aprobado separadamente y lo ejecuta el owner
 operativo, nunca este flujo ni la migración. No altera snapshots F8, controles
 de sesión/ownership ni la allowlist pública. La UI usa «Para firmar»/«Firmado»,
 sin historial, revisión/emisión separadas ni ordinal editable.
+La sustitución de certificados seed local/cloud es una operación excepcional
+aprobada, con PLAN/revisión/ownership y reconstrucción por el ciclo normal;
+no habilita eliminación general de evidencia productiva. Los nombres nuevos
+proceden de una nueva versión oficial de cierre, obtenida mediante operaciones
+normales si el snapshot seed anterior contiene nombres antiguos. No se cambian
+notas/eligibilidad ni se reescriben informes F8 inmutables desde el renderer.
