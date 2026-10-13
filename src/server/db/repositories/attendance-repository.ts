@@ -404,7 +404,8 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
             state: s.preRegistrations.state,
           },
           firstName: s.participants.firstName,
-          lastName: s.participants.lastName,
+          paternalSurname: s.participants.paternalSurname,
+          maternalSurname: s.participants.maternalSurname,
         })
         .from(s.sessionRoster)
         .innerJoin(
@@ -417,7 +418,8 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
         )
         .where(eq(s.sessionRoster.sessionId, sessionId))
         .orderBy(
-          asc(s.participants.lastName),
+          asc(s.participants.paternalSurname),
+          asc(s.participants.maternalSurname),
           asc(s.participants.firstName),
           asc(s.preRegistrations.id),
         );
@@ -466,7 +468,8 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
             ? eligibleNow.map((e) => ({
                 registrationId: e.registration.id,
                 firstName: e.firstName,
-                lastName: e.lastName,
+                paternalSurname: e.paternalSurname,
+                maternalSurname: e.maternalSurname,
               }))
             : [],
         participants: (ctx.report
@@ -476,61 +479,71 @@ export class DrizzleAttendanceRepository implements AttendanceRepository {
             ).map((p) => ({
               registration: { id: p.registrationId, state: "ACTIVE" as const },
               firstName: p.firstName,
-              lastName: p.lastName,
+              paternalSurname: p.paternalSurname,
+              maternalSurname: p.maternalSurname,
             }))
           : roster
-        ).map(({ registration: r, firstName, lastName }) => ({
-          registrationId: r.id,
-          firstName,
-          lastName,
-          currentlyEnrolled: ctx.report
-            ? ctx.report.participants.some((p) => p.registrationId === r.id)
-            : r.state === "ACTIVE" &&
-              eligibleNow.some((e) => e.registration.id === r.id),
-          ...attendanceSummary(
-            ctx.report
-              ? ctx.report.sessions
-                  .filter((s) => !s.cancelledAt)
-                  .flatMap((s) =>
-                    s.participants
-                      .filter((p) => p.registrationId === r.id)
-                      .map((p) => p.attendance.status),
-                  )
-              : rows
-                  .filter(
-                    (row) =>
-                      !row.cancelledAt &&
-                      membership.some(
-                        (m) =>
-                          m.sessionId === row.id && m.registrationId === r.id,
+        ).map(
+          ({
+            registration: r,
+            firstName,
+            paternalSurname,
+            maternalSurname,
+          }) => ({
+            registrationId: r.id,
+            firstName,
+            paternalSurname,
+            maternalSurname,
+            currentlyEnrolled: ctx.report
+              ? ctx.report.participants.some((p) => p.registrationId === r.id)
+              : r.state === "ACTIVE" &&
+                eligibleNow.some((e) => e.registration.id === r.id),
+            ...attendanceSummary(
+              ctx.report
+                ? ctx.report.sessions
+                    .filter((s) => !s.cancelledAt)
+                    .flatMap((s) =>
+                      s.participants
+                        .filter((p) => p.registrationId === r.id)
+                        .map((p) => p.attendance.status),
+                    )
+                : rows
+                    .filter(
+                      (row) =>
+                        !row.cancelledAt &&
+                        membership.some(
+                          (m) =>
+                            m.sessionId === row.id && m.registrationId === r.id,
+                        ),
+                    )
+                    .map((row) =>
+                      effectiveAttendance(
+                        marks.find(
+                          (m) =>
+                            m.sessionId === row.id && m.registrationId === r.id,
+                        )?.status ?? null,
+                        row.startsAt,
+                        row.administrativeReviewRequired,
+                        now,
                       ),
-                  )
-                  .map((row) =>
-                    effectiveAttendance(
-                      marks.find(
-                        (m) =>
-                          m.sessionId === row.id && m.registrationId === r.id,
-                      )?.status ?? null,
-                      row.startsAt,
-                      row.administrativeReviewRequired,
-                      now,
                     ),
-                  ),
-            group.settings.consecutiveAbsenceLimit,
-          ),
-          attendance:
-            ctx.report?.sessions
-              .find((s) => s.id === selected.id)
-              ?.participants.find((p) => p.registrationId === r.id)
-              ?.attendance ??
-            markDto(
-              marks.find(
-                (m) => m.sessionId === selected.id && m.registrationId === r.id,
-              ),
-              selected,
-              now,
+              group.settings.consecutiveAbsenceLimit,
             ),
-        })),
+            attendance:
+              ctx.report?.sessions
+                .find((s) => s.id === selected.id)
+                ?.participants.find((p) => p.registrationId === r.id)
+                ?.attendance ??
+              markDto(
+                marks.find(
+                  (m) =>
+                    m.sessionId === selected.id && m.registrationId === r.id,
+                ),
+                selected,
+                now,
+              ),
+          }),
+        ),
       };
     });
   }

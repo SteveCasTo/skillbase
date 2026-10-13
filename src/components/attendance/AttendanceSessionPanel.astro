@@ -191,7 +191,7 @@ const inlineFailure =
               <AttendanceMarkRow
                 id={`attendance-mark-${person.registrationId}`}
                 registrationId={person.registrationId}
-                name={`${person.firstName} ${person.lastName}`}
+                name={`${person.firstName} ${person.paternalSurname} ${person.maternalSurname}`}
                 mark={person.attendance}
                 participant={person}
                 revision={session.revision}
@@ -214,7 +214,7 @@ const inlineFailure =
                 <AttendanceMarkRow
                   id={`attendance-mark-${person.registrationId}`}
                   registrationId={person.registrationId}
-                  name={`${person.firstName} ${person.lastName}`}
+                  name={`${person.firstName} ${person.paternalSurname} ${person.maternalSurname}`}
                   mark={pending}
                   revision={session.revision}
                   action={`${path}?operation=record`}

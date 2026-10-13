@@ -44,7 +44,8 @@ const errors = moneyFieldIssues(serverErrors);
 const participant = Astro.props.participant ?? {
   ci: "",
   firstName: form.sourceInterest?.firstName ?? "",
-  lastName: form.sourceInterest?.lastName ?? "",
+  paternalSurname: form.sourceInterest?.paternalSurname ?? "",
+  maternalSurname: form.sourceInterest?.maternalSurname ?? "",
   email: form.sourceInterest?.email ?? "",
   phone: form.sourceInterest?.phone ?? null,
 };
@@ -100,7 +101,8 @@ const unavailable =
     {[
       "ci",
       "firstName",
-      "lastName",
+      "paternalSurname",
+      "maternalSurname",
       "email",
       "phone",
       "groupId",
@@ -120,7 +122,8 @@ const unavailable =
       participant={{
         ci: values.ci ?? participant.ci,
         firstName: values.firstName ?? participant.firstName,
-        lastName: values.lastName ?? participant.lastName,
+        paternalSurname: values.paternalSurname ?? participant.paternalSurname,
+        maternalSurname: values.maternalSurname ?? participant.maternalSurname,
         email: values.email ?? participant.email,
         phone: values.phone ?? participant.phone,
       }}

@@ -123,7 +123,8 @@ async function enroll(f: Fixture, full = true) {
       participant: {
         ci: `ATT-${crypto.randomUUID()}`,
         firstName: "Synthetic",
-        lastName: "Attendance Participant",
+        paternalSurname: "Attendance",
+        maternalSurname: "Participant",
         email: "attendee@test.invalid",
         phone: null,
       },

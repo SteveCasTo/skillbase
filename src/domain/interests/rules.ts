@@ -42,7 +42,8 @@ export function validateRegisterInterest(
   const input = raw as Record<string, unknown>;
   const fields = [
     "firstName",
-    "lastName",
+    "paternalSurname",
+    "maternalSurname",
     "email",
     "phone",
     "preferredGroupId",
@@ -81,7 +82,8 @@ export function validateRegisterInterest(
     return text;
   };
   const firstName = value("firstName", 100, true);
-  const lastName = value("lastName", 150, true);
+  const paternalSurname = value("paternalSurname", 150, true);
+  const maternalSurname = value("maternalSurname", 150, true);
   const email = value("email", 254, true).toLowerCase();
   if ([...email].length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email))
     issues.email = "Introduce un email válido.";
@@ -98,7 +100,14 @@ export function validateRegisterInterest(
       "Revisa los campos indicados.",
       issues,
     );
-  return { firstName, lastName, email, phone, preferredGroupId };
+  return {
+    firstName,
+    paternalSurname,
+    maternalSurname,
+    email,
+    phone,
+    preferredGroupId,
+  };
 }
 export function validateInterestMutation(
   raw: unknown,

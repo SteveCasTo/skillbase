@@ -283,7 +283,7 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
     const ledger = await fixture.database.db.execute<{ count: number }>(
       sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
     );
-    expect(ledger[0]!.count).toBe(24);
+    expect(ledger[0]!.count).toBe(25);
     console.info(
       "Certificate UI isolated QA",
       process.env.TEST_SUPABASE_PROJECT_ID,

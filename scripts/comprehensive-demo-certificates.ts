@@ -70,9 +70,9 @@ async function planCertificates(
       sql`select id,hash,created_at::text as "createdAt" from drizzle.__drizzle_migrations order by id`,
     );
     assertApprovedDemoMigrationLedger(ledger);
-    if (readApprovedDemoMigrations().length !== 24)
+    if (readApprovedDemoMigrations().length !== 25)
       throw new Error(
-        "F9 requires source/schema ledger 24; no migrations performed",
+        "Certificate seed requires source/schema ledger 25; no migrations performed",
       );
     const [operator] = await tx
       .select()

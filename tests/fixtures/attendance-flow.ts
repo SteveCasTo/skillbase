@@ -212,7 +212,8 @@ export async function createAttendanceFlowFixture(
           participant: {
             ci: `ATT-${crypto.randomUUID()}`,
             firstName: full ? "Enrolled" : "Awaiting",
-            lastName: "Attendance",
+            paternalSurname: "Attendance",
+            maternalSurname: "Quispe",
             email: `attendance-${crypto.randomUUID()}@test.invalid`,
             phone: null,
           },

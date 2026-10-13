@@ -54,7 +54,8 @@ export function privateClosureReport(
       registrationId: person.registrationId,
       groupId: person.groupId,
       firstName: person.firstName,
-      lastName: person.lastName,
+      paternalSurname: person.paternalSurname,
+      maternalSurname: person.maternalSurname,
       membershipStatus: person.membershipStatus,
       canGrade: person.canGrade,
       grades: person.grades.map((grade) => ({
@@ -98,7 +99,8 @@ export function privateClosureReport(
       participants: session.participants.map((person) => ({
         registrationId: person.registrationId,
         firstName: person.firstName,
-        lastName: person.lastName,
+        paternalSurname: person.paternalSurname,
+        maternalSurname: person.maternalSurname,
         attendance: attendanceMark(person.attendance),
       })),
     })),

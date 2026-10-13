@@ -40,7 +40,8 @@ let course: typeof courses.$inferSelect;
 let group: typeof groups.$inferSelect;
 const input = {
   firstName: "María José",
-  lastName: "Test 李",
+  paternalSurname: "Test 李",
+  maternalSurname: "Quispe",
   email: " A.B+test@Example.invalid ",
   phone: "+591 123",
 };
@@ -199,7 +200,8 @@ test("interests preferences require same-course published planned group, includi
       .values({
         courseId: course.id,
         firstName: "Test",
-        lastName: "Test",
+        paternalSurname: "Test",
+        maternalSurname: "Quispe",
         email: "foreign@test.invalid",
         preferredGroupId: foreign!.id,
       })
@@ -747,7 +749,8 @@ test("interests schema denies Data API roles, protects normalized email and all-
       .values({
         courseId: course.id,
         firstName: "Test",
-        lastName: "Test",
+        paternalSurname: "Test",
+        maternalSurname: "Quispe",
         email: "a.b+test@example.invalid",
         status: "CANCELLED",
       })
@@ -765,7 +768,8 @@ test("interests schema denies Data API roles, protects normalized email and all-
         .values({
           courseId: course.id,
           firstName: "Test",
-          lastName: "Test",
+          paternalSurname: "Test",
+          maternalSurname: "Quispe",
           email,
         })
         .execute(),

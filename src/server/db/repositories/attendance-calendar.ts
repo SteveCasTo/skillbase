@@ -93,7 +93,8 @@ export async function loadGroupEligibility(
         totalPriceCents: schema.preRegistrations.totalPriceCents,
       },
       firstName: schema.participants.firstName,
-      lastName: schema.participants.lastName,
+      paternalSurname: schema.participants.paternalSurname,
+      maternalSurname: schema.participants.maternalSurname,
     })
     .from(schema.preRegistrations)
     .innerJoin(

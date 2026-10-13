@@ -16,7 +16,7 @@ test("CSV is UTF-8 BOM, comma-separated CRLF, quoted accents and exact integer-c
   expect([...bytes.slice(0, 3)]).toEqual([239, 187, 191]);
   const value = new TextDecoder().decode(bytes);
   expect(value).toBe(
-    '"Curso","Grupo","Nombres","Apellidos","CI","Categoría","Estado","Estado financiero","Precio BOB","Pagado BOB","Saldo BOB","Devuelto BOB","Por devolver BOB"\r\n"Diseño y programación","Grupo mañana","María José","Muñoz","\'000123-LP","Estudiante","Preinscrito","Pago parcial",80.01,20.01,60.00,0.00,0.00\r\n',
+    '"Curso","Grupo","Nombres","Apellido paterno","Apellido materno","CI","Categoría","Estado","Estado financiero","Precio BOB","Pagado BOB","Saldo BOB","Devuelto BOB","Por devolver BOB"\r\n"Diseño y programación","Grupo mañana","María José","Muñoz","Rojas","\'000123-LP","Estudiante","Preinscrito","Pago parcial",80.01,20.01,60.00,0.00,0.00\r\n',
   );
   expect(value).not.toContain("participant-private");
   expect(value).not.toContain("private-interest");
@@ -52,7 +52,8 @@ test("PDF is real paginated A4 landscape with repeated headings, full names and 
       participant: {
         ...exportRow().participant,
         firstName: "Ángela Ω Иван",
-        lastName: "Muñoz ".repeat(20).trim(),
+        paternalSurname: "Muñoz ".repeat(20).trim(),
+        maternalSurname: "Rojas",
       },
     };
     const bytes = await renderRegistrationsPdf(rows, exportNow);
@@ -108,7 +109,7 @@ test("PDF is real paginated A4 landscape with repeated headings, full names and 
 test("PDF refuses unsupported Unicode explicitly; CSV retains it losslessly", async () => {
   const row = {
     ...exportRow(),
-    participant: { ...exportRow().participant, lastName: "李" },
+    participant: { ...exportRow().participant, paternalSurname: "李" },
   };
   await expect(renderRegistrationsPdf([row], exportNow)).rejects.toBeInstanceOf(
     RegistrationPdfTextError,

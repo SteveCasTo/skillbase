@@ -120,7 +120,13 @@ En Fase 3, el término funcional es **registro de interesado**: una manifestaci�
 
 Una persona debe poder dejar sus datos como interesada desde el detalle público de un curso publicado. No se modifica ni se añade información a la landing para este flujo.
 
-Datos obligatorios: nombre, apellidos y email. Teléfono y preferencia de grupo son opcionales. Se permite una solicitud por curso y email normalizado. La disponibilidad comienza al publicarse el curso y termina con el cierre presencial configurado cuando existe una ventana; si no existe ventana, termina al inicio oficial del curso. El servidor valida disponibilidad y duplicados, y no acepta solicitudes para cursos retirados o archivados.
+Datos obligatorios: nombres, apellido paterno, apellido materno y email. Ambos
+apellidos se introducen por separado y son obligatorios también en la ficha
+global de participante y su edición/prellenado. Se admiten nombres compuestos,
+espacios, acentos y Unicode; no se deduce un apellido desde otro campo. La API
+estudiantil no acepta `lastName` como alias. Instructor y ADMIN mantienen sus
+contratos de identidad independientes.
+Teléfono y preferencia de grupo son opcionales. Se permite una solicitud por curso y email normalizado. La disponibilidad comienza al publicarse el curso y termina con el cierre presencial configurado cuando existe una ventana; si no existe ventana, termina al inicio oficial del curso. El servidor valida disponibilidad y duplicados, y no acepta solicitudes para cursos retirados o archivados.
 
 Al recibir un duplicado, la respuesta pública conserva el mismo resultado neutro de éxito que una solicitud nueva; nunca confirma si el email ya está registrado. Integridad y detección de duplicados siguen siendo autoritativas en servidor.
 

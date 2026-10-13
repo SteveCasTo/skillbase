@@ -33,7 +33,7 @@ describe("public interest SSR fallback", () => {
       '<option value="" selected="">Sin preferencia</option>',
     );
     expect(html).toContain("Lunes a viernes, 18:00–19:30");
-    expect(html.match(/ required=""/g)).toHaveLength(3);
+    expect(html.match(/ required=""/g)).toHaveLength(4);
     expect(html).not.toContain("noValidate");
     expect(html).not.toContain("capacity");
     expect(html).not.toContain("remainingPlaces");
@@ -58,7 +58,8 @@ describe("public interest SSR fallback", () => {
       initialValues: {
         ...EMPTY_INTEREST_VALUES,
         firstName: "María José",
-        lastName: "Pérez García",
+        paternalSurname: "Pérez",
+        maternalSurname: "García",
         email: "interest@example.test",
       },
       initialResult: {
@@ -73,7 +74,12 @@ describe("public interest SSR fallback", () => {
     expect(submit).toContain('type="submit"');
     expect(submit).not.toMatch(/\sdisabled(?:=|\s|>)/i);
     expect(html.toLowerCase()).not.toContain("novalidate");
-    for (const name of ["firstName", "lastName", "email"]) {
+    for (const name of [
+      "firstName",
+      "paternalSurname",
+      "maternalSurname",
+      "email",
+    ]) {
       const input = html.match(
         new RegExp(`<input\\b[^>]*name="${name}"[^>]*>`),
       )?.[0];

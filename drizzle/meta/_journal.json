@@ -169,6 +169,13 @@
       "when": 1791500766703,
       "tag": "0023_phase9_certificates",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791845484727,
+      "tag": "0024_student_required_surnames",
+      "breakpoints": true
     }
   ]
 }

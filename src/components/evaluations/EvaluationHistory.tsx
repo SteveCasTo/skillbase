@@ -33,7 +33,7 @@ export function EvaluationHistory({ data }: { data: CourseEvaluationsDto }) {
             >
               <p className="font-medium break-words">
                 {person
-                  ? `${person.firstName} ${person.lastName}`
+                  ? `${person.firstName} ${person.paternalSurname} ${person.maternalSurname}`
                   : "Participante"}{" "}
                 · {component?.name ?? "Componente"}
               </p>

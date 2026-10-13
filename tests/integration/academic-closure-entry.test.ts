@@ -49,7 +49,8 @@ async function fixture() {
     participant: {
       ci: `ENTRY-${crypto.randomUUID()}`,
       firstName: "Synthetic",
-      lastName: "Entry",
+      paternalSurname: "Entry",
+      maternalSurname: "Quispe",
       email: "entry@test.invalid",
       phone: null,
     },

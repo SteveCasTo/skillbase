@@ -34,17 +34,25 @@ interface Props {
 const fields = [
   {
     name: "firstName",
-    label: "Nombre",
+    label: "Nombres",
     type: "text",
     autoComplete: "given-name",
     maxLength: 100,
     required: true,
   },
   {
-    name: "lastName",
-    label: "Apellidos",
+    name: "paternalSurname",
+    label: "Apellido paterno",
     type: "text",
     autoComplete: "family-name",
+    maxLength: 150,
+    required: true,
+  },
+  {
+    name: "maternalSurname",
+    label: "Apellido materno",
+    type: "text",
+    autoComplete: "off",
     maxLength: 150,
     required: true,
   },

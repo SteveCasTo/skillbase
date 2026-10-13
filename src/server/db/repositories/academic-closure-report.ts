@@ -1,4 +1,5 @@
 import { asc, eq } from "drizzle-orm";
+import { compareParticipantNames } from "@/domain/pre-registrations/participant-name";
 import * as s from "@/server/db/schema";
 import type {
   ClosureReportDto,
@@ -90,7 +91,8 @@ export async function buildClosureReport(
       sessionId: s.sessionRoster.sessionId,
       registrationId: s.sessionRoster.registrationId,
       firstName: s.participants.firstName,
-      lastName: s.participants.lastName,
+      paternalSurname: s.participants.paternalSurname,
+      maternalSurname: s.participants.maternalSurname,
     })
     .from(s.sessionRoster)
     .innerJoin(
@@ -183,7 +185,8 @@ export async function buildClosureReport(
           return {
             registrationId: row.registrationId,
             firstName: row.firstName,
-            lastName: row.lastName,
+            paternalSurname: row.paternalSurname,
+            maternalSurname: row.maternalSurname,
             attendance: markDto(session, mark?.mark, mark?.actorName),
           };
         }),
@@ -229,8 +232,7 @@ export async function buildClosureReport(
     participants: people
       .sort(
         (a, b) =>
-          a.lastName.localeCompare(b.lastName) ||
-          a.firstName.localeCompare(b.firstName) ||
+          compareParticipantNames(a, b) ||
           a.participantId.localeCompare(b.participantId),
       )
       .map((person) => {
@@ -261,7 +263,8 @@ export async function buildClosureReport(
           registrationId: person.id,
           groupId: group.id,
           firstName: person.firstName,
-          lastName: person.lastName,
+          paternalSurname: person.paternalSurname,
+          maternalSurname: person.maternalSurname,
           ci: person.ci,
           balanceCents: Number(person.balance),
           membershipStatus: person.membershipStatus,
