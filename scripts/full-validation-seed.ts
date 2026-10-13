@@ -184,7 +184,9 @@ if (import.meta.main) {
       actorId: values["actor-id"],
       operationId: values["operation-id"],
       apply: mode === "apply",
-      ...(values["reviewed-plan-sha256"]?{reviewedPlanSha256:values["reviewed-plan-sha256"]}:{}),
+      ...(values["reviewed-plan-sha256"]
+        ? { reviewedPlanSha256: values["reviewed-plan-sha256"] }
+        : {}),
     };
     stage = selected!;
     let result: unknown;
@@ -222,7 +224,11 @@ if (import.meta.main) {
         .select()
         .from(s.auditEvents)
         .where(eq(s.auditEvents.entityId, common.operationId));
-      const seeded=previous.find(event=>event.action==="VALIDATION_BUSINESS_SEEDED"&&event.metadata.owner===FULL_VALIDATION_OWNER);
+      const seeded = previous.find(
+        (event) =>
+          event.action === "VALIDATION_BUSINESS_SEEDED" &&
+          event.metadata.owner === FULL_VALIDATION_OWNER,
+      );
       // A supplied/frozen anchor is reused for replay, never rolled forward.
       const anchor =
         values.anchor ??
@@ -262,7 +268,7 @@ if (import.meta.main) {
           target === "production"
             ? "https://skillbase-alpha.vercel.app"
             : "http://127.0.0.1:4321",
-        allowSyntheticFinal: values["allow-synthetic-final"]??false,
+        allowSyntheticFinal: values["allow-synthetic-final"] ?? false,
       });
     }
     await Bun.write(

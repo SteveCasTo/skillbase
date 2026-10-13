@@ -206,6 +206,24 @@ export async function seedFullValidationBusiness(
       )
     )
       throw new Error("Unexpected application evidence before fresh seed");
+    const actors = await tx.select({ name: s.users.name }).from(s.users);
+    const profiles = await tx
+      .select({
+        firstName: s.instructorProfiles.firstName,
+        lastName: s.instructorProfiles.lastName,
+      })
+      .from(s.instructorProfiles);
+    if (
+      actors.some((user) => /demo|fictici|ejemplo/iu.test(user.name)) ||
+      profiles.some((profile) =>
+        /demo|fictici|ejemplo/iu.test(
+          `${profile.firstName} ${profile.lastName}`,
+        ),
+      )
+    )
+      throw new Error(
+        "Remaining old account/profile display names require their reviewed ordinary service edits",
+      );
     const [freshAttendance] = await tx
       .select()
       .from(s.attendanceSettings)

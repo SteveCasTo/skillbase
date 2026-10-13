@@ -37,7 +37,9 @@ const git = (args: string[]) => {
   if (result.status !== 0) throw new Error("Git inspection failed");
   return result.stdout.trim();
 };
-export async function releaseProof(env: NodeJS.ProcessEnv): Promise<ReleaseProof> {
+export async function releaseProof(
+  env: NodeJS.ProcessEnv,
+): Promise<ReleaseProof> {
   const sha = env.DEMO_APPROVED_RELEASE_SHA ?? "";
   const runId = env.DEMO_RELEASE_CI_RUN_ID ?? "";
   const projectId = env.VERCEL_PROJECT_ID ?? "";

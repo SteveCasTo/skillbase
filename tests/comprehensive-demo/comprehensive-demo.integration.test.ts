@@ -45,6 +45,8 @@ import { seedCurrentValidationCertificates } from "../../scripts/full-validation
 import { defaultCertificateConfiguration } from "@/domain/certificates/rules";
 import { DrizzleCertificateRepository } from "@/server/db/repositories/certificate-repository";
 import { FULL_VALIDATION_AUTHORITIES } from "../../scripts/full-validation-seed-matrix";
+import { seedValidationInvitations } from "../../scripts/full-validation-invitations";
+import { prepareFullValidationNamesAndSettings } from "../../scripts/full-validation-prepare";
 
 test("real owned Auth/domain fixtures fill F8, preserve every original row, remain idempotent and retain edits", async () => {
   const environment = getTestSupabaseEnvironment();
@@ -649,6 +651,44 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
         reviewedPlanSha256: "0".repeat(64),
       }),
     ).rejects.toThrow("plan changed");
+    // The preservation half intentionally retains older legacy account labels.
+    // Full recreation must refuse those BEFORE any new snapshots are frozen.
+    const legacyAccountLabels = (await db.select().from(s.users)).filter(
+      (user) => /demo|fictici|ejemplo/i.test(user.name),
+    );
+    expect(legacyAccountLabels.length).toBeGreaterThan(0);
+    await expect(
+      seedFullValidationBusiness(db, auth, {
+        ...fullOptions,
+        apply: true,
+        reviewedPlanSha256: fullPlan.planSha256,
+      }),
+    ).rejects.toThrow("Remaining old account/profile");
+    // Explicit managed-fixture preparation (not a production correction path):
+    // preserve UUID/Auth/roles/outbox evidence, supply authored natural labels.
+    const retainedPeople = [
+      "Daniela Bustos Gallardo",
+      "Manuel Rivas Toledo",
+      "Claudia Romero Arias",
+      "Teresa Vargas Pizarro",
+      "Álvaro Rojas Montero",
+      "Beatriz Torres Miranda",
+    ];
+    for (const [index, user] of legacyAccountLabels.entries())
+      await db
+        .update(s.users)
+        .set({ name: retainedPeople[index % retainedPeople.length]! })
+        .where(eq(s.users.id, user.id));
+    const legacyProfiles = (
+      await db.select().from(s.instructorProfiles)
+    ).filter((profile) =>
+      /demo|fictici|ejemplo/i.test(`${profile.firstName} ${profile.lastName}`),
+    );
+    for (const profile of legacyProfiles)
+      await db
+        .update(s.instructorProfiles)
+        .set({ firstName: "Daniela", lastName: "Bustos Gallardo" })
+        .where(eq(s.instructorProfiles.id, profile.id));
     const fullSeed = await seedFullValidationBusiness(db, auth, {
       ...fullOptions,
       apply: true,
@@ -678,6 +718,32 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
       expect(JSON.stringify(version.report)).not.toMatch(
         /demo|fictici|ejemplo/i,
       );
+    const invitationOptions = {
+      actorId: actor!.id,
+      operationId: resetId,
+      apply: false,
+    };
+    const invitePlan = await seedValidationInvitations(
+      db,
+      auth,
+      invitationOptions,
+    );
+    const inviteSeed = await seedValidationInvitations(db, auth, {
+      ...invitationOptions,
+      apply: true,
+      reviewedPlanSha256: invitePlan.planSha256,
+    });
+    if (inviteSeed.mode !== "APPLIED")
+      throw new Error("Expected internal validation invitations");
+    expect(inviteSeed.accounts).toHaveLength(2);
+    for (const account of inviteSeed.accounts) {
+      const [invited] = await db
+        .select()
+        .from(s.users)
+        .where(eq(s.users.id, account.id));
+      expect(invited!.status).toBe("INVITED");
+      expect(invited!.authUserId).toBeNull();
+    }
     const certRepo = new DrizzleCertificateRepository(db);
     const settings = await certRepo.getSettings(actor!.id);
     const cfg = structuredClone(defaultCertificateConfiguration);
@@ -691,6 +757,22 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
       name: FULL_VALIDATION_AUTHORITIES.departmentHead,
     };
     await certRepo.updateSettings(actor!.id, settings.revision, cfg);
+    const prepOptions = {
+      actorId: actor!.id,
+      operationId: resetId,
+      nameEdits: [],
+      apply: false,
+    };
+    const prepPlan = await prepareFullValidationNamesAndSettings(
+      db,
+      auth,
+      prepOptions,
+    );
+    await prepareFullValidationNamesAndSettings(db, auth, {
+      ...prepOptions,
+      apply: true,
+      reviewedPlanSha256: prepPlan.planSha256,
+    });
     const certificateOptions = {
       actorId: actor!.id,
       operationId: resetId,
@@ -731,6 +813,24 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
       reviewedPlanSha256: certPlan.planSha256,
       allowSyntheticFinal: true,
     });
+    expect(
+      (
+        await seedValidationInvitations(db, auth, {
+          ...invitationOptions,
+          apply: true,
+          reviewedPlanSha256: invitePlan.planSha256,
+        })
+      ).mode,
+    ).toBe("NOOP");
+    expect(
+      (
+        await prepareFullValidationNamesAndSettings(db, auth, {
+          ...prepOptions,
+          apply: true,
+          reviewedPlanSha256: prepPlan.planSha256,
+        })
+      ).mode,
+    ).toBe("NOOP");
     assertDemoNoChanges(fullBeforeReplay, await captureDemoSnapshot(db));
   } finally {
     await connection.close();
