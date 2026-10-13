@@ -1,0 +1,3 @@
+ALTER TABLE "academic_group_reopenings" DROP CONSTRAINT "academic_group_reopenings_reason_check";--> statement-breakpoint
+ALTER TABLE "academic_group_reopenings" ALTER COLUMN "reason" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "academic_group_reopenings" ADD CONSTRAINT "academic_group_reopenings_reason_check" CHECK (("academic_group_reopenings"."reason" is null or (char_length(btrim("academic_group_reopenings"."reason")) between 1 and 500 and "academic_group_reopenings"."reason" !~ '[[:cntrl:]]')) and char_length(btrim("academic_group_reopenings"."actor_name")) > 0);
