@@ -1,5 +1,11 @@
 # Demo integral F1–F8
 
+La renovación integral posterior aprobada por el usuario se implementa como una
+operación separada de reset/recreación, no como refresh insert-only del manifiesto
+antiguo. Procedimiento, orden previo a 0024/0025 y límites en
+[`FULL_VALIDATION_SEED.md`](FULL_VALIDATION_SEED.md). Las notas siguientes conservan
+la evidencia histórica; no autorizan repetir un PLAN viejo sobre el nuevo alcance.
+
 ## Extensión F9 opt-in (liberada y ejecutada en producción)
 
 El usuario autorizó datos ficticios de todas las secciones, incluidos certificados,
