@@ -140,18 +140,22 @@ export async function handleClosurePost(input: {
       requestKey: raw.requestKey,
       revision,
     };
-    if (input.operation === "reopen" && typeof raw.reason !== "string")
+    if (
+      input.operation === "reopen" &&
+      raw.reason != null &&
+      typeof raw.reason !== "string"
+    )
       throw new ClosureError(
         "VALIDATION_FAILED",
-        "Indica el motivo de reapertura.",
-        { reason: "Motivo obligatorio." },
+        "Revisa el motivo de reapertura.",
+        { reason: "El motivo debe ser texto." },
       );
     const result =
       input.operation === "close"
         ? await closeAcademicGroup(input.repository, input.actor, command)
         : await reopenAcademicGroup(input.repository, input.actor, {
             ...command,
-            reason: raw.reason as string,
+            reason: typeof raw.reason === "string" ? raw.reason : null,
           });
     return {
       status: 200,

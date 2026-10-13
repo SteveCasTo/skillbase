@@ -122,7 +122,7 @@ test("academic closure blockers ignore balances and eligibility, retain pending 
   r.participants = [];
   expect(closureBlockers(r, now)).toEqual([]);
 });
-test("academic closure application requires active roles and mandatory sanitized reopen reason", () => {
+test("academic closure application requires active roles and sanitizes optional reopen reasons", () => {
   requireClosureActor(actor, true);
   requireClosureActor({ ...actor, roles: ["INSTRUCTOR"] });
   expect(() =>
@@ -137,7 +137,9 @@ test("academic closure application requires active roles and mandatory sanitized
     reason: "Corrección",
   };
   validateReopen(command);
-  for (const reason of [" ", "x".repeat(501), "bad\nreason"])
+  validateReopen({ courseId: id, groupId: id, requestKey: id, revision: 0 });
+  for (const reason of [null, "", " "]) validateReopen({ ...command, reason });
+  for (const reason of ["x".repeat(501), "bad\nreason"])
     expect(() => validateReopen({ ...command, reason })).toThrow();
   expect(() => validateReopen({ ...command, revision: -1 })).toThrow();
 });
@@ -234,6 +236,15 @@ test("academic closure HTTP fixes context and actor, supports forms, fails safel
         ...base,
         operation: "reopen",
         request: request(raw),
+      })
+    ).status,
+  ).toBe(409);
+  expect(
+    (
+      await handleClosurePost({
+        ...base,
+        operation: "reopen",
+        request: request({ ...raw, reason: 42 }),
       })
     ).status,
   ).toBe(422);
