@@ -778,6 +778,16 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
     );
     if (!disabledTarget)
       throw new Error("Managed fixture retained spare instructor missing");
+    const [coverageProfile] = await db
+      .select()
+      .from(s.instructorProfiles)
+      .where(eq(s.instructorProfiles.id, disabledTarget.id));
+    // Lifecycle uses the instructor PROFILE revision, not a coincident users
+    // timestamp. Make them observably different to cover real driver timing.
+    await db
+      .update(s.users)
+      .set({ updatedAt: new Date(coverageProfile!.updatedAt.getTime() + 5000) })
+      .where(eq(s.users.id, disabledTarget.id));
     const coverageOptions = {
       actorId: actor!.id,
       operationId: resetId,

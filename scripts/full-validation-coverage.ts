@@ -73,6 +73,10 @@ export async function seedValidationCoverage(
     .select()
     .from(s.users)
     .where(eq(s.users.id, options.disabledInstructorId));
+  const [profile] = await db
+    .select()
+    .from(s.instructorProfiles)
+    .where(eq(s.instructorProfiles.id, options.disabledInstructorId));
   const roles = await db
     .select()
     .from(s.userRoles)
@@ -80,6 +84,7 @@ export async function seedValidationCoverage(
   if (
     !candidate ||
     !target?.authUserId ||
+    !profile ||
     roles.length !== 1 ||
     roles[0]?.roleCode !== "INSTRUCTOR" ||
     candidate.courseCount !== 0 ||
@@ -136,7 +141,7 @@ export async function seedValidationCoverage(
     operationId: options.operationId,
     actorId: actor.id,
     disabledInstructorId: target.id,
-    targetRevision: target.updatedAt.toISOString(),
+    targetRevision: profile.updatedAt.toISOString(),
     beforeStatus: target.status,
     afterStatus: "DISABLED",
     coverage,
@@ -171,7 +176,7 @@ export async function seedValidationCoverage(
         actor,
         target.id,
         "deactivate",
-        target.updatedAt.toISOString(),
+        profile.updatedAt.toISOString(),
       );
     const actual = await validationAccountCoverage(tx);
     assertCoverage(actual);
