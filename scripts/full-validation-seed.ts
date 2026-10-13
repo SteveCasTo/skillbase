@@ -25,6 +25,7 @@ import {
 } from "./full-validation-business-seed";
 import { seedCurrentValidationCertificates } from "./full-validation-certificates";
 import { seedValidationInvitations } from "./full-validation-invitations";
+import { seedValidationCoverage } from "./full-validation-coverage";
 import type { ComprehensiveDemoContext } from "./comprehensive-demo-plan";
 import { fullValidationPlanHash } from "./full-validation-reset-plan";
 
@@ -107,9 +108,13 @@ if (import.meta.main) {
       selected = values.stage,
       mode = values.mode;
     if (
-      !["prepare", "business", "invitations", "certificates"].includes(
-        selected ?? "",
-      ) ||
+      ![
+        "prepare",
+        "business",
+        "invitations",
+        "coverage",
+        "certificates",
+      ].includes(selected ?? "") ||
       !["plan", "apply"].includes(mode ?? "") ||
       !values["actor-id"] ||
       !values["operation-id"] ||
@@ -244,7 +249,22 @@ if (import.meta.main) {
       });
     } else if (selected === "invitations")
       result = await seedValidationInvitations(db, auth, common);
-    else {
+    else if (selected === "coverage") {
+      const raw: unknown = await Bun.file(
+        external(values["account-plan"] ?? ""),
+      ).json();
+      if (
+        !raw ||
+        typeof raw !== "object" ||
+        !("disabledInstructorId" in raw) ||
+        typeof raw.disabledInstructorId !== "string"
+      )
+        throw new Error("Reviewed unused instructor lifecycle target required");
+      result = await seedValidationCoverage(db, auth, {
+        ...common,
+        disabledInstructorId: raw.disabledInstructorId,
+      });
+    } else {
       const rows = await db
         .select()
         .from(s.auditEvents)

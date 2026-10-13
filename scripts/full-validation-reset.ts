@@ -7,7 +7,10 @@ import {
   captureFullValidationResetInventory,
   captureNativeCloudValidationInventory,
 } from "./full-validation-native-inventory";
-import { fullValidationPlanHash } from "./full-validation-reset-plan";
+import {
+  fullValidationPlanHash,
+  assertReviewedStorageObject,
+} from "./full-validation-reset-plan";
 import {
   fullValidationResetSql,
   type ReviewedBusinessReset,
@@ -320,6 +323,11 @@ async function main() {
           )
         )
           throw new Error("Unknown new Storage object appeared; no deletion");
+        for (const object of current.objects) {
+          const expected = original.get(`${object.bucket}/${object.name}`);
+          if (!expected) throw new Error("Unreviewed Storage object appeared");
+          assertReviewedStorageObject(expected, object);
+        }
         for (const object of plan.inventory.objects) {
           const key = `${object.bucket}/${object.name}`;
           const actual = current.objects.find(
@@ -329,7 +337,42 @@ async function main() {
             throw new Error(
               "Old object disappeared without this cleanup receipt; inspect before resuming",
             );
-          if (completed.has(key)) continue;
+          if (completed.has(key)) {
+            if (actual)
+              throw new Error(
+                "Completed cleanup object reappeared; recovery inspection required",
+              );
+            continue;
+          }
+          if (!actual)
+            throw new Error(
+              "Approved object is missing without a completed receipt",
+            );
+          assertReviewedStorageObject(object, actual);
+          // Re-read each object just before removing it. Storage has no atomic
+          // cross-DB snapshot; this reviewed maintenance window stays exclusive.
+          const immediate = connection
+            ? await captureFullValidationResetInventory(connection)
+            : await captureNativeCloudValidationInventory(
+                project!,
+                `${output}.immediate-inventory.sql`,
+              );
+          const immediateObject = immediate.inventory.objects.find(
+            (row) => row.bucket === object.bucket && row.name === object.name,
+          );
+          for (const present of immediate.inventory.objects) {
+            const expected = original.get(`${present.bucket}/${present.name}`);
+            if (!expected || completed.has(`${present.bucket}/${present.name}`))
+              throw new Error(
+                "Unknown or completed Storage object reappeared; no deletion",
+              );
+            assertReviewedStorageObject(expected, present);
+          }
+          if (!immediateObject)
+            throw new Error(
+              "Approved object disappeared immediately before removal",
+            );
+          assertReviewedStorageObject(object, immediateObject);
           const args = ["x", "supabase", "storage", "rm"];
           if (target === "production")
             args.push("--linked", "--project-ref", project!);

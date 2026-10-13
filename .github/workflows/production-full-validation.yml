@@ -7,7 +7,7 @@ on:
         description: "Reviewed stage; business RESET is a separate pre-migration operation"
         required: true
         type: choice
-        options: [prepare, business, invitations, certificates]
+        options: [prepare, business, invitations, coverage, certificates]
       mode:
         description: "PLAN first; APPLY requires that stage's reviewed hash"
         required: true
@@ -35,7 +35,7 @@ on:
         required: true
         type: string
       retained_account_plan:
-        description: "Reviewed JSON {instructors:[four retained UUIDs],operatorId:retained synthetic ADMIN UUID}"
+        description: "Reviewed JSON {instructors:[four active UUIDs],operatorId:synthetic ADMIN UUID,disabledInstructorId:spare retained UUID}"
         required: true
         type: string
       name_edit_plan:

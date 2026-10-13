@@ -77,7 +77,14 @@ export interface NativeInventory {
     primaryKeys: readonly Record<string, unknown>[];
   }[];
   readonly ledger: readonly { id: number; hash: string; createdAt: string }[];
-  readonly objects: readonly { id: string; bucket: string; name: string }[];
+  readonly objects: readonly {
+    id: string;
+    bucket: string;
+    name: string;
+    metadata?: unknown;
+    createdAt?: unknown;
+    updatedAt?: unknown;
+  }[];
   readonly buckets: readonly { id: string; public: boolean }[];
   readonly columns: readonly Record<string, unknown>[];
   readonly settings: readonly {

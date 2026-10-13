@@ -28,7 +28,7 @@ APPLY explícito. Un PLAN viejo de solo ocho certificados no autoriza este reset
    `master` en cloud. Los 24 hashes/timestamps anteriores no cambian; el source
    final incluye 0024/0025/0026, ledger **27**. No modificar manualmente el ledger.
 6. Verificar release exacto, CI first-pass completo y Vercel READY/alias canónico.
-7. PLAN/APPLY independientes de preparación, negocio, invitaciones y certificados.
+7. PLAN/APPLY independientes de preparación, negocio, invitaciones, cobertura de cuentas y certificados.
    Cada etapa tiene su hash/receipt; no obtiene permiso porque otra pasó.
 8. Smoke por rol, nombres/slugs/reportes/PDFs, QR/hash/download privado, replay
    no-op y cleanup de sesiones/procesos temporales. No afirmar firma institucional.
@@ -89,6 +89,15 @@ los nombres antiguos requieren una edición normal auditada y PLAN específico.
 Dos invitaciones internas adicionales muestran `INVITED`, sin Auth identity,
 correo enviado, verificación fabricada o cambios a roles existentes.
 
+Solo tres de los cuatro instructores activos retenidos reciben cursos; el cuarto
+permanece realmente activo sin asignaciones. La etapa `coverage` recibe el UUID
+explícitamente revisado de otro instructor retenido, natural, sin cursos y con
+Auth link. Lo desactiva mediante el lifecycle normal, sin borrar credenciales,
+roles o proveedores. Verifica filas reales para ADMIN/INSTRUCTOR en ACTIVE,
+INVITED y DISABLED, más instructores activos con/sin cursos; guarda la cobertura
+por UUID/conteo. Si el target no conserva esos perfiles o aparece una asignación,
+PLAN/APPLY bloquea en lugar de fabricar una identidad verificada.
+
 Cobertura funcional: pago mínimo/completo, auxiliar/descuento/gratuito,
 cancelación/devolución/transferencia/conversión; notas aprobadas/reprobadas/cero/
 límite/pendientes; asistencia presente/ausente/justificada, aviso N y restricción
@@ -117,7 +126,7 @@ bun scripts/full-validation-reset.ts --mode plan --target production --project f
 RESET/Storage requieren además `--plan-file`, `--reviewed-plan-sha256`,
 `--approved-source-sha` y `--source-ci-run-id`. No se copian comandos con hashes
 antiguos. Después del schema completo, `full-validation-seed.ts --stage
-prepare|business|invitations|certificates --mode plan|apply` recibe el actor,
+prepare|business|invitations|coverage|certificates --mode plan|apply` recibe el actor,
 operation UUID, anchor y planes privados de nombres/cuentas. APPLY añade el
 hash exacto; certificados finales añaden aprobación explícita de documento de
 prueba. Producción se ejecuta solo desde el workflow protegido nuevo.

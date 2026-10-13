@@ -214,9 +214,13 @@ export async function seedFullValidationBusiness(
       })
       .from(s.instructorProfiles);
     if (
-      actors.some((user) => /demo|fictici|ejemplo/iu.test(user.name)) ||
+      actors.some((user) =>
+        /demo|fictici|ejemplo|sint[eé]tic|fixture|\bQA\b|\bprueba\b/iu.test(
+          user.name,
+        ),
+      ) ||
       profiles.some((profile) =>
-        /demo|fictici|ejemplo/iu.test(
+        /demo|fictici|ejemplo|sint[eé]tic|fixture|\bQA\b|\bprueba\b/iu.test(
           `${profile.firstName} ${profile.lastName}`,
         ),
       )

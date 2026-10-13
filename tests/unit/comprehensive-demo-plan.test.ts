@@ -17,6 +17,7 @@ import {
   FULL_VALIDATION_BUSINESS_TABLES,
   FULL_VALIDATION_RETAINED_TABLES,
   fullValidationPlanHash,
+  assertReviewedStorageObject,
 } from "../../scripts/full-validation-reset-plan";
 import {
   fullValidationNativeReadSql,
@@ -94,6 +95,25 @@ test("bounded comprehensive plan uses independent deterministic identities, exac
   expect(() => comprehensiveDemoPlan("2026-10-08", 3, 0)).toThrow();
   expect(() => comprehensiveDemoPlan("2026-02-30", 3, 25)).toThrow();
   const validation = fullValidationSeedMatrix("2026-10-12", 3, 25);
+  expect(
+    validation.courses.some((course) => course.instructorIndex === 3),
+  ).toBe(false);
+  const object = {
+    id: "a",
+    bucket: "certificate-documents",
+    name: "owned.pdf",
+    metadata: { etag: "first", size: 100 },
+    updatedAt: "2026-10-13",
+  };
+  expect(() =>
+    assertReviewedStorageObject(object, {
+      ...object,
+      metadata: { etag: "overwritten", size: 100 },
+    }),
+  ).toThrow("metadata/content descriptor changed");
+  expect(() =>
+    assertReviewedStorageObject(object, { ...object }),
+  ).not.toThrow();
   expect(validation.mode).toBe("MATRIX_ONLY_NO_WRITES");
   expect(validation.courses).toHaveLength(12);
   expect(validation.studentIdentityCount).toBe(33);

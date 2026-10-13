@@ -62,3 +62,27 @@ function stable(value: unknown): string {
 export function fullValidationPlanHash(value: unknown): string {
   return createHash("sha256").update(stable(value)).digest("hex");
 }
+
+export function assertReviewedStorageObject(
+  expected: {
+    id: string;
+    bucket: string;
+    name: string;
+    metadata?: unknown;
+    createdAt?: unknown;
+    updatedAt?: unknown;
+  },
+  actual: {
+    id: string;
+    bucket: string;
+    name: string;
+    metadata?: unknown;
+    createdAt?: unknown;
+    updatedAt?: unknown;
+  },
+): void {
+  if (fullValidationPlanHash(expected) !== fullValidationPlanHash(actual))
+    throw new Error(
+      "Reviewed Storage object metadata/content descriptor changed; no deletion",
+    );
+}

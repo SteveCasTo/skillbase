@@ -277,7 +277,7 @@ export function fullValidationSeedMatrix(
     courses,
     studentIdentityCount: identities.size,
     certificateContract:
-      "Await approved current-record service from certificate owner",
+      "Current-record v2 service: one group/type/recipient, atomic signed upload and current-file hash",
     additionalAccountCases: [
       "Retained authenticated primary ADMIN with natural display name",
       "Authorized active/invited/disabled ADMIN cases via actual account services",
@@ -294,8 +294,7 @@ export function fullValidationSeedMatrix(
     ],
     limitations: [
       "Planning only; no participant/course/registration/closure/certificate inserted",
-      "Reviewed service mapping and exact integrated schema are required before APPLY",
-      "New certificate enum/commands must not be guessed from legacy fixtures",
+      "Exact integrated schema and separate stage PLAN hashes are required before APPLY",
     ],
   };
 }
@@ -431,6 +430,9 @@ function validationCalendarPlan(
     archived: -120,
   };
   for (const sample of source.samples) {
+    // Keep the fourth retained active instructor genuinely unassigned. The
+    // three former index-3 cohorts occupy non-overlapping calendar periods.
+    if (sample.teacher === 3) sample.teacher = 0;
     const format = source.formats.find(
       (f) =>
         comprehensiveDemoId(`revision:${f.id}`) ===

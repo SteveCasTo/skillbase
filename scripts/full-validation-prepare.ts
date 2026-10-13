@@ -102,7 +102,11 @@ export async function prepareFullValidationNamesAndSettings(
       if (/demo|fictici|ejemplo/iu.test(edit.name) || !edit.name.trim())
         throw new Error("Natural reviewed ADMIN display name required");
       if (record.name !== edit.name) {
-        if (!/demo|fictici|ejemplo/iu.test(record.name))
+        if (
+          !/demo|fictici|ejemplo|sint[eé]tic|fixture|\bQA\b|\bprueba\b/iu.test(
+            record.name,
+          )
+        )
           throw new Error(
             "Never overwrite an already natural primary profile without a separate plan",
           );
@@ -129,7 +133,7 @@ export async function prepareFullValidationNamesAndSettings(
         record.lastName !== edit.lastName
       ) {
         if (
-          !/demo|fictici|ejemplo/iu.test(
+          !/demo|fictici|ejemplo|sint[eé]tic|fixture|\bQA\b|\bprueba\b/iu.test(
             `${record.firstName} ${record.lastName}`,
           )
         )
