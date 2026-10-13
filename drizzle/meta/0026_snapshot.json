@@ -1,6 +1,6 @@
 {
-  "id": "944faf96-721c-422c-94a4-9df68916c0c1",
-  "prevId": "9c535c71-7a82-4f89-aa50-cb26a6b48eab",
+  "id": "086edcb2-25a8-48ad-a6b3-97b0ab69bec5",
+  "prevId": "957386fe-53f9-4dd5-9b5e-8a64b340a04d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2990,8 +2990,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "last_name": {
-          "name": "last_name",
+        "paternal_surname": {
+          "name": "paternal_surname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "maternal_surname": {
+          "name": "maternal_surname",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -3148,9 +3154,13 @@
           "name": "interest_registrations_first_name_check",
           "value": "char_length(\"interest_registrations\".\"first_name\") between 1 and 100 and \"interest_registrations\".\"first_name\" = btrim(\"interest_registrations\".\"first_name\") and \"interest_registrations\".\"first_name\" !~ '[[:cntrl:]]'"
         },
-        "interest_registrations_last_name_check": {
-          "name": "interest_registrations_last_name_check",
-          "value": "char_length(\"interest_registrations\".\"last_name\") between 1 and 150 and \"interest_registrations\".\"last_name\" = btrim(\"interest_registrations\".\"last_name\") and \"interest_registrations\".\"last_name\" !~ '[[:cntrl:]]'"
+        "interest_registrations_paternal_surname_check": {
+          "name": "interest_registrations_paternal_surname_check",
+          "value": "char_length(\"interest_registrations\".\"paternal_surname\") between 1 and 150 and \"interest_registrations\".\"paternal_surname\" = btrim(\"interest_registrations\".\"paternal_surname\") and \"interest_registrations\".\"paternal_surname\" !~ '[[:cntrl:]]'"
+        },
+        "interest_registrations_maternal_surname_check": {
+          "name": "interest_registrations_maternal_surname_check",
+          "value": "char_length(\"interest_registrations\".\"maternal_surname\") between 1 and 150 and \"interest_registrations\".\"maternal_surname\" = btrim(\"interest_registrations\".\"maternal_surname\") and \"interest_registrations\".\"maternal_surname\" !~ '[[:cntrl:]]'"
         },
         "interest_registrations_email_check": {
           "name": "interest_registrations_email_check",
@@ -3298,8 +3308,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "last_name": {
-          "name": "last_name",
+        "paternal_surname": {
+          "name": "paternal_surname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "maternal_surname": {
+          "name": "maternal_surname",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -3361,9 +3377,13 @@
           "name": "participants_first_name_check",
           "value": "char_length(\"participants\".\"first_name\") between 1 and 100 and \"participants\".\"first_name\" = btrim(\"participants\".\"first_name\") and \"participants\".\"first_name\" !~ '[[:cntrl:]]'"
         },
-        "participants_last_name_check": {
-          "name": "participants_last_name_check",
-          "value": "char_length(\"participants\".\"last_name\") between 1 and 150 and \"participants\".\"last_name\" = btrim(\"participants\".\"last_name\") and \"participants\".\"last_name\" !~ '[[:cntrl:]]'"
+        "participants_paternal_surname_check": {
+          "name": "participants_paternal_surname_check",
+          "value": "char_length(\"participants\".\"paternal_surname\") between 1 and 150 and \"participants\".\"paternal_surname\" = btrim(\"participants\".\"paternal_surname\") and \"participants\".\"paternal_surname\" !~ '[[:cntrl:]]'"
+        },
+        "participants_maternal_surname_check": {
+          "name": "participants_maternal_surname_check",
+          "value": "char_length(\"participants\".\"maternal_surname\") between 1 and 150 and \"participants\".\"maternal_surname\" = btrim(\"participants\".\"maternal_surname\") and \"participants\".\"maternal_surname\" !~ '[[:cntrl:]]'"
         },
         "participants_email_check": {
           "name": "participants_email_check",
