@@ -421,12 +421,16 @@ test("academic closure privacy projects open, official and historical loaders us
       },
     },
   });
-  await repo.reopen(f.admin2.id, {
+  const privacyReopen = {
     ...f.command,
     requestKey: crypto.randomUUID(),
     revision: 1,
     reason: "   ",
-  });
+  };
+  const reopening = await repo.reopen(f.admin2.id, privacyReopen);
+  expect(
+    await repo.reopen(f.admin2.id, { ...privacyReopen, reason: null }),
+  ).toEqual(reopening);
   expect(
     (await repo.getGroup(f.admin.id, f.course.id, f.groupId)).reopenings[0]!
       .reason,

@@ -23,6 +23,31 @@ a producción ni firma institucional.
 
 ## OBJETIVO
 
+### Ajuste de cierre académico (QA local, 2026-10-12)
+
+- Se adaptaron únicamente casos existentes de cierre: badge de nota separada de
+  asistencia, categorías/fracciones reales, racha relevante, saldo omitido en UI,
+  privacidad ADMIN/INSTRUCTOR y reapertura con motivo opcional normalizado a `null`.
+- Typecheck, lint, format y build pasaron. La ejecución final de los 20 unit de
+  cierre pasó; una corrida combinada previa tuvo un timeout del PDF existente
+  bajo carga, sin aumentar límites ni cambiar tests.
+- Integración focal aislada: 5/5, incluidos persistencia/auditoría `null`, locks,
+  historial inmutable y proyección por rol. E2E existente: 3/3 sin retries en
+  `skillbase_test_84378d0362f8c001` (API 50966, DB 50967, servidor 44897).
+  Tras ampliar el caso existente para verificar replay de motivo vacío/null,
+  una corrida bajo carga alcanzó el timeout del caso y su cleanup interrumpió
+  la lectura histórica; la corrida final del archivo aislado pasó 5/5, sin
+  cambiar límites, expectativas de negocio o retries.
+- El mismo caso ADMIN comprobó ausencia de overflow en 375/768/1440 px, light/dark,
+  y capturó el diálogo de resultados y reapertura. Escape/retorno de foco, errores
+  de motivo y HTML sin JavaScript quedaron cubiertos. La primera ejecución tuvo
+  fallos de hidratación por un junction de dependencias; se instaló `node_modules`
+  local en el worktree y la ejecución final pasó. No se tocó el canónico.
+- Esta evidencia es local dirigida, no un gate completo ni CI/release remoto.
+  La confirmación visual final del caso ADMIN pasó también con badges de alto
+  contraste basadas en tokens (`primary`/`destructive` translúcidos y texto
+  `foreground`).
+
 Mantener un entorno de pruebas reproducible, aislado y cercano a producción.
 
 Las pruebas deben detectar defectos antes de que un cambio llegue a `master`.
