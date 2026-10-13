@@ -1,4 +1,5 @@
 import type { ClosureReportDto } from "@/domain/academic-closure/types";
+import { participantFullName } from "@/domain/pre-registrations/participant-name";
 import type {
   CertificateConfiguration,
   CertificateState,
@@ -132,7 +133,7 @@ export function certificateRecipients(
     .filter((p) => p.membershipStatus === "INSCRITO" && p.academicallyPassed)
     .map((p) => ({
       id: p.participantId,
-      name: certificateText(`${p.firstName} ${p.lastName}`, "recipientName"),
+      name: certificateText(participantFullName(p), "recipientName"),
     }));
 }
 export function requireCurrentClosure(

@@ -99,7 +99,8 @@ export function participantValues(values: FormValues): ParticipantData {
   return validateParticipant({
     ci: values.ci ?? "",
     firstName: values.firstName ?? "",
-    lastName: values.lastName ?? "",
+    paternalSurname: values.paternalSurname ?? "",
+    maternalSurname: values.maternalSurname ?? "",
     email: values.email ?? "",
     phone: values.phone || null,
   });

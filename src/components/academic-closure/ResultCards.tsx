@@ -1,4 +1,5 @@
 import { useState, useSyncExternalStore } from "react";
+import { participantFullName } from "@/domain/pre-registrations/participant-name";
 import { X } from "lucide-react";
 import {
   Dialog,
@@ -125,7 +126,7 @@ function Summary({ report, person }: PersonProps) {
     <span className="flex min-w-0 flex-col gap-3">
       <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="font-semibold break-words">
-          {person.firstName} {person.lastName}
+          {participantFullName(person)}
         </span>
         <PrivateIdentity report={report} person={person} />
       </span>
@@ -175,7 +176,7 @@ function DetailCard({ report, person }: PersonProps) {
       <DialogTrigger asChild>
         <button
           type="button"
-          aria-label={`Ver resultados de ${person.firstName} ${person.lastName}`}
+          aria-label={`Ver resultados de ${participantFullName(person)}`}
           className="bg-card hover:bg-muted/50 focus-visible:outline-ring h-full w-full min-w-0 cursor-pointer rounded-xl border p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 sm:p-5"
         >
           <Summary report={report} person={person} />
@@ -187,7 +188,7 @@ function DetailCard({ report, person }: PersonProps) {
       >
         <DialogHeader className="pr-10 text-left">
           <DialogTitle className="leading-snug break-words">
-            {person.firstName} {person.lastName}
+            {participantFullName(person)}
           </DialogTitle>
           <PrivateIdentity report={report} person={person} />
           <DialogDescription>Notas y asistencia</DialogDescription>

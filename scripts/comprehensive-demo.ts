@@ -197,7 +197,7 @@ async function interests(
               firstName: ["Ana", "Luis", "Sara", "Pablo", "Eva", "Nicolás"][
                 n % 6
               ]!,
-              lastName: legacyLabels
+              paternalSurname: legacyLabels
                 ? "Demo Interés"
                 : [
                     "Varela Durán",
@@ -207,12 +207,14 @@ async function interests(
                     "Figueroa Montes",
                     "Palacios Ugarte",
                   ][n % 6]!,
+              maternalSurname: "Quispe",
               email: `comprehensive.v1.interest.${interestKey}.${n}@example.test`,
               phone: null,
             };
       await registerInterest(repo, course.course.slug, {
         firstName: participant.firstName,
-        lastName: participant.lastName,
+        paternalSurname: participant.paternalSurname,
+        maternalSurname: participant.maternalSurname,
         email: participant.email,
         phone: participant.phone,
         preferredGroupId:

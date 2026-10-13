@@ -103,8 +103,11 @@ async function fixture(
 async function fillPerson(page: Page) {
   const ci = `00-${crypto.randomUUID()}`;
   await page.getByLabel("CI", { exact: true }).fill(ci);
-  await page.getByLabel("Nombre", { exact: true }).fill("Synthetic");
-  await page.getByLabel("Apellidos", { exact: true }).fill("Registration");
+  await page.getByLabel("Nombres", { exact: true }).fill("Synthetic");
+  await page
+    .getByLabel("Apellido paterno", { exact: true })
+    .fill("Registration");
+  await page.getByLabel("Apellido materno", { exact: true }).fill("Quispe");
   await page
     .getByLabel("Correo electrónico", { exact: true })
     .fill(`registration-${crypto.randomUUID()}@test.invalid`);
@@ -391,9 +394,9 @@ registrationTest.describe(() => {
         name: "Datos del participante",
       });
       await participantSection
-        .getByRole("button", { name: "Editar nombre", exact: true })
+        .getByRole("button", { name: "Editar nombres", exact: true })
         .click();
-      const firstName = participantSection.getByLabel("Nombre", {
+      const firstName = participantSection.getByLabel("Nombres", {
         exact: true,
       });
       await firstName.fill("Sintética");
@@ -449,14 +452,14 @@ registrationTest.describe(() => {
       await expect(phone).toHaveValue("+591 70000000");
       await expect(firstName).toHaveValue("Sintética");
       const nameForm = participantSection.locator("form").filter({
-        has: page.getByLabel("Nombre", { exact: true }),
+        has: page.getByLabel("Nombres", { exact: true }),
       });
       await expect(nameForm.locator('[name="revision"]')).toHaveValue(
         await phoneForm.locator('[name="revision"]').inputValue(),
       );
       await nameForm.getByRole("button", { name: /^Guardar / }).click();
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-        "Sintética Registration",
+        "Sintética Registration Quispe",
       );
       expect(
         await page
@@ -524,7 +527,7 @@ registrationTest.describe(() => {
       ).toBe("kept");
       await page.reload();
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-        "Sintética Registration",
+        "Sintética Registration Quispe",
       );
       await expect(emailForm.locator('[name="participantId"]')).toHaveValue(
         participantId,
@@ -639,7 +642,13 @@ test("same-course interest prefill preserves demand and instructor roster expose
     const email = `interest-${crypto.randomUUID()}@test.invalid`;
     const interested = await page.request.post(`/cursos/${f.slug}`, {
       headers,
-      form: { firstName, lastName: "Prueba", email, phone: "" },
+      form: {
+        firstName,
+        paternalSurname: "Prueba",
+        maternalSurname: "Quispe",
+        email,
+        phone: "",
+      },
     });
     expect(interested.status()).toBe(200);
     await page.goto(`/app/preinscripciones/nueva?courseId=${f.id}`);
@@ -650,7 +659,7 @@ test("same-course interest prefill preserves demand and instructor roster expose
         name: new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "u"),
       })
       .click();
-    await expect(page.getByLabel("Nombre", { exact: true })).toHaveValue(
+    await expect(page.getByLabel("Nombres", { exact: true })).toHaveValue(
       firstName,
     );
     await expect(page.getByLabel("CI", { exact: true })).toHaveValue("");
@@ -744,7 +753,14 @@ test("same-course interest prefill preserves demand and instructor roster expose
         sourceInterestId: null,
         participantType: "STUDENT",
         firstDayException: false,
-        participant: { ci, firstName, lastName: "Prueba", email, phone: null },
+        participant: {
+          ci,
+          firstName,
+          paternalSurname: "Prueba",
+          maternalSurname: "Quispe",
+          email,
+          phone: null,
+        },
         initialPayment: {
           amountCents: 10000,
           effectiveDate: null,

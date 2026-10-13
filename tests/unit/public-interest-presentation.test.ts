@@ -11,7 +11,14 @@ describe("public interest presentation", () => {
     expect(interestGroupLabel({ startTime: "18:00", endTime: "19:30" })).toBe(
       "Lunes a viernes, 18:00–19:30",
     );
-    expect(Object.values(EMPTY_INTEREST_VALUES)).toEqual(["", "", "", "", ""]);
+    expect(Object.values(EMPTY_INTEREST_VALUES)).toEqual([
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+    ]);
   });
   test("accepts only the neutral success transport", () => {
     expect(

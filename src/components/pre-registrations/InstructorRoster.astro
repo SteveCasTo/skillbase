@@ -50,7 +50,7 @@ const { entries, available } = Astro.props;
       <ul class="rounded-xl border px-5">
         {entries.map((entry) => (
           <li class="break-words py-4">
-            {entry.firstName} {entry.lastName}
+            {entry.firstName} {entry.paternalSurname} {entry.maternalSurname}
           </li>
         ))}
       </ul>

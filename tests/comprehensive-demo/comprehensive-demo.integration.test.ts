@@ -70,7 +70,8 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
     await db.insert(s.participants).values({
       ci: "ORIGINAL-QA-PRESERVE",
       firstName: "Original",
-      lastName: "Fixture",
+      paternalSurname: "Fixture",
+      maternalSurname: "Quispe",
       email: "original.fixture@example.test",
     });
     await renewDemo(
@@ -240,7 +241,8 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
       .values({
         ci,
         firstName: "Collision",
-        lastName: "QA",
+        paternalSurname: "QA",
+        maternalSurname: "Quispe",
         email: "collision@example.test",
       })
       .returning();
@@ -510,7 +512,11 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
       ...options,
       apply: false,
     });
-    expect(refreshPlan.edits).toHaveLength(87); // One deliberate course-description edit is retained.
+    // The authored maternal components add 27 edits; the manual description remains retained.
+    expect(refreshPlan.edits).toHaveLength(114);
+    expect(
+      refreshPlan.edits.filter((edit) => edit.field === "maternal_surname"),
+    ).toHaveLength(27);
     expect(
       refreshPlan.edits.filter((edit) => edit.table === "instructor_profiles"),
     ).toHaveLength(8);

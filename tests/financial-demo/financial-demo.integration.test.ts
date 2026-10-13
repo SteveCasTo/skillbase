@@ -105,7 +105,8 @@ test("isolated demo is read-only by default, atomic, provenance-bound and never 
       .values({
         ci,
         firstName: "Persona",
-        lastName: "Ajena",
+        paternalSurname: "Ajena",
+        maternalSurname: "Quispe",
         email: "collision@example.test",
       })
       .returning();

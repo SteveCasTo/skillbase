@@ -166,7 +166,9 @@ const fallbackColumns = [
                           <header class="grid gap-3 lg:contents">
                             <div class="min-w-0 lg:col-start-1 lg:row-start-2 lg:self-center">
                               <h3 class="break-words font-semibold">
-                                {participant.firstName} {participant.lastName}
+                                {participant.firstName}{" "}
+                                {participant.paternalSurname}{" "}
+                                {participant.maternalSurname}
                               </h3>
                               {participant.membershipStatus !== "INSCRITO" && (
                                 <p class="mt-2 text-sm text-muted-foreground">
@@ -208,7 +210,7 @@ const fallbackColumns = [
                                     <form
                                       method="post"
                                       action={Astro.url.pathname}
-                                      aria-label={`${component.name} · ${participant.firstName} ${participant.lastName}`}
+                                      aria-label={`${component.name} · ${participant.firstName} ${participant.paternalSurname} ${participant.maternalSurname}`}
                                       class="row-span-4 grid min-w-0 grid-rows-subgrid gap-y-1"
                                     >
                                       <input
@@ -254,7 +256,8 @@ const fallbackColumns = [
                                         <span class="sr-only">
                                           {" "}
                                           · {participant.firstName}{" "}
-                                          {participant.lastName}
+                                          {participant.paternalSurname}{" "}
+                                          {participant.maternalSurname}
                                         </span>
                                       </label>
                                       <input

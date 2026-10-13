@@ -10,7 +10,8 @@ const interest = (
   id,
   courseId: "selected-course",
   firstName,
-  lastName: "Origin",
+  paternalSurname: "Origin",
+  maternalSurname: "Quispe",
   email: `${id}@example.invalid`,
   phone: null,
   preferredGroupId: null,
@@ -33,7 +34,10 @@ test("search normalizes composed/decomposed accents, case and Unicode whitespace
 });
 
 test("interest candidates normalize both sides, reject cancelled/foreign rows and deduplicate only IDs", () => {
-  const first = { ...interest("first", "José\u00a0 María"), lastName: "Muñoz" };
+  const first = {
+    ...interest("first", "José\u00a0 María"),
+    paternalSurname: "Muñoz",
+  };
   const homonym = { ...first, id: "homonym", email: "other@example.invalid" };
   const cancelled = { ...first, id: "cancelled", status: "CANCELLED" as const };
   const foreign = { ...first, id: "foreign", courseId: "other-course" };

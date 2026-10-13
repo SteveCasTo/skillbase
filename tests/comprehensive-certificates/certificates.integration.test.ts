@@ -74,7 +74,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
       createHash("sha256").update(bytes).digest("hex"),
     );
     const before = await captureDemoSnapshot(db);
-    expect(before.ledger).toHaveLength(24);
+    expect(before.ledger).toHaveLength(25);
     const options = {
       actorId: original!.id,
       auth,

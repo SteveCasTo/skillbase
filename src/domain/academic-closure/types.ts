@@ -31,7 +31,8 @@ export interface ClosureSessionDto {
   participants: {
     registrationId: string;
     firstName: string;
-    lastName: string;
+    paternalSurname: string;
+    maternalSurname: string;
     attendance: AttendanceMarkDto;
   }[];
 }
@@ -74,7 +75,8 @@ export type InstructorClosureParticipantDto = Pick<
   | "registrationId"
   | "groupId"
   | "firstName"
-  | "lastName"
+  | "paternalSurname"
+  | "maternalSurname"
   | "membershipStatus"
   | "canGrade"
   | "grades"

@@ -49,7 +49,7 @@ export function comprehensiveScenarioMatrix(plan: ComprehensiveDemoPlan) {
         registrationRequestKey: comprehensiveDemoId(
           `registration:${registration.key}`,
         ),
-        name: `${registration.participant.firstName} ${registration.participant.lastName}`,
+        name: `${registration.participant.firstName} ${registration.participant.paternalSurname} ${registration.participant.maternalSurname}`,
         scenario: registration.scenario,
         expected:
           registration.scenario === "failed"

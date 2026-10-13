@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { participantFullName } from "@/domain/pre-registrations/participant-name";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,15 +36,13 @@ export function GradeRoster({
     .normalize("NFD")
     .replace(/\p{M}/gu, "")
     .toLocaleLowerCase("es");
-  const matches = (firstName: string, lastName: string) =>
-    `${firstName} ${lastName}`
+  const matches = (person: CourseEvaluationsDto["participants"][number]) =>
+    participantFullName(person)
       .normalize("NFD")
       .replace(/\p{M}/gu, "")
       .toLocaleLowerCase("es")
       .includes(normalized);
-  const count = data.participants.filter((person) =>
-    matches(person.firstName, person.lastName),
-  ).length;
+  const count = data.participants.filter((person) => matches(person)).length;
   if (!data.scheme.components.length)
     return (
       <p className="text-muted-foreground text-sm">
@@ -106,11 +105,11 @@ export function GradeRoster({
         {data.participants.map((participant, index) => (
           <li
             key={participant.registrationId}
-            hidden={!matches(participant.firstName, participant.lastName)}
+            hidden={!matches(participant)}
             className={
               data.participants
                 .slice(0, index)
-                .some((person) => matches(person.firstName, person.lastName))
+                .some((person) => matches(person))
                 ? "min-w-0 border-t"
                 : "min-w-0"
             }

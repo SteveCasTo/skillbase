@@ -184,7 +184,8 @@ const filters = [
                 id={`interest-name-${registration.id}`}
                 class="break-words font-semibold"
               >
-                {registration.firstName} {registration.lastName}
+                {registration.firstName} {registration.paternalSurname}{" "}
+                {registration.maternalSurname}
               </h3>
               <p data-interest-status class="mt-2 text-sm font-medium">
                 {registration.status === "ACTIVE" ? "Activo" : "Cancelado"}
@@ -234,7 +235,7 @@ const filters = [
                 method="post"
                 action={status ? `${path}?status=${status}` : path}
                 data-interest-form
-                aria-label={`Cambiar estado de ${registration.firstName} ${registration.lastName}`}
+                aria-label={`Cambiar estado de ${registration.firstName} ${registration.paternalSurname} ${registration.maternalSurname}`}
                 class="mt-3 flex flex-col gap-3"
               >
                 <input

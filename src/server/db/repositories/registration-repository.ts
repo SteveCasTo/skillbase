@@ -16,6 +16,7 @@ import {
   validateSettings,
 } from "@/domain/pre-registrations/money";
 import { validateParticipant } from "@/domain/pre-registrations/participant";
+import { normalizeRegistrationSearch } from "@/domain/pre-registrations/search";
 import {
   assertAdditionalPayment,
   assertAcademicRegistrationDestination,
@@ -70,6 +71,11 @@ import {
 type Receipt = typeof schema.registrationCommandReceipts.$inferInsert;
 type PendingCash = typeof schema.registrationLedger.$inferInsert;
 type CommandResult = Receipt["result"];
+/** Search equivalence only; CI remains the authoritative identity. */
+function participantSearchText() {
+  return sql`lower(regexp_replace(regexp_replace(normalize(concat_ws(' ', ${schema.participants.ci}, ${schema.participants.firstName}, ${schema.participants.paternalSurname}, ${schema.participants.maternalSurname}, ${schema.participants.email}), NFD), ${"[\u0300-\u036f]"}, '', 'g'), '[[:space:]]+', ' ', 'g'))`;
+}
+
 /** Recursively stable keys; callers supply only explicitly validated contract fields. */
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
@@ -314,7 +320,8 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
           ? {
               id: interest.id,
               firstName: interest.firstName,
-              lastName: interest.lastName,
+              paternalSurname: interest.paternalSurname,
+              maternalSurname: interest.maternalSurname,
               email: interest.email,
               phone: interest.phone,
             }
@@ -439,7 +446,8 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
           );
         if (
           person.firstName !== input.participant.firstName ||
-          person.lastName !== input.participant.lastName ||
+          person.paternalSurname !== input.participant.paternalSurname ||
+          person.maternalSurname !== input.participant.maternalSurname ||
           person.email !== input.participant.email ||
           person.phone !== input.participant.phone
         )
@@ -873,7 +881,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
     const filter = validateRegistrationFilter(raw);
     return this.read(actorId, async (tx, now) => {
       const search = filter.search
-        ? `%${filter.search.replace(/[\\%_]/gu, "\\$&")}%`
+        ? `%${normalizeRegistrationSearch(filter.search).replace(/[\\%_]/gu, "\\$&")}%`
         : undefined;
       // State projection is computed in SQL before pagination, using the same authoritative clock.
       const totals = sql`(select coalesce(sum(case when kind = 'PAYMENT' then amount_cents else 0 end), 0) from registration_ledger l where l.registration_id = ${schema.preRegistrations.id})`;
@@ -893,9 +901,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
         filter.financialStatus
           ? sql`${financial} = ${filter.financialStatus}`
           : undefined,
-        search
-          ? sql`(${schema.participants.ci} ilike ${search} or ${schema.participants.firstName} ilike ${search} or ${schema.participants.lastName} ilike ${search} or ${schema.participants.email} ilike ${search})`
-          : undefined,
+        search ? sql`${participantSearchText()} like ${search}` : undefined,
       );
       const base = () =>
         tx
@@ -1008,16 +1014,15 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
         "Busca con al menos dos caracteres; máximo 50 resultados.",
       );
     return this.read(actorId, async (tx) => {
-      const pattern = `%${search.trim().replace(/[\\%_]/gu, "\\$&")}%`;
+      const pattern = `%${normalizeRegistrationSearch(search).replace(/[\\%_]/gu, "\\$&")}%`;
       return (
         await tx
           .select()
           .from(schema.participants)
-          .where(
-            sql`(${schema.participants.ci} ilike ${pattern} or ${schema.participants.firstName} ilike ${pattern} or ${schema.participants.lastName} ilike ${pattern} or ${schema.participants.email} ilike ${pattern})`,
-          )
+          .where(sql`${participantSearchText()} like ${pattern}`)
           .orderBy(
-            asc(schema.participants.lastName),
+            asc(schema.participants.paternalSurname),
+            asc(schema.participants.maternalSurname),
             asc(schema.participants.firstName),
             asc(schema.participants.id),
           )
@@ -1061,7 +1066,8 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
         return tx
           .select({
             firstName: schema.participants.firstName,
-            lastName: schema.participants.lastName,
+            paternalSurname: schema.participants.paternalSurname,
+            maternalSurname: schema.participants.maternalSurname,
           })
           .from(schema.preRegistrations)
           .innerJoin(
@@ -1076,7 +1082,8 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
             ),
           )
           .orderBy(
-            asc(schema.participants.lastName),
+            asc(schema.participants.paternalSurname),
+            asc(schema.participants.maternalSurname),
             asc(schema.participants.firstName),
             asc(schema.participants.id),
           );
