@@ -96,7 +96,8 @@ async function fixtures(tx: Transaction) {
     .values({
       ci: `00AB-${crypto.randomUUID().toUpperCase()}`,
       firstName: "Synthetic",
-      lastName: "Participant",
+      paternalSurname: "Participant",
+      maternalSurname: "Quispe",
       email: "same@example.invalid",
     })
     .returning();
@@ -178,7 +179,8 @@ test("phase5 schema CI unique, conservative string identity and no unique email 
         sp.insert(participants).values({
           ci: f.person.ci,
           firstName: "Another",
-          lastName: "Person",
+          paternalSurname: "Person",
+          maternalSurname: "Quispe",
           email: "other@example.invalid",
         }),
       "23505",
@@ -190,7 +192,8 @@ test("phase5 schema CI unique, conservative string identity and no unique email 
           sp.insert(participants).values({
             ci,
             firstName: "Another",
-            lastName: "Person",
+            paternalSurname: "Person",
+            maternalSurname: "Quispe",
             email: "other@example.invalid",
           }),
         "23514",
@@ -200,12 +203,49 @@ test("phase5 schema CI unique, conservative string identity and no unique email 
       .values({
         ci: "0000123A-LP",
         firstName: "Second",
-        lastName: "Person",
+        paternalSurname: "Person",
+        maternalSurname: "Quispe",
         email: f.person.email,
       })
       .returning();
     expect(second!.ci).toBe("0000123A-LP");
     expect(second!.id).not.toBe(f.person.id);
+    const migration = await Bun.file(
+      new URL(
+        "../../drizzle/0024_student_required_surnames.sql",
+        import.meta.url,
+      ),
+    ).text();
+    await rejects(
+      tx,
+      (sp) =>
+        sp.execute(sql.raw(migration.split("--> statement-breakpoint")[0]!)),
+      "P0001",
+    );
+    for (const field of [
+      "first_name",
+      "paternal_surname",
+      "maternal_surname",
+    ]) {
+      await rejects(
+        tx,
+        (sp) =>
+          sp.execute(
+            sql`update participants set ${sql.identifier(field)} = null where id = ${second!.id}`,
+          ),
+        "23502",
+      );
+      for (const value of ["", " Leading", "Trailing ", "A\nB"]) {
+        await rejects(
+          tx,
+          (sp) =>
+            sp.execute(
+              sql`update participants set ${sql.identifier(field)} = ${value} where id = ${second!.id}`,
+            ),
+          "23514",
+        );
+      }
+    }
   }));
 test("phase5 schema one ACTIVE membership per person/course, cancellation retains row and permits new membership", async () =>
   isolated(async (tx, f) => {
@@ -286,7 +326,8 @@ test("phase5 schema same-course group/revision/origin FKs reject cross-course re
       .values({
         courseId: other.course.id,
         firstName: "Public",
-        lastName: "Interest",
+        paternalSurname: "Interest",
+        maternalSurname: "Quispe",
         email: "public@example.invalid",
       })
       .returning();

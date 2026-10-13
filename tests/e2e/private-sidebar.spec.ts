@@ -162,7 +162,9 @@ test("collapsed rail expands on hover without shifting main and persists across 
   );
   const inactiveWeight = await page
     .getByRole("navigation", { name: "Navegación privada" })
-    .getByRole("link", { name: "Instructores" })
+    // The rail is intentionally collapsed here; read the hidden link's style,
+    // without asserting that a noninteractive navigation child is visible.
+    .getByRole("link", { name: "Instructores", includeHidden: true })
     .evaluate((element) => getComputedStyle(element).fontWeight);
   expect(activeWeight).not.toBe(inactiveWeight);
   await expect(

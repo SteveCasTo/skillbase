@@ -43,7 +43,8 @@ async function exportParticipant(
       participant: {
         ci: person.ci,
         firstName: "=María Ñúñez",
-        lastName: "Álvarez",
+        paternalSurname: "Álvarez",
+        maternalSurname: "Quispe",
         email: person.email,
         phone: "+591 70000000",
       },
@@ -276,7 +277,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     await prepare(page, fixture);
     await page.goto(path);
     const resultCard = page.getByRole("button", {
-      name: "Ver resultados de =María Ñúñez Álvarez",
+      name: "Ver resultados de =María Ñúñez Álvarez Quispe",
       exact: true,
     });
     await expect(resultCard).toBeVisible();
@@ -284,7 +285,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     await resultCard.focus();
     await page.keyboard.press("Space");
     const resultDetail = page.getByRole("dialog", {
-      name: "=María Ñúñez Álvarez",
+      name: "=María Ñúñez Álvarez Quispe",
       exact: true,
     });
     await expect(resultDetail).toBeVisible();
@@ -469,14 +470,14 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
     await page.goto(path);
     await expect(page.getByText(sensitive, { exact: false })).toHaveCount(0);
     const card = page.getByRole("button", {
-      name: "Ver resultados de =María Ñúñez Álvarez",
+      name: "Ver resultados de =María Ñúñez Álvarez Quispe",
       exact: true,
     });
     await expect(card).toContainText("8 de 8 notas calificadas");
     await card.focus();
     await page.keyboard.press("Enter");
     const detail = page.getByRole("dialog", {
-      name: "=María Ñúñez Álvarez",
+      name: "=María Ñúñez Álvarez Quispe",
       exact: true,
     });
     await expect(detail).toBeVisible();

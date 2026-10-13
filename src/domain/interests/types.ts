@@ -1,7 +1,8 @@
 export type InterestStatus = "ACTIVE" | "CANCELLED";
 export type RegisterInterestInput = {
   firstName: string;
-  lastName: string;
+  paternalSurname: string;
+  maternalSurname: string;
   email: string;
   phone?: string | null;
   preferredGroupId?: string | null;
@@ -19,7 +20,8 @@ export type AdminInterestRegistrationDto = {
   id: string;
   courseId: string;
   firstName: string;
-  lastName: string;
+  paternalSurname: string;
+  maternalSurname: string;
   email: string;
   phone: string | null;
   preferredGroupId: string | null;

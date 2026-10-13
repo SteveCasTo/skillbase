@@ -137,8 +137,8 @@ export class DrizzleInterestRepository implements InterestRepository {
       const result = await tx.execute<{
         open: boolean;
       }>(sql`with acceptance as materialized (select clock_timestamp() < ${deadline}::timestamptz as open), inserted as (
-        insert into interest_registrations (course_id, first_name, last_name, email, phone, preferred_group_id)
-        select ${course.id}::uuid, ${input.firstName}, ${input.lastName}, ${input.email}, ${input.phone}, ${input.preferredGroupId}::uuid from acceptance where open
+        insert into interest_registrations (course_id, first_name, paternal_surname, maternal_surname, email, phone, preferred_group_id)
+        select ${course.id}::uuid, ${input.firstName}, ${input.paternalSurname}, ${input.maternalSurname}, ${input.email}, ${input.phone}, ${input.preferredGroupId}::uuid from acceptance where open
         on conflict (course_id,email) do nothing returning id
       ) select open from acceptance`);
       if (!result[0]?.open) throw unavailable();

@@ -417,6 +417,14 @@ Verificar cada componente en ambos temas.
 
 ## FORMULARIOS
 
+La ficha de estudiante y el formulario público de interés presentan «Nombres»,
+«Apellido paterno» y «Apellido materno» como tres entradas obligatorias con
+errores asociados, preservación de valores y los estados existentes. El
+prellenado conserva los tres componentes editables. Listas, roster, búsqueda y
+documentos muestran nombres + paterno + materno; el orden académico usa paterno,
+materno y nombres. CSV exporta tres columnas separadas. Instructor conserva
+solo identidad y datos académicos autorizados, sin CI/contacto/finanzas.
+
 - Labels siempre visibles.
 - Descripción cuando la entrada pueda generar dudas.
 - Error cerca del campo.

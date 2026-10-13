@@ -179,7 +179,7 @@ test("F9 generation freezes F8 identity and nominal metadata; public drafts are 
     data: {
       courseName: original.report.courseName,
       academicHours: 6,
-      recipientName: `${original.report.participants[0]!.firstName} ${original.report.participants[0]!.lastName}`,
+      recipientName: `${original.report.participants[0]!.firstName} ${original.report.participants[0]!.paternalSurname} ${original.report.participants[0]!.maternalSurname}`,
       instructorName: original.report.instructorName,
       endsOn: "2099-03-05",
       printedMonth: 3,

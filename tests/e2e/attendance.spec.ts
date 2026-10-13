@@ -70,7 +70,7 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
         writes.push(request.postData() ?? "");
     });
     const person = page.getByRole("form", {
-      name: "Enrolled Attendance",
+      name: "Enrolled Attendance Quispe",
       exact: true,
     });
     await chooseState(page, person, "Presente");
@@ -88,13 +88,13 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
       markedBy: fixture.adminId,
     });
     const pencil = person.getByRole("button", {
-      name: "Editar asistencia de Enrolled Attendance",
+      name: "Editar asistencia de Enrolled Attendance Quispe",
       exact: true,
     });
     await pencil.click();
     await person
       .getByRole("button", {
-        name: "Cancelar edición de asistencia de Enrolled Attendance",
+        name: "Cancelar edición de asistencia de Enrolled Attendance Quispe",
         exact: true,
       })
       .click();
@@ -122,13 +122,13 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     await expect(person).toHaveAttribute("aria-busy", "true");
     await expect(
       person.getByRole("combobox", {
-        name: "Asistencia de Enrolled Attendance",
+        name: "Asistencia de Enrolled Attendance Quispe",
         exact: true,
       }),
     ).toBeDisabled();
     await expect(
       person.getByRole("button", {
-        name: "Cancelar edición de asistencia de Enrolled Attendance",
+        name: "Cancelar edición de asistencia de Enrolled Attendance Quispe",
         exact: true,
       }),
     ).toBeDisabled();
@@ -158,7 +158,7 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     );
     await person
       .getByRole("combobox", {
-        name: "Asistencia de Enrolled Attendance",
+        name: "Asistencia de Enrolled Attendance Quispe",
         exact: true,
       })
       .click();
@@ -182,7 +182,7 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     await expect(person.getByRole("alert")).toHaveCount(0);
     await expect(
       person.getByRole("combobox", {
-        name: "Asistencia de Enrolled Attendance",
+        name: "Asistencia de Enrolled Attendance Quispe",
         exact: true,
       }),
     ).toContainText("Ausente");
@@ -194,7 +194,7 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     ).toBeEnabled();
     await person
       .getByRole("button", {
-        name: "Cancelar edición de asistencia de Enrolled Attendance",
+        name: "Cancelar edición de asistencia de Enrolled Attendance Quispe",
         exact: true,
       })
       .click();
@@ -206,13 +206,13 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     await pencil.click();
     await expect(
       person.getByRole("combobox", {
-        name: "Asistencia de Enrolled Attendance",
+        name: "Asistencia de Enrolled Attendance Quispe",
         exact: true,
       }),
     ).toContainText("Presente");
     await person
       .getByRole("button", {
-        name: "Cancelar edición de asistencia de Enrolled Attendance",
+        name: "Cancelar edición de asistencia de Enrolled Attendance Quispe",
         exact: true,
       })
       .click();
@@ -390,11 +390,14 @@ test("INSTRUCTOR records only enrolled own participants without contacts or fina
     );
     await page.goto(path);
     const person = page.getByRole("form", {
-      name: "Enrolled Attendance",
+      name: "Enrolled Attendance Quispe",
       exact: true,
     });
     await expect(
-      page.getByRole("heading", { name: "Awaiting Attendance", exact: true }),
+      page.getByRole("heading", {
+        name: "Awaiting Attendance Quispe",
+        exact: true,
+      }),
     ).not.toBeVisible();
     await expect(
       page.getByRole("group", { name: "Acciones de sesión", exact: true }),
@@ -437,7 +440,10 @@ test("INSTRUCTOR records only enrolled own participants without contacts or fina
     );
     await page.goto(past);
     await expect(
-      page.getByRole("form", { name: "Enrolled Attendance", exact: true }),
+      page.getByRole("form", {
+        name: "Enrolled Attendance Quispe",
+        exact: true,
+      }),
     ).not.toBeVisible();
     const history = await detail(page, past);
     expect(history.session.canRecord).toBe(false);

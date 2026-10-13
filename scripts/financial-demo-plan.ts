@@ -207,7 +207,8 @@ export function financialDemoPlan(
       participant: {
         ci: `00FD${definitions.indexOf(def) + 1}${String(i + 1).padStart(3, "0")}LP`,
         firstName: ["Lucía", "Mateo", "Elena", "Diego", "Sofía", "Andrés"][i]!,
-        lastName: "Ejemplo",
+        paternalSurname: "Ejemplo",
+        maternalSurname: "Mamani",
         email: `finanzas.v1.${def.key}.${scenario}@example.test`,
         phone: null,
       },

@@ -47,7 +47,8 @@ const input: CreateRegistrationInput = {
   participant: {
     ci: " 00 ab-X ",
     firstName: " Synthetic ",
-    lastName: " Participant ",
+    paternalSurname: " Participant ",
+    maternalSurname: " Quispe ",
     email: " PERSON@TEST.INVALID ",
     phone: null,
   },
@@ -152,7 +153,8 @@ test("create orchestration passes normalized contract fields and server actor on
   expect(received!.participant).toEqual({
     ci: "00AB-X",
     firstName: "Synthetic",
-    lastName: "Participant",
+    paternalSurname: "Participant",
+    maternalSurname: "Quispe",
     email: "person@test.invalid",
     phone: null,
   });

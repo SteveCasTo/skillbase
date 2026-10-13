@@ -16,13 +16,15 @@ import { getPrivateRoutePolicy } from "@/server/auth/route-policy";
 import { requestHasExpectedOrigin } from "@/server/auth/redirects";
 const input = {
   firstName: " María José ",
-  lastName: " O'Connor 李 ",
+  paternalSurname: " O'Connor 李 ",
+  maternalSurname: " García ",
   email: " A.B+test@Example.COM ",
 };
 test("interests normalize snapshot without provider-specific email transformations", () => {
   expect(validateRegisterInterest(input)).toEqual({
     firstName: "María José",
-    lastName: "O'Connor 李",
+    paternalSurname: "O'Connor 李",
+    maternalSurname: "García",
     email: "a.b+test@example.com",
     phone: null,
     preferredGroupId: null,
@@ -38,12 +40,23 @@ test("interests normalize snapshot without provider-specific email transformatio
     validateRegisterInterest({
       ...input,
       firstName: "😀".repeat(100),
-      lastName: "李".repeat(150),
+      paternalSurname: "李".repeat(150),
+      maternalSurname: "Quispe",
       phone: "",
     }).phone,
   ).toBeNull();
 });
 test("interests reject invalid types, controls, limits, missing and unknown fields", () => {
+  for (const field of ["firstName", "paternalSurname", "maternalSurname"]) {
+    for (const value of [" ", undefined, "x\ny", "x".repeat(151)]) {
+      expect(() =>
+        validateRegisterInterest({ ...input, [field]: value }),
+      ).toThrow();
+    }
+  }
+  expect(() =>
+    validateRegisterInterest({ ...input, lastName: "Legacy" }),
+  ).toThrow();
   for (const raw of [
     null,
     [],
@@ -55,7 +68,7 @@ test("interests reject invalid types, controls, limits, missing and unknown fiel
     { ...input, preferredGroupId: false },
     { ...input, firstName: " " },
     { ...input, firstName: "😀".repeat(101) },
-    { ...input, lastName: "x".repeat(151) },
+    { ...input, paternalSurname: "x".repeat(151) },
     { ...input, phone: "x".repeat(33) },
     { ...input, phone: "+591 70AB-0000" },
     { ...input, firstName: "\nname" },
@@ -255,7 +268,8 @@ test("interests counts real stream bytes despite false or missing length and can
   ).toEqual({
     ...blankInterestValues(),
     firstName: input.firstName,
-    lastName: input.lastName,
+    paternalSurname: input.paternalSurname,
+    maternalSurname: input.maternalSurname,
     email: input.email,
   });
 });

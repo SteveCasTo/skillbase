@@ -273,11 +273,23 @@ development; PR 286 liberó el schema a producción. Ver contrato/evidencia en
 
 ### Participant
 
+La identidad estudiantil usa `firstName`, `paternalSurname` y `maternalSurname`,
+todos obligatorios, con trim, límites de 100/150/150 caracteres y rechazo de
+caracteres de control. PostgreSQL conserva `first_name`, `paternal_surname` y
+`maternal_surname` con NOT NULL/checks. El mismo contrato aplica a interesados;
+no cambia `instructor_profiles.first_name/last_name` ni `users.name`.
+La migración forward-only `0024_student_required_surnames` exige participantes
+e interesados vacíos mediante el reset de negocio aprobado antes de aplicarse:
+no divide nombres históricos ni fabrica un apellido materno. Los snapshots de
+cierre y certificados se reconstruyen por la operación de seed autorizada, no
+por esta migración. Las migraciones anteriores y sus hashes permanecen intactos.
+
 Implementado mediante migración 0017 (release Fase 5, cloud ledger 18): persona global de administración sin cuenta Auth. CI es texto único tras trim, eliminación de whitespace y uppercase, preservando ceros iniciales, letras/sufijos; no cast numérico, validación de formato nacional, checksum ni escaneo documental. No es `InterestRegistration` ni se fusiona por email. Una persona puede tener una preinscripción activa por curso y otras en cursos distintos. CI no se expone al roster instructor.
 
 - id
 - firstName
-- lastName
+- paternalSurname
+- maternalSurname
 - ci (identificador único como texto normalizado)
 - email (requerido)
 - phone (nullable)

@@ -39,7 +39,8 @@ export interface EvaluationParticipantDto {
   registrationId: string;
   groupId: string;
   firstName: string;
-  lastName: string;
+  paternalSurname: string;
+  maternalSurname: string;
   membershipStatus: MembershipStatus;
   canGrade: boolean;
   grades: EvaluationGradeDto[];

@@ -183,7 +183,7 @@ export async function renderRegistrationsPdf(
   }
   for (const row of rows) {
     const values = [
-      `${row.participant.firstName}\n${row.participant.lastName}\nCI: ${row.participant.ci} · ${PARTICIPANT_LABELS[row.price.participantType]}`,
+      `${row.participant.firstName}\n${row.participant.paternalSurname} ${row.participant.maternalSurname}\nCI: ${row.participant.ci} · ${PARTICIPANT_LABELS[row.price.participantType]}`,
       `${MEMBERSHIP_LABELS[row.membershipStatus]}\n${FINANCE_LABELS[row.financialStatus]}`,
       ...registrationAmounts(row),
     ];

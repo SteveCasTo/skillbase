@@ -57,7 +57,8 @@ test("certificate eligibility uses only official combined decision and stable id
       {
         participantId: "eligible",
         firstName: "Full",
-        lastName: "Name",
+        paternalSurname: "Name",
+        maternalSurname: "Quispe",
         membershipStatus: "INSCRITO",
         academicallyPassed: true,
         balanceCents: 5000,
@@ -65,7 +66,8 @@ test("certificate eligibility uses only official combined decision and stable id
       {
         participantId: "attendance-failed",
         firstName: "Not",
-        lastName: "Eligible",
+        paternalSurname: "Eligible",
+        maternalSurname: "Quispe",
         membershipStatus: "INSCRITO",
         academicallyPassed: false,
         result: { passed: true },
@@ -73,21 +75,23 @@ test("certificate eligibility uses only official combined decision and stable id
       {
         participantId: "pending",
         firstName: "Pending",
-        lastName: "Grade",
+        paternalSurname: "Grade",
+        maternalSurname: "Quispe",
         membershipStatus: "INSCRITO",
         academicallyPassed: false,
       },
       {
         participantId: "unpaid",
         firstName: "Wrong",
-        lastName: "Membership",
+        paternalSurname: "Membership",
+        maternalSurname: "Quispe",
         membershipStatus: "PREINSCRITO",
         academicallyPassed: true,
       },
     ],
   } as unknown as ClosureReportDto;
   expect(certificateRecipients(report, "APPROVAL")).toEqual([
-    { id: "eligible", name: "Full Name" },
+    { id: "eligible", name: "Full Name Quispe" },
   ]);
   expect(
     certificateRecipients({ ...report, participants: [] }, "INSTRUCTOR"),

@@ -38,7 +38,8 @@ export interface AttendanceSessionDto {
 export interface AttendanceParticipantDto {
   registrationId: string;
   firstName: string;
-  lastName: string;
+  paternalSurname: string;
+  maternalSurname: string;
   currentlyEnrolled: boolean;
   consecutiveAbsences: number;
   maximumConsecutiveAbsences: number;
@@ -63,7 +64,8 @@ export interface AttendanceSessionDetailDto {
   reviewCandidates: {
     registrationId: string;
     firstName: string;
-    lastName: string;
+    paternalSurname: string;
+    maternalSurname: string;
   }[];
 }
 export interface AttendanceCommand {

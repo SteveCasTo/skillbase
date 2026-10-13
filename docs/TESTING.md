@@ -115,6 +115,15 @@ El entorno debe tener datos conocidos antes de cada suite.
 
 ## SEEDS Y FIXTURES
 
+La separación obligatoria de apellidos actualiza fixtures y assertions de las
+suites existentes, sin añadir casos, specs ni suites. Las pruebas de identidad
+comprueban campos ausentes/vacíos, controles, Unicode y rechazo del alias
+estudiantil `lastName`; SSR exige las cuatro entradas obligatorias del interés.
+Los contratos de roster, cierre, certificados y CSV incluyen ambos apellidos.
+`0024_student_required_surnames` se ejecuta solamente sobre stacks QA vacíos;
+la operación canónica requiere el reset de negocio autorizado antes de migrar.
+Los controles de Auth, roles, instructor y el ledger aprobado no se relajan.
+
 Separar:
 
 - development seed;

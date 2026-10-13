@@ -84,7 +84,8 @@ async function interestCourse(page: Page, context: BrowserContext) {
       headers,
       form: {
         firstName: firstName!,
-        lastName: "Fixture",
+        paternalSurname: "Fixture",
+        maternalSurname: "Quispe",
         email: `${crypto.randomUUID()}@example.test`,
         preferredGroupId: preferredGroupId!,
       },
@@ -114,7 +115,10 @@ async function interestCourse(page: Page, context: BrowserContext) {
 
 const rowFor = (page: Page, name = "Ana Sintética") =>
   page.locator("[data-interest-id]").filter({
-    has: page.getByRole("heading", { name: `${name} Fixture`, exact: true }),
+    has: page.getByRole("heading", {
+      name: `${name} Fixture Quispe`,
+      exact: true,
+    }),
   });
 
 test("filters replace only the authorized list, retain focus and handle history, failure and retry", async ({
