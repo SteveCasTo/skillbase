@@ -246,6 +246,8 @@ schema Drizzle:
   versión reabierta.
   `0026_optional_academic_reopening_reason.sql` permite `null` sin reescribir
   eventos existentes ni cambiar los triggers de inmutabilidad, RLS o grants.
+  Su snapshot deriva de 0025 y conserva el esquema de certificados actuales y
+  los apellidos separados de 0024; el journal completo contiene 27 entradas.
 - `academic_closure_receipts`: resultado append-only con actor, UUID request key,
   fingerprint SHA-256 y comando result; unique `(actor_id, request_key)`.
 

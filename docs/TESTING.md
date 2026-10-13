@@ -54,6 +54,16 @@ a producción ni firma institucional.
   capturas proceden de `skillbase_test_7bc649f03b43655e` (API 57596, DB 57597,
   servidor 44897); para no capturar transiciones de color a medio cambio de tema,
   los screenshots deshabilitan animaciones únicamente durante la captura.
+- Rebase final sobre `31edc52` (PR352): se regeneró 0026 contra el snapshot de
+  0025; Drizzle confirmó cero drift, journal de 27 entradas y hashes históricos
+  sin cambios. Check/build, los 464 unit del checkout combinado y los cinco
+  casos de integración académica aislada pasaron. La primera build/E2E local
+  encontró un módulo runtime ausente en la instalación de Astro; reinstalar con
+  lockfile congelado restauró la build sin alterar source ni dependencias.
+  La corrida E2E posterior pasó instructor y HTML, pero ADMIN recibió un reporte
+  temporalmente no disponible después de preparar el fixture (causa no atribuida).
+  La ejecución final serial pasó los tres casos sin retries ni cambios de límites,
+  en `skillbase_test_61ac0b723bba7fdd` (API 53169, DB 53170, servidor 44897).
 
 Mantener un entorno de pruebas reproducible, aislado y cercano a producción.
 

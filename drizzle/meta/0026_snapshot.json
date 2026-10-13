@@ -1,6 +1,6 @@
 {
-  "id": "086edcb2-25a8-48ad-a6b3-97b0ab69bec5",
-  "prevId": "957386fe-53f9-4dd5-9b5e-8a64b340a04d",
+  "id": "f4090acd-d541-44b8-9878-8c850edebd6f",
+  "prevId": "7e2b4845-cbd6-4cc5-b639-4cd9a1e6ad3f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5142,18 +5142,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
-        },
-        "replacement_for_id": {
-          "name": "replacement_for_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "replaced_by_id": {
-          "name": "replaced_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -5172,11 +5160,11 @@
           "method": "btree",
           "with": {}
         },
-        "certificates_one_active_unique": {
-          "name": "certificates_one_active_unique",
+        "certificates_one_current_unique": {
+          "name": "certificates_one_current_unique",
           "columns": [
             {
-              "expression": "course_id",
+              "expression": "group_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5195,7 +5183,6 @@
             }
           ],
           "isUnique": true,
-          "where": "\"certificates\".\"state\" = 'issued'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -5250,36 +5237,6 @@
           "columns": [
             {
               "expression": "created_by",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "certificates_replacement_idx": {
-          "name": "certificates_replacement_idx",
-          "columns": [
-            {
-              "expression": "replacement_for_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "certificates_replaced_idx": {
-          "name": "certificates_replaced_idx",
-          "columns": [
-            {
-              "expression": "replaced_by_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5358,32 +5315,6 @@
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
-        },
-        "certificates_replacement_for_fk": {
-          "name": "certificates_replacement_for_fk",
-          "tableFrom": "certificates",
-          "tableTo": "certificates",
-          "columnsFrom": [
-            "replacement_for_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "certificates_replaced_by_fk": {
-          "name": "certificates_replaced_by_fk",
-          "tableFrom": "certificates",
-          "tableTo": "certificates",
-          "columnsFrom": [
-            "replaced_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5392,11 +5323,15 @@
       "checkConstraints": {
         "certificates_values_check": {
           "name": "certificates_values_check",
-          "value": "\"certificates\".\"type\" in ('APPROVAL','INSTRUCTOR') and \"certificates\".\"state\" in ('pending','generated','awaiting_signature','issued','revoked','replaced') and \"certificates\".\"version\" > 0 and \"certificates\".\"revision\" >= 0 and \"certificates\".\"public_credential_id\" ~ '^[A-Za-z0-9_-]{32}$' and (\"certificates\".\"signed_sha256\" is null or \"certificates\".\"signed_sha256\" ~ '^[0-9a-f]{64}$')"
+          "value": "\"certificates\".\"type\" in ('APPROVAL','INSTRUCTOR') and \"certificates\".\"state\" in ('pending','generated','issued','revoked') and \"certificates\".\"version\" > 0 and \"certificates\".\"revision\" >= 0 and \"certificates\".\"public_credential_id\" ~ '^[A-Za-z0-9_-]{32}$' and (\"certificates\".\"signed_sha256\" is null or \"certificates\".\"signed_sha256\" ~ '^[0-9a-f]{64}$')"
         },
         "certificates_issued_check": {
           "name": "certificates_issued_check",
           "value": "\"certificates\".\"state\" not in ('issued','revoked','replaced') or (\"certificates\".\"signed_path\" is not null and \"certificates\".\"signed_sha256\" is not null and \"certificates\".\"issued_at\" is not null and \"certificates\".\"reviewed\")"
+        },
+        "certificates_draft_check": {
+          "name": "certificates_draft_check",
+          "value": "\"certificates\".\"state\" not in ('pending','generated') or (\"certificates\".\"signed_path\" is null and \"certificates\".\"signed_sha256\" is null and \"certificates\".\"issued_at\" is null and not \"certificates\".\"reviewed\" and ((\"certificates\".\"state\" = 'pending' and \"certificates\".\"unsigned_path\" is null and \"certificates\".\"generated_at\" is null) or (\"certificates\".\"state\" = 'generated' and \"certificates\".\"unsigned_path\" is not null and \"certificates\".\"generated_at\" is not null)))"
         }
       },
       "isRLSEnabled": true
