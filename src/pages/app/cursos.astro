@@ -120,6 +120,12 @@ const hasMatches = entries.some(
         <p class="mt-2 text-sm leading-6 text-muted-foreground">
           Inténtalo nuevamente en unos minutos.
         </p>
+        <a
+          href={`${Astro.url.pathname}${Astro.url.search}`}
+          class="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg border px-4 text-sm font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          Reintentar
+        </a>
       </section>
     ) : courses.length === 0 ? (
       <section
