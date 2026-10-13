@@ -525,8 +525,10 @@ El contrato funcional/técnico aprobado está en [`docs/EVALUATIONS_CONTRACT.md`
   conserva «Cierre del grupo» y fecha/hora numérica de Bolivia; historial muestra
   fechas y motivos presentes, sin ordinales de versión ni nombres de actores.
   Snapshots, actor y versiones permanecen íntegros en servidor.
-- Reabrir abre un diálogo breve con motivo opcional, Cancelar y Confirmar;
-  mantiene Escape, retorno de foco y formulario HTML sin JavaScript.
+- Reabrir abre un diálogo breve con input de motivo opcional en una línea,
+  Cancelar y Confirmar; omite explicación y ayuda visibles redundantes y mantiene
+  una descripción accesible para el diálogo, Escape, retorno de foco y formulario
+  HTML sin JavaScript.
 
 ## CONSISTENCIA
 

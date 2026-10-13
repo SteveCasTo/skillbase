@@ -681,7 +681,7 @@ test("HTML without JavaScript retains server validation and supports closing and
     await page.getByText("Reabrir grupo", { exact: true }).click();
     await page
       .getByRole("textbox", { name: "Motivo de reapertura (opcional)" })
-      .fill("Motivo\nno válido");
+      .fill("Motivo\u0007no válido");
     const invalid = page.waitForResponse(
       (r) =>
         r.request().method() === "POST" && r.url().includes("operation=reopen"),
@@ -690,7 +690,7 @@ test("HTML without JavaScript retains server validation and supports closing and
     expect((await invalid).status()).toBe(422);
     await expect(
       page.getByRole("textbox", { name: "Motivo de reapertura (opcional)" }),
-    ).toHaveValue("Motivo\nno válido");
+    ).toHaveValue("Motivo\u0007no válido");
     await expect(
       page.getByText(
         "Usa hasta 500 caracteres, sin saltos de línea ni caracteres de control.",

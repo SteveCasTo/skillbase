@@ -12,7 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { notifications } from "@/lib/notifications";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 
 interface Props {
   path: string;
@@ -151,7 +151,7 @@ export function ClosureActions({
       <label htmlFor="closure-reason" className="text-sm font-medium">
         Motivo de reapertura (opcional)
       </label>
-      <Textarea
+      <Input
         id="closure-reason"
         name="reason"
         maxLength={500}
@@ -159,16 +159,9 @@ export function ClosureActions({
         onChange={(e) => setReason(e.target.value)}
         disabled={pending}
         aria-invalid={Boolean(reasonError)}
-        aria-describedby={
-          reasonError
-            ? "closure-reason-help closure-reason-error"
-            : "closure-reason-help"
-        }
-        className="min-h-24"
+        aria-describedby={reasonError ? "closure-reason-error" : undefined}
+        className="min-h-11"
       />
-      <p id="closure-reason-help" className="text-muted-foreground text-xs">
-        Hasta 500 caracteres, en una sola línea.
-      </p>
       {reasonError && (
         <p
           id="closure-reason-error"
@@ -213,12 +206,9 @@ export function ClosureActions({
         className="bg-card w-full max-w-lg rounded-xl border p-4"
         open={Boolean(reasonError)}
       >
-        <summary className="focus-visible:outline-ring min-h-11 cursor-pointer font-medium focus-visible:outline-2">
+        <summary className="focus-visible:outline-ring mb-3 min-h-11 cursor-pointer font-medium focus-visible:outline-2">
           Reabrir grupo
         </summary>
-        <p className="my-3 text-sm">
-          Permite corregir notas y asistencia; conserva el cierre anterior.
-        </p>
         {reopenForm}
       </details>
     );
@@ -264,9 +254,9 @@ export function ClosureActions({
           <DialogTitle>
             {canReopen ? "Reabrir grupo" : "Cerrar grupo"}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className={canReopen ? "sr-only" : undefined}>
             {canReopen
-              ? "Permite corregir notas y asistencia; conserva el cierre anterior."
+              ? "Indica un motivo si lo necesitas."
               : "Se conservará una versión oficial y se bloquearán cambios de notas, asistencia y altas en este grupo. No archiva el curso."}
           </DialogDescription>
         </DialogHeader>
