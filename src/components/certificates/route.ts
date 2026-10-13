@@ -113,8 +113,10 @@ export async function certificateMutation(
             service: getCertificateService(),
             courseId: astro.params.id ?? "",
             groupId: astro.params.groupId ?? "",
-            ...(astro.params.recipientId ? {recipientId: astro.params.recipientId} : {}),
-            ...(astro.params.type ? {type: astro.params.type} : {}),
+            ...(astro.params.recipientId
+              ? { recipientId: astro.params.recipientId }
+              : {}),
+            ...(astro.params.type ? { type: astro.params.type } : {}),
           }
         : {}),
       ...(operation === "review" ||

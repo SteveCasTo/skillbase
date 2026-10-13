@@ -68,7 +68,9 @@ const { feedback } = Astro.props;
                 : "Ningún archivo seleccionado";
             const error = selected ? localPdfError(selected) : "";
             file.setCustomValidity(error);
-            const fileError = form.querySelector<HTMLElement>('[data-field-error="file"]');
+            const fileError = form.querySelector<HTMLElement>(
+              '[data-field-error="file"]',
+            );
             if (fileError) fileError.textContent = error;
             file.setAttribute("aria-invalid", error ? "true" : "false");
             sync();

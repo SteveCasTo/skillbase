@@ -5,37 +5,106 @@ import RegistrationPageError from "@/components/pre-registrations/RegistrationPa
 import { certificateStateLabel } from "./presentation";
 import type { GroupCertificateProps } from "./group-route";
 type Props = GroupCertificateProps;
-const { load, closure, current, title, groupName, sections, courseId, groupId, instructorRoute } = Astro.props;
+const {
+  load,
+  closure,
+  current,
+  title,
+  groupName,
+  sections,
+  courseId,
+  groupId,
+  instructorRoute,
+} = Astro.props;
 const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
 const base = `${prefix}/${courseId}/grupos/${groupId}/certificados`;
 ---
+
 <PrivateLayout title="Certificados">
-  <CourseBreadcrumbs current="Certificados" parents={[
-    { label: "Resumen", href: "/app" },
-    { label: instructorRoute ? "Mis cursos" : "Cursos", href: prefix },
-    { label: title, href: instructorRoute ? `${prefix}/${courseId}` : `${prefix}/${courseId}/grupos` },
-  ]} />
+  <CourseBreadcrumbs
+    current="Certificados"
+    parents={[
+      { label: "Resumen", href: "/app" },
+      { label: instructorRoute ? "Mis cursos" : "Cursos", href: prefix },
+      {
+        label: title,
+        href: instructorRoute
+          ? `${prefix}/${courseId}`
+          : `${prefix}/${courseId}/grupos`,
+      },
+    ]}
+  />
   <header class="mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-2">
     <h1 class="text-3xl font-semibold tracking-tight">Certificados</h1>
-    {groupName && <p class="text-lg text-muted-foreground">Grupo {groupName}</p>}
+    {groupName && (
+      <p class="text-lg text-muted-foreground">Grupo {groupName}</p>
+    )}
   </header>
-  {!load.available ? <RegistrationPageError message={load.unavailableReason} retryHref={Astro.url.pathname} /> : (
+  {!load.available ? (
+    <RegistrationPageError
+      message={load.unavailableReason}
+      retryHref={Astro.url.pathname}
+    />
+  ) : (
     <div class="mt-7 flex min-w-0 flex-col gap-8">
-      {closure && !closure.available && <RegistrationPageError message={closure.unavailableReason} retryHref={Astro.url.pathname} />}
-      {!current && <p role="status" class="text-sm text-muted-foreground">Los destinatarios estarán disponibles cuando el grupo tenga un cierre oficial vigente.</p>}
-      {sections.map(section => <section aria-labelledby={`recipients-${section.type}`} class="flex min-w-0 flex-col gap-4">
-        <h2 id={`recipients-${section.type}`} class="text-xl font-semibold">{section.type === "APPROVAL" ? "Participantes" : "Instructor"}</h2>
-        {!section.recipients.length ? <p class="text-sm text-muted-foreground">{section.type === "APPROVAL" ? "No hay participantes elegibles en el cierre oficial." : "No hay instructor elegible en el cierre oficial."}</p> : (
-          <ul class="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {section.recipients.map(recipient => <li class="min-w-0">
-              <a href={recipient.record ? `${instructorRoute ? "/app/mis-certificados" : "/app/certificados"}/${recipient.record.id}` : `${base}/${section.type.toLowerCase()}/${recipient.id}`} class="flex h-full min-w-0 flex-col gap-3 rounded-xl border bg-card p-5 hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring">
-                <h3 class="break-words text-lg font-semibold">{recipient.name}</h3>
-                {recipient.record?.hasUnsignedPdf || recipient.record?.hasSignedPdf ? <span class="text-sm font-medium">{certificateStateLabel[recipient.record.state]}</span> : <span class="text-sm text-muted-foreground">PDF por generar</span>}
-              </a>
-            </li>)}
-          </ul>
-        )}
-      </section>)}
+      {closure && !closure.available && (
+        <RegistrationPageError
+          message={closure.unavailableReason}
+          retryHref={Astro.url.pathname}
+        />
+      )}
+      {!current && (
+        <p role="status" class="text-sm text-muted-foreground">
+          Los destinatarios estarán disponibles cuando el grupo tenga un cierre
+          oficial vigente.
+        </p>
+      )}
+      {sections.map((section) => (
+        <section
+          aria-labelledby={`recipients-${section.type}`}
+          class="flex min-w-0 flex-col gap-4"
+        >
+          <h2 id={`recipients-${section.type}`} class="text-xl font-semibold">
+            {section.type === "APPROVAL" ? "Participantes" : "Instructor"}
+          </h2>
+          {!section.recipients.length ? (
+            <p class="text-sm text-muted-foreground">
+              {section.type === "APPROVAL"
+                ? "No hay participantes elegibles en el cierre oficial."
+                : "No hay instructor elegible en el cierre oficial."}
+            </p>
+          ) : (
+            <ul class="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {section.recipients.map((recipient) => (
+                <li class="min-w-0">
+                  <a
+                    href={
+                      recipient.record
+                        ? `${instructorRoute ? "/app/mis-certificados" : "/app/certificados"}/${recipient.record.id}`
+                        : `${base}/${section.type.toLowerCase()}/${recipient.id}`
+                    }
+                    class="flex h-full min-w-0 flex-col gap-3 rounded-xl border bg-card p-5 hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    <h3 class="break-words text-lg font-semibold">
+                      {recipient.name}
+                    </h3>
+                    {recipient.record?.hasUnsignedPdf ||
+                    recipient.record?.hasSignedPdf ? (
+                      <span class="text-sm font-medium">
+                        {certificateStateLabel[recipient.record.state]}
+                      </span>
+                    ) : (
+                      <span class="text-sm text-muted-foreground">
+                        PDF por generar
+                      </span>
+                    )}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
     </div>
   )}
 </PrivateLayout>

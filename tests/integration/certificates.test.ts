@@ -140,7 +140,7 @@ async function setup(score = "100") {
     configurationRevision: updatedSettings.revision,
     requestKey: crypto.randomUUID(),
     type: "APPROVAL" as const,
-    recipientId: f.paid.participantId,
+    recipientId: f.paid.participant.id,
   };
   return { ...f, groupId, version, input, storage, service };
 }
@@ -268,8 +268,9 @@ test("signed save is atomic, idempotent and serializes concurrent substitution/r
     f.service.uploadSigned(f.admin.id, c, unsigned),
     f.service.uploadSigned(f.admin.id, c, unsigned),
   ]);
-  const result = results.find(r => r.status === "fulfilled");
-  if (!result || result.status !== "fulfilled") throw new Error("No signed substitution winner");
+  const result = results.find((r) => r.status === "fulfilled");
+  if (!result || result.status !== "fulfilled")
+    throw new Error("No signed substitution winner");
   const issued = result.value;
   expect(await f.service.uploadSigned(f.admin.id, c, unsigned)).toEqual(issued);
   expect(issued.state).toBe("issued");
@@ -280,7 +281,9 @@ test("signed save is atomic, idempotent and serializes concurrent substitution/r
     await f.service.download(f.instructor.id, issued.id, "SIGNED"),
   ).toEqual(unsigned);
   expect((await repository.verify(issued.publicCredentialId)).valid).toBe(true);
-  await expect(f.service.download(f.admin.id, issued.id, "UNSIGNED")).rejects.toMatchObject({code: "NOT_FOUND"});
+  await expect(
+    f.service.download(f.admin.id, issued.id, "UNSIGNED"),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
   const revoke = command(issued);
   const revoked = await repository.revoke(
     f.admin.id,
@@ -362,7 +365,11 @@ test("concurrent generation keeps one current record; draft regeneration invalid
   const f = await setup();
   const preparations = await Promise.all([
     repository.prepare(f.admin.id, f.input, "https://qa.invalid"),
-    repository.prepare(f.admin2.id, {...f.input, requestKey: crypto.randomUUID()}, "https://qa.invalid"),
+    repository.prepare(
+      f.admin2.id,
+      { ...f.input, requestKey: crypto.randomUUID() },
+      "https://qa.invalid",
+    ),
   ]);
   expect(preparations[0]![0]!.id).toBe(preparations[1]![0]!.id);
   const [generated] = await f.service.generate(f.admin.id, f.input);
@@ -375,7 +382,10 @@ test("concurrent generation keeps one current record; draft regeneration invalid
   const [one] = await f.service.generate(f.admin.id, regeneration);
   expect(one!.id).toBe(generated!.id);
   expect(one!.publicCredentialId).not.toBe(generated!.publicCredentialId);
-  expect(await repository.verify(generated!.publicCredentialId)).toEqual({state: "not_found", valid: false});
+  expect(await repository.verify(generated!.publicCredentialId)).toEqual({
+    state: "not_found",
+    valid: false,
+  });
   const issued = await ready(f, one!);
   const results = await Promise.allSettled([
     f.service.uploadSigned(f.admin.id, command(issued), unsigned),
@@ -387,8 +397,16 @@ test("concurrent generation keeps one current record; draft regeneration invalid
   if (winner?.status !== "fulfilled") throw new Error("No substitution winner");
   expect(winner.value.id).toBe(issued.id);
   expect(winner.value.publicCredentialId).toBe(issued.publicCredentialId);
-  expect(winner.value.signedSha256).toBe(createHash("sha256").update(unsigned).digest("hex"));
-  await expect(f.service.generate(f.admin.id, {...regeneration, requestKey: crypto.randomUUID(), certificateRevision: winner.value.revision})).rejects.toMatchObject({code: "INVALID_STATE"});
+  expect(winner.value.signedSha256).toBe(
+    createHash("sha256").update(unsigned).digest("hex"),
+  );
+  await expect(
+    f.service.generate(f.admin.id, {
+      ...regeneration,
+      requestKey: crypto.randomUUID(),
+      certificateRevision: winner.value.revision,
+    }),
+  ).rejects.toMatchObject({ code: "INVALID_STATE" });
   expect((await repository.verify(winner.value.publicCredentialId)).valid).toBe(
     true,
   );
@@ -396,7 +414,7 @@ test("concurrent generation keeps one current record; draft regeneration invalid
     (await repository.list(f.admin.id, f.course.id, f.groupId)).filter(
       (r) => r.state === "issued",
     ),
-   ).toHaveLength(1);
+  ).toHaveLength(1);
 }, 30000);
 test("fresh roles/status and F9 used-account references are enforced", async () => {
   const f = await setup();
@@ -650,7 +668,11 @@ test("stale configuration and recipient/version boundaries roll back generation 
   ).toHaveLength(0);
   const [row] = await f.service.generate(f.admin.id, f.input);
   const first = await f.service.uploadSigned(f.admin.id, command(row!), signed);
-  const reviewed = await f.service.uploadSigned(f.admin.id, command(first), signed);
+  const reviewed = await f.service.uploadSigned(
+    f.admin.id,
+    command(first),
+    signed,
+  );
   await expect(
     f.service.uploadSigned(f.admin.id, command(first), unsigned),
   ).rejects.toMatchObject({ code: "CONCURRENT_UPDATE" });

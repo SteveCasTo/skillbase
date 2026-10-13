@@ -5,74 +5,262 @@ import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
 import { buttonVariants } from "@/components/ui/button";
 import type { CertificateDetailProps } from "./detail-route";
-import { certificateStateLabel, certificateTypeLabel, civilDateLabel } from "./presentation";
+import {
+  certificateStateLabel,
+  certificateTypeLabel,
+  civilDateLabel,
+} from "./presentation";
 import FormFeedback from "./FormFeedback.astro";
 import CertificateFilePicker from "./CertificateFilePicker.astro";
 import RevokeCertificate from "./RevokeCertificate";
 type Props = CertificateDetailProps;
-const { load, closure, settings, feedback, instructorRoute, path, requestKey } = Astro.props;
+const { load, closure, settings, feedback, instructorRoute, path, requestKey } =
+  Astro.props;
 const record = load.available ? load.data : null;
 const title = record ? certificateTypeLabel[record.type] : "Certificado";
-const groupPath = record ? `${instructorRoute ? "/app/mis-cursos" : "/app/cursos"}/${record.courseId}/grupos/${record.groupId}/certificados` : "/app/certificados";
-const current = closure?.available && closure.data.status === "CLOSED" ? closure.data.official : null;
+const groupPath = record
+  ? `${instructorRoute ? "/app/mis-cursos" : "/app/cursos"}/${record.courseId}/grupos/${record.groupId}/certificados`
+  : "/app/certificados";
+const current =
+  closure?.available && closure.data.status === "CLOSED"
+    ? closure.data.official
+    : null;
 const signed = record?.hasSignedPdf;
 const editable = record && record.state !== "revoked" && !record.obsolete;
 ---
+
 <PrivateLayout {title}>
   <DownloadFeedback />
-  <CourseBreadcrumbs current="Certificado" parents={[{label: "Resumen", href: "/app"}, {label: "Certificados", href: groupPath}]} />
-  {record ? <article class="mt-5 flex min-w-0 flex-col gap-7">
-    <header class="flex flex-wrap items-baseline gap-x-4 gap-y-2">
-      <h1 class="text-3xl font-semibold tracking-tight">{title}</h1>
-      <p class="min-w-0 break-words text-lg text-muted-foreground">{record.data.recipientName}</p>
-      <span class="text-sm font-medium">{certificateStateLabel[record.state]}</span>
-    </header>
-    <dl class="grid gap-x-8 gap-y-5 border-b pb-6 sm:grid-cols-2 xl:grid-cols-4">
-      <div><dt class="text-sm text-muted-foreground">Fechas nominales</dt><dd class="mt-1 text-sm">{civilDateLabel(record.data.startsOn)} al {civilDateLabel(record.data.endsOn)}</dd></div>
-      <div><dt class="text-sm text-muted-foreground">Duración</dt><dd class="mt-1 font-medium">{record.data.academicHours} horas académicas</dd></div>
-      <div><dt class="text-sm text-muted-foreground">Grupo</dt><dd class="mt-1 font-medium">{record.data.groupNumber}</dd></div>
-      <div><dt class="text-sm text-muted-foreground">Horario nominal</dt><dd class="mt-1 font-medium">{record.data.groupStartsAt} a {record.data.groupEndsAt}</dd></div>
-    </dl>
-    {!signed && record.obsolete && <p role="status" class="text-sm">El cierre cambió. Regenera el PDF desde el cierre oficial vigente antes de firmarlo.</p>}
-    <section aria-label="Documento" class="flex min-w-0 flex-col gap-5">
-      <div class="flex flex-wrap items-start gap-3">
-        {signed ? <a data-astro-reload href={`${path}/firmado.pdf`} data-feedback-download class={buttonVariants({className: "min-h-11"})}>Descargar firmado</a> : record.hasUnsignedPdf && <a data-astro-reload href={`${path}/generado.pdf`} data-feedback-download class={buttonVariants({className: "min-h-11"})}>Descargar para firmar</a>}
-        {!instructorRoute && !signed && current && settings?.available && <form method="post" action={`${groupPath}/${record.type.toLowerCase()}/${record.recipientId}`} data-certificate-form data-pending-label="Regenerando PDF…" data-success-label="PDF regenerado." class="flex flex-col gap-3">
-          <input type="hidden" name="type" value={record.type} />
-          <input type="hidden" name="recipientId" value={record.recipientId} />
-          <input type="hidden" name="versionId" value={current.id} />
-          <input type="hidden" name="closureRevision" value={closure?.available ? closure.data.revision : 0} />
-          <input type="hidden" name="configurationRevision" value={settings.data.revision} />
-          <input type="hidden" name="requestKey" value={crypto.randomUUID()} />
-          <input type="hidden" name="regenerate" value="true" />
-          <input type="hidden" name="certificateRevision" value={record.revision} />
-          <button type="submit" class={buttonVariants({variant: "outline", className: "min-h-11"})}>Regenerar PDF</button>
-          <FormFeedback {feedback} />
-        </form>}
-      </div>
-      {!instructorRoute && editable && (signed || record.hasUnsignedPdf) && <form method="post" action={`${path}/cargar`} enctype="multipart/form-data" data-certificate-form data-pending-label="Guardando firmado…" data-success-label="Certificado firmado guardado." class="flex w-full min-w-0 flex-col gap-4">
-        <input type="hidden" name="revision" value={record.revision} />
-        <input type="hidden" name="requestKey" value={requestKey} />
-        <input type="hidden" name="purpose" value="SIGNED" />
-        <CertificateFilePicker id="signed-pdf" name="file" required title={signed ? "Sustituir firmado" : "PDF firmado"} description="Un archivo PDF, hasta 10 MB." describedby="signed-file-error" />
-        <p id="signed-file-error" data-field-error="file" class="text-sm text-destructive empty:hidden"></p>
-        <label class="flex min-h-11 items-center gap-3">
-          <input type="checkbox" name="attestation" value="true" required data-review-confirmation aria-describedby="attestation-error" class="size-5 shrink-0 accent-primary" />
-          <span class="text-sm">Confirmo que es el certificado firmado.</span>
-        </label>
-        <p id="attestation-error" data-field-error="attestation" class="text-sm text-destructive empty:hidden"></p>
-        <FormFeedback />
-        <button type="submit" class={buttonVariants({className: "min-h-11 self-start"})}>{signed ? "Sustituir firmado" : "Guardar firmado"}</button>
-      </form>}
-    </section>
-    {signed && <section aria-label="Credencial pública" class="flex min-w-0 flex-col gap-3 border-t pt-6">
-      <a href={`/certificados/${record.publicCredentialId}`} class="inline-flex min-h-11 items-center self-start text-sm underline underline-offset-4">Consultar estado público</a>
-      <dl class="min-w-0"><dt class="text-sm text-muted-foreground">SHA-256 del PDF firmado</dt><dd class="mt-2 break-all font-mono text-xs leading-6">{record.signedSha256}</dd></dl>
-      {record.state === "issued" && <>
-        <label for="credential-share" class="text-sm font-medium">Datos para compartir o añadir a LinkedIn</label>
-        <textarea id="credential-share" readonly rows={5} class="w-full rounded-lg border bg-card p-4 text-sm leading-6 focus-visible:outline-2 focus-visible:outline-ring">{`${record.data.courseName}\n${record.data.organization}\nTitular: ${record.data.recipientName}\nID: ${record.publicCredentialId}\nURL: ${record.data.verificationUrl}`}</textarea>
-      </>}
-    </section>}
-    {!instructorRoute && record.state === "issued" && <section aria-label="Gestión de vigencia" class="border-t pt-6"><RevokeCertificate client:load {path} requestKey={crypto.randomUUID()} revision={record.revision} initialReason={feedback.values.reason} initialError={feedback.success ? "" : feedback.message} /></section>}
-  </article> : <RegistrationPageError message={!load.available ? load.unavailableReason : "Certificado no disponible."} retryHref={path} />}
+  <CourseBreadcrumbs
+    current="Certificado"
+    parents={[
+      { label: "Resumen", href: "/app" },
+      { label: "Certificados", href: groupPath },
+    ]}
+  />
+  {record ? (
+    <article class="mt-5 flex min-w-0 flex-col gap-7">
+      <header class="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+        <h1 class="text-3xl font-semibold tracking-tight">{title}</h1>
+        <p class="min-w-0 break-words text-lg text-muted-foreground">
+          {record.data.recipientName}
+        </p>
+        <span class="text-sm font-medium">
+          {certificateStateLabel[record.state]}
+        </span>
+      </header>
+      <dl class="grid gap-x-8 gap-y-5 border-b pb-6 sm:grid-cols-2 xl:grid-cols-4">
+        <div>
+          <dt class="text-sm text-muted-foreground">Fechas nominales</dt>
+          <dd class="mt-1 text-sm">
+            {civilDateLabel(record.data.startsOn)} al{" "}
+            {civilDateLabel(record.data.endsOn)}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm text-muted-foreground">Duración</dt>
+          <dd class="mt-1 font-medium">
+            {record.data.academicHours} horas académicas
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm text-muted-foreground">Grupo</dt>
+          <dd class="mt-1 font-medium">{record.data.groupNumber}</dd>
+        </div>
+        <div>
+          <dt class="text-sm text-muted-foreground">Horario nominal</dt>
+          <dd class="mt-1 font-medium">
+            {record.data.groupStartsAt} a {record.data.groupEndsAt}
+          </dd>
+        </div>
+      </dl>
+      {!signed && record.obsolete && (
+        <p role="status" class="text-sm">
+          El cierre cambió. Regenera el PDF desde el cierre oficial vigente
+          antes de firmarlo.
+        </p>
+      )}
+      <section aria-label="Documento" class="flex min-w-0 flex-col gap-5">
+        <div class="flex flex-wrap items-start gap-3">
+          {signed ? (
+            <a
+              data-astro-reload
+              href={`${path}/firmado.pdf`}
+              data-feedback-download
+              class={buttonVariants({ className: "min-h-11" })}
+            >
+              Descargar firmado
+            </a>
+          ) : (
+            record.hasUnsignedPdf && (
+              <a
+                data-astro-reload
+                href={`${path}/generado.pdf`}
+                data-feedback-download
+                class={buttonVariants({ className: "min-h-11" })}
+              >
+                Descargar para firmar
+              </a>
+            )
+          )}
+          {!instructorRoute && !signed && current && settings?.available && (
+            <form
+              method="post"
+              action={`${groupPath}/${record.type.toLowerCase()}/${record.recipientId}`}
+              data-certificate-form
+              data-pending-label="Regenerando PDF…"
+              data-success-label="PDF regenerado."
+              class="flex flex-col gap-3"
+            >
+              <input type="hidden" name="type" value={record.type} />
+              <input
+                type="hidden"
+                name="recipientId"
+                value={record.recipientId}
+              />
+              <input type="hidden" name="versionId" value={current.id} />
+              <input
+                type="hidden"
+                name="closureRevision"
+                value={closure?.available ? closure.data.revision : 0}
+              />
+              <input
+                type="hidden"
+                name="configurationRevision"
+                value={settings.data.revision}
+              />
+              <input
+                type="hidden"
+                name="requestKey"
+                value={crypto.randomUUID()}
+              />
+              <input type="hidden" name="regenerate" value="true" />
+              <input
+                type="hidden"
+                name="certificateRevision"
+                value={record.revision}
+              />
+              <button
+                type="submit"
+                class={buttonVariants({
+                  variant: "outline",
+                  className: "min-h-11",
+                })}
+              >
+                Regenerar PDF
+              </button>
+              <FormFeedback {feedback} />
+            </form>
+          )}
+        </div>
+        {!instructorRoute && editable && (signed || record.hasUnsignedPdf) && (
+          <form
+            method="post"
+            action={`${path}/cargar`}
+            enctype="multipart/form-data"
+            data-certificate-form
+            data-pending-label="Guardando firmado…"
+            data-success-label="Certificado firmado guardado."
+            class="flex w-full min-w-0 flex-col gap-4"
+          >
+            <input type="hidden" name="revision" value={record.revision} />
+            <input type="hidden" name="requestKey" value={requestKey} />
+            <input type="hidden" name="purpose" value="SIGNED" />
+            <CertificateFilePicker
+              id="signed-pdf"
+              name="file"
+              required
+              title={signed ? "Sustituir firmado" : "PDF firmado"}
+              description="Un archivo PDF, hasta 10 MB."
+              describedby="signed-file-error"
+            />
+            <p
+              id="signed-file-error"
+              data-field-error="file"
+              class="text-sm text-destructive empty:hidden"
+            ></p>
+            <label class="flex min-h-11 items-center gap-3">
+              <input
+                type="checkbox"
+                name="attestation"
+                value="true"
+                required
+                data-review-confirmation
+                aria-describedby="attestation-error"
+                class="size-5 shrink-0 accent-primary"
+              />
+              <span class="text-sm">
+                Confirmo que es el certificado firmado.
+              </span>
+            </label>
+            <p
+              id="attestation-error"
+              data-field-error="attestation"
+              class="text-sm text-destructive empty:hidden"
+            ></p>
+            <FormFeedback />
+            <button
+              type="submit"
+              class={buttonVariants({ className: "min-h-11 self-start" })}
+            >
+              {signed ? "Sustituir firmado" : "Guardar firmado"}
+            </button>
+          </form>
+        )}
+      </section>
+      {signed && (
+        <section
+          aria-label="Credencial pública"
+          class="flex min-w-0 flex-col gap-3 border-t pt-6"
+        >
+          <a
+            href={`/certificados/${record.publicCredentialId}`}
+            class="inline-flex min-h-11 items-center self-start text-sm underline underline-offset-4"
+          >
+            Consultar estado público
+          </a>
+          <dl class="min-w-0">
+            <dt class="text-sm text-muted-foreground">
+              SHA-256 del PDF firmado
+            </dt>
+            <dd class="mt-2 break-all font-mono text-xs leading-6">
+              {record.signedSha256}
+            </dd>
+          </dl>
+          {record.state === "issued" && (
+            <>
+              <label for="credential-share" class="text-sm font-medium">
+                Datos para compartir o añadir a LinkedIn
+              </label>
+              <textarea
+                id="credential-share"
+                readonly
+                rows={5}
+                class="w-full rounded-lg border bg-card p-4 text-sm leading-6 focus-visible:outline-2 focus-visible:outline-ring"
+              >{`${record.data.courseName}\n${record.data.organization}\nTitular: ${record.data.recipientName}\nID: ${record.publicCredentialId}\nURL: ${record.data.verificationUrl}`}</textarea>
+            </>
+          )}
+        </section>
+      )}
+      {!instructorRoute && record.state === "issued" && (
+        <section aria-label="Gestión de vigencia" class="border-t pt-6">
+          <RevokeCertificate
+            client:load
+            {path}
+            requestKey={crypto.randomUUID()}
+            revision={record.revision}
+            initialReason={feedback.values.reason}
+            initialError={feedback.success ? "" : feedback.message}
+          />
+        </section>
+      )}
+    </article>
+  ) : (
+    <RegistrationPageError
+      message={
+        !load.available ? load.unavailableReason : "Certificado no disponible."
+      }
+      retryHref={path}
+    />
+  )}
 </PrivateLayout>

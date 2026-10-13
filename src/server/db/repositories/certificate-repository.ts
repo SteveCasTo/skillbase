@@ -272,8 +272,15 @@ export class DrizzleCertificateRepository implements CertificateRepository {
     verificationOrigin: string,
   ) {
     certificateId(input.versionId);
-    if (!input.recipientId || input.groupNumber !== undefined || input.replacementForId)
-      throw new CertificateError("VALIDATION_FAILED", "Selecciona un destinatario individual; el ordinal se determina en servidor.");
+    if (
+      !input.recipientId ||
+      input.groupNumber !== undefined ||
+      input.replacementForId
+    )
+      throw new CertificateError(
+        "VALIDATION_FAILED",
+        "Selecciona un destinatario individual; el ordinal se determina en servidor.",
+      );
     certificateId(input.recipientId);
     return this.db.transaction(async (tx) => {
       const { actor } = await certificateActor(tx, actorId);
@@ -349,7 +356,8 @@ export class DrizzleCertificateRepository implements CertificateRepository {
         .where(eq(s.groups.courseId, input.courseId))
         .orderBy(asc(s.groups.createdAt), asc(s.groups.id));
       const groupNumber = groups.findIndex((g) => g.id === input.groupId) + 1;
-      if (groupNumber < 1) throw new CertificateError("NOT_FOUND", "Grupo no disponible.");
+      if (groupNumber < 1)
+        throw new CertificateError("NOT_FOUND", "Grupo no disponible.");
       const result: Row[] = [];
       for (const recipient of recipients) {
         const active = await tx
@@ -360,7 +368,7 @@ export class DrizzleCertificateRepository implements CertificateRepository {
               eq(s.certificates.courseId, input.courseId),
               eq(s.certificates.type, input.type),
               eq(s.certificates.recipientId, recipient.id),
-               eq(s.certificates.groupId, input.groupId),
+              eq(s.certificates.groupId, input.groupId),
             ),
           )
           .for("update");
@@ -369,9 +377,16 @@ export class DrizzleCertificateRepository implements CertificateRepository {
           result.push(existing);
           continue;
         }
-        if (input.regenerate && (!existing || !["pending", "generated"].includes(existing.state)))
-          throw new CertificateError("INVALID_STATE", "Solo se regenera un PDF antes de guardar el firmado.");
-        if (existing) revision(existing.revision, input.certificateRevision ?? -1);
+        if (
+          input.regenerate &&
+          (!existing || !["pending", "generated"].includes(existing.state))
+        )
+          throw new CertificateError(
+            "INVALID_STATE",
+            "Solo se regenera un PDF antes de guardar el firmado.",
+          );
+        if (existing)
+          revision(existing.revision, input.certificateRevision ?? -1);
         const publicCredentialId = randomBytes(24).toString("base64url");
         const data = freezeCertificateData({
           type: input.type,
@@ -390,39 +405,66 @@ export class DrizzleCertificateRepository implements CertificateRepository {
           generatedAt: this.clock(),
         });
         const values = {
-            courseId: input.courseId,
-            groupId: input.groupId,
+          courseId: input.courseId,
+          groupId: input.groupId,
+          versionId: v.id,
+          version: v.version,
+          type: input.type,
+          recipientId: recipient.id,
+          instructorId: v.report.instructorId!,
+          data,
+          publicCredentialId,
+          createdBy: actorId,
+          provenance: {
+            configurationRevision: input.configurationRevision,
+            courseRevision: ctx.course.updatedAt.toISOString(),
+            groupRevision: ctx.group.updatedAt.toISOString(),
+            courseTypeRevisionId: format.id,
             versionId: v.id,
-            version: v.version,
-            type: input.type,
-            recipientId: recipient.id,
             instructorId: v.report.instructorId!,
-            data,
-            publicCredentialId,
-            createdBy: actorId,
-            provenance: {
-              configurationRevision: input.configurationRevision,
-              courseRevision: ctx.course.updatedAt.toISOString(),
-              groupRevision: ctx.group.updatedAt.toISOString(),
-              courseTypeRevisionId: format.id,
-              versionId: v.id,
-              instructorId: v.report.instructorId!,
-              courseStartsAt: ctx.course.startsAt.toISOString(),
-              courseEndsAt: ctx.course.endsAt.toISOString(),
-              groupStartsAt: ctx.group.startsAt.toISOString(),
-              groupEndsAt: ctx.group.endsAt.toISOString(),
-              academicHours: format.totalHours,
-              groupNumber,
-            },
-          };
+            courseStartsAt: ctx.course.startsAt.toISOString(),
+            courseEndsAt: ctx.course.endsAt.toISOString(),
+            groupStartsAt: ctx.group.startsAt.toISOString(),
+            groupEndsAt: ctx.group.endsAt.toISOString(),
+            academicHours: format.totalHours,
+            groupNumber,
+          },
+        };
         const [row] = existing
-          ? await tx.update(s.certificates).set({...values, createdBy: existing.createdBy, state: "pending", unsignedPath: null, generatedAt: null, revision: existing.revision + 1}).where(eq(s.certificates.id, existing.id)).returning()
+          ? await tx
+              .update(s.certificates)
+              .set({
+                ...values,
+                createdBy: existing.createdBy,
+                state: "pending",
+                unsignedPath: null,
+                generatedAt: null,
+                revision: existing.revision + 1,
+              })
+              .where(eq(s.certificates.id, existing.id))
+              .returning()
           : await tx.insert(s.certificates).values(values).returning();
         if (existing) {
-          await tx.update(s.certificateArtifacts).set({status: "cleanup_pending"}).where(and(eq(s.certificateArtifacts.certificateId, existing.id), eq(s.certificateArtifacts.status, "attached")));
+          await tx
+            .update(s.certificateArtifacts)
+            .set({ status: "cleanup_pending" })
+            .where(
+              and(
+                eq(s.certificateArtifacts.certificateId, existing.id),
+                eq(s.certificateArtifacts.status, "attached"),
+              ),
+            );
         }
         if (!row) throw new Error("Certificate insertion failed");
-        await event(tx, actor, row, existing ? "REGENERATED" : "PREPARED", existing ? `Invalidated credential ${existing.publicCredentialId}` : undefined);
+        await event(
+          tx,
+          actor,
+          row,
+          existing ? "REGENERATED" : "PREPARED",
+          existing
+            ? `Invalidated credential ${existing.publicCredentialId}`
+            : undefined,
+        );
         result.push(row);
       }
       await tx.insert(s.certificateReceipts).values({
@@ -540,7 +582,10 @@ export class DrizzleCertificateRepository implements CertificateRepository {
         throw new CertificateError("INVALID_STATE", "Carga descartada.");
       await currentCertificate(tx, row);
       revision(row.revision, artifact.certificateRevision);
-       if (!["pending", "generated", "issued"].includes(row.state) || (artifact.purpose === "UNSIGNED" && row.state === "issued"))
+      if (
+        !["pending", "generated", "issued"].includes(row.state) ||
+        (artifact.purpose === "UNSIGNED" && row.state === "issued")
+      )
         throw new CertificateError("INVALID_STATE", "Documento inmutable.");
       const unsigned = artifact.purpose === "UNSIGNED";
       const [updated] = await tx
@@ -556,16 +601,26 @@ export class DrizzleCertificateRepository implements CertificateRepository {
             : {
                 signedPath: artifact.path,
                 signedSha256: artifact.sha256,
-                 reviewed: true,
-                 issuedAt: row.issuedAt ?? this.clock(),
-                 state: "issued",
+                reviewed: true,
+                issuedAt: row.issuedAt ?? this.clock(),
+                state: "issued",
                 revision: row.revision + 1,
               },
         )
         .where(eq(s.certificates.id, row.id))
         .returning();
       // Retire the previous artifact only after the current path changes atomically.
-      if (!unsigned && row.signedPath) await tx.update(s.certificateArtifacts).set({ status: "cleanup_pending" }).where(and(eq(s.certificateArtifacts.certificateId, row.id), eq(s.certificateArtifacts.path, row.signedPath), eq(s.certificateArtifacts.status, "attached")));
+      if (!unsigned && row.signedPath)
+        await tx
+          .update(s.certificateArtifacts)
+          .set({ status: "cleanup_pending" })
+          .where(
+            and(
+              eq(s.certificateArtifacts.certificateId, row.id),
+              eq(s.certificateArtifacts.path, row.signedPath),
+              eq(s.certificateArtifacts.status, "attached"),
+            ),
+          );
       await tx
         .update(s.certificateArtifacts)
         .set({ status: "attached" })
@@ -574,7 +629,11 @@ export class DrizzleCertificateRepository implements CertificateRepository {
         tx,
         actor,
         row,
-         unsigned ? "GENERATED" : row.signedPath ? "SIGNED_PDF_SUBSTITUTED" : "SIGNED_PDF_SAVED",
+        unsigned
+          ? "GENERATED"
+          : row.signedPath
+            ? "SIGNED_PDF_SUBSTITUTED"
+            : "SIGNED_PDF_SAVED",
       );
       return dto(tx, updated!);
     });
@@ -613,14 +672,19 @@ export class DrizzleCertificateRepository implements CertificateRepository {
         .where(
           and(
             eq(s.certificateArtifacts.status, "reserved"),
-             lt(s.certificateArtifacts.createdAt, before),
-             ...(id ? [eq(s.certificateArtifacts.certificateId, id)] : []),
+            lt(s.certificateArtifacts.createdAt, before),
+            ...(id ? [eq(s.certificateArtifacts.certificateId, id)] : []),
           ),
         );
       return tx
         .select()
         .from(s.certificateArtifacts)
-        .where(and(eq(s.certificateArtifacts.status, "cleanup_pending"), ...(id ? [eq(s.certificateArtifacts.certificateId, id)] : [])));
+        .where(
+          and(
+            eq(s.certificateArtifacts.status, "cleanup_pending"),
+            ...(id ? [eq(s.certificateArtifacts.certificateId, id)] : []),
+          ),
+        );
     });
   }
   private mutate(
@@ -640,9 +704,21 @@ export class DrizzleCertificateRepository implements CertificateRepository {
       const row = await rowById(tx, command.certificateId);
       revision(row.revision, command.revision);
       if (operation !== "REVOKE") await currentCertificate(tx, row);
-      if (operation !== "REVOKE") throw new CertificateError("INVALID_STATE", "Guardar el PDF firmado confirma el certificado en una sola operación.");
-      if (row.state !== "issued") throw new CertificateError("INVALID_STATE", "Solo se revoca una credencial vigente.");
-      const changes = { state: "revoked" as const, revokedAt: this.clock(), reason };
+      if (operation !== "REVOKE")
+        throw new CertificateError(
+          "INVALID_STATE",
+          "Guardar el PDF firmado confirma el certificado en una sola operación.",
+        );
+      if (row.state !== "issued")
+        throw new CertificateError(
+          "INVALID_STATE",
+          "Solo se revoca una credencial vigente.",
+        );
+      const changes = {
+        state: "revoked" as const,
+        revokedAt: this.clock(),
+        reason,
+      };
       const [updated] = await tx
         .update(s.certificates)
         .set({ ...changes, revision: row.revision + 1 })

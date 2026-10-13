@@ -199,10 +199,24 @@ export async function handleCertificatePost(input: {
         "certificateRevision",
       ]);
       const type = text(raw.type);
-      if ((raw.regenerate !== undefined && raw.regenerate !== true && raw.regenerate !== "true") || (raw.certificateRevision !== undefined && raw.regenerate === undefined))
-        throw new CertificateError("VALIDATION_FAILED", "Regeneración no válida.");
-      if ((input.recipientId && raw.recipientId !== input.recipientId) || (input.type && type.toLowerCase() !== input.type))
-        throw new CertificateError("VALIDATION_FAILED", "Destinatario o tipo fuera de la ruta.");
+      if (
+        (raw.regenerate !== undefined &&
+          raw.regenerate !== true &&
+          raw.regenerate !== "true") ||
+        (raw.certificateRevision !== undefined && raw.regenerate === undefined)
+      )
+        throw new CertificateError(
+          "VALIDATION_FAILED",
+          "Regeneración no válida.",
+        );
+      if (
+        (input.recipientId && raw.recipientId !== input.recipientId) ||
+        (input.type && type.toLowerCase() !== input.type)
+      )
+        throw new CertificateError(
+          "VALIDATION_FAILED",
+          "Destinatario o tipo fuera de la ruta.",
+        );
       if (type !== "APPROVAL" && type !== "INSTRUCTOR")
         throw new CertificateError("VALIDATION_FAILED", "Tipo no válido.");
       if (!input.service || !input.courseId || !input.groupId)
@@ -216,7 +230,12 @@ export async function handleCertificatePost(input: {
         configurationRevision: number(raw.configurationRevision),
         type,
         recipientId: text(raw.recipientId),
-        ...(raw.regenerate === "true" || raw.regenerate === true ? { regenerate: true, certificateRevision: number(raw.certificateRevision) } : {}),
+        ...(raw.regenerate === "true" || raw.regenerate === true
+          ? {
+              regenerate: true,
+              certificateRevision: number(raw.certificateRevision),
+            }
+          : {}),
       });
     } else {
       allow(raw, [
@@ -311,7 +330,14 @@ export async function handleCertificateUpload(input: {
     const form = await boundedMultipart(input.request);
     if (
       [...form.keys()].some(
-        (k) => !["file", "revision", "requestKey", "purpose", "attestation"].includes(k),
+        (k) =>
+          ![
+            "file",
+            "revision",
+            "requestKey",
+            "purpose",
+            "attestation",
+          ].includes(k),
       ) ||
       [...new Set(form.keys())].some((k) => form.getAll(k).length !== 1)
     )
@@ -321,7 +347,11 @@ export async function handleCertificateUpload(input: {
       );
     const file = form.get("file");
     if (form.get("attestation") !== "true")
-      throw new CertificateError("VALIDATION_FAILED", "Confirma que es el certificado firmado.", { attestation: "Confirma que es el certificado firmado." });
+      throw new CertificateError(
+        "VALIDATION_FAILED",
+        "Confirma que es el certificado firmado.",
+        { attestation: "Confirma que es el certificado firmado." },
+      );
     if (!(file instanceof File) || form.get("purpose") !== "SIGNED")
       throw new CertificateError(
         "VALIDATION_FAILED",

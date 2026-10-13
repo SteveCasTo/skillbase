@@ -208,7 +208,14 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
           ).ok,
         ).toBe(false);
       }
-      expect(certificates.filter(r => r.groupId === row.groupId && r.type === row.type && r.recipientId === row.recipientId)).toHaveLength(1);
+      expect(
+        certificates.filter(
+          (r) =>
+            r.groupId === row.groupId &&
+            r.type === row.type &&
+            r.recipientId === row.recipientId,
+        ),
+      ).toHaveLength(1);
     }
     await runComprehensiveCertificates(db, { ...options, apply: true });
     const repeat = await captureDemoSnapshot(db);
