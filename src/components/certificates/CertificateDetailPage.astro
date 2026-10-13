@@ -237,7 +237,22 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
                 readonly
                 rows={5}
                 class="w-full rounded-lg border bg-card p-4 text-sm leading-6 focus-visible:outline-2 focus-visible:outline-ring"
-              >{`${record.data.courseName}\n${record.data.organization}\nTitular: ${record.data.recipientName}\nID: ${record.publicCredentialId}\nURL: ${record.data.verificationUrl}`}</textarea>
+              >{`${record.data.courseName}\n${record.data.organization}\nTitular: ${record.data.recipientName}\nFinalización: ${civilDateLabel(record.data.endsOn)}\nID: ${record.publicCredentialId}\nURL: ${record.data.verificationUrl}`}</textarea>
+              <button
+                type="button"
+                data-copy-credential
+                class={buttonVariants({
+                  variant: "outline",
+                  className: "min-h-11 self-start",
+                })}
+              >
+                Copiar datos de credencial
+              </button>
+              <p
+                data-copy-status
+                role="status"
+                class="text-sm empty:hidden"
+              ></p>
             </>
           )}
         </section>
@@ -264,3 +279,26 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
     />
   )}
 </PrivateLayout>
+<script>
+  function enableCredentialCopy() {
+    const button = document.querySelector<HTMLButtonElement>(
+      "[data-copy-credential]",
+    );
+    const text =
+      document.querySelector<HTMLTextAreaElement>("#credential-share");
+    const status = document.querySelector<HTMLElement>("[data-copy-status]");
+    if (!button || !text || !status) return;
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(text.value);
+        status.textContent = "Datos copiados.";
+      } catch {
+        text.focus();
+        text.select();
+        status.textContent =
+          "Seleccionamos los datos. Cópialos con el teclado.";
+      }
+    });
+  }
+  document.addEventListener("astro:page-load", enableCredentialCopy);
+</script>
