@@ -311,7 +311,10 @@ un registro por grupo/tipo/destinatario, protegido por índice único para todos
 los estados. No conservar entidades completas antiguas ni cadenas de reemplazo.
 
 La migración forward `0025_certificate_current_flow.sql` no modifica 0023 ni
-convierte credenciales históricas. Falla cerrada si hay certificados: requiere
+convierte credenciales históricas. Bloquea `certificates` en modo
+`ACCESS EXCLUSIVE` antes de comprobar vacío y mantiene el bloqueo en la
+transacción de migración, evitando generaciones concurrentes entre guard y DDL.
+Falla cerrada si hay certificados: requiere
 el reset operativo de datos sintéticos aprobado y revisado por el responsable
 del release. El código fuente no ejecuta ese reset ni escribe en cloud/canónico.
 

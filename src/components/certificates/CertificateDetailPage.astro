@@ -34,7 +34,7 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
   <CourseBreadcrumbs
     current="Certificado"
     parents={[
-      { label: "Resumen", href: "/app" },
+      { label: "Inicio", href: "/app" },
       { label: "Certificados", href: groupPath },
     ]}
   />
@@ -103,55 +103,59 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
               </a>
             )
           )}
-          {!instructorRoute && !signed && current && settings?.available && (
-            <form
-              method="post"
-              action={`${groupPath}/${record.type.toLowerCase()}/${record.recipientId}`}
-              data-certificate-form
-              data-pending-label="Regenerando PDF…"
-              data-success-label="PDF regenerado."
-              class="flex flex-col gap-3"
-            >
-              <input type="hidden" name="type" value={record.type} />
-              <input
-                type="hidden"
-                name="recipientId"
-                value={record.recipientId}
-              />
-              <input type="hidden" name="versionId" value={current.id} />
-              <input
-                type="hidden"
-                name="closureRevision"
-                value={closure?.available ? closure.data.revision : 0}
-              />
-              <input
-                type="hidden"
-                name="configurationRevision"
-                value={settings.data.revision}
-              />
-              <input
-                type="hidden"
-                name="requestKey"
-                value={crypto.randomUUID()}
-              />
-              <input type="hidden" name="regenerate" value="true" />
-              <input
-                type="hidden"
-                name="certificateRevision"
-                value={record.revision}
-              />
-              <button
-                type="submit"
-                class={buttonVariants({
-                  variant: "outline",
-                  className: "min-h-11",
-                })}
+          {!instructorRoute &&
+            !signed &&
+            record.state !== "revoked" &&
+            current &&
+            settings?.available && (
+              <form
+                method="post"
+                action={`${groupPath}/${record.type.toLowerCase()}/${record.recipientId}`}
+                data-certificate-form
+                data-pending-label="Regenerando PDF…"
+                data-success-label="PDF regenerado."
+                class="flex flex-col gap-3"
               >
-                Regenerar PDF
-              </button>
-              <FormFeedback {feedback} />
-            </form>
-          )}
+                <input type="hidden" name="type" value={record.type} />
+                <input
+                  type="hidden"
+                  name="recipientId"
+                  value={record.recipientId}
+                />
+                <input type="hidden" name="versionId" value={current.id} />
+                <input
+                  type="hidden"
+                  name="closureRevision"
+                  value={closure?.available ? closure.data.revision : 0}
+                />
+                <input
+                  type="hidden"
+                  name="configurationRevision"
+                  value={settings.data.revision}
+                />
+                <input
+                  type="hidden"
+                  name="requestKey"
+                  value={crypto.randomUUID()}
+                />
+                <input type="hidden" name="regenerate" value="true" />
+                <input
+                  type="hidden"
+                  name="certificateRevision"
+                  value={record.revision}
+                />
+                <button
+                  type="submit"
+                  class={buttonVariants({
+                    variant: "outline",
+                    className: "min-h-11",
+                  })}
+                >
+                  Regenerar PDF
+                </button>
+                <FormFeedback {feedback} />
+              </form>
+            )}
         </div>
         {!instructorRoute && editable && (signed || record.hasUnsignedPdf) && (
           <form

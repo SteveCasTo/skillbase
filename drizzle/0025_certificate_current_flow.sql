@@ -1,6 +1,7 @@
 -- Requires an explicitly reviewed operational reset of synthetic certificates.
 -- Never converts or overwrites previously issued production credentials.
 DO $$ BEGIN
+  LOCK TABLE public.certificates IN ACCESS EXCLUSIVE MODE;
   IF EXISTS (SELECT 1 FROM public.certificates) THEN
     RAISE EXCEPTION 'Current certificate flow requires reviewed empty certificate dataset';
   END IF;
