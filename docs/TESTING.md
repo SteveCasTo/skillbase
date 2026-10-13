@@ -47,6 +47,13 @@ a producción ni firma institucional.
   La confirmación visual final del caso ADMIN pasó también con badges de alto
   contraste basadas en tokens (`primary`/`destructive` translúcidos y texto
   `foreground`).
+- Tras PR351, se preservó `participantFullName` en tarjetas, disparadores y
+  encabezados; la reapertura usa el Input compartido sin explicación/ayuda
+  visibles redundantes. La validación local pasó de nuevo: 20 unit, 5 integración
+  y los mismos 3 E2E sin retries, además de typecheck/lint/format/build. Las
+  capturas proceden de `skillbase_test_7bc649f03b43655e` (API 57596, DB 57597,
+  servidor 44897); para no capturar transiciones de color a medio cambio de tema,
+  los screenshots deshabilitan animaciones únicamente durante la captura.
 
 Mantener un entorno de pruebas reproducible, aislado y cercano a producción.
 

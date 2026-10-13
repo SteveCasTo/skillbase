@@ -316,6 +316,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
         if (process.env.E2E_EVIDENCE_DIR)
           await page.screenshot({
             path: testInfo.outputPath(`academic-results-${theme}-${width}.png`),
+            animations: "disabled",
           });
       }
     }
@@ -391,6 +392,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     if (process.env.E2E_EVIDENCE_DIR)
       await page.screenshot({
         path: testInfo.outputPath("academic-reopen-dialog.png"),
+        animations: "disabled",
       });
     await page.keyboard.press("Escape");
     await expect(
