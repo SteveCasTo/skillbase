@@ -360,6 +360,23 @@ test("reopening retains issued validity but obsoletes drafts; new closure cannot
   await expect(
     repository.issue(f.admin.id, command(draft!)),
   ).rejects.toMatchObject({ code: "STALE_CLOSURE" });
+  const [recovered] = await f.service.generate(f.admin.id, {
+    ...f.input,
+    type: "INSTRUCTOR",
+    recipientId: f.instructor.id,
+    versionId: next.versionId,
+    closureRevision: next.revision,
+    requestKey: crypto.randomUUID(),
+    regenerate: true,
+    certificateRevision: draft!.revision,
+  });
+  expect(recovered!.id).toBe(draft!.id);
+  expect(recovered!.version).toBe(2);
+  expect(recovered!.obsolete).toBe(false);
+  expect(await repository.verify(draft!.publicCredentialId)).toEqual({
+    state: "not_found",
+    valid: false,
+  });
 }, 30000);
 test("concurrent generation keeps one current record; draft regeneration invalidates its prior credential and signed substitution keeps its ID", async () => {
   const f = await setup();
@@ -594,6 +611,18 @@ test("F9 tables are server-only with RLS and revoked Data API grants; current-fl
     sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
   );
   expect(ledger[0]!.count).toBe(readApprovedDemoMigrations().length);
+  // Exercise the actual forward guard against populated QA data. Its exclusive
+  // table lock is released by rollback; no DDL or migration ledger is modified.
+  const migration = await Bun.file(
+    "drizzle/0025_certificate_current_flow.sql",
+  ).text();
+  const emptyGuard = migration.split("--> statement-breakpoint")[0]!;
+  const beforeGuard = await db.select().from(s.certificates);
+  expect(beforeGuard.length).toBeGreaterThan(0);
+  await expect(
+    db.transaction((tx) => tx.execute(sql.raw(emptyGuard))),
+  ).rejects.toThrow();
+  expect(await db.select().from(s.certificates)).toEqual(beforeGuard);
 });
 test("failed Storage upload preserves original unsigned file and completes scoped compensation", async () => {
   const f = await setup();

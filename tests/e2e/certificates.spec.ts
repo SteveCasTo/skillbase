@@ -631,6 +631,9 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     await expect(
       page.getByRole("link", { name: "Preparar reemplazo" }),
     ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Regenerar PDF", exact: true }),
+    ).toHaveCount(0);
   } finally {
     try {
       await anonymous?.close();
