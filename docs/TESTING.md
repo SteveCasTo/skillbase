@@ -13,8 +13,13 @@ Antes de integrar la dependencia 351/0024: 464 unit, 15 integración focal de
 certificados, 2 E2E Chromium y el caso único de extensión demo pasaron en stacks
 aislados (ledger 25 temporal). Typecheck, lint, formato y build pasaron. No se
 ejecutó el reset autorizado ni se escribieron datos canónicos/cloud. El gate
-combinado sobre 0024+0025 (ledger 26) y la revisión independiente de MAIN siguen
-pendientes; no atribuir estos resultados a producción ni firma institucional.
+combinado inicial se completó después sobre 0024+0025 (ledger 26): 464 unit,
+el caso de extensión demo con 7 registros actuales/replay sin cambios y los
+2 E2E de certificados pasaron. Los 6 E2E existentes de sidebar también pasaron
+sin modificar ese spec, timeout ni retries. Capturas de grupo y detalle firmado
+mobile/desktop se generan en los mismos casos. La integración global, CI final
+y revisión independiente de MAIN están en curso; no atribuir estos resultados
+a producción ni firma institucional.
 
 ## OBJETIVO
 
