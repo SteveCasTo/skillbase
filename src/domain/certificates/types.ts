@@ -1,11 +1,5 @@
 export type CertificateType = "APPROVAL" | "INSTRUCTOR";
-export type CertificateState =
-  | "pending"
-  | "generated"
-  | "awaiting_signature"
-  | "issued"
-  | "revoked"
-  | "replaced";
+export type CertificateState = "pending" | "generated" | "issued" | "revoked";
 export interface CertificateSignatory {
   readonly name: string;
   readonly role: string;
@@ -104,9 +98,6 @@ export interface GenerateCertificatesInput {
   type: CertificateType;
   /** One official snapshot recipient; null is rejected by the server. */
   recipientId: string | null;
-  groupNumber?: number;
-  replacementForId?: string;
-  reason?: string;
   regenerate?: boolean;
   certificateRevision?: number;
 }

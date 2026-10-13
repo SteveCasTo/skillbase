@@ -85,13 +85,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
     const plan = await runComprehensiveCertificates(db, options);
     expect(plan.configuration.present).toBe(false);
     expect(plan.fixtures.map((f) => f.scenario)).toEqual(
-      expect.arrayContaining([
-        "generated",
-        "awaiting_signature",
-        "issued",
-        "revoked",
-        "replaced",
-      ]),
+      expect.arrayContaining(["generated", "issued", "revoked"]),
     );
     expect(
       plan.fixtures.filter((f) => f.input.type === "INSTRUCTOR"),

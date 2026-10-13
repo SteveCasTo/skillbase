@@ -154,7 +154,7 @@ export function publicCertificate(
   data: CertificateTemplateData,
   signedSha256: string | null,
 ): PublicCertificateDto {
-  if (state !== "issued" && state !== "revoked" && state !== "replaced")
+  if (state !== "issued" && state !== "revoked")
     return { state: "not_issued", valid: false };
   if (!signedSha256) throw new Error("Issued certificate hash unavailable");
   return {

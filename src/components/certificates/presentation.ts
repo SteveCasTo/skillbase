@@ -7,10 +7,8 @@ import type {
 export const certificateStateLabel: Record<CertificateState, string> = {
   pending: "Para firmar",
   generated: "Para firmar",
-  awaiting_signature: "Para firmar",
   issued: "Firmado",
   revoked: "Revocado",
-  replaced: "Reemplazado",
 };
 export const certificateTypeLabel: Record<CertificateType, string> = {
   APPROVAL: "Certificado de aprobación",

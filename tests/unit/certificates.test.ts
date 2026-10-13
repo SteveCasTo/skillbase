@@ -149,12 +149,12 @@ test("public projection is an exact allowlist and draft returns no identity", ()
     storagePath: "secret",
     grades: [100],
   };
-  for (const state of ["pending", "generated", "awaiting_signature"] as const)
+  for (const state of ["pending", "generated"] as const)
     expect(publicCertificate(state, data, null)).toEqual({
       state: "not_issued",
       valid: false,
     });
-  for (const state of ["issued", "revoked", "replaced"] as const) {
+  for (const state of ["issued", "revoked"] as const) {
     const result = publicCertificate(state, data, "f".repeat(64));
     expect(result.valid).toBe(state === "issued");
     expect(Object.keys(result).sort()).toEqual(

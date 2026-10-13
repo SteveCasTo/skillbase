@@ -272,8 +272,8 @@ export class DrizzleCertificateRepository implements CertificateRepository {
     certificateId(input.versionId);
     if (
       !input.recipientId ||
-      input.groupNumber !== undefined ||
-      input.replacementForId
+      "groupNumber" in input ||
+      "replacementForId" in input
     )
       throw new CertificateError(
         "VALIDATION_FAILED",
