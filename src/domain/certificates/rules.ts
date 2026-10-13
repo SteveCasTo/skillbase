@@ -1,4 +1,7 @@
-import type { ClosureReportDto } from "@/domain/academic-closure/types";
+import type {
+  AuthorizedClosureReportDto,
+  ClosureReportDto,
+} from "@/domain/academic-closure/types";
 import { participantFullName } from "@/domain/pre-registrations/participant-name";
 import type {
   CertificateConfiguration,
@@ -112,7 +115,7 @@ export function validateCertificateConfiguration(
   );
 }
 export function certificateRecipients(
-  report: ClosureReportDto,
+  report: ClosureReportDto | AuthorizedClosureReportDto,
   type: CertificateType,
 ) {
   if (!report.instructorId || !report.instructorName?.trim())
@@ -152,7 +155,7 @@ export function publicCertificate(
   data: CertificateTemplateData,
   signedSha256: string | null,
 ): PublicCertificateDto {
-  if (state !== "issued" && state !== "revoked" && state !== "replaced")
+  if (state !== "issued" && state !== "revoked")
     return { state: "not_issued", valid: false };
   if (!signedSha256) throw new Error("Issued certificate hash unavailable");
   return {

@@ -53,6 +53,7 @@ export interface CertificateRepository {
   cleanupCandidates(
     actorId: string,
     before: Date,
+    certificateId?: string,
   ): Promise<ArtifactReservation[]>;
   review(actorId: string, command: CertificateCommand): Promise<CertificateDto>;
   issue(actorId: string, command: CertificateCommand): Promise<CertificateDto>;

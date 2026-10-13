@@ -134,7 +134,7 @@ Ejemplos:
 - ConfigureAssessmentPlan.
 - RecordGrade.
 - CloseGroup.
-- IssueCertificate.
+- SaveSignedCertificate (atestación ADMIN, hash y publicación atómicos).
 - RevokeCertificate.
 
 ### Domain
