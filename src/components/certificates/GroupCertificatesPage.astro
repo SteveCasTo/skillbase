@@ -2,35 +2,29 @@
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
 import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
-import GenerationForm from "./GenerationForm.astro";
-import { certificateStateLabel, certificateTypeLabel } from "./presentation";
-import { buttonVariants } from "@/components/ui/button";
+import { certificateStateLabel } from "./presentation";
 import type { GroupCertificateProps } from "./group-route";
 type Props = GroupCertificateProps;
 const {
   load,
   closure,
-  settings,
   current,
   title,
   groupName,
-  selectedReplacement,
-  generation,
-  feedback,
+  sections,
   courseId,
   groupId,
   instructorRoute,
-  path,
 } = Astro.props;
 const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
-const base = `${prefix}/${courseId}/grupos/${groupId}`;
+const base = `${prefix}/${courseId}/grupos/${groupId}/certificados`;
 ---
 
-<PrivateLayout title="Certificados del grupo">
+<PrivateLayout title="Certificados">
   <CourseBreadcrumbs
     current="Certificados"
     parents={[
-      { label: "Resumen", href: "/app" },
+      { label: "Inicio", href: "/app" },
       { label: instructorRoute ? "Mis cursos" : "Cursos", href: prefix },
       {
         label: title,
@@ -40,23 +34,10 @@ const base = `${prefix}/${courseId}/grupos/${groupId}`;
       },
     ]}
   />
-  <header class="mt-5 flex flex-wrap items-start justify-between gap-4">
-    <div class="min-w-0">
-      <h1 class="text-3xl font-semibold tracking-tight">
-        Certificados del grupo
-      </h1>
-      <p class="mt-2 break-words text-muted-foreground">
-        {title}
-        {groupName ? ` · ${groupName}` : ""}
-      </p>
-    </div>
-    {!instructorRoute && (
-      <a
-        href="/app/configuracion/certificados"
-        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
-      >
-        Configurar firmantes
-      </a>
+  <header class="mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-2">
+    <h1 class="text-3xl font-semibold tracking-tight">Certificados</h1>
+    {groupName && (
+      <p class="text-lg text-muted-foreground">Grupo {groupName}</p>
     )}
   </header>
   {!load.available ? (
@@ -66,116 +47,64 @@ const base = `${prefix}/${courseId}/grupos/${groupId}`;
     />
   ) : (
     <div class="mt-7 flex min-w-0 flex-col gap-8">
-      {!instructorRoute && (
+      {!instructorRoute && closure && !closure.available && (
+        <RegistrationPageError
+          message={closure.unavailableReason}
+          retryHref={Astro.url.pathname}
+        />
+      )}
+      {!current && !instructorRoute && (
+        <p role="status" class="text-sm text-muted-foreground">
+          Los destinatarios estarán disponibles cuando el grupo tenga un cierre
+          oficial vigente.
+        </p>
+      )}
+      {sections.map((section) => (
         <section
-          aria-labelledby="generation-title"
+          aria-labelledby={`recipients-${section.type}`}
           class="flex min-w-0 flex-col gap-4"
         >
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <h2 id="generation-title" class="text-xl font-semibold">
-              {selectedReplacement
-                ? "Preparar reemplazo"
-                : "Preparar certificados"}
-            </h2>
-            <a
-              href={`${base}/cierre`}
-              class="inline-flex min-h-11 items-center text-sm underline underline-offset-4"
-            >
-              Consultar cierre oficial
-            </a>
-          </div>
-          {!current ? (
-            <p class="text-sm leading-6 text-muted-foreground">
-              La generación requiere la última versión oficial de un grupo
-              cerrado. Los certificados emitidos conservan su estado si se
-              reabre el grupo.
+          <h2 id={`recipients-${section.type}`} class="text-xl font-semibold">
+            {section.type === "APPROVAL" ? "Participantes" : "Instructor"}
+          </h2>
+          {!section.recipients.length ? (
+            <p class="text-sm text-muted-foreground">
+              {section.type === "APPROVAL"
+                ? "No hay participantes elegibles en el cierre oficial."
+                : "No hay instructor elegible en el cierre oficial."}
             </p>
-          ) : settings && !settings.available ? (
-            <RegistrationPageError
-              message={settings.unavailableReason}
-              retryHref={Astro.url.pathname}
-            />
           ) : (
-            settings?.available && (
-              <div class="grid min-w-0 gap-5 xl:grid-cols-2">
-                {generation.map((item) => (
-                  <GenerationForm
-                    {...item}
-                    {path}
-                    versionId={current.id}
-                    version={current.version}
-                    closureRevision={
-                      closure?.available ? closure.data.revision : 0
+            <ul class="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {section.recipients.map((recipient) => (
+                <li class="min-w-0">
+                  <a
+                    href={
+                      recipient.record
+                        ? `${instructorRoute ? "/app/mis-certificados" : "/app/certificados"}/${recipient.record.id}`
+                        : `${base}/${section.type.toLowerCase()}/${recipient.id}`
                     }
-                    configurationRevision={settings.data.revision}
-                    {feedback}
-                    replacement={
-                      selectedReplacement
-                        ? {
-                            id: selectedReplacement.id,
-                            recipientName:
-                              selectedReplacement.data.recipientName,
-                          }
-                        : undefined
-                    }
-                  />
-                ))}
-              </div>
-            )
+                    class="flex h-full min-w-0 flex-col gap-3 rounded-xl border bg-card p-5 hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    <h3 class="break-words text-lg font-semibold">
+                      {recipient.name}
+                    </h3>
+                    {recipient.record?.hasUnsignedPdf ||
+                    recipient.record?.hasSignedPdf ? (
+                      <span class="text-sm font-medium">
+                        {certificateStateLabel[recipient.record.state]}
+                      </span>
+                    ) : (
+                      <span class="text-sm text-muted-foreground">
+                        PDF por generar
+                      </span>
+                    )}
+                  </a>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
-      )}
-      <section
-        aria-labelledby="certificate-list-title"
-        class="flex flex-col gap-4"
-      >
-        <h2 id="certificate-list-title" class="text-xl font-semibold">
-          Documentos del grupo
-        </h2>
-        {!load.data.length ? (
-          <p
-            role="status"
-            class="rounded-xl border border-dashed p-6 text-sm text-muted-foreground"
-          >
-            Todavía no hay certificados preparados para este grupo.
-            {instructorRoute
-              ? " Administración gestiona su preparación y emisión."
-              : " Genera los documentos desde el cierre oficial."}
-          </p>
-        ) : (
-          <ul class="grid min-w-0 gap-4 lg:grid-cols-2">
-            {load.data.map((record) => (
-              <li class="min-w-0">
-                <a
-                  href={`${instructorRoute ? "/app/mis-certificados" : "/app/certificados"}/${record.id}`}
-                  class="flex h-full min-w-0 flex-col gap-3 rounded-xl border bg-card p-5 hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
-                >
-                  <div class="flex flex-wrap items-start justify-between gap-2">
-                    <h3 class="min-w-0 break-words text-lg font-semibold">
-                      {record.data.recipientName}
-                    </h3>
-                    <span class="text-sm font-medium">
-                      {certificateStateLabel[record.state]}
-                    </span>
-                  </div>
-                  <p class="text-sm text-muted-foreground">
-                    {certificateTypeLabel[record.type]} · Versión{" "}
-                    {record.version}
-                  </p>
-                  {record.obsolete &&
-                    ["pending", "generated", "awaiting_signature"].includes(
-                      record.state,
-                    ) && (
-                      <p class="text-sm text-muted-foreground">
-                        Borrador obsoleto · Regenera desde el cierre vigente.
-                      </p>
-                    )}
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      ))}
     </div>
   )}
 </PrivateLayout>

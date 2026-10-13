@@ -9,6 +9,8 @@ import {
 import {
   isPublicCertificateDto,
   validCredentialCode,
+  civilDateLabel,
+  certificateStateLabel,
 } from "@/components/certificates/presentation";
 import { getPrivateRoutePolicy } from "@/server/auth/route-policy";
 import { navigationSkeletonVariant } from "@/components/private-nav/navigation-skeleton";
@@ -97,14 +99,19 @@ describe("certificate public verification", () => {
 describe("certificate route policy", () => {
   const id = "11111111-1111-4111-8111-111111111111";
   test("ADMIN routes and signed/unsigned delivery are explicit", () => {
+    expect(civilDateLabel("2026-08-01")).toBe("01/08/2026");
+    expect(certificateStateLabel.generated).toBe("Para firmar");
+    expect(certificateStateLabel.issued).toBe("Firmado");
     for (const path of [
       "/app/certificados",
       "/app/configuracion/certificados",
+      "/app/configuracion/certificados/vista-previa.pdf",
       `/app/certificados/${id}`,
       `/app/certificados/${id}/generado.pdf`,
       `/app/certificados/${id}/firmado.pdf`,
       `/app/certificados/${id}/cargar`,
       `/app/cursos/${id}/grupos/${id}/certificados`,
+      `/app/cursos/${id}/grupos/${id}/certificados/approval/${id}`,
     ])
       expect(getPrivateRoutePolicy(path)).toEqual({
         access: "ROLES",
@@ -117,6 +124,7 @@ describe("certificate route policy", () => {
       `/app/mis-certificados/${id}/generado.pdf`,
       `/app/mis-certificados/${id}/firmado.pdf`,
       `/app/mis-cursos/${id}/grupos/${id}/certificados`,
+      `/app/mis-cursos/${id}/grupos/${id}/certificados/instructor/${id}`,
     ])
       expect(getPrivateRoutePolicy(path)).toEqual({
         access: "ROLES",
@@ -129,6 +137,10 @@ describe("certificate route policy", () => {
       `/app/cursos/${id}/grupos/not-a-uuid/certificados`,
       `/app/certificados/${id}/firmado.pdf/extra`,
       "/app/mis-certificados",
+      "/app/configuracion/certificados/vista-previa.pdf/extra",
+      "/app/configuracion/certificados/preview.pdf",
+      `/app/cursos/${id}/grupos/${id}/certificados/approval/not-a-uuid`,
+      `/app/cursos/${id}/grupos/${id}/certificados/unknown/${id}`,
     ])
       expect(getPrivateRoutePolicy(path)).toBeNull();
   });

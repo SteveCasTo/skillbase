@@ -10,6 +10,7 @@ import ThemeToggle from "@/components/ThemeToggle.astro";
 import { hasRole } from "@/domain/auth/policies";
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import { requireInternalUser } from "@/server/auth/context";
+import { privateEntryPath } from "@/server/auth/private-entry";
 import OAuthLoginNotice from "@/components/auth/OAuthLoginNotice.astro";
 import { consumeOAuthLoginNotice } from "@/server/auth/login-notice";
 
@@ -22,6 +23,7 @@ const user = requireInternalUser(Astro.locals);
 const isAdmin = hasRole(user, "ADMIN");
 const isInstructor = hasRole(user, "INSTRUCTOR");
 const currentPath = Astro.url.pathname;
+const entryPath = privateEntryPath(user) ?? "/app";
 const oauthLoginNotice = consumeOAuthLoginNotice(
   Astro.cookies,
   Astro.url,
@@ -36,8 +38,8 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
       <div class="private-sidebar-panel">
         <a
           class="private-brand"
-          href="/app"
-          aria-label="SkillBase, ir al resumen"
+          href={entryPath}
+          aria-label="SkillBase, ir al inicio"
         >
           <span class="private-brand-mark" aria-hidden="true">
             S
@@ -108,7 +110,7 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
         >
           <Menu size={21} aria-hidden="true" />
         </button>
-        <a class="font-semibold" href="/app">
+        <a class="font-semibold" href={entryPath}>
           SkillBase
         </a>
       </header>
@@ -363,7 +365,7 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
             drawer.querySelectorAll<HTMLElement>(
               "a, button:not([disabled]), summary",
             ),
-          );
+          ).filter((element) => element.getClientRects().length > 0);
           const first = focusable[0];
           const last = focusable.at(-1);
           if (event.shiftKey && document.activeElement === first) {

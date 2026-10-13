@@ -30,7 +30,7 @@ test("email login, keyboard password toggle, own profile and secure password cha
   await page
     .getByRole("button", { name: "Iniciar sesión", exact: true })
     .click();
-  await expect(page).toHaveURL("/app");
+  await expect(page).toHaveURL("/app/cursos");
   await page
     .getByRole("link", { name: "Mi perfil", exact: true })
     .first()
@@ -94,7 +94,7 @@ test("email login, keyboard password toggle, own profile and secure password cha
   await page
     .getByRole("button", { name: "Iniciar sesión", exact: true })
     .click();
-  await expect(page).toHaveURL("/app");
+  await expect(page).toHaveURL("/app/cursos");
 });
 
 test("login and profile work without JavaScript and do not overflow on mobile", async ({
@@ -116,7 +116,7 @@ test("login and profile work without JavaScript and do not overflow on mobile", 
   await page
     .getByRole("button", { name: "Iniciar sesión", exact: true })
     .click();
-  await expect(page).toHaveURL("/app");
+  await expect(page).toHaveURL("/app/mis-cursos");
   await page.goto("/app/perfil");
   await expect(page.getByRole("heading", { name: "Mi perfil" })).toBeVisible();
   await page

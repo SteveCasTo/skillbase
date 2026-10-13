@@ -52,6 +52,8 @@ type EditorialChange = {
     | "name"
     | "first_name"
     | "last_name"
+    | "paternal_surname"
+    | "maternal_surname"
     | "description"
     | "conditions"
     | "content_markdown";
@@ -329,17 +331,28 @@ async function planRefresh(
             (edit) =>
               edit.table === "participants" && edit.id === participant.id,
           )
-        )
+        ) {
           await change(
             "participants",
             participant.id,
-            "last_name",
+            "paternal_surname",
             "Demo",
             modern.samples
               .find((row) => row.key === sample.key)!
               .registrations.find((row) => row.key === registration.key)!
-              .participant.lastName,
+              .participant.paternalSurname,
           );
+          await change(
+            "participants",
+            participant.id,
+            "maternal_surname",
+            registration.participant.maternalSurname,
+            modern.samples
+              .find((row) => row.key === sample.key)!
+              .registrations.find((row) => row.key === registration.key)!
+              .participant.maternalSurname,
+          );
+        }
       }
     }
     for (const format of old.formats) {
@@ -462,15 +475,25 @@ async function planRefresh(
             ),
           ),
         );
-      if (convertedInterest)
+      if (convertedInterest) {
         await change(
           "interest_registrations",
           convertedInterest.id,
-          "last_name",
+          "paternal_surname",
           "Demo",
           modern.samples.find((sample) => sample.key === "closed")!
-            .registrations[0]!.participant.lastName,
+            .registrations[0]!.participant.paternalSurname,
         );
+        await change(
+          "interest_registrations",
+          convertedInterest.id,
+          "maternal_surname",
+          old.samples.find((sample) => sample.key === "closed")!
+            .registrations[0]!.participant.maternalSurname,
+          modern.samples.find((sample) => sample.key === "closed")!
+            .registrations[0]!.participant.maternalSurname,
+        );
+      }
       for (let n = 1; n < 6; n++) {
         const [interest] = await tx
           .select()
@@ -491,7 +514,7 @@ async function planRefresh(
           await change(
             "interest_registrations",
             interest.id,
-            "last_name",
+            "paternal_surname",
             "Demo Interés",
             [
               "Varela Durán",

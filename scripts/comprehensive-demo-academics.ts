@@ -171,7 +171,9 @@ export async function seedComprehensiveAcademics(
             groupId: group.id,
             sessionId: future[0]!.id,
             revision: future[0]!.revision,
-            reason: "[DEMO] Feriado: cancelación individual",
+            reason: legacyLabels
+              ? "[DEMO] Feriado: cancelación individual"
+              : "Suspensión por feriado",
           });
           const today = await replaceAttendanceSession(attendance, actor, {
             requestKey: comprehensiveDemoId("session:replace"),
@@ -180,7 +182,9 @@ export async function seedComprehensiveAcademics(
             sessionId: future[1]!.id,
             revision: future[1]!.revision,
             startsAt: `${plan.anchorDay}T15:00`,
-            reason: "[DEMO] Recuperación de sesión",
+            reason: legacyLabels
+              ? "[DEMO] Recuperación de sesión"
+              : "Recuperación de sesión",
           });
           if (today.kind !== "session")
             throw new Error("Demo replacement receipt invalid");
@@ -201,7 +205,9 @@ export async function seedComprehensiveAcademics(
             sessionId: future[2]!.id,
             revision: future[2]!.revision,
             startsAt: `${weekend}T15:00`,
-            reason: "[DEMO] Recuperación en fin de semana",
+            reason: legacyLabels
+              ? "[DEMO] Recuperación en fin de semana"
+              : "Recuperación en fin de semana",
           });
         }
       }
@@ -218,8 +224,9 @@ export async function seedComprehensiveAcademics(
             courseId: sample.course.id,
             groupId: group.id,
             revision: first.revision,
-            reason:
-              "[DEMO] Corrección administrativa de una nota; conservar versión anterior",
+            reason: legacyLabels
+              ? "[DEMO] Corrección administrativa de una nota; conservar versión anterior"
+              : "Corrección de una evaluación",
           });
           const fresh = await getCourseEvaluations(
             evaluations,

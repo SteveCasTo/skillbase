@@ -1,6 +1,69 @@
 # TESTING
 
+## Certificados individuales: QA fuente (2026-10-13)
+
+PR 352 adapta los casos existentes, sin añadir casos/specs/suites: registro
+único por grupo/tipo/destinatario, ordinal autoritativo, regeneración unsigned
+con ID anterior no encontrado, atestación ADMIN, guardado firmado atómico y
+sustitución con mismo ID/hash actual. Se mantienen ownership histórico, roles
+frescos, idempotencia, MIME/magic/tamaño/purpose, reserva/compensación y privacidad
+Storage; se deniega unsigned también por URL directa después de firmar.
+
+Antes de integrar la dependencia 351/0024: 464 unit, 15 integración focal de
+certificados, 2 E2E Chromium y el caso único de extensión demo pasaron en stacks
+aislados (ledger 25 temporal). Typecheck, lint, formato y build pasaron. No se
+ejecutó el reset autorizado ni se escribieron datos canónicos/cloud. El gate
+combinado inicial se completó después sobre 0024+0025 (ledger 26): 464 unit,
+el caso de extensión demo con 7 registros actuales/replay sin cambios y los
+2 E2E de certificados pasaron. Los 6 E2E existentes de sidebar también pasaron
+sin modificar ese spec, timeout ni retries. Capturas de grupo y detalle firmado
+mobile/desktop se generan en los mismos casos. La integración global, CI final
+y revisión independiente de MAIN están en curso; no atribuir estos resultados
+a producción ni firma institucional.
+
 ## OBJETIVO
+
+### Ajuste de cierre académico (QA local, 2026-10-12)
+
+- Se adaptaron únicamente casos existentes de cierre: badge de nota separada de
+  asistencia, categorías/fracciones reales, racha relevante, saldo omitido en UI,
+  privacidad ADMIN/INSTRUCTOR y reapertura con motivo opcional normalizado a `null`.
+- Typecheck, lint, format y build pasaron. La ejecución final de los 20 unit de
+  cierre pasó; una corrida combinada previa tuvo un timeout del PDF existente
+  bajo carga, sin aumentar límites ni cambiar tests.
+- Integración focal aislada: 5/5, incluidos persistencia/auditoría `null`, locks,
+  historial inmutable y proyección por rol. E2E existente: 3/3 sin retries en
+  `skillbase_test_84378d0362f8c001` (API 50966, DB 50967, servidor 44897).
+  Tras ampliar el caso existente para verificar replay de motivo vacío/null,
+  una corrida bajo carga alcanzó el timeout del caso y su cleanup interrumpió
+  la lectura histórica; la corrida final del archivo aislado pasó 5/5, sin
+  cambiar límites, expectativas de negocio o retries.
+- El mismo caso ADMIN comprobó ausencia de overflow en 375/768/1440 px, light/dark,
+  y capturó el diálogo de resultados y reapertura. Escape/retorno de foco, errores
+  de motivo y HTML sin JavaScript quedaron cubiertos. La primera ejecución tuvo
+  fallos de hidratación por un junction de dependencias; se instaló `node_modules`
+  local en el worktree y la ejecución final pasó. No se tocó el canónico.
+- Esta evidencia es local dirigida, no un gate completo ni CI/release remoto.
+  La confirmación visual final del caso ADMIN pasó también con badges de alto
+  contraste basadas en tokens (`primary`/`destructive` translúcidos y texto
+  `foreground`).
+- Tras PR351, se preservó `participantFullName` en tarjetas, disparadores y
+  encabezados; la reapertura usa el Input compartido sin explicación/ayuda
+  visibles redundantes. La validación local pasó de nuevo: 20 unit, 5 integración
+  y los mismos 3 E2E sin retries, además de typecheck/lint/format/build. Las
+  capturas proceden de `skillbase_test_7bc649f03b43655e` (API 57596, DB 57597,
+  servidor 44897); para no capturar transiciones de color a medio cambio de tema,
+  los screenshots deshabilitan animaciones únicamente durante la captura.
+- Rebase final sobre `31edc52` (PR352): se regeneró 0026 contra el snapshot de
+  0025; Drizzle confirmó cero drift, journal de 27 entradas y hashes históricos
+  sin cambios. Check/build, los 464 unit del checkout combinado y los cinco
+  casos de integración académica aislada pasaron. La primera build/E2E local
+  encontró un módulo runtime ausente en la instalación de Astro; reinstalar con
+  lockfile congelado restauró la build sin alterar source ni dependencias.
+  La corrida E2E posterior pasó instructor y HTML, pero ADMIN recibió un reporte
+  temporalmente no disponible después de preparar el fixture (causa no atribuida).
+  La ejecución final serial pasó los tres casos sin retries ni cambios de límites,
+  en `skillbase_test_61ac0b723bba7fdd` (API 53169, DB 53170, servidor 44897).
 
 Mantener un entorno de pruebas reproducible, aislado y cercano a producción.
 
@@ -98,6 +161,15 @@ start services
 El entorno debe tener datos conocidos antes de cada suite.
 
 ## SEEDS Y FIXTURES
+
+La separación obligatoria de apellidos actualiza fixtures y assertions de las
+suites existentes, sin añadir casos, specs ni suites. Las pruebas de identidad
+comprueban campos ausentes/vacíos, controles, Unicode y rechazo del alias
+estudiantil `lastName`; SSR exige las cuatro entradas obligatorias del interés.
+Los contratos de roster, cierre, certificados y CSV incluyen ambos apellidos.
+`0024_student_required_surnames` se ejecuta solamente sobre stacks QA vacíos;
+la operación canónica requiere el reset de negocio autorizado antes de migrar.
+Los controles de Auth, roles, instructor y el ledger aprobado no se relajan.
 
 Separar:
 
@@ -344,6 +416,10 @@ La carga pública cuenta con unit tests deterministas para los tres intentos má
 - La fotografía de preview y su procedencia son material sintético de desarrollo. Tests unitarios cubren formato/key/dimensiones y tests E2E comprueban autorización/origen, subida y guardado reales en Storage local, visualización pública y limpieza del objeto de prueba. La cobertura de formatos y revisiones incluye persistencia, inmutabilidad, preservación histórica, asignación a borradores, activación y destacado singleton.
 
 ### Cobertura de formatos, catálogo y navegación
+
+La eliminación de la pantalla Resumen adapta únicamente expectativas existentes: login/entrada genérica llegan a Cursos o Mis cursos según rol; rail/router/toasts regresan a Cursos; `/app` no genera skeleton propio. No se añaden suites, specs ni casos para este ajuste. Los destinos explícitos y assertions de denegación/Auth permanecen. La ejecución E2E local dirigida del 2026-10-12 no inició por Docker Desktop no disponible; no se declara PASS local de integración/E2E ni se reinicia el stack compartido.
+
+La evidencia remota vigente está en los [checks del PR 344](https://github.com/SteveCasTo/skillbase/pull/344/checks). En el primer run `38294092322`, quality, integración y shard E2E 2 pasaron; el shard 1 falló en dos escenarios de asociación Google porque el helper esperaba Cursos para fixtures INSTRUCTOR. La corrección exige explícitamente Mis cursos para esos actores y Cursos para el fixture ADMIN, sin ampliar los destinos aceptados, cambiar timeouts/retries ni modificar Auth. Ese fallo no se clasifica como flakiness.
 
 - `tests/unit/course-markdown.test.ts` cubre la conversión a nodos permitidos y el rechazo de destinos de enlaces peligrosos.
 - Las pruebas unitarias del Markdown verifican niveles de encabezado, bloques de código, citas, separadores, selección del toolbar y enlaces seguros; `public-courses.spec.ts` comprueba la representación real de estos elementos en el detalle publicado. Los E2E de cursos comprueban la vista previa y la foto persistida dentro del bloque de información general en desktop y mobile.
@@ -816,3 +892,26 @@ del boolean cloud, Google OAuth real, entrega SMTP ni flujos autenticados de
 cambio/recovery/primera contraseña en producción. El smoke productivo fue
 anónimo. El detalle de configuración nativa y el estado parcial de AUTH-1 está
 en [`DEPLOYMENT.md`](DEPLOYMENT.md) y [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md).
+
+### Gate de release combinado PR 342 (2026-10-12)
+
+El CI del PR `38209427441` y el CI de push/deploy a `master` `38210161355`
+pasaron en primer intento para el source combinado exacto. El run final informó
+464 unit/4.167 assertions, 177 integration/1.452, fixture F8 1/906, fixture F9
+1/142, y 145 E2E en dos shards (76+69), sin flake ni retry; quality,
+formatter/typecheck/build, migraciones, agregador y deploy pasaron. El run final
+reportó 177 integration PASS sin skip; el resultado de un skip preexistente
+pertenece a la ejecución previa y se conserva como dato histórico. La deployment
+`dpl_6RhZNN7sus7B8jo36TRPmMqsHYgP` quedó `READY` para `master`
+`4e3c827e8cc5f7b05df182e90b450d256f2c85aa`.
+
+No se añadieron ni modificaron tests en el trabajo documental. No se volvieron a
+ejecutar suites locales completas por esta sincronización; el CI remoto anterior
+es la evidencia para el release. La aceptación Auth de producción consistió en
+navegación PASSWORD legítima acotada, no en una nueva prueba de cambio/recovery,
+Google OAuth real o SMTP. El refresh del seed se validó por su workflow protegido
+y evidencia de preservación independiente; no debe interpretarse como suite de
+tests ni como un test de carga. Ver los detalles/límites en
+[`DEPLOYMENT.md`](DEPLOYMENT.md), [`AUTHENTICATION.md`](AUTHENTICATION.md),
+[`DEMO_SEED.md`](DEMO_SEED.md) y
+[`validation/PRODUCTION-PERFORMANCE.md`](validation/PRODUCTION-PERFORMANCE.md).

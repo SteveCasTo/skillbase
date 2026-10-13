@@ -22,6 +22,7 @@ import {
   demoSnapshotSummary,
 } from "../../scripts/comprehensive-demo-preservation";
 import { fingerprint } from "../../scripts/financial-demo-plan";
+import { readApprovedDemoMigrations } from "../../scripts/approved-demo-migration-ledger";
 
 test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and all original full rows; repeat has zero changes", async () => {
   const env = getTestSupabaseEnvironment();
@@ -74,7 +75,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
       createHash("sha256").update(bytes).digest("hex"),
     );
     const before = await captureDemoSnapshot(db);
-    expect(before.ledger).toHaveLength(24);
+    expect(before.ledger).toHaveLength(readApprovedDemoMigrations().length);
     const options = {
       actorId: original!.id,
       auth,
@@ -84,13 +85,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
     const plan = await runComprehensiveCertificates(db, options);
     expect(plan.configuration.present).toBe(false);
     expect(plan.fixtures.map((f) => f.scenario)).toEqual(
-      expect.arrayContaining([
-        "generated",
-        "awaiting_signature",
-        "issued",
-        "revoked",
-        "replaced",
-      ]),
+      expect.arrayContaining(["generated", "issued", "revoked"]),
     );
     expect(
       plan.fixtures.filter((f) => f.input.type === "INSTRUCTOR"),
@@ -109,15 +104,17 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
       }),
     ).rejects.toThrow("Reviewed certificate plan changed");
     assertDemoNoChanges(before, await captureDemoSnapshot(db));
-    // Inject only a lost response AFTER the real issue committed. A retry must
+    // Inject only a lost response AFTER the real signed attach committed. A retry must
     // use current records/receipts, not re-render or upload this issued PDF.
-    const actualIssue = DrizzleCertificateRepository.prototype.issue;
+    const actualIssue = DrizzleCertificateRepository.prototype.attachArtifact;
     const lostAcknowledgment = spyOn(
       DrizzleCertificateRepository.prototype,
-      "issue",
+      "attachArtifact",
     ).mockImplementation(async (actorId, command) => {
-      await actualIssue.call(repo, actorId, command);
-      throw new Error("Synthetic lost issue acknowledgment");
+      const result = await actualIssue.call(repo, actorId, command);
+      if (command.purpose === "SIGNED")
+        throw new Error("Synthetic lost issue acknowledgment");
+      return result;
     });
     try {
       await expect(
@@ -142,13 +139,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
     const certificates = await db.select().from(s.certificates);
     expect(certificates).toHaveLength(plan.plannedCount);
     expect(new Set(certificates.map((r) => r.state))).toEqual(
-      new Set([
-        "generated",
-        "awaiting_signature",
-        "issued",
-        "revoked",
-        "replaced",
-      ]),
+      new Set(["generated", "issued", "revoked"]),
     );
     const settings = await db.select().from(s.certificateSettings);
     expect(settings[0]!.updatedBy).toBe(context!.admins.operator!);
@@ -157,7 +148,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
       expect(row.createdBy).toBe(context!.admins.operator!);
       expect(row.data.courseName).not.toContain("[DEMO]");
       expect(row.data.recipientName.toLowerCase()).not.toContain("demo");
-      expect(row.data.templateVersion).toBe("phase9-v1");
+      expect(row.data.templateVersion).toBe("phase9-v2");
       expect(row.data.venue).toBe(defaultCertificateConfiguration.venue);
       expect(row.data.printedMonth).toBe(Number(row.data.endsOn.slice(5, 7)));
       expect(row.data.printedYear).toBe(Number(row.data.endsOn.slice(0, 4)));
@@ -173,7 +164,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
       expect(publicDto).not.toHaveProperty("signedPath");
       expect(publicDto).not.toHaveProperty("data");
       expect(publicDto).not.toHaveProperty("demoFlag");
-      if (["generated", "awaiting_signature"].includes(row.state))
+      if (row.state === "generated")
         expect(publicDto).toEqual({ state: "not_issued", valid: false });
       else
         expect(publicDto).toMatchObject({
@@ -208,14 +199,14 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
           ).ok,
         ).toBe(false);
       }
-      if (row.state === "replaced") {
-        const replacement = certificates.find(
-          (r) => r.id === row.replacedById,
-        )!;
-        expect(replacement.state).toBe("issued");
-        expect(replacement.replacementForId).toBe(row.id);
-        expect(replacement.recipientId).toBe(row.recipientId);
-      }
+      expect(
+        certificates.filter(
+          (r) =>
+            r.groupId === row.groupId &&
+            r.type === row.type &&
+            r.recipientId === row.recipientId,
+        ),
+      ).toHaveLength(1);
     }
     await runComprehensiveCertificates(db, { ...options, apply: true });
     const repeat = await captureDemoSnapshot(db);
@@ -236,13 +227,7 @@ test("F9 opt-in uses real lifecycle/renderer/private Storage, preserves F8 and a
         after: demoSnapshotSummary(repeat),
         certificates: certificates.length,
         states: Object.fromEntries(
-          [
-            "generated",
-            "awaiting_signature",
-            "issued",
-            "revoked",
-            "replaced",
-          ].map((state) => [
+          ["generated", "issued", "revoked"].map((state) => [
             state,
             certificates.filter((r) => r.state === state).length,
           ]),

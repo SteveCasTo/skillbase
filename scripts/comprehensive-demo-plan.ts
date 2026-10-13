@@ -312,7 +312,8 @@ export function legacyComprehensiveDemoPlan(
           "Valeria",
           "Daniel",
         ][i]!,
-        lastName: "Demo",
+        paternalSurname: "Demo",
+        maternalSurname: "Quispe",
         email: `comprehensive.v1.${def.key}.${i}@example.test`,
         phone: null,
       },
@@ -447,9 +448,13 @@ export function comprehensiveDemoPlan(
       "Se requiere manejo básico de computadora y disponibilidad para las sesiones programadas.";
     sample.course.contentMarkdown =
       "## Programa\n\n- Fundamentos y herramientas\n- Resolución de casos\n- Proyecto aplicado y retroalimentación";
-    for (const registration of sample.registrations)
-      registration.participant.lastName =
-        surnames[personIndex++ % surnames.length]!;
+    for (const registration of sample.registrations) {
+      const surname = surnames[personIndex++ % surnames.length]!;
+      // These are authored synthetic pairs, not inferred from existing records.
+      const [paternalSurname, maternalSurname] = surname.split(" ");
+      registration.participant.paternalSurname = paternalSurname!;
+      registration.participant.maternalSurname = maternalSurname!;
+    }
   }
   const archived = plan.samples.find((sample) => sample.key === "archived")!;
   const retired = plan.formats[2]!;
@@ -521,7 +526,9 @@ export function comprehensiveDemoPlan(
           participant: {
             ...registration.participant,
             firstName: ["Paula", "Martín", "Julieta", "Sebastián"][i]!,
-            lastName: surnames[personIndex++ % surnames.length]!,
+            paternalSurname:
+              surnames[personIndex++ % surnames.length]!.split(" ")[0]!,
+            maternalSurname: "Quispe",
             ci: `00CDV2${cohort.key === "next-open-data" ? "D" : "W"}${i}LP`,
             email: `comprehensive.v2.${cohort.key}.${i}@example.test`,
           },

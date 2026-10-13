@@ -45,7 +45,8 @@ export function isAdminRegistration(
     value.courseId === courseId &&
     identifier(value.courseId) &&
     typeof value.firstName === "string" &&
-    typeof value.lastName === "string" &&
+    typeof value.paternalSurname === "string" &&
+    typeof value.maternalSurname === "string" &&
     typeof value.email === "string" &&
     (value.phone === null || typeof value.phone === "string") &&
     (value.preferredGroupId === null || identifier(value.preferredGroupId)) &&

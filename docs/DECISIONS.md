@@ -883,3 +883,42 @@ los detalles de almacenamiento/ordinal que corresponderán al diseño técnico.
   ejecuciones futuras. El release/demo sintético no prueba firma institucional,
   ni cotejo de bytes privados cloud; esas limitaciones no modifican la decisión
   de negocio aceptada.
+
+### Ajuste aprobado de distribución PDF (2026-10-12)
+
+QR bajo el logo departamental y a la derecha del título, ID debajo del QR y
+más espacio sobre las tres firmas, en ambas orientaciones. Se identifica como
+`phase9-v2`, conservando branding/assets v1. El adaptador y el renderer aceptan
+únicamente v2 tras la autorización posterior de retirar la distribución antigua.
+No amplía elegibilidad, permisos o campos imprimibles ni trata metadata v1 como
+v2. Branding v1 se conserva porque los assets son los mismos. Los ajustes
+persistidos se activan separadamente por la operación auditada existente;
+el cambio de código no los modifica silenciosamente.
+
+### Ajuste aprobado: certificado actual por destinatario (2026-10-12)
+
+El flujo individual sustituye la selección masiva y las cadenas de versiones.
+La identidad vigente es grupo/tipo/destinatario, con índice único incluso para
+borradores. Cada tarjeta deriva únicamente del cierre oficial elegible; GET no
+crea documentos. Primer PDF requiere POST explícito. El ordinal procede siempre
+de `groups.createdAt/id` en servidor.
+
+Antes de firmar, regenerar actualiza el registro con nueva metadata y nuevo ID
+público, invalidando el anterior. Guardar firmado exige PDF válido y atestación
+ADMIN, y confirma hash/path/estado en una sola transacción. Después solo se sirve
+el firmado; sustituir su archivo conserva ID y metadata. No se almacenan clones
+completos/versiones de certificados. Auditoría/receipts/reservas conservan
+evidencia mínima, y objetos retirados se limpian después del commit con outbox.
+Revocación explícita permanece disponible con autorización y motivo.
+
+0025 requiere dataset de certificados vacío y falla cerrada ante credenciales
+existentes. El reset sintético fue aprobado separadamente y lo ejecuta el owner
+operativo, nunca este flujo ni la migración. No altera snapshots F8, controles
+de sesión/ownership ni la allowlist pública. La UI usa «Para firmar»/«Firmado»,
+sin historial, revisión/emisión separadas ni ordinal editable.
+La sustitución de certificados seed local/cloud es una operación excepcional
+aprobada, con PLAN/revisión/ownership y reconstrucción por el ciclo normal;
+no habilita eliminación general de evidencia productiva. Los nombres nuevos
+proceden de una nueva versión oficial de cierre, obtenida mediante operaciones
+normales si el snapshot seed anterior contiene nombres antiguos. No se cambian
+notas/eligibilidad ni se reescriben informes F8 inmutables desde el renderer.

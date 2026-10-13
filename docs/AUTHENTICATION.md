@@ -117,6 +117,8 @@ El signup público por email/password permanece deshabilitado. El proveedor inte
 
 Las rutas privadas tienen políticas fail-closed: `/app` y `/app/perfil` permiten usuario interno activo; mantenimiento de cursos/formats/interesados/participantes/configuración exige `ADMIN`; `/app/mis-cursos` y páginas de sesiones requieren `INSTRUCTOR` más ownership del repositorio. Instructor solo accede a asistencia de sus propios grupos y no a finanzas, CI/email ni settings. Rutas futuras no declaradas bajo `/app` fallan cerradas.
 
+La URL compatible `/app` resuelve la entrada operativa después del guard existente: ADMIN tiene prioridad y redirige a `/app/cursos`; INSTRUCTOR redirige a `/app/mis-cursos`; ningún rol reconocido redirige a la denegación `forbidden`, nunca al propio resolver. No renderiza ni consume el feedback OAuth: la cookie de un uso llega intacta al layout del destino. Login password/Google, callbacks, `safeRelativeRedirect`, `next`, `returnTo` y enlaces profundos conservan sus contratos; solo la entrada genérica se resuelve por rol.
+
 ### Configuración cloud
 
 El proyecto `SkillBase` está enlazado con referencia `fvzxqlezdrlzykyoevub`. Google OAuth, Site URL y el callback `https://skillbase-alpha.vercel.app/auth/callback` están configurados. El primer administrador permanece como invitación `INVITED` hasta completar su primer acceso Google, momento en que se vinculará su UUID Auth y pasará a `ACTIVE`.
@@ -356,5 +358,35 @@ los límites documentados; **no es cierre productivo**. Master permanece
 `07042f851c8d0fe6b133288c088051bad6973bb5`, sin la promoción combinada; cloud no
 se modificó. Recovery/primera contraseña Google mantienen evidencia aislada 8/8
 con control activo, no una nueva prueba canónica ni Google OAuth/SMTP reales.
-Rollback sigue siendo literal false, no ausencia física; no hay monitorización
+Rollback sigue siendo literal `false`, no ausencia física; no hay monitorización
 continua de operadores CLI alternativos.
+
+### Aceptación de release combinado en producción — 2026-10-12
+
+PR 342 liberó a `master` el source combinado que incluye el guard común de
+identidad de PR 337 y el enforcement nativo local de PR 340. CI del PR
+(`38209427441`) y del push/release a `master` (`38210161355`) pasaron en el
+primer intento; el deployment exacto quedó `READY`. El boolean nativo cloud
+`security_update_password_require_current_password` fue leído como `true`; no se
+cambió la configuración cloud en este release. Detalles en
+[`DEPLOYMENT.md`](DEPLOYMENT.md).
+
+Una identidad sintética `INSTRUCTOR` preexistente y autorizada completó login
+normal y navegación a `/app/mis-cursos` y `/app/perfil` con `private, no-store`.
+La lectura protegida antes/después confirmó el mismo UUID Auth, hash de
+credencial cifrado, contenido de identidad y roles. Esto valida navegación
+PASSWORD legítima bajo el guard desplegado; no es prueba de cambio/recovery en
+producción ni de Google OAuth, SMTP o entrega de correo. La sesión temporal se
+cerró por logout normal. Una primera medición interrumpida falló en
+selector/cleanup y no se cuenta como aceptación ni como revocación de sesión del
+proveedor.
+
+La regla autorizada permite la primera contraseña nativa de una cuenta Google
+legítima cuyo UUID ya esté vinculado y cuya identidad/correo verificado y usuario
+interno activo con roles sigan siendo los mismos. Esa excepción del proveedor es
+intencional; no autoriza otra identidad ni otorga roles. El guard común valida
+esa propiedad de cuenta en accesos PASSWORD y recovery; el formulario de la
+aplicación mantiene sus propias pruebas recientes. La aceptación no certifica
+todos los flujos externos ni la seguridad global. AUTH-1 queda validado bajo la
+regla aprobada; la verificación real de Google OAuth, recovery y SMTP permanece
+pendiente como bloque independiente de Fase 10.

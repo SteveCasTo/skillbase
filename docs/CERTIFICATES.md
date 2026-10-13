@@ -25,9 +25,23 @@ grupo cerrado
 → imprimir / tramitar firmas
 → subir archivo firmado
 → calcular hash
-→ emitir
+→ confirmar y publicar atómicamente con atestación ADMIN
 → verificación pública
 ```
+
+## Configuración y vista previa
+
+ADMIN edita cada nombre, cargo o afiliación desde Configuración → Certificados
+y autoridades. Cada guardado modifica solo el campo solicitado, valida la revisión
+vigente y conserva la auditoría; los PDFs históricos no cambian. La ruta antigua
+redirige a `#firmantes` en GET y conserva compatibilidad de POST.
+
+Las vistas previas de aprobación e instructor usan la configuración **guardada**
+y datos de curso/destinatario de muestra. El PDF se abre en un visor, con una sola
+marca «Vista previa», sin QR, folio ni enlace verificable. El endpoint ADMIN privado
+`/app/configuracion/certificados/vista-previa.pdf` responde inline y no-store:
+solo lee ajustes, incluso con revisión cero; no genera registros, artefactos,
+receipts, eventos ni escrituras en Storage. No añade un tipo de participación.
 
 ## IDENTIFICADORES
 
@@ -81,14 +95,12 @@ Almacenar hash junto al certificado.
 
 ## ESTADOS
 
-Iniciales:
+Internos (la UI presenta «Para firmar» y «Firmado»):
 
 - pending
 - generated
-- awaiting_signature
 - issued
 - revoked
-- replaced
 
 ## REVOCACIÓN
 
@@ -104,9 +116,12 @@ Registrar:
 - motivo;
 - responsable.
 
-## REEMPLAZO
+## REGENERACIÓN Y SUSTITUCIÓN
 
-Un certificado reemplazado debe conservar relación con el nuevo.
+Un único registro por grupo/tipo/destinatario, sin versiones/historial en UI.
+Regenerar antes de firmar cambia el ID público e invalida el anterior. Sustituir
+un firmado conserva su ID y metadata, cambia el hash del artefacto actual y deja
+auditoría mínima. La limpieza del objeto previo ocurre después del commit.
 
 ## PDF
 
@@ -136,9 +151,9 @@ La ruta de verificación debe consultar el registro actual del certificado.
 
 La interfaz conectada al backend disponible en esta rama incluye:
 
-- Administración de certificados en `/app/certificados`, ajustes en `/app/configuracion/certificados` y acceso a certificados del grupo desde las vistas ADMIN e INSTRUCTOR.
+- Administración de certificados en `/app/certificados` lista solo cursos con al menos un grupo cuyo cierre oficial está `CLOSED`; permite buscar esos cursos por nombre. Los ajustes de firmantes están en `/app/configuracion#firmantes` (la ruta anterior `/app/configuracion/certificados` redirige allí), y las vistas ADMIN e INSTRUCTOR conservan el acceso a certificados del grupo.
 - Detalle privado ADMIN y detalle histórico readonly del instructor en `/app/mis-certificados/[certificateId]`; descargas PDF privadas usan rutas autenticadas.
-- Generación, revisión/carga del archivo firmado, emisión y revocación mediante las operaciones server-side existentes. Los formularios SSR conservan los errores y valores recuperables; la autorización y las transiciones las decide el servidor.
+- Tarjetas individuales desde elegibilidad oficial, generación explícita POST y carga de un PDF firmado con atestación ADMIN. Guardar/sustituir confirma el firmado en una sola transacción; no existen formularios independientes de revisión/emisión, selector masivo ni campo ordinal. Después de firmar, la descarga unsigned se deniega también en servidor.
 - Página pública `/certificados/[publicCredentialId]` y formulario de búsqueda en `/certificados`. La respuesta pública es una proyección mínima; no expone snapshots privados ni ofrece descarga anónima del PDF.
 - Verificación local opcional del archivo seleccionado: SHA-256 se calcula en el navegador, sobre el archivo local. El contenido no se transmite para calcular ese hash; no equivale a una firma digital ni demuestra por sí solo la identidad de quien lo presenta.
 

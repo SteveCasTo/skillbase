@@ -26,6 +26,7 @@ import type { CertificateDto } from "@/domain/certificates/types";
 import { createClosureFixture } from "../fixtures/academic-closure";
 import { evaluationFixtureTables } from "../fixtures/evaluation-cleanup";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
+import { readApprovedDemoMigrations } from "../../scripts/approved-demo-migration-ledger";
 
 const connection = createDatabase(getTestSupabaseEnvironment().databaseUrl, {
   max: 8,
@@ -139,7 +140,7 @@ async function setup(score = "100") {
     configurationRevision: updatedSettings.revision,
     requestKey: crypto.randomUUID(),
     type: "APPROVAL" as const,
-    recipientId: null,
+    recipientId: f.paid.participant.id,
   };
   return { ...f, groupId, version, input, storage, service };
 }
@@ -159,7 +160,7 @@ async function ready(
     command(row),
     signed,
   );
-  return repository.review(f.admin.id, command(uploaded));
+  return uploaded;
 }
 
 test("F9 generation freezes F8 identity and nominal metadata; public drafts are minimal and instructor ownership is historical", async () => {
@@ -178,7 +179,7 @@ test("F9 generation freezes F8 identity and nominal metadata; public drafts are 
     data: {
       courseName: original.report.courseName,
       academicHours: 6,
-      recipientName: `${original.report.participants[0]!.firstName} ${original.report.participants[0]!.lastName}`,
+      recipientName: `${original.report.participants[0]!.firstName} ${original.report.participants[0]!.paternalSurname} ${original.report.participants[0]!.maternalSurname}`,
       instructorName: original.report.instructorName,
       endsOn: "2099-03-05",
       printedMonth: 3,
@@ -232,6 +233,7 @@ test("official failed/zero grades never yield APPROVAL while instructor remains 
   const [row] = await f.service.generate(f.admin.id, {
     ...f.input,
     type: "INSTRUCTOR",
+    recipientId: f.instructor.id,
     requestKey: crypto.randomUUID(),
   });
   expect(row!.data.recipientName).toBe(
@@ -240,7 +242,7 @@ test("official failed/zero grades never yield APPROVAL while instructor remains 
   );
   expect(row!.type).toBe("INSTRUCTOR");
 }, 30000);
-test("issue requires reviewed exact signed PDF, is idempotent and serializes concurrent issue/revoke", async () => {
+test("signed save is atomic, idempotent and serializes concurrent substitution/revoke", async () => {
   const f = await setup();
   const [generated] = await f.service.generate(f.admin.id, f.input);
   await expect(
@@ -261,25 +263,27 @@ test("issue requires reviewed exact signed PDF, is idempotent and serializes con
   await expect(
     repository.issue(f.admin.id, command(uploaded)),
   ).rejects.toMatchObject({ code: "INVALID_STATE" });
-  const reviewed = await repository.review(f.admin.id, command(uploaded));
-  const c = command(reviewed);
-  const results = await Promise.all([
-    repository.issue(f.admin.id, c),
-    repository.issue(f.admin.id, c),
+  const c = command(uploaded);
+  const results = await Promise.allSettled([
+    f.service.uploadSigned(f.admin.id, c, unsigned),
+    f.service.uploadSigned(f.admin.id, c, unsigned),
   ]);
-  expect(results[0]).toEqual(results[1]);
-  const issued = results[0]!;
+  const result = results.find((r) => r.status === "fulfilled");
+  if (!result || result.status !== "fulfilled")
+    throw new Error("No signed substitution winner");
+  const issued = result.value;
+  expect(await f.service.uploadSigned(f.admin.id, c, unsigned)).toEqual(issued);
   expect(issued.state).toBe("issued");
   expect(issued.signedSha256).toBe(
-    createHash("sha256").update(signed).digest("hex"),
+    createHash("sha256").update(unsigned).digest("hex"),
   );
   expect(
     await f.service.download(f.instructor.id, issued.id, "SIGNED"),
-  ).toEqual(signed);
+  ).toEqual(unsigned);
   expect((await repository.verify(issued.publicCredentialId)).valid).toBe(true);
   await expect(
-    f.service.uploadSigned(f.admin.id, command(issued), signed),
-  ).rejects.toMatchObject({ code: "INVALID_STATE" });
+    f.service.download(f.admin.id, issued.id, "UNSIGNED"),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
   const revoke = command(issued);
   const revoked = await repository.revoke(
     f.admin.id,
@@ -320,10 +324,11 @@ test("reopening retains issued validity but obsoletes drafts; new closure cannot
   const f = await setup();
   const [generated] = await f.service.generate(f.admin.id, f.input);
   const reviewed = await ready(f, generated!);
-  const issued = await repository.issue(f.admin.id, command(reviewed));
+  const issued = reviewed;
   const [draft] = await f.service.generate(f.admin.id, {
     ...f.input,
     type: "INSTRUCTOR",
+    recipientId: f.instructor.id,
     requestKey: crypto.randomUUID(),
   });
   await closure.reopen(f.admin.id, {
@@ -355,54 +360,70 @@ test("reopening retains issued validity but obsoletes drafts; new closure cannot
   await expect(
     repository.issue(f.admin.id, command(draft!)),
   ).rejects.toMatchObject({ code: "STALE_CLOSURE" });
-}, 30000);
-test("replacement atomically links history and prevents two equivalent active certificates", async () => {
-  const f = await setup();
-  const [generated] = await f.service.generate(f.admin.id, f.input);
-  const originalReady = await ready(f, generated!);
-  const issued = await repository.issue(f.admin.id, command(originalReady));
-  await expect(
-    f.service.generate(f.admin.id, {
-      ...f.input,
-      requestKey: crypto.randomUUID(),
-    }),
-  ).rejects.toMatchObject({ code: "ACTIVE_CERTIFICATE_EXISTS" });
-  const official = await closure.getVersion(
-    f.admin.id,
-    f.course.id,
-    f.groupId,
-    1,
-  );
-  const replacementInput = {
+  const [recovered] = await f.service.generate(f.admin.id, {
     ...f.input,
-    recipientId: official.report.participants[0]!.participantId,
-    replacementForId: issued.id,
-    reason: "Synthetic replacement",
+    type: "INSTRUCTOR",
+    recipientId: f.instructor.id,
+    versionId: next.versionId,
+    closureRevision: next.revision,
+    requestKey: crypto.randomUUID(),
+    regenerate: true,
+    certificateRevision: draft!.revision,
+  });
+  expect(recovered!.id).toBe(draft!.id);
+  expect(recovered!.version).toBe(2);
+  expect(recovered!.obsolete).toBe(false);
+  expect(await repository.verify(draft!.publicCredentialId)).toEqual({
+    state: "not_found",
+    valid: false,
+  });
+}, 30000);
+test("concurrent generation keeps one current record; draft regeneration invalidates its prior credential and signed substitution keeps its ID", async () => {
+  const f = await setup();
+  const preparations = await Promise.all([
+    repository.prepare(f.admin.id, f.input, "https://qa.invalid"),
+    repository.prepare(
+      f.admin2.id,
+      { ...f.input, requestKey: crypto.randomUUID() },
+      "https://qa.invalid",
+    ),
+  ]);
+  expect(preparations[0]![0]!.id).toBe(preparations[1]![0]!.id);
+  const [generated] = await f.service.generate(f.admin.id, f.input);
+  const regeneration = {
+    ...f.input,
+    regenerate: true,
+    certificateRevision: generated!.revision,
     requestKey: crypto.randomUUID(),
   };
-  const [one] = await f.service.generate(f.admin.id, replacementInput);
-  const [two] = await f.service.generate(f.admin.id, {
-    ...replacementInput,
-    requestKey: crypto.randomUUID(),
+  const [one] = await f.service.generate(f.admin.id, regeneration);
+  expect(one!.id).toBe(generated!.id);
+  expect(one!.publicCredentialId).not.toBe(generated!.publicCredentialId);
+  expect(await repository.verify(generated!.publicCredentialId)).toEqual({
+    state: "not_found",
+    valid: false,
   });
-  const a = await ready(f, one!),
-    b = await ready(f, two!);
+  const issued = await ready(f, one!);
   const results = await Promise.allSettled([
-    repository.issue(f.admin.id, command(a)),
-    repository.issue(f.admin2.id, command(b)),
+    f.service.uploadSigned(f.admin.id, command(issued), unsigned),
+    f.service.uploadSigned(f.admin2.id, command(issued), unsigned),
   ]);
   expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
   expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
   const winner = results.find((r) => r.status === "fulfilled");
-  if (winner?.status !== "fulfilled") throw new Error("No replacement winner");
-  expect(await repository.get(f.admin.id, issued.id)).toMatchObject({
-    state: "replaced",
-    replacedById: winner.value.id,
-  });
-  expect(winner.value.replacementForId).toBe(issued.id);
-  expect((await repository.verify(issued.publicCredentialId)).valid).toBe(
-    false,
+  if (winner?.status !== "fulfilled") throw new Error("No substitution winner");
+  expect(winner.value.id).toBe(issued.id);
+  expect(winner.value.publicCredentialId).toBe(issued.publicCredentialId);
+  expect(winner.value.signedSha256).toBe(
+    createHash("sha256").update(unsigned).digest("hex"),
   );
+  await expect(
+    f.service.generate(f.admin.id, {
+      ...regeneration,
+      requestKey: crypto.randomUUID(),
+      certificateRevision: winner.value.revision,
+    }),
+  ).rejects.toMatchObject({ code: "INVALID_STATE" });
   expect((await repository.verify(winner.value.publicCredentialId)).valid).toBe(
     true,
   );
@@ -517,6 +538,7 @@ test("HTTP mutation and upload adapters validate origin, allowlist, purpose and 
     new File(["not a PDF"], "scan.pdf", { type: "application/pdf" }),
   );
   form.set("purpose", "SIGNED");
+  form.set("attestation", "true");
   form.set("revision", String(row!.revision));
   form.set("requestKey", crypto.randomUUID());
   const result = await handleCertificateUpload({
@@ -532,8 +554,40 @@ test("HTTP mutation and upload adapters validate origin, allowlist, purpose and 
   });
   expect(result.status).toBe(422);
   expect((await repository.get(f.admin.id, row!.id)).hasSignedPdf).toBe(false);
+  form.set(
+    "file",
+    new File([new Uint8Array(signed)], "qa.pdf", { type: "application/pdf" }),
+  );
+  form.delete("attestation");
+  const unconfirmed = await handleCertificateUpload({
+    request: new Request(`${siteUrl}upload`, {
+      method: "POST",
+      headers: { Origin: siteUrl.origin },
+      body: form,
+    }),
+    actor,
+    siteUrl,
+    certificateId: row!.id,
+    service: f.service,
+  });
+  expect(unconfirmed.status).toBe(422);
+  expect((await repository.get(f.admin.id, row!.id)).hasSignedPdf).toBe(false);
+  const { courseId: _course, groupId: _group, ...generation } = f.input;
+  void _course;
+  void _group;
+  const forgedOrdinal = await handleCertificatePost({
+    request: request({ ...generation, groupNumber: 1 }),
+    actor,
+    siteUrl,
+    repository,
+    service: f.service,
+    operation: "generate",
+    courseId: f.course.id,
+    groupId: f.groupId,
+  });
+  expect(forgedOrdinal.status).toBe(422);
 }, 30000);
-test("F9 tables are server-only with RLS and revoked Data API grants; ledger is 24", async () => {
+test("F9 tables are server-only with RLS and revoked Data API grants; current-flow ledger is applied", async () => {
   const tables = [
     "certificates",
     "certificate_artifacts",
@@ -556,7 +610,19 @@ test("F9 tables are server-only with RLS and revoked Data API grants; ledger is 
   const ledger = await db.execute(
     sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
   );
-  expect(ledger[0]!.count).toBe(24);
+  expect(ledger[0]!.count).toBe(readApprovedDemoMigrations().length);
+  // Exercise the actual forward guard against populated QA data. Its exclusive
+  // table lock is released by rollback; no DDL or migration ledger is modified.
+  const migration = await Bun.file(
+    "drizzle/0025_certificate_current_flow.sql",
+  ).text();
+  const emptyGuard = migration.split("--> statement-breakpoint")[0]!;
+  const beforeGuard = await db.select().from(s.certificates);
+  expect(beforeGuard.length).toBeGreaterThan(0);
+  await expect(
+    db.transaction((tx) => tx.execute(sql.raw(emptyGuard))),
+  ).rejects.toThrow();
+  expect(await db.select().from(s.certificates)).toEqual(beforeGuard);
 });
 test("failed Storage upload preserves original unsigned file and completes scoped compensation", async () => {
   const f = await setup();
@@ -663,7 +729,11 @@ test("stale configuration and recipient/version boundaries roll back generation 
   ).toHaveLength(0);
   const [row] = await f.service.generate(f.admin.id, f.input);
   const first = await f.service.uploadSigned(f.admin.id, command(row!), signed);
-  const reviewed = await repository.review(f.admin.id, command(first));
+  const reviewed = await f.service.uploadSigned(
+    f.admin.id,
+    command(first),
+    signed,
+  );
   await expect(
     f.service.uploadSigned(f.admin.id, command(first), unsigned),
   ).rejects.toMatchObject({ code: "CONCURRENT_UPDATE" });
@@ -672,8 +742,8 @@ test("stale configuration and recipient/version boundaries roll back generation 
     command(reviewed),
     unsigned,
   );
-  expect(second.reviewed).toBe(false);
-  expect(f.storage.objects.size).toBe(3);
+  expect(second.reviewed).toBe(true);
+  expect(f.storage.objects.size).toBe(2);
   await expect(
     repository.issue(f.admin.id, command(second)),
   ).rejects.toMatchObject({ code: "INVALID_STATE" });
@@ -736,8 +806,7 @@ test("merged real renderer integrates with pending metadata and preserves separa
     command(generated!),
     signed,
   );
-  const reviewed = await repository.review(f.admin.id, command(uploaded));
-  const issued = await repository.issue(f.admin.id, command(reviewed));
+  const issued = uploaded;
   expect(issued.signedSha256).toBe(
     createHash("sha256").update(signed).digest("hex"),
   );

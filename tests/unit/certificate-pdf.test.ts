@@ -8,6 +8,7 @@ import {
   PDFDict,
   PDFDocument,
   PDFName,
+  PDFPage,
   PDFRawStream,
   PDFString,
 } from "pdf-lib";
@@ -25,6 +26,9 @@ import {
   drawCertificateQr,
 } from "@/server/certificates/pdf/qr";
 import { certificateResources } from "@/server/certificates/pdf/resources";
+import { certificatePreviewData } from "@/domain/certificates/metadata";
+import { defaultCertificateConfiguration } from "@/domain/certificates/rules";
+import { certificatePdfInput } from "@/server/certificates/renderer";
 
 function fixture(
   type: "APPROVAL" | "INSTRUCTOR" = "APPROVAL",
@@ -178,7 +182,15 @@ test("approved supplied logos remain byte-identical raster assets and embed thei
 for (const type of ["APPROVAL", "INSTRUCTOR"] as const) {
   test(`${type} produces exactly one Letter page with frozen fields, Unicode and three signature blocks`, async () => {
     const input = fixture(type);
+    const signatureLines = spyOn(PDFPage.prototype, "drawLine");
     const bytes = await renderCertificatePdf(input);
+    const lineY = type === "APPROVAL" ? 80 : 120;
+    expect(
+      signatureLines.mock.calls.filter(
+        ([line]) => line.start.y === lineY && line.end.y === lineY,
+      ),
+    ).toHaveLength(3);
+    signatureLines.mockRestore();
     const doc = await PDFDocument.load(bytes, { updateMetadata: false });
     expect(doc.getPageCount()).toBe(1);
     expect(doc.getPage(0).getSize()).toEqual({
@@ -201,9 +213,25 @@ for (const type of ["APPROVAL", "INSTRUCTOR"] as const) {
       "del 23 de julio al 05 de agosto de 2026",
       "20 horas académicas.",
       "Cochabamba, agosto 2026",
-      `ID: ${input.publicCredentialId}`,
     ])
       expect(text).toContain(value);
+    expect(lines.join("")).toContain(`ID: ${input.publicCredentialId}`);
+    const annotation = doc.getPage(0).node.Annots()!.lookup(0, PDFDict);
+    const qrX = type === "APPROVAL" ? 612 : 468;
+    const qrY =
+      CERTIFICATE_PAGE_SIZES[type][1] - (type === "APPROVAL" ? 105 : 140) - 72;
+    expect(
+      annotation
+        .lookup(PDFName.of("Rect"), PDFArray)
+        .asArray()
+        .map((value) => Number(value.toString())),
+    ).toEqual([qrX, qrY, qrX + 72, qrY + 72]);
+    expect(
+      annotation
+        .lookup(PDFName.of("A"), PDFDict)
+        .lookup(PDFName.of("URI"), PDFString)
+        .decodeText(),
+    ).toBe(input.verificationUrl);
     for (const signer of input.signatories) {
       expect(lines.filter((line) => line === signer.name)).toHaveLength(1);
       expect(text).toContain(signer.role);
@@ -225,6 +253,11 @@ for (const type of ["APPROVAL", "INSTRUCTOR"] as const) {
       );
     }
     expect(bytes).toEqual(await renderCertificatePdf(input));
+    expect(doc.getCreator()).toBe("Certificados / plantilla 2");
+    // Old frozen metadata is rejected, never silently reinterpreted as v2.
+    await expect(
+      renderCertificatePdf({ ...input, templateVersion: 1 }),
+    ).rejects.toMatchObject({ code: "PDF_TEMPLATE_VERSION_UNSUPPORTED" });
   });
 }
 
@@ -271,6 +304,27 @@ test("real vector QR matches every library matrix module, axis orientation, whit
   expect(action.lookup(PDFName.of("URI"), PDFString).decodeText()).toBe(
     input.verificationUrl,
   );
+  for (const type of ["APPROVAL", "INSTRUCTOR"] as const) {
+    const sample = certificatePdfInput(
+      certificatePreviewData(defaultCertificateConfiguration, type),
+    );
+    const preview = await PDFDocument.load(
+      await renderCertificatePdf(sample, { preview: true }),
+    );
+    expect(preview.getPageCount()).toBe(1);
+    expect(preview.getPage(0).getSize()).toEqual({
+      width: CERTIFICATE_PAGE_SIZES[type][0],
+      height: CERTIFICATE_PAGE_SIZES[type][1],
+    });
+    const lines = extractedLines(preview);
+    expect(lines.filter((line) => line === "Vista previa")).toHaveLength(1);
+    expect(lines.join(" ")).not.toContain("ID:");
+    expect(lines.join(" ")).not.toContain("DEMO");
+    expect(preview.getPage(0).node.Annots()?.size() ?? 0).toBe(0);
+    await expect(renderCertificatePdf(sample)).rejects.toMatchObject({
+      code: "PDF_INVALID_INPUT",
+    });
+  }
 });
 
 test("long identities, course names and signatories wrap without truncation or a second page", async () => {
@@ -278,6 +332,8 @@ test("long identities, course names and signatories wrap without truncation or a
     const original = fixture(type);
     const input: CertificateRenderInput = {
       ...original,
+      publicCredentialId: "W".repeat(128),
+      verificationUrl: `https://example.test/certificados/${"W".repeat(128)}`,
       recipientName:
         "DEMOSTRACIÓN ÑÚÑEZ DE LA PEÑA, MARÍA ÁNGELA DEL VALLE DE LOS ANDES",
       courseName:
@@ -294,7 +350,45 @@ test("long identities, course names and signatories wrap without truncation or a
         original.signatories[2],
       ],
     };
+    const drawnText = spyOn(PDFPage.prototype, "drawText");
     const doc = await PDFDocument.load(await renderCertificatePdf(input));
+    const idLines = drawnText.mock.calls.slice(
+      drawnText.mock.calls.findIndex(([text]) => text.startsWith("ID:")),
+    );
+    expect(
+      idLines
+        .map(([text]) => text)
+        .join("")
+        .replace(/\s/g, ""),
+    ).toBe(`ID:${input.publicCredentialId}`);
+    for (const [text, options] of drawnText.mock.calls) {
+      expect(options!.x).toBeGreaterThanOrEqual(12);
+      expect(options!.y).toBeGreaterThanOrEqual(12);
+      expect(
+        options!.x! + options!.font!.widthOfTextAtSize(text, options!.size!),
+      ).toBeLessThanOrEqual(doc.getPage(0).getWidth() - 12);
+      expect(options!.y! + options!.size!).toBeLessThanOrEqual(
+        doc.getPage(0).getHeight() - 12,
+      );
+    }
+    const codeTop = type === "APPROVAL" ? 183 : 218;
+    const codeBottom = type === "APPROVAL" ? 243 : 288;
+    for (const [text, options] of idLines) {
+      expect(options!.size).toBeGreaterThanOrEqual(7);
+      expect(options!.x).toBeGreaterThanOrEqual(
+        type === "APPROVAL" ? 538 : 414,
+      );
+      expect(
+        options!.x! + options!.font!.widthOfTextAtSize(text, options!.size!),
+      ).toBeLessThanOrEqual(type === "APPROVAL" ? 758 : 594);
+      expect(options!.y! + options!.size!).toBeLessThanOrEqual(
+        doc.getPage(0).getHeight() - codeTop,
+      );
+      expect(options!.y).toBeGreaterThanOrEqual(
+        doc.getPage(0).getHeight() - codeBottom,
+      );
+    }
+    drawnText.mockRestore();
     expect(doc.getPageCount()).toBe(1);
     const text = extractedLines(doc).join(" ");
     expect(text).toContain(input.recipientName);

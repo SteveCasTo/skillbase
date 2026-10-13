@@ -241,8 +241,13 @@ schema Drizzle:
   `ClosureReportDto` completo (roster, notas/resultados, umbral, asistencia y
   elegibilidad). Sus FK de grupo/curso y actor usan `RESTRICT`.
 - `academic_group_reopenings`: evento append-only con referencia a versión,
-  instante, actor UUID/name y razón obligatoria de 1–500 caracteres; unique por
+  instante, actor UUID/name y razón opcional (`null` o 1–500 caracteres sin
+  controles); unique por
   versión reabierta.
+  `0026_optional_academic_reopening_reason.sql` permite `null` sin reescribir
+  eventos existentes ni cambiar los triggers de inmutabilidad, RLS o grants.
+  Su snapshot deriva de 0025 y conserva el esquema de certificados actuales y
+  los apellidos separados de 0024; el journal completo contiene 27 entradas.
 - `academic_closure_receipts`: resultado append-only con actor, UUID request key,
   fingerprint SHA-256 y comando result; unique `(actor_id, request_key)`.
 
@@ -273,11 +278,23 @@ development; PR 286 liberó el schema a producción. Ver contrato/evidencia en
 
 ### Participant
 
+La identidad estudiantil usa `firstName`, `paternalSurname` y `maternalSurname`,
+todos obligatorios, con trim, límites de 100/150/150 caracteres y rechazo de
+caracteres de control. PostgreSQL conserva `first_name`, `paternal_surname` y
+`maternal_surname` con NOT NULL/checks. El mismo contrato aplica a interesados;
+no cambia `instructor_profiles.first_name/last_name` ni `users.name`.
+La migración forward-only `0024_student_required_surnames` exige participantes
+e interesados vacíos mediante el reset de negocio aprobado antes de aplicarse:
+no divide nombres históricos ni fabrica un apellido materno. Los snapshots de
+cierre y certificados se reconstruyen por la operación de seed autorizada, no
+por esta migración. Las migraciones anteriores y sus hashes permanecen intactos.
+
 Implementado mediante migración 0017 (release Fase 5, cloud ledger 18): persona global de administración sin cuenta Auth. CI es texto único tras trim, eliminación de whitespace y uppercase, preservando ceros iniciales, letras/sufijos; no cast numérico, validación de formato nacional, checksum ni escaneo documental. No es `InterestRegistration` ni se fusiona por email. Una persona puede tener una preinscripción activa por curso y otras en cursos distintos. CI no se expone al roster instructor.
 
 - id
 - firstName
-- lastName
+- paternalSurname
+- maternalSurname
 - ci (identificador único como texto normalizado)
 - email (requerido)
 - phone (nullable)
@@ -387,9 +404,11 @@ probada en stacks aislados, pero no aplicada a canónico/cloud; en este boundary
 `master` conserva ledger 23. El schema incluye ajustes singleton, certificados,
 eventos, receipts idempotentes y reservas/metadata de artefactos, todos con RLS.
 La tabla `certificates` conserva tipo/estado, destinatario, versión oficial F8,
-datos/procedencia congelados, actor, paths/hash de artefactos y vínculos de
-reemplazo; los índices/constraints limitan IDs públicos y un único certificado
-`issued` por curso/tipo/destinatario. Detalle normativo en
+datos/procedencia congelados, actor y paths/hash de artefactos. La migración
+forward 0025 elimina las relaciones de reemplazo y garantiza un único registro
+por grupo/tipo/destinatario en todos los estados. Regeneración unsigned actualiza
+ese registro con ID público nuevo; sustitución signed conserva ID/metadata y
+actualiza el artefacto con reserva exacta y revisión optimista. Detalle normativo en
 [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). El estado de release y
 evidencia QA están en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 
@@ -409,13 +428,16 @@ evidencia QA están en [`PLAN.md`](PLAN.md) y [`TESTING.md`](TESTING.md).
 - reason
 - unsignedPath / signedPath / signedSha256
 - reviewed
-- replacementForId / replacedById
 
 Related tables: `certificate_settings` is a revisioned singleton whose default
 projection is read-only until an ADMIN explicitly saves it; `certificate_events`
 and `certificate_receipts` preserve append-only audit/idempotency evidence;
 `certificate_artifacts` records reserved/attached/cleanup states and exact file
-hashes. The private Storage bucket is `certificate-documents`.
+hashes, not copies of prior credential entities. Retired objects move to
+`cleanup_pending` only after no current path references them, then are removed
+after commit. 0025 fails closed on nonempty certificates and requires the
+reviewed synthetic reset; it does not migrate issued credentials implicitly.
+The private Storage bucket is `certificate-documents`.
 
 ### AuditEvent
 

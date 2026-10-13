@@ -7,6 +7,8 @@ import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
 import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
+import { readMigrationFiles } from "drizzle-orm/migrator";
+import { resolve } from "node:path";
 import type { ClosureStateDto } from "@/domain/academic-closure/types";
 import type { CertificateDto } from "@/domain/certificates/types";
 import { courses } from "@/server/db/schema";
@@ -92,26 +94,60 @@ async function closeOfficialGroup(page: Page, fixture: Fixture) {
   expect(response.status()).toBe(200);
   return state(page, fixture);
 }
-async function settings(page: Page) {
+async function settings(page: Page, fixtureKey: string) {
   await page.goto("/app/configuracion/certificados");
+  await expect(page).toHaveURL(/\/app\/configuracion#firmantes$/);
   for (const [id, name] of [
-    ["departmentHead.name", "Jefatura ficticia QA"],
-    ["director.name", "Dirección ficticia QA"],
-    ["dean.name", "Decanato ficticio QA"],
-  ])
-    await page.locator(`[id="${id}"]`).fill(name!);
-  const saved = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      new URL(response.url()).pathname === "/app/configuracion/certificados",
+    ["departmentHead.name", `Jefatura ficticia QA ${fixtureKey}`],
+    ["director.name", `Dirección ficticia QA ${fixtureKey}`],
+    ["dean.name", `Decanato ficticio QA ${fixtureKey}`],
+  ]) {
+    const form = page.locator(
+      `[data-certificate-settings-field][data-edit-field="${id}"]`,
+    );
+    await form
+      .getByRole("button", { name: "Editar nombre completo", exact: true })
+      .click();
+    await form.locator(`[id="${id}"]`).fill(name!);
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === "/app/configuracion/certificados",
+    );
+    await form
+      .getByRole("button", { name: "Guardar nombre completo", exact: true })
+      .click();
+    expect((await saved).status()).toBe(200);
+    await expect(form.locator("[data-inline-value]")).toHaveText(name!);
+  }
+  const draft = page.locator(
+    '[data-edit-field="director.name"][data-certificate-settings-field]',
   );
-  await page
-    .getByRole("button", { name: "Guardar configuración", exact: true })
+  await draft
+    .getByRole("button", { name: "Editar nombre completo", exact: true })
     .click();
-  expect((await saved).status()).toBe(200);
-  await expect(page.locator('[id="director.name"]')).toHaveValue(
-    "Dirección ficticia QA",
-  );
+  await draft.locator('input[name="value"]').fill("Borrador sin guardar QA");
+  for (const label of [
+    "Previsualizar aprobación",
+    "Previsualizar instructor",
+  ]) {
+    const pdf = page.waitForResponse((response) =>
+      new URL(response.url()).pathname.endsWith("/vista-previa.pdf"),
+    );
+    await page.getByRole("button", { name: label, exact: true }).click();
+    expect((await pdf).status()).toBe(200);
+    await expect(page.getByRole("dialog").locator("iframe")).toBeVisible();
+    await page.getByRole("button", { name: "Cerrar", exact: true }).click();
+    await expect(draft.locator('input[name="value"]')).toHaveValue(
+      "Borrador sin guardar QA",
+    );
+  }
+  await draft
+    .getByRole("button", {
+      name: "Cancelar edición de nombre completo",
+      exact: true,
+    })
+    .click();
 }
 async function records(
   page: Page,
@@ -141,42 +177,38 @@ async function generate(
   type: "APPROVAL" | "INSTRUCTOR" = "APPROVAL",
 ) {
   await page.goto(`${groupPath(fixture)}/certificados`);
-  const form = page.getByRole("form", {
-    name:
-      type === "APPROVAL"
-        ? "Certificado de aprobación"
-        : "Certificado de instructor",
-    exact: true,
-  });
+  const section = page.locator(`section[aria-labelledby="recipients-${type}"]`);
+  await section.getByRole("link").first().click();
+  const form = page.locator("form[data-certificate-form]");
   await expect(
     form.getByRole("button", { name: "Generar PDF", exact: true }),
   ).toBeEnabled();
   const generated = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
-      new URL(response.url()).pathname.endsWith("/certificados"),
+      new URL(response.url()).pathname.includes(
+        `/certificados/${type.toLowerCase()}/`,
+      ),
   );
   await form.getByRole("button", { name: "Generar PDF", exact: true }).click();
   expect((await generated).status()).toBe(200);
-  await expect(
-    page.getByRole("heading", { name: "Documentos del grupo" }),
-  ).toBeVisible();
-  await expect(
-    page.locator('a[href^="/app/certificados/"]').filter({
-      hasText:
-        type === "APPROVAL"
-          ? "Certificado de aprobación"
-          : "Certificado de instructor",
-    }),
-  ).toBeVisible();
-  return (await records(page, fixture)).find((record) => record.type === type)!;
+  await expect(page).toHaveURL(/\/app\/certificados\/[0-9a-f-]{36}$/u);
+  const response = await page.request.get(new URL(page.url()).pathname, {
+    headers,
+  });
+  const loaded: { available: boolean; data: CertificateDto } =
+    await response.json();
+  expect(loaded.available).toBe(true);
+  return loaded.data;
 }
-async function signedFixture() {
+async function signedFixture(
+  notice = "SYNTHETIC QA: lifecycle upload evidence only",
+) {
   const pdf = await PDFDocument.create();
   pdf.setTitle(
     "SYNTHETIC QA uploaded PDF — not institutional handwritten signatures",
   );
-  pdf.addPage().drawText("SYNTHETIC QA: lifecycle upload evidence only");
+  pdf.addPage().drawText(notice);
   return Buffer.from(await pdf.save());
 }
 async function uploadReviewIssue(
@@ -186,7 +218,7 @@ async function uploadReviewIssue(
 ) {
   const path = `/app/certificados/${record.id}`;
   await page.goto(path);
-  await page.getByLabel(/Cargar PDF firmado/).setInputFiles({
+  await page.locator('input[type="file"]').setInputFiles({
     name: "synthetic-qa-signed.pdf",
     mimeType: "application/pdf",
     buffer: bytes,
@@ -196,34 +228,16 @@ async function uploadReviewIssue(
       response.request().method() === "POST" &&
       new URL(response.url()).pathname === `${path}/cargar`,
   );
-  await page
-    .getByRole("button", { name: "Cargar PDF firmado", exact: true })
-    .click();
-  expect((await uploaded).status()).toBe(200);
-  const review = page.getByRole("button", {
-    name: "Confirmar revisión",
+  const save = page.getByRole("button", {
+    name: record.hasSignedPdf ? "Sustituir firmado" : "Guardar firmado",
     exact: true,
   });
-  await expect(review).toBeDisabled();
+  await expect(save).toBeDisabled();
   await page
-    .getByRole("checkbox", { name: /He revisado el documento/ })
+    .getByRole("checkbox", { name: "Confirmo que es el certificado firmado." })
     .check();
-  const reviewed = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      response.url().includes("operation=review"),
-  );
-  await review.click();
-  expect((await reviewed).status()).toBe(200);
-  const issued = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      response.url().includes("operation=issue"),
-  );
-  await page
-    .getByRole("button", { name: "Emitir certificado", exact: true })
-    .click();
-  expect((await issued).status()).toBe(200);
+  await save.click();
+  expect((await uploaded).status()).toBe(200);
   await expect(
     page.getByRole("link", { name: "Consultar estado público" }),
   ).toBeVisible();
@@ -236,7 +250,7 @@ async function assertNoOverflow(page: Page) {
   ).toBe(true);
 }
 
-test("ADMIN configures, generates, uploads, reviews, issues, revokes and replaces; anonymous file comparison stays local", async ({
+test("ADMIN configures a single recipient certificate, regenerates drafts, saves and substitutes signed PDF; anonymous file comparison stays local", async ({
   page,
   context,
   browser,
@@ -249,7 +263,11 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
     const ledger = await fixture.database.db.execute<{ count: number }>(
       sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
     );
-    expect(ledger[0]!.count).toBe(24);
+    expect(ledger[0]!.count).toBe(
+      readMigrationFiles({
+        migrationsFolder: resolve(process.cwd(), "drizzle"),
+      }).length,
+    );
     console.info(
       "Certificate UI isolated QA",
       process.env.TEST_SUPABASE_PROJECT_ID,
@@ -267,22 +285,79 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
     await anonymous.clock.setFixedTime(fixture.now);
     const publicPage = await anonymous.newPage();
     await closeOfficialGroup(page, fixture);
+    await page.goto("/app/certificados?search=attendance");
+    const courseSearch = page.getByRole("search", { name: "Buscar cursos" });
+    await expect(courseSearch).toBeVisible();
+    await expect(courseSearch.getByLabel("Buscar cursos")).toHaveValue(
+      "attendance",
+    );
+    const groupCertificateLink = page.locator(
+      `a[href="${groupPath(fixture)}/certificados"]`,
+    );
+    await expect(groupCertificateLink).toBeVisible();
+    await expect(
+      page.locator(
+        `a[href="/app/cursos/${fixture.courseId}/grupos/${fixture.groupId}/certificados"]`,
+      ),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Configurar firmantes" }),
+    ).toHaveCount(0);
+    await courseSearch.getByLabel("Buscar cursos").fill("sin-coincidencia");
+    await expect(
+      page.getByText("No hay cursos que coincidan con la búsqueda."),
+    ).toBeVisible();
+    await courseSearch.getByLabel("Buscar cursos").fill("ATTENDANCE");
+    await expect(groupCertificateLink).toBeVisible();
+    await courseSearch.getByLabel("Buscar cursos").fill("");
+    await expect(groupCertificateLink).toBeVisible();
     await page.goto(`${groupPath(fixture)}/certificados`);
     await expect(
+      page.getByRole("link", { name: "Configurar firmantes" }),
+    ).toHaveCount(0);
+    await expect(
       page.getByRole("button", { name: "Generar PDF", exact: true }),
-    ).toHaveCount(2);
-    for (const button of await page
-      .getByRole("button", { name: "Generar PDF", exact: true })
-      .all())
-      await expect(button).toBeDisabled();
-    await settings(page);
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Certificados", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Consultar cierre oficial" }),
+    ).toHaveCount(0);
+    await settings(page, fixture.historyCourseId.slice(0, 8));
     await page.setViewportSize({ width: 1440, height: 1000 });
     await assertNoOverflow(page);
     await page.screenshot({
       path: testInfo.outputPath("settings-desktop.png"),
       fullPage: true,
     });
-    const record = await generate(page, fixture);
+    let record = await generate(page, fixture);
+    const oldCode = record.publicCredentialId;
+    const regenerated = page.waitForResponse(
+      (r) =>
+        r.request().method() === "POST" &&
+        r.url().includes("/certificados/approval/"),
+    );
+    await page
+      .getByRole("button", { name: "Regenerar PDF", exact: true })
+      .click();
+    expect((await regenerated).status()).toBe(200);
+    await expect(
+      page.getByRole("link", { name: "Descargar para firmar", exact: true }),
+    ).toBeVisible();
+    const currentResponse = await page.request.get(
+      `/app/certificados/${record.id}`,
+      { headers },
+    );
+    record = ((await currentResponse.json()) as { data: CertificateDto }).data;
+    expect(record.publicCredentialId).not.toBe(oldCode);
+    await publicPage.goto(`/certificados/${oldCode}`);
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado no disponible",
+        exact: true,
+      }),
+    ).toBeVisible();
     expect(record.data.recipientName).toContain("Enrolled");
     await publicPage.goto(`/certificados/${record.publicCredentialId}`);
     await expect(
@@ -296,6 +371,29 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
     ).toHaveCount(0);
     const signed = await signedFixture();
     await uploadReviewIssue(page, record, signed);
+    await expect(
+      page.getByRole("link", { name: "Descargar para firmar" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Regenerar PDF" }),
+    ).toHaveCount(0);
+    expect(
+      (
+        await page.request.get(`/app/certificados/${record.id}/generado.pdf`)
+      ).status(),
+    ).toBe(404);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await assertNoOverflow(page);
+    await page.screenshot({
+      path: testInfo.outputPath("signed-detail-mobile.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await assertNoOverflow(page);
+    await page.screenshot({
+      path: testInfo.outputPath("signed-detail-desktop.png"),
+      fullPage: true,
+    });
     const privateFile = await page.request.get(
       `/app/certificados/${record.id}/firmado.pdf`,
     );
@@ -453,6 +551,45 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
       path: testInfo.outputPath("public-mobile.png"),
       fullPage: true,
     });
+    const replacementBytes = await signedFixture(
+      "SYNTHETIC QA: replacement file, no institutional signature",
+    );
+    const currentSigned = await page.request.get(
+      `/app/certificados/${record.id}`,
+      { headers },
+    );
+    const signedRecord = (
+      (await currentSigned.json()) as { data: CertificateDto }
+    ).data;
+    await uploadReviewIssue(page, signedRecord, replacementBytes);
+    const substituted = (
+      (await (
+        await page.request.get(`/app/certificados/${record.id}`, { headers })
+      ).json()) as { data: CertificateDto }
+    ).data;
+    expect(substituted.id).toBe(record.id);
+    expect(substituted.publicCredentialId).toBe(record.publicCredentialId);
+    expect(substituted.signedSha256).toBe(
+      createHash("sha256")
+        .update(new Uint8Array(replacementBytes))
+        .digest("hex"),
+    );
+    await page.goto(`${groupPath(fixture)}/certificados`);
+    expect(
+      (await records(page, fixture)).filter((r) => r.type === "APPROVAL"),
+    ).toHaveLength(1);
+    await expect(page.getByText(/Versión|Historial/)).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath("group-desktop.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await assertNoOverflow(page);
+    await page.screenshot({
+      path: testInfo.outputPath("group-mobile.png"),
+      fullPage: true,
+    });
+    await page.goto(`/app/certificados/${record.id}`);
     await page
       .getByRole("button", { name: "Revocar certificado", exact: true })
       .click();
@@ -484,62 +621,19 @@ test("ADMIN configures, generates, uploads, reviews, issues, revokes and replace
     await publicPage.getByLabel("Seleccionar PDF firmado").setInputFiles({
       name: "synthetic-qa-signed.pdf",
       mimeType: "application/pdf",
-      buffer: signed,
+      buffer: replacementBytes,
     });
     await expect(
       publicPage.getByRole("status", {
         name: "Resultado de comparación local",
       }),
     ).toContainText("coincide, pero el certificado no es válido");
-    await page
-      .getByRole("link", { name: "Preparar reemplazo", exact: true })
-      .click();
-    const replaceForm = page.getByRole("form", {
-      name: "Certificado de aprobación",
-      exact: true,
-    });
-    await replaceForm
-      .getByRole("combobox", { name: "Titular del reemplazo" })
-      .click();
-    await page
-      .getByRole("option", { name: record.data.recipientName, exact: true })
-      .click();
-    await replaceForm
-      .getByLabel("Motivo de reemplazo (obligatorio)")
-      .fill("Reemplazo sintético QA");
-    const prepared = page.waitForResponse(
-      (response) =>
-        response.request().method() === "POST" &&
-        new URL(response.url()).pathname.endsWith("/certificados"),
-    );
-    await replaceForm
-      .getByRole("button", { name: "Preparar reemplazo", exact: true })
-      .click();
-    expect((await prepared).status()).toBe(200);
     await expect(
-      page
-        .locator('a[href^="/app/certificados/"]')
-        .filter({ hasText: "PDF generado" }),
-    ).toBeVisible();
-    const replacement = (await records(page, fixture)).find(
-      (entry) => entry.replacementForId === record.id,
-    )!;
-    expect(replacement).toBeDefined();
-    await uploadReviewIssue(page, replacement, signed);
-    await publicPage.reload();
+      page.getByRole("link", { name: "Preparar reemplazo" }),
+    ).toHaveCount(0);
     await expect(
-      publicPage.getByRole("heading", {
-        name: "Certificado reemplazado",
-        exact: true,
-      }),
-    ).toBeVisible();
-    await publicPage.goto(`/certificados/${replacement.publicCredentialId}`);
-    await expect(
-      publicPage.getByRole("heading", {
-        name: "Certificado vigente",
-        exact: true,
-      }),
-    ).toBeVisible();
+      page.getByRole("button", { name: "Regenerar PDF", exact: true }),
+    ).toHaveCount(0);
   } finally {
     try {
       await anonymous?.close();
@@ -564,7 +658,7 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
     await instructor.clock.setFixedTime(fixture.now);
     instructorPage = await instructor.newPage();
     await closeOfficialGroup(page, fixture);
-    await settings(page);
+    await settings(page, fixture.historyCourseId.slice(0, 8));
     const approval = await generate(page, fixture);
     await uploadReviewIssue(page, approval, await signedFixture());
     const teacherCertificate = await generate(page, fixture, "INSTRUCTOR");
@@ -627,19 +721,24 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
     );
     expect(reopened.status()).toBe(200);
     await page.goto(`/app/certificados/${teacherCertificate.id}`);
-    await expect(
-      page.getByText(/Este borrador pertenece a un cierre/),
-    ).toBeVisible();
+    await expect(page.getByText(/El cierre cambió/)).toBeVisible();
     await expect(
       page.getByRole("button", { name: /Cargar|Emitir|revisión/ }),
     ).toHaveCount(0);
     const stale = await page.request.post(
-      `/app/certificados/${teacherCertificate.id}?operation=issue`,
+      `/app/certificados/${teacherCertificate.id}/cargar`,
       {
         headers,
-        data: {
+        multipart: {
           requestKey: crypto.randomUUID(),
           revision: teacherCertificate.revision,
+          purpose: "SIGNED",
+          attestation: "true",
+          file: {
+            name: "qa.pdf",
+            mimeType: "application/pdf",
+            buffer: await signedFixture(),
+          },
         },
       },
     );

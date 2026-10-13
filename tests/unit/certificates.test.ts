@@ -14,6 +14,9 @@ import {
   CERTIFICATE_PDF_MAX_BYTES,
 } from "@/server/certificates/upload";
 import { requireCertificateActor } from "@/server/certificates/http";
+import { previewCertificate } from "@/server/certificates/preview";
+import { updateCertificateSettingsField } from "@/application/certificates/update-settings-field";
+import { CertificateError } from "@/domain/certificates/rules";
 import { handlePublicCertificateGet } from "@/server/certificates/public-http";
 import {
   certificatePdfInput,
@@ -54,7 +57,8 @@ test("certificate eligibility uses only official combined decision and stable id
       {
         participantId: "eligible",
         firstName: "Full",
-        lastName: "Name",
+        paternalSurname: "Name",
+        maternalSurname: "Quispe",
         membershipStatus: "INSCRITO",
         academicallyPassed: true,
         balanceCents: 5000,
@@ -62,7 +66,8 @@ test("certificate eligibility uses only official combined decision and stable id
       {
         participantId: "attendance-failed",
         firstName: "Not",
-        lastName: "Eligible",
+        paternalSurname: "Eligible",
+        maternalSurname: "Quispe",
         membershipStatus: "INSCRITO",
         academicallyPassed: false,
         result: { passed: true },
@@ -70,21 +75,23 @@ test("certificate eligibility uses only official combined decision and stable id
       {
         participantId: "pending",
         firstName: "Pending",
-        lastName: "Grade",
+        paternalSurname: "Grade",
+        maternalSurname: "Quispe",
         membershipStatus: "INSCRITO",
         academicallyPassed: false,
       },
       {
         participantId: "unpaid",
         firstName: "Wrong",
-        lastName: "Membership",
+        paternalSurname: "Membership",
+        maternalSurname: "Quispe",
         membershipStatus: "PREINSCRITO",
         academicallyPassed: true,
       },
     ],
   } as unknown as ClosureReportDto;
   expect(certificateRecipients(report, "APPROVAL")).toEqual([
-    { id: "eligible", name: "Full Name" },
+    { id: "eligible", name: "Full Name Quispe" },
   ]);
   expect(
     certificateRecipients({ ...report, participants: [] }, "INSTRUCTOR"),
@@ -146,12 +153,12 @@ test("public projection is an exact allowlist and draft returns no identity", ()
     storagePath: "secret",
     grades: [100],
   };
-  for (const state of ["pending", "generated", "awaiting_signature"] as const)
+  for (const state of ["pending", "generated"] as const)
     expect(publicCertificate(state, data, null)).toEqual({
       state: "not_issued",
       valid: false,
     });
-  for (const state of ["issued", "revoked", "replaced"] as const) {
+  for (const state of ["issued", "revoked"] as const) {
     const result = publicCertificate(state, data, "f".repeat(64));
     expect(result.valid).toBe(state === "issued");
     expect(Object.keys(result).sort()).toEqual(
@@ -206,7 +213,7 @@ test("PDF upload rejects mismatched MIME extension sniff size purpose malformed 
       validateCertificatePdf(invalid, "scan.pdf", "application/pdf", "SIGNED"),
     ).rejects.toThrow();
 });
-test("HTTP session guard permits ADMIN peers but never inactive or instructor mutations", () => {
+test("HTTP session guard permits ADMIN peers but never inactive or instructor mutations", async () => {
   const actor = {
     id: crypto.randomUUID(),
     authUserId: crypto.randomUUID(),
@@ -225,6 +232,99 @@ test("HTTP session guard permits ADMIN peers but never inactive or instructor mu
   expect(() =>
     requireCertificateActor({ ...actor, roles: ["INSTRUCTOR"] }, false),
   ).not.toThrow();
+  let reads = 0;
+  const repository = {
+    async getSettings() {
+      reads++;
+      return {
+        revision: 0,
+        configuration: structuredClone(defaultCertificateConfiguration),
+      };
+    },
+  };
+  for (const denied of [
+    { ...actor, roles: ["INSTRUCTOR" as const] },
+    { ...actor, status: "DISABLED" as const },
+  ]) {
+    expect(
+      (await previewCertificate(denied, "APPROVAL", repository)).status,
+    ).toBe(403);
+  }
+  expect(reads).toBe(0);
+  expect(
+    (await previewCertificate(actor, "PARTICIPATION", repository)).status,
+  ).toBe(422);
+  expect(reads).toBe(0);
+  const preview = await previewCertificate(actor, "APPROVAL", repository);
+  expect(preview.status).toBe(200);
+  expect(preview.headers.get("Cache-Control")).toBe("private, no-store");
+  expect(preview.headers.get("Content-Disposition")).toStartWith("inline;");
+  expect(
+    (await PDFDocument.load(await preview.arrayBuffer())).getPageCount(),
+  ).toBe(1);
+  expect(reads).toBe(1);
+  let current = {
+    revision: 0,
+    configuration: structuredClone(defaultCertificateConfiguration),
+  };
+  let writes = 0;
+  const settingsRepository = {
+    async getSettings() {
+      return structuredClone(current);
+    },
+    async updateSettings(
+      _actor: string,
+      revision: number,
+      configuration: typeof current.configuration,
+    ) {
+      if (revision !== current.revision)
+        throw new CertificateError("CONCURRENT_UPDATE", "Conflict");
+      writes++;
+      current = { revision: revision + 1, configuration };
+      return structuredClone(current);
+    },
+  };
+  const unchanged = structuredClone(current.configuration);
+  const saved = await updateCertificateSettingsField(
+    settingsRepository,
+    actor.id,
+    0,
+    "director.name",
+    " Synthetic Director ",
+  );
+  expect(saved.configuration).toEqual({
+    ...unchanged,
+    director: { ...unchanged.director, name: "Synthetic Director" },
+  });
+  expect(saved.revision).toBe(1);
+  await expect(
+    updateCertificateSettingsField(
+      settingsRepository,
+      actor.id,
+      0,
+      "dean.name",
+      "Other",
+    ),
+  ).rejects.toMatchObject({ code: "CONCURRENT_UPDATE" });
+  await expect(
+    updateCertificateSettingsField(
+      settingsRepository,
+      actor.id,
+      1,
+      "organization",
+      "Other",
+    ),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  await expect(
+    updateCertificateSettingsField(
+      settingsRepository,
+      actor.id,
+      1,
+      "dean.role",
+      "",
+    ),
+  ).rejects.toMatchObject({ fields: { "dean.role": expect.any(String) } });
+  expect(writes).toBe(1);
 });
 test("public adapter limits before registry access and exposes only authoritative DTO", async () => {
   let reads = 0;
@@ -256,7 +356,13 @@ test("public adapter limits before registry access and exposes only authoritativ
 test("merged renderer adapter maps version, frozen generation instant and exact signature tuple", async () => {
   const approval = certificatePdfInput(freezeCertificateData(input));
   expect(approval.type).toBe("APPROVAL");
-  expect(approval.templateVersion).toBe(1);
+  expect(approval.templateVersion).toBe(2);
+  expect(() =>
+    certificatePdfInput({
+      ...freezeCertificateData(input),
+      templateVersion: "phase9-v1",
+    }),
+  ).toThrow();
   expect(approval.generatedAt).toBe("2099-03-06T12:00:00.000Z");
   expect(approval.signatories).toHaveLength(3);
   expect(approval).not.toHaveProperty("groupNumber");
@@ -284,6 +390,12 @@ test("merged renderer adapter maps version, frozen generation instant and exact 
     certificatePdfInput({
       ...freezeCertificateData(input),
       templateVersion: "unsupported",
+    }),
+  ).toThrow();
+  expect(() =>
+    certificatePdfInput({
+      ...freezeCertificateData(input),
+      brandingVersion: "phase9-v2",
     }),
   ).toThrow();
   await expect(

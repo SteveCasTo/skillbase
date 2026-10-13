@@ -9,7 +9,10 @@ import type {
   ClosureCommand,
   ReopenGroupInput,
 } from "@/domain/academic-closure/types";
-import type { ClosureRepository } from "./closure-repository";
+import type {
+  ClosedAcademicGroupRepository,
+  ClosureRepository,
+} from "./closure-repository";
 
 export function requireClosureActor(
   actor: InternalUser,
@@ -36,6 +39,16 @@ export function getAcademicClosure(
   closureId(groupId, "groupId");
   return repository.getGroup(actor.id, courseId, groupId);
 }
+
+export function listClosedAcademicGroups(
+  repository: ClosedAcademicGroupRepository,
+  actor: InternalUser,
+  courseIds: readonly string[],
+) {
+  requireClosureActor(actor, true);
+  return repository.listClosedGroups(courseIds);
+}
+
 export function getAcademicClosureVersion(
   repository: ClosureRepository,
   actor: InternalUser,

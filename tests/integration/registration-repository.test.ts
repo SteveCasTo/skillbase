@@ -117,7 +117,8 @@ async function fixture(capacity = 3) {
     participant: {
       ci: `00AB-${crypto.randomUUID()}`,
       firstName: "Synthetic",
-      lastName: "Participant",
+      paternalSurname: "Participant",
+      maternalSurname: "Quispe",
       email: "participant@test.invalid",
       phone: null,
     },
@@ -583,7 +584,13 @@ test("fresh role/status authorization and instructor ownership/start return name
       row.groupId,
       f.instructor.id,
     ),
-  ).toEqual([{ firstName: "Synthetic", lastName: "Participant" }]);
+  ).toEqual([
+    {
+      firstName: "Synthetic",
+      paternalSurname: "Participant",
+      maternalSurname: "Quispe",
+    },
+  ]);
   const other = await createInstructorFixture(db);
   await expect(
     repository.instructorRoster(f.course.id, row.groupId, other.id),
@@ -636,7 +643,8 @@ test("interest conversion consumes operational demand permanently while preservi
     .values({
       courseId: f.course.id,
       firstName: "Public",
-      lastName: "Origin",
+      paternalSurname: "Origin",
+      maternalSurname: "Quispe",
       email: "public@test.invalid",
       preferredGroupId: f.groups[1]!.id,
     })
@@ -650,7 +658,8 @@ test("interest conversion consumes operational demand permanently while preservi
     .values({
       courseId: other.course.id,
       firstName: "Public",
-      lastName: "Origin",
+      paternalSurname: "Origin",
+      maternalSurname: "Quispe",
       email: interest!.email,
     })
     .returning();
@@ -758,7 +767,8 @@ test("interest picker offers normalized active same-course sources only, never g
       participant: {
         ...other.input.participant,
         firstName: "José",
-        lastName: "Muñoz",
+        paternalSurname: "Muñoz",
+        maternalSurname: "Quispe",
       },
     },
     other.actor.id,
@@ -769,20 +779,23 @@ test("interest picker offers normalized active same-course sources only, never g
       {
         courseId: f.course.id,
         firstName: "José",
-        lastName: "Muñoz",
+        paternalSurname: "Muñoz",
+        maternalSurname: "Quispe",
         email: "first@test.invalid",
       },
       {
         courseId: f.course.id,
         firstName: "José",
-        lastName: "Muñoz",
+        paternalSurname: "Muñoz",
+        maternalSurname: "Quispe",
         email: "cancelled@test.invalid",
         status: "CANCELLED" as const,
       },
       {
         courseId: other.course.id,
         firstName: "José",
-        lastName: "Muñoz",
+        paternalSurname: "Muñoz",
+        maternalSurname: "Quispe",
         email: "foreign@test.invalid",
       },
     ])
@@ -846,7 +859,8 @@ test("interest conversion rollback leaves source available and does not change e
     .values({
       courseId: f.course.id,
       firstName: "Public",
-      lastName: "Origin",
+      paternalSurname: "Origin",
+      maternalSurname: "Quispe",
       email: "rollback@test.invalid",
     })
     .returning();

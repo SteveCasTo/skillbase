@@ -811,7 +811,8 @@ export const interestRegistrations = pgTable(
       .notNull()
       .references(() => courses.id, { onDelete: "restrict" }),
     firstName: text("first_name").notNull(),
-    lastName: text("last_name").notNull(),
+    paternalSurname: text("paternal_surname").notNull(),
+    maternalSurname: text("maternal_surname").notNull(),
     email: text("email").notNull(),
     phone: text("phone"),
     preferredGroupId: uuid("preferred_group_id"),
@@ -852,8 +853,12 @@ export const interestRegistrations = pgTable(
       sql`char_length(${table.firstName}) between 1 and 100 and ${table.firstName} = btrim(${table.firstName}) and ${table.firstName} !~ '[[:cntrl:]]'`,
     ),
     check(
-      "interest_registrations_last_name_check",
-      sql`char_length(${table.lastName}) between 1 and 150 and ${table.lastName} = btrim(${table.lastName}) and ${table.lastName} !~ '[[:cntrl:]]'`,
+      "interest_registrations_paternal_surname_check",
+      sql`char_length(${table.paternalSurname}) between 1 and 150 and ${table.paternalSurname} = btrim(${table.paternalSurname}) and ${table.paternalSurname} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      "interest_registrations_maternal_surname_check",
+      sql`char_length(${table.maternalSurname}) between 1 and 150 and ${table.maternalSurname} = btrim(${table.maternalSurname}) and ${table.maternalSurname} !~ '[[:cntrl:]]'`,
     ),
     check(
       "interest_registrations_email_check",
@@ -989,14 +994,14 @@ export const academicGroupReopenings = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     actorName: text("actor_name").notNull(),
-    reason: text("reason").notNull(),
+    reason: text("reason"),
   },
   (t) => [
     uniqueIndex("academic_group_reopenings_version_unique").on(t.versionId),
     index("academic_group_reopenings_actor_idx").on(t.actorId),
     check(
       "academic_group_reopenings_reason_check",
-      sql`char_length(btrim(${t.reason})) between 1 and 500 and ${t.reason} !~ '[[:cntrl:]]' and char_length(btrim(${t.actorName})) > 0`,
+      sql`(${t.reason} is null or (char_length(btrim(${t.reason})) between 1 and 500 and ${t.reason} !~ '[[:cntrl:]]')) and char_length(btrim(${t.actorName})) > 0`,
     ),
   ],
 ).enableRLS();
@@ -1045,7 +1050,8 @@ export const participants = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     ci: text("ci").notNull(),
     firstName: text("first_name").notNull(),
-    lastName: text("last_name").notNull(),
+    paternalSurname: text("paternal_surname").notNull(),
+    maternalSurname: text("maternal_surname").notNull(),
     email: text("email").notNull(),
     phone: text("phone"),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 3 })
@@ -1066,8 +1072,12 @@ export const participants = pgTable(
       sql`char_length(${t.firstName}) between 1 and 100 and ${t.firstName} = btrim(${t.firstName}) and ${t.firstName} !~ '[[:cntrl:]]'`,
     ),
     check(
-      "participants_last_name_check",
-      sql`char_length(${t.lastName}) between 1 and 150 and ${t.lastName} = btrim(${t.lastName}) and ${t.lastName} !~ '[[:cntrl:]]'`,
+      "participants_paternal_surname_check",
+      sql`char_length(${t.paternalSurname}) between 1 and 150 and ${t.paternalSurname} = btrim(${t.paternalSurname}) and ${t.paternalSurname} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      "participants_maternal_surname_check",
+      sql`char_length(${t.maternalSurname}) between 1 and 150 and ${t.maternalSurname} = btrim(${t.maternalSurname}) and ${t.maternalSurname} !~ '[[:cntrl:]]'`,
     ),
     check(
       "participants_email_check",

@@ -16,7 +16,8 @@ export type LedgerKind = "PAYMENT" | "REFUND";
 export interface ParticipantData {
   readonly ci: string;
   readonly firstName: string;
-  readonly lastName: string;
+  readonly paternalSurname: string;
+  readonly maternalSurname: string;
   readonly email: string;
   readonly phone: string | null;
 }
@@ -83,7 +84,8 @@ export interface AdminRegistrationDto extends RegistrationFinance {
 /** Deliberately separate from administrative DTOs: no identity/contact/finance. */
 export interface InstructorRosterEntryDto {
   readonly firstName: string;
-  readonly lastName: string;
+  readonly paternalSurname: string;
+  readonly maternalSurname: string;
 }
 export interface RegistrationCourseContext {
   readonly id: string;
@@ -197,7 +199,8 @@ export interface RegistrationFormDto {
   readonly sourceInterest: {
     readonly id: string;
     readonly firstName: string;
-    readonly lastName: string;
+    readonly paternalSurname: string;
+    readonly maternalSurname: string;
     readonly email: string;
     readonly phone: string | null;
   } | null;

@@ -98,7 +98,8 @@ export function attendanceDemoPlan(
       participant: {
         ci: `00AD${String(i + 1).padStart(3, "0")}LP`,
         firstName: ["Valeria", "Gabriel", "Camila", "Nicolás"][i]!,
-        lastName: "Ejemplo",
+        paternalSurname: "Ejemplo",
+        maternalSurname: "Quispe",
         email: `asistencia.v1.${key}@example.test`,
         phone: null,
       },

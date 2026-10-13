@@ -3,7 +3,7 @@ import { navigationSkeletonVariant } from "../../src/components/private-nav/navi
 
 describe("private navigation skeleton structure", () => {
   test("matches only known server-rendered private surfaces", () => {
-    expect(navigationSkeletonVariant("/app")).toBe("summary");
+    expect(navigationSkeletonVariant("/app")).toBeNull();
     expect(navigationSkeletonVariant("/app/formatos/")).toBe("list");
     expect(navigationSkeletonVariant("/app/cursos")).toBe("list");
     expect(navigationSkeletonVariant("/app/interesados")).toBe("list");

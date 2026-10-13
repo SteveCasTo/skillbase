@@ -79,7 +79,7 @@ async function configure(page: Page, courseId: string) {
 }
 
 async function saveGrade(page: Page, component: string, score: string) {
-  const person = "Enrolled Attendance";
+  const person = "Enrolled Attendance Quispe";
   await page
     .getByRole("button", {
       name: `Editar notas de ${person}`,
@@ -223,7 +223,7 @@ test("INSTRUCTOR saves rows atomically with pending distinct from zero, and corr
     expect(pending.grades[1]?.score).toBeNull();
     await page
       .getByRole("button", {
-        name: "Editar notas de Enrolled Attendance",
+        name: "Editar notas de Enrolled Attendance Quispe",
         exact: true,
       })
       .click();
@@ -234,7 +234,7 @@ test("INSTRUCTOR saves rows atomically with pending distinct from zero, and corr
       name: /Práctica.*Enrolled Attendance/u,
     });
     const save = page.getByRole("button", {
-      name: "Guardar notas de Enrolled Attendance",
+      name: "Guardar notas de Enrolled Attendance Quispe",
       exact: true,
     });
     await expect(save).toBeDisabled();
@@ -253,7 +253,7 @@ test("INSTRUCTOR saves rows atomically with pending distinct from zero, and corr
     await save.click();
     await expect(
       page.getByRole("button", {
-        name: "Editar notas de Enrolled Attendance",
+        name: "Editar notas de Enrolled Attendance Quispe",
         exact: true,
       }),
     ).toBeVisible();
@@ -327,7 +327,7 @@ test("INSTRUCTOR saves rows atomically with pending distinct from zero, and corr
     ).toBe(true);
     await expect(
       page.getByRole("button", {
-        name: "Editar notas de Enrolled Attendance",
+        name: "Editar notas de Enrolled Attendance Quispe",
         exact: true,
       }),
     ).toBeVisible();
@@ -373,7 +373,7 @@ async function verifySsr(
     await page.goto(group);
     await page
       .getByRole("textbox", {
-        name: "Evaluación · Enrolled Attendance",
+        name: "Evaluación · Enrolled Attendance Quispe",
         exact: true,
       })
       .fill("0");

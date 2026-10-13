@@ -59,10 +59,11 @@ lee las fuentes institucionales/curriculares que aún no están incluidas en ese
 snapshot. Congelar en el registro de certificado y en el artefacto todos los
 valores efectivamente impresos, su procedencia/versión, fechas, horas, grupo,
 destinatario y firmantes/cargos, además de la versión de plantilla, branding,
-logos y configuración usada. Una edición posterior de curso, grupo, instructor,
-ajustes o plantilla no debe reescribir lo ya generado o emitido. Corregir los
-datos del certificado exige el flujo explícito de reemplazo, conservando el
-anterior y su trazabilidad; no se corrige sobrescribiendo un PDF emitido.
+logos y configuración usada. Una edición posterior no cambia el documento por
+sí sola. Antes de firmar, ADMIN puede regenerar explícitamente el borrador: se
+actualiza el mismo registro, se congela la metadata vigente y se cambia el ID
+público, invalidando el anterior. Después de guardar el firmado, la metadata y
+el ID permanecen congelados; solo se sustituye el artefacto firmado.
 
 No modificar el snapshot ni los datos históricos de Fase 8 para suplir campos
 que no conserva. El código de cierre actual conserva curso/grupo, destinatario
@@ -96,9 +97,9 @@ configuración/branding en la metadata del certificado.
 
 La etiqueta visible del grupo es un ordinal humano positivo (por ejemplo,
 `GRUPO 1`, `GRUPO 2`), inicialmente por orden de creación dentro del curso
-(`groups.createdAt`, con `groups.id` como desempate estable). ADMIN puede corregirlo antes de generar
-el certificado; congelar entonces el valor y no recalcularlo si cambia el orden
-ni alterar certificados ya generados. El horario impreso usa el horario nominal
+(`groups.createdAt`, con `groups.id` como desempate estable). Siempre lo determina
+el servidor: no existe campo editable ni se admite un ordinal enviado por el
+cliente. Se congela al generar. El horario impreso usa el horario nominal
 del grupo; nunca inferir o inventar una etiqueta/horario desde asistencia o
 sesión individual.
 
@@ -123,6 +124,32 @@ contenido, logos o espacios de firma.
 El QR apunta a `https://<dominio>/certificados/<publicCredentialId>` y no lleva
 PII ni otro dato del certificado codificado. No se imprime necesariamente una
 URL larga.
+
+La plantilla `phase9-v2` conserva branding `phase9-v1` y los tres logos. En ambas
+orientaciones coloca el QR vectorial de 72 pt (incluida su zona de silencio)
+debajo del logo departamental, a la derecha del título, y el ID completo debajo
+del QR. El ID admite 22–128 caracteres con ajuste acotado y fuente mínima de 7 pt;
+no se recorta. Las tres líneas de firma bajan para liberar espacio manuscrito;
+el bloque de verificación ya no ocupa el pie. Las vistas previas ADMIN siguen
+sin QR, ID ni enlace verificable.
+
+La versión se congela en cada nueva generación. Solo está disponible la plantilla
+`phase9-v2` (versión numérica 2 del renderer); v1 se rechaza, nunca se reinterpreta
+silenciosamente como v2. Branding `phase9-v1` identifica los assets conservados,
+no una segunda distribución PDF. Una configuración persistida v1 requiere
+activación ADMIN explícita mediante el repositorio existente, con revisión y
+auditoría. El valor predeterminado para configuración ausente es v2.
+
+El usuario autorizó sustituir los certificados de los namespaces **seed** local
+y cloud para que todos usen v2. Esa operación excepcional requiere PLAN con
+ownership/UUIDs/rutas/hashes/dependencias y aprobación antes de APPLY; no concede
+un permiso general de borrar certificados reales, no debilita guards permanentes
+ni altera migraciones históricas. Los PDFs nuevos se generan por los servicios
+normales desde la versión oficial actual. Si los nombres de los snapshots F8
+seed son antiguos, se obtiene una nueva versión de cierre mediante reapertura y
+cierre normales; no se reescribe el informe inmutable ni se cambia el resultado
+académico para corregir un nombre. La implementación de plantilla única no
+ejecuta por sí sola mantenimiento, cambios de ajustes, release o escrituras Storage.
 
 Orden institucional y logos: UMSS → FCyT → Departamento de Informática y
 Sistemas. Usar los PNG transparentes provistos, sin redibujarlos, alterar
@@ -199,13 +226,26 @@ dato; no resolver al instructor vigente ni sustituir el nombre.
 
 ## Gestión y ciclo de vida
 
-ADMIN puede generar el PDF, imprimirlo para obtener firmas manuscritas, cargar
-el PDF final firmado/escaneado, emitirlo, y posteriormente revocarlo o
-reemplazarlo. La carga/emisión no se concede al instructor. Conservar historial
-y artefactos previos con relación entre el certificado reemplazado y su
-sustituto; revocación exige fecha, motivo y actor responsable. No borrar registros
-ni archivos históricos como mecanismo de corrección. La operación de carga debe
-validarse server-side según la política general de archivos en
+La vista de grupo presenta solo destinatarios elegibles del snapshot oficial,
+en secciones Participantes e Instructor con las mismas tarjetas; no ofrece
+generación masiva, versiones ni historial. Abrir una tarjeta no escribe datos.
+La primera generación requiere un POST explícito «Generar PDF» desde el detalle
+individual. Solicitudes repetidas recuperan un único registro por
+grupo/tipo/destinatario, también antes de firmar; grupos distintos conservan
+certificados independientes.
+
+Los estados operativos visibles son «Para firmar» y «Firmado». ADMIN descarga
+el borrador para obtener firmas y puede regenerarlo solo antes de guardar el
+firmado. Un único PDF y la atestación «Confirmo que es el certificado firmado.»
+se validan en servidor. Guardar publica atómicamente el firmado con SHA-256 de
+sus bytes completos, sin pasos independientes de revisión/emisión. No verifica
+criptográficamente firmas manuscritas. Una sustitución firmada mantiene el ID
+público, actualiza hash/path con revisión optimista y deja auditoría mínima, no
+una copia completa/versionada del certificado. El objeto sustituido se retira
+solo después del commit; fallos de limpieza conservan una reserva recuperable.
+No se ofrece ni se permite descargar el borrador desde URL directa después de
+firmar. Revocación explícita conserva fecha, motivo y actor, sin borrado del
+registro. La carga debe validarse server-side según la política de archivos en
 [`SECURITY.md`](SECURITY.md); el bucket/entrega del PDF final es privado. ADMIN
 e INSTRUCTOR activo pueden descargar un certificado propio/permitido mediante
 una operación autenticada server-side. En INSTRUCTOR, validar `instructorId` del
@@ -221,8 +261,9 @@ completos, sin normalizar/re-renderizar el archivo.
 ## Verificación pública y privacidad
 
 La página pública de verificación recibe el identificador impredecible y consulta
-el registro autoritativo actual. Presenta claramente estado vigente, revocado o
-reemplazado. Su DTO de allowlist contiene únicamente estado,
+el registro autoritativo actual. Presenta claramente estado vigente o revocado;
+un identificador unsigned invalidado por regeneración ya no existe. Su DTO de
+allowlist contiene únicamente estado,
 nombre real del titular, tipo, curso, horas nominales, fecha de finalización,
 `publicCredentialId`/URL y el hash oficial necesario para comparar bytes. No
 exponer CI, email, teléfono, notas, asistencia/participación parcial, finanzas,
@@ -250,12 +291,12 @@ auténtica.
 Para LinkedIn ofrecer copiar/compartir URL, ID, nombre real del titular,
 organización, curso y fecha; no foto/imagen de identidad ni integración API u
 OAuth. El QR incluye solo la URL pública y no requiere imprimir la URL larga.
-Si un código corresponde a un registro todavía no emitido (`pending`, `generated`
-o `awaiting_signature`), no presentarlo como credencial válida ni mostrar datos
+Si un código corresponde a un registro todavía no firmado (`pending`, `generated`),
+no presentarlo como credencial válida ni mostrar datos
 adicionales. La validez positiva corresponde a registro `issued` vigente, no
 revocado ni reemplazado.
 
-## Reapertura, versiones y reemplazo
+## Reapertura y registro vigente
 
 Generación y emisión solo se permiten cuando el grupo está cerrado y la versión
 objetivo es la última versión oficial actual. La reapertura bloquea nuevas
@@ -265,16 +306,25 @@ una versión antigua ni una versión provisional.
 
 La reapertura **no revoca automáticamente** certificados ya emitidos: siguen
 válidos hasta una revocación/reemplazo explícito de ADMIN. No modificar el
-snapshot de cierre ni el certificado emitido. Mantener como máximo un
-certificado activo por curso/tipo/destinatario; el reemplazo marca el previo
-`replaced`, lo enlaza al nuevo y conserva ambos registros y artefactos.
+snapshot de cierre ni la metadata del firmado. Mantener como máximo
+un registro por grupo/tipo/destinatario, protegido por índice único para todos
+los estados. No conservar entidades completas antiguas ni cadenas de reemplazo.
+
+La migración forward `0025_certificate_current_flow.sql` no modifica 0023 ni
+convierte credenciales históricas. Bloquea `certificates` en modo
+`ACCESS EXCLUSIVE` antes de comprobar vacío y mantiene el bloqueo en la
+transacción de migración, evitando generaciones concurrentes entre guard y DDL.
+Falla cerrada si hay certificados: requiere
+el reset operativo de datos sintéticos aprobado y revisado por el responsable
+del release. El código fuente no ejecuta ese reset ni escribe en cloud/canónico.
 
 ## Implementación y límites de estado
 
 La migración 0023 (journal `idx: 23`, SHA-256
 `4c78ed1735b0cd3cb34d2bdc5f1f2c0d15b51dcc31568136839d706649489ee1`, timestamp
-`1791500766703`) se aplicó a cloud y el ledger quedó en 24. El ordinal de grupo es
-ADMIN-editable antes de generar; sus ajustes, ubicación/leyendas institucionales,
+`1791500766703`) se aplicó a cloud y el ledger quedó en 24 en el release original.
+0025 sustituye el flujo actual, sin reescribir aquella migración. El ordinal
+se calcula exclusivamente en servidor; ubicación/leyendas institucionales,
 branding y assets autorizados se congelan en la configuración/procedencia del
 certificado. Los snapshots F8 no se modifican.
 

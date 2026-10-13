@@ -80,8 +80,6 @@ export const certificates = pgTable(
     signedPath: text("signed_path"),
     signedSha256: text("signed_sha256"),
     reviewed: boolean("reviewed").notNull().default(false),
-    replacementForId: uuid("replacement_for_id"),
-    replacedById: uuid("replaced_by_id"),
   },
   (t) => [
     foreignKey({
@@ -89,33 +87,27 @@ export const certificates = pgTable(
       foreignColumns: [groups.courseId, groups.id],
       name: "certificates_course_group_fk",
     }).onDelete("restrict"),
-    foreignKey({
-      columns: [t.replacementForId],
-      foreignColumns: [t.id],
-      name: "certificates_replacement_for_fk",
-    }).onDelete("restrict"),
-    foreignKey({
-      columns: [t.replacedById],
-      foreignColumns: [t.id],
-      name: "certificates_replaced_by_fk",
-    }).onDelete("restrict"),
     uniqueIndex("certificates_public_id_unique").on(t.publicCredentialId),
-    uniqueIndex("certificates_one_active_unique")
-      .on(t.courseId, t.type, t.recipientId)
-      .where(sql`${t.state} = 'issued'`),
+    uniqueIndex("certificates_one_current_unique").on(
+      t.groupId,
+      t.type,
+      t.recipientId,
+    ),
     index("certificates_group_idx").on(t.groupId),
     index("certificates_version_idx").on(t.versionId),
     index("certificates_instructor_idx").on(t.instructorId),
     index("certificates_actor_idx").on(t.createdBy),
-    index("certificates_replacement_idx").on(t.replacementForId),
-    index("certificates_replaced_idx").on(t.replacedById),
     check(
       "certificates_values_check",
-      sql`${t.type} in ('APPROVAL','INSTRUCTOR') and ${t.state} in ('pending','generated','awaiting_signature','issued','revoked','replaced') and ${t.version} > 0 and ${t.revision} >= 0 and ${t.publicCredentialId} ~ '^[A-Za-z0-9_-]{32}$' and (${t.signedSha256} is null or ${t.signedSha256} ~ '^[0-9a-f]{64}$')`,
+      sql`${t.type} in ('APPROVAL','INSTRUCTOR') and ${t.state} in ('pending','generated','issued','revoked') and ${t.version} > 0 and ${t.revision} >= 0 and ${t.publicCredentialId} ~ '^[A-Za-z0-9_-]{32}$' and (${t.signedSha256} is null or ${t.signedSha256} ~ '^[0-9a-f]{64}$')`,
     ),
     check(
       "certificates_issued_check",
       sql`${t.state} not in ('issued','revoked','replaced') or (${t.signedPath} is not null and ${t.signedSha256} is not null and ${t.issuedAt} is not null and ${t.reviewed})`,
+    ),
+    check(
+      "certificates_draft_check",
+      sql`${t.state} not in ('pending','generated') or (${t.signedPath} is null and ${t.signedSha256} is null and ${t.issuedAt} is null and not ${t.reviewed} and ((${t.state} = 'pending' and ${t.unsignedPath} is null and ${t.generatedAt} is null) or (${t.state} = 'generated' and ${t.unsignedPath} is not null and ${t.generatedAt} is not null)))`,
     ),
   ],
 ).enableRLS();

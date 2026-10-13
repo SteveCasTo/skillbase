@@ -77,7 +77,8 @@ export async function createClosureFixture(
         participant: {
           ci: `CL-${crypto.randomUUID()}`,
           firstName: "Synthetic",
-          lastName: crypto.randomUUID(),
+          paternalSurname: crypto.randomUUID(),
+          maternalSurname: "Quispe",
           email: "closure@test.invalid",
           phone: null,
         },

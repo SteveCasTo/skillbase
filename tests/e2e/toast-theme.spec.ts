@@ -444,8 +444,8 @@ for (const selected of ["light", "dark"] as const) {
     await navigation.getByRole("link", { name: "Formatos" }).click();
     await expect(page).toHaveURL(/\/app\/formatos$/);
     await expect(page.locator("html")).toHaveAttribute("data-theme", selected);
-    await navigation.getByRole("link", { name: "Resumen" }).click();
-    await expect(page).toHaveURL(/\/app$/);
+    await navigation.getByRole("link", { name: "Cursos", exact: true }).click();
+    await expect(page).toHaveURL(/\/app\/cursos$/);
     await expect(page.locator("html")).toHaveAttribute("data-theme", selected);
     expect(
       await page.evaluate(

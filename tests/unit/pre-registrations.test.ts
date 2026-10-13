@@ -85,7 +85,8 @@ function snapshot(
 const participant = {
   ci: " 00 ab - lp ",
   firstName: " María José ",
-  lastName: " Test 李 ",
+  paternalSurname: " Test 李 ",
+  maternalSurname: " García ",
   email: "PERSON@Example.invalid",
   phone: null,
 };
@@ -149,13 +150,24 @@ test("phase5 CI normalization preserves leading zeroes, letters and suffixes wit
   expect(validateParticipant(participant)).toEqual({
     ci: "00AB-LP",
     firstName: "María José",
-    lastName: "Test 李",
+    paternalSurname: "Test 李",
+    maternalSurname: "García",
     email: "person@example.invalid",
     phone: null,
   });
   expect(validateParticipant({ ...participant, ci: "A" })).toMatchObject({
     ci: "A",
   });
+  for (const field of ["firstName", "paternalSurname", "maternalSurname"]) {
+    for (const value of [" ", undefined, "x\ny"]) {
+      expect(() =>
+        validateParticipant({ ...participant, [field]: value }),
+      ).toThrow();
+    }
+  }
+  expect(() =>
+    validateParticipant({ ...participant, lastName: "Legacy" }),
+  ).toThrow();
 });
 test.each([
   {},

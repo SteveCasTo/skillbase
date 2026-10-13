@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { participantFullName } from "@/domain/pre-registrations/participant-name";
 import { Check, LoaderCircle, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +37,7 @@ export function GradeRow({
   attempted,
   initialError = "",
 }: Props) {
-  const name = `${participant.firstName} ${participant.lastName}`;
+  const name = participantFullName(participant);
   const componentRows = Array.from(
     { length: Math.ceil(components.length / 4) },
     (_, index) => components.slice(index * 4, index * 4 + 4),

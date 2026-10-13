@@ -2,8 +2,9 @@ import type { AstroGlobal } from "astro";
 import { requireInternalUser } from "@/server/auth/context";
 import {
   loadCertificate,
-  loadCertificateHistory,
+  loadCertificateSettings,
 } from "@/server/certificates/loaders";
+import { loadAcademicClosure } from "@/server/academic-closure/loaders";
 import { certificateJson } from "@/server/certificates/http";
 import {
   certificateMethodNotAllowed,
@@ -28,11 +29,7 @@ export async function prepareCertificateDetail(
   let feedback = emptyFeedback();
   if (astro.request.method === "POST") {
     const operation = astro.url.searchParams.get("operation");
-    if (
-      operation !== "review" &&
-      operation !== "issue" &&
-      operation !== "revoke"
-    )
+    if (operation !== "revoke")
       return certificateJson(
         {
           ok: false,
@@ -50,13 +47,22 @@ export async function prepareCertificateDetail(
   if (!load.available) astro.response.status = load.status;
   if (astro.request.headers.get("Accept")?.includes("application/json"))
     return certificateJson(load, load.available ? 200 : load.status);
-  const history =
-    !instructorRoute && load.available
-      ? await loadCertificateHistory({ actor, id })
+  const closure =
+    !instructorRoute && load.available && !load.data.hasSignedPdf
+      ? await loadAcademicClosure({
+          actor,
+          courseId: load.data.courseId,
+          groupId: load.data.groupId,
+        })
+      : null;
+  const settings =
+    closure?.available && closure.data.status === "CLOSED"
+      ? await loadCertificateSettings({ actor })
       : null;
   return {
     load,
-    history,
+    closure,
+    settings,
     feedback,
     instructorRoute,
     path: astro.url.pathname,

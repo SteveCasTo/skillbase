@@ -1,6 +1,6 @@
 ---
 import { Skeleton } from "./Skeleton";
-const variants = ["list", "form", "detail", "summary", "interests"] as const;
+const variants = ["list", "form", "detail", "interests"] as const;
 ---
 
 <div data-navigation-skeleton hidden aria-hidden="true"></div>
@@ -45,7 +45,7 @@ const variants = ["list", "form", "detail", "summary", "interests"] as const;
         </div>
       ) : (
         <div class="mt-8 grid gap-4 sm:grid-cols-2">
-          {Array.from({ length: variant === "summary" ? 2 : 4 }, () => (
+          {Array.from({ length: 4 }, () => (
             <div class="flex flex-col gap-5 rounded-xl border bg-card p-6">
               <Skeleton className="h-6 w-3/5" />
               <Skeleton className="h-4 w-full" />

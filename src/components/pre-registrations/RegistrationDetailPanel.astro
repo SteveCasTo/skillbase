@@ -95,7 +95,9 @@ const canTransfer = form.groups.some((group) => {
         data-registration-person-name
         class="break-words text-3xl font-semibold tracking-tight"
       >
-        {registration.participant.firstName} {registration.participant.lastName}
+        {registration.participant.firstName}{" "}
+        {registration.participant.paternalSurname}{" "}
+        {registration.participant.maternalSurname}
       </h1>
       <p
         data-registration-course-group
@@ -157,7 +159,12 @@ const canTransfer = form.groups.some((group) => {
                 ci: values.ci ?? registration.participant.ci,
                 firstName:
                   values.firstName ?? registration.participant.firstName,
-                lastName: values.lastName ?? registration.participant.lastName,
+                paternalSurname:
+                  values.paternalSurname ??
+                  registration.participant.paternalSurname,
+                maternalSurname:
+                  values.maternalSurname ??
+                  registration.participant.maternalSurname,
                 email: values.email ?? registration.participant.email,
                 phone: values.phone ?? registration.participant.phone,
               },

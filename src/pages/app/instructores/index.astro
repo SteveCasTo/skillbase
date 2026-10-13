@@ -2,7 +2,13 @@
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
 import PrivateBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import { buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import SearchToolbar from "@/components/lists/SearchToolbar.astro";
+import ListSearchEmpty from "@/components/lists/ListSearchEmpty.astro";
+import {
+  accountFilters,
+  matchesListFilter,
+  selectedListFilter,
+} from "@/components/lists/filters";
 import { normalizeRegistrationSearch } from "@/domain/pre-registrations/search";
 import { listInstructors } from "@/application/instructors/manage-instructors";
 import { requireInternalUser } from "@/server/auth/context";
@@ -16,6 +22,10 @@ let instructors: readonly InstructorProfile[] = [];
 let error = false;
 const search = Astro.url.searchParams.get("search") ?? "";
 const query = normalizeRegistrationSearch(search);
+const status = selectedListFilter(
+  Astro.url.searchParams.get("status"),
+  accountFilters,
+);
 try {
   instructors = await listInstructors(
     new DrizzleInstructorRepository(getDatabase()),
@@ -31,14 +41,17 @@ const entries = instructors.map((instructor) => ({
     `${instructorFullName(instructor)} ${instructor.email}`,
   ),
 }));
-const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
+const hasMatches = entries.some(
+  ({ instructor, searchable }) =>
+    searchable.includes(query) && matchesListFilter(instructor.status, status),
+);
 ---
 
 <PrivateLayout title="Instructores">
   <div class="mb-5">
     <PrivateBreadcrumbs
       current="Instructores"
-      parents={[{ label: "Resumen", href: "/app" }]}
+      parents={[{ label: "Inicio", href: "/app" }]}
     />
   </div>
   {Astro.url.searchParams.get("success") === "deleted" && (
@@ -62,106 +75,74 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
       Crear instructor
     </a>
   </header>
-  <form
-    data-instructor-search
-    method="get"
-    class="mt-8 flex min-w-0 flex-col gap-2"
-    role="search"
-    aria-label="Buscar instructores"
-  >
-    <label for="instructor-search" class="text-sm font-medium">
-      Buscar por nombre o correo
-    </label>
-    <Input
+  <div data-search-list="instructores">
+    <SearchToolbar
       id="instructor-search"
-      name="search"
-      type="search"
-      autoComplete="off"
-      defaultValue={search}
-      className="min-h-11 min-w-0 w-full"
+      label="Buscar por nombre o correo"
+      {search}
+      {status}
+      options={accountFilters}
     />
-    <noscript>
-      <button
-        type="submit"
-        class={buttonVariants({
-          variant: "outline",
-          className: "min-h-11 self-end",
-        })}
-      >
-        Buscar
-      </button>
-    </noscript>
-  </form>
-  {error ? (
-    <p role="alert" class="mt-8 text-destructive">
-      No se pudieron cargar los instructores. Recarga para intentarlo
-      nuevamente.
-    </p>
-  ) : instructors.length === 0 ? (
-    <section class="mt-8 rounded-xl border p-6">
-      <h2 class="text-lg font-semibold">Todavía no hay instructores</h2>
-      <p class="mt-2 text-muted-foreground">
-        Crea el primer perfil para asignarlo a un curso.
+    {error ? (
+      <p role="alert" class="mt-8 text-destructive">
+        No se pudieron cargar los instructores. Recarga para intentarlo
+        nuevamente.
       </p>
-    </section>
-  ) : (
-    <>
-      <p
-        data-instructor-search-empty
-        role="status"
-        hidden={hasMatches}
-        class="mt-8 text-muted-foreground"
-      >
-        No hay instructores que coincidan. Prueba otro nombre o correo.
-      </p>
-      <ul
-        data-instructor-search-results
-        hidden={!hasMatches}
-        class="mt-8 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3"
-      >
-        {entries.map(({ instructor, searchable }) => (
-          <li
-            data-instructor-search-entry={searchable}
-            hidden={!searchable.includes(query)}
-            class="flex min-w-0 flex-col gap-2"
-          >
-            <a
-              href={`/app/instructores/${instructor.id}/editar`}
-              class="flex h-full min-w-0 flex-col gap-3 rounded-xl border bg-card p-6 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+    ) : instructors.length === 0 ? (
+      <section class="mt-8 rounded-xl border p-6">
+        <h2 class="text-lg font-semibold">Todavía no hay instructores</h2>
+        <p class="mt-2 text-muted-foreground">
+          Crea el primer perfil para asignarlo a un curso.
+        </p>
+      </section>
+    ) : (
+      <>
+        <ListSearchEmpty
+          hidden={hasMatches}
+          message={
+            query
+              ? "No hay instructores que coincidan. Prueba otro nombre o correo."
+              : `No hay instructores en «${accountFilters.find((option) => option.value === status)?.label}».`
+          }
+          resetHref="/app/instructores?status=ALL"
+        />
+        <ul
+          data-list-results
+          hidden={!hasMatches}
+          class="mt-8 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          {entries.map(({ instructor, searchable }) => (
+            <li
+              data-list-entry={searchable}
+              data-list-status={instructor.status}
+              hidden={
+                !searchable.includes(query) ||
+                !matchesListFilter(instructor.status, status)
+              }
+              class="flex min-w-0 flex-col gap-2"
             >
-              <h2 class="break-words text-xl font-semibold">
-                {instructorFullName(instructor)}
-              </h2>
-              <p class="break-all text-sm text-muted-foreground">
-                {instructor.email}
-              </p>
-              <p class="text-sm">
-                {instructor.status === "ACTIVE"
-                  ? "Cuenta activa"
-                  : instructor.status === "DISABLED"
-                    ? "Cuenta desactivada"
-                    : "Acceso no habilitado"}
-              </p>
-            </a>
-          </li>
-        ))}
-      </ul>
-    </>
-  )}
+              <a
+                href={`/app/instructores/${instructor.id}/editar`}
+                class="flex h-full min-w-0 flex-col gap-3 rounded-xl border bg-card p-6 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <h2 class="break-words text-xl font-semibold">
+                  {instructorFullName(instructor)}
+                </h2>
+                <p class="break-all text-sm text-muted-foreground">
+                  {instructor.email}
+                </p>
+                <p class="text-sm">
+                  {instructor.status === "ACTIVE"
+                    ? "Cuenta activa"
+                    : instructor.status === "DISABLED"
+                      ? "Cuenta desactivada"
+                      : "Acceso no habilitado"}
+                </p>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </>
+    )}
+  </div>
 </PrivateLayout>
-
-<script>
-  import { bindInstructorSearch } from "@/components/instructors/search-client";
-
-  let dispose: (() => void) | undefined;
-  const init = () => {
-    dispose?.();
-    dispose = bindInstructorSearch(document);
-  };
-  document.addEventListener("astro:page-load", init);
-  document.addEventListener("astro:before-swap", () => {
-    dispose?.();
-    dispose = undefined;
-  });
-  init();
-</script>

@@ -40,7 +40,7 @@ acotada incluye workspace, historial y `planilla.pdf`, `planilla.csv`,
 ownership. Los seis route modules y enlaces SSR se integraron por PRs 281/282 y
 se liberaron por PR 286.
 
-El comando requiere `requestKey` UUID y `revision`; `reopen` requiere además `reason` (1–500 caracteres). El body admite opcionalmente `courseId`/`groupId` solo como referencias que deben coincidir con el contexto de ruta; para reabrir no se aceptan campos desconocidos. El helper valida origen y límite de 65 536 bytes. Respuestas usan `{ok:true,value,message}` o `{ok:false,code,message,issues}`, JSON `private, no-store` y `nosniff`. Mapeo: autorización 403, contexto inexistente/ajeno 404, revisión/idempotencia/estado cerrado o bloqueo 409, validación 422 y fallo inesperado 503 saneado. Páginas SSR workspace/history y adapters GET se integraron por PRs 281/282 y se liberaron mediante PR 286.
+El comando requiere `requestKey` UUID y `revision`; `reopen` admite `reason` opcional (`null` o texto). Omitido, vacío o espacios se normalizan a `null` para persistencia, fingerprint y auditoría; un motivo presente conserva el límite de 500 caracteres y el rechazo de controles/saltos de línea. El body admite opcionalmente `courseId`/`groupId` solo como referencias que deben coincidir con el contexto de ruta; para reabrir no se aceptan campos desconocidos. El helper valida origen y límite de 65 536 bytes. Respuestas usan `{ok:true,value,message}` o `{ok:false,code,message,issues}`, JSON `private, no-store` y `nosniff`. Mapeo: autorización 403, contexto inexistente/ajeno 404, revisión/idempotencia/estado cerrado o bloqueo 409, validación 422 y fallo inesperado 503 saneado. Páginas SSR workspace/history y adapters GET se integraron por PRs 281/282 y se liberaron mediante PR 286.
 
 Las descargas reciben IDs/role context desde el route adapter y sesión fresca de
 `Astro.locals`; versión debe ser entero positivo canónico. Requieren role
@@ -61,7 +61,7 @@ usuario.
 
 ## Versiones, snapshots e idempotencia
 
-Un cierre escribe en **una transacción** la versión completa del reporte, el estado cerrado/revisión, receipt idempotente y evento de auditoría. Cada cierre incrementa la versión por grupo. Reapertura requiere motivo, conserva la versión previa y registra timestamp/actor UUID+nombre/motivo enlazados a ella; un cierre posterior crea una versión nueva. Mientras está cerrado el DTO presenta la última versión `official`; abierto presenta un reporte `provisional` recalculado y mantiene `history`/`reopenings`.
+Un cierre escribe en **una transacción** la versión completa del reporte, el estado cerrado/revisión, receipt idempotente y evento de auditoría. Cada cierre incrementa la versión por grupo. Reapertura admite motivo opcional, conserva la versión previa y registra timestamp/actor UUID+nombre/motivo enlazados a ella; un cierre posterior crea una versión nueva. Mientras está cerrado el DTO presenta la última versión `official`; abierto presenta un reporte `provisional` recalculado y mantiene `history`/`reopenings`.
 
 La versión snapshot persiste `closedAt`, UUID y nombre del actor como fueron capturados, y el reporte académico completo: curso/grupo, instructor, `minimumGrade`, esquema/componentes, configuración de asistencia, roster `INSCRITO`, notas/resultados/elegibilidad y evidencias/resumen de sesiones/asistencia. Las consultas históricas usan el nombre almacenado, no el perfil dinámico. Las versiones y reaperturas son append-only; los FK de actor/historia son restrictivos. La transacción no sustituye una versión previa con el reporte provisional posterior.
 
@@ -72,13 +72,16 @@ El receipt se acota por `(actorId, requestKey)` y guarda fingerprint del comando
 - Nueva preinscripción/alta o transferencia **hacia** un grupo cerrado se rechaza en servidor aunque siga abierta la ventana Fase 5. El guard se ejecuta dentro de la transacción bajo los locks de curso/destino y antes de crear la ficha/preinscripción, movimiento, command receipt o auditoría de una operación nueva; no queda escritura parcial.
 - El replay exacto de una operación financiera/membership ya completada responde desde su receipt idempotente original, antes de reevaluar el nuevo estado del destino. Reutilizar el `requestKey` con otros datos continúa siendo conflicto.
 - El guard nuevo no impone una restricción adicional a transferencia **desde** el grupo cerrado, pagos/receipts de caja, cancelaciones o devoluciones/refunds existentes. Estas operaciones conservan sus reglas, límites temporales, historial append-only y comportamiento Fase 5.
-- Reabrir está sujeto a ADMIN activo, motivo y revisión/idempotencia; tras reabrir, cualquier alta/transferencia sigue sujeta a las reglas F5 existentes (ventana, curso/grupo, cupo, estado y finanzas). El cierre no borra ni modifica historial financiero.
+- Reabrir está sujeto a ADMIN activo y revisión/idempotencia, con motivo opcional; tras reabrir, cualquier alta/transferencia sigue sujeta a las reglas F5 existentes (ventana, curso/grupo, cupo, estado y finanzas). El cierre no borra ni modifica historial financiero.
 
 ## Persistencia y guardas PostgreSQL
 
 `0021_phase8_academic_group_closure.sql` añade cuatro tablas: `academic_group_states` (estado/revisión/última versión por grupo), `academic_closure_versions` (snapshot JSONB con curso/grupo, versión, timestamp, actor ID/name), `academic_group_reopenings` (reapertura, actor y motivo) y `academic_closure_receipts` (clave, fingerprint y resultado). Unicidad de versión por grupo, receipt actor/key y reapertura por versión; relaciones a grupo/curso/actor/historia usan `RESTRICT`. RLS queda activado y los grants Data API a `PUBLIC`, `anon`, `authenticated` y `service_role` revocados.
 
 Triggers hacen inmutables snapshots/reaperturas/receipts y rechazan insert/update/delete de grades, sesiones, roster y attendance que afecten un grupo cerrado; updates tampoco permiten mover evidencia cerrada a grupo abierto. Esta defensa complementa los guards transaccionales de los repositorios, no expone una RPC ni sustituye autorización server-side. `academic_group_states` es administrado por el repositorio autorizado.
+
+La migración 0026 permite motivo `null` en nuevas reaperturas y conserva validación
+de motivos presentes y nombre del actor. No modifica evidencia histórica ni permisos.
 
 ## Proyección de privacidad y documentos exportados (integrados en development)
 

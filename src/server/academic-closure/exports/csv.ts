@@ -16,7 +16,8 @@ export function renderClosureCsv(version: ClosureVersionDto): Uint8Array {
     "Nota mínima",
     "Límite ausencias consecutivas",
     "Nombres",
-    "Apellidos",
+    "Apellido paterno",
+    "Apellido materno",
     ...(r.access === "ADMIN" ? ["CI"] : []),
     ...components.map(
       (c) =>
@@ -46,7 +47,8 @@ export function renderClosureCsv(version: ClosureVersionDto): Uint8Array {
     const cells = [
       ...metadata.map((v) => csvText(v)),
       csvText(p.firstName),
-      csvText(p.lastName),
+      csvText(p.paternalSurname),
+      csvText(p.maternalSurname),
     ];
     if (r.access === "ADMIN")
       cells.push(

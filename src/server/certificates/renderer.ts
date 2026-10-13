@@ -8,12 +8,11 @@ import { renderCertificatePdf, type CertificateRenderInput } from "./pdf";
 
 /** Maps frozen domain metadata to the normally merged producer's real contract.
  * Application/domain do not import infrastructure types or own a fake renderer. */
-export type CertificatePdfV1Input = CertificateRenderInput;
 export function certificatePdfInput(
   data: CertificateTemplateData,
-): CertificatePdfV1Input {
+): CertificateRenderInput {
   if (
-    data.templateVersion !== "phase9-v1" ||
+    data.templateVersion !== "phase9-v2" ||
     data.brandingVersion !== "phase9-v1" ||
     data.venue !== defaultCertificateConfiguration.venue ||
     data.organization !== defaultCertificateConfiguration.organization
@@ -23,7 +22,7 @@ export function certificatePdfInput(
       "La plantilla institucional configurada no está disponible.",
       {
         templateVersion:
-          "Selecciona la plantilla institucional v1 y su branding compatible.",
+          "Selecciona la plantilla institucional v2 y branding v1.",
       },
     );
   const base = {
@@ -39,7 +38,7 @@ export function certificatePdfInput(
     printedMonth: data.printedMonth,
     printedYear: data.printedYear,
     generatedAt: data.generatedAt,
-    templateVersion: 1 as const,
+    templateVersion: 2,
     signatories: [
       { ...data.signatories[0] },
       { ...data.signatories[1] },

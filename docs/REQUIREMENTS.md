@@ -120,7 +120,13 @@ En Fase 3, el término funcional es **registro de interesado**: una manifestaci�
 
 Una persona debe poder dejar sus datos como interesada desde el detalle público de un curso publicado. No se modifica ni se añade información a la landing para este flujo.
 
-Datos obligatorios: nombre, apellidos y email. Teléfono y preferencia de grupo son opcionales. Se permite una solicitud por curso y email normalizado. La disponibilidad comienza al publicarse el curso y termina con el cierre presencial configurado cuando existe una ventana; si no existe ventana, termina al inicio oficial del curso. El servidor valida disponibilidad y duplicados, y no acepta solicitudes para cursos retirados o archivados.
+Datos obligatorios: nombres, apellido paterno, apellido materno y email. Ambos
+apellidos se introducen por separado y son obligatorios también en la ficha
+global de participante y su edición/prellenado. Se admiten nombres compuestos,
+espacios, acentos y Unicode; no se deduce un apellido desde otro campo. La API
+estudiantil no acepta `lastName` como alias. Instructor y ADMIN mantienen sus
+contratos de identidad independientes.
+Teléfono y preferencia de grupo son opcionales. Se permite una solicitud por curso y email normalizado. La disponibilidad comienza al publicarse el curso y termina con el cierre presencial configurado cuando existe una ventana; si no existe ventana, termina al inicio oficial del curso. El servidor valida disponibilidad y duplicados, y no acepta solicitudes para cursos retirados o archivados.
 
 Al recibir un duplicado, la respuesta pública conserva el mismo resultado neutro de éxito que una solicitud nueva; nunca confirma si el email ya está registrado. Integridad y detección de duplicados siguen siendo autoritativas en servidor.
 
@@ -334,8 +340,8 @@ Corrección post-release: la UI permite editar notas por celda, pero guarda toda
 
 El usuario aprobó cierre por grupo, snapshots/informes y gestión multi-ADMIN. Core (PR 280), exporters (PR 281), UI workspace/history/policy (PR 282), backend ADMIN (PR 283), descargas QA (PR 284), UI ADMIN (PR 285) y aislamiento de fixtures E2E (PR 287) se liberaron por PR 286 a master. CI run `37727200394` y deploy/ledger/preservación están documentados en [`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md). Esto no inicia la Fase 9 de certificados:
 
-- El cierre es por grupo y requiere sus sesiones activas finalizadas, notas completas de cada persona `INSCRITO` de ese grupo y asistencia resuelta (incluida revisión histórica). Una sesión cancelada es resolución válida; no se exige reactivarla ni crear marcas/ausencias ocultas. La elegibilidad/racha se incluye en resultado, pero no bloquea cierre. El saldo se muestra como información y no bloquea cierre.
-- El instructor solo cierra un grupo de un curso propio. `ADMIN` puede cerrar cualquier grupo y es el único rol autorizado para reabrir; la reapertura exige motivo y auditoría. Mientras esté cerrado, servidor debe rechazar toda mutación de notas o asistencia que afecte evidencia oficial. Reabrir no desbloquea componentes/pesos congelados de Fase 7.
+- El cierre es por grupo y requiere sus sesiones activas finalizadas, notas completas de cada persona `INSCRITO` de ese grupo y asistencia resuelta (incluida revisión histórica). Una sesión cancelada es resolución válida; no se exige reactivarla ni crear marcas/ausencias ocultas. La elegibilidad/racha se incluye en resultado, pero no bloquea cierre. El saldo no bloquea cierre: permanece en el contrato privado y los documentos autorizados, pero no se presenta en tarjetas ni diálogos de resultados académicos.
+- El instructor solo cierra un grupo de un curso propio. `ADMIN` puede cerrar cualquier grupo y es el único rol autorizado para reabrir; la reapertura conserva auditoría y admite motivo opcional. Ausencia, texto vacío o espacios se normalizan a `null`; un motivo presente admite hasta 500 caracteres sin controles ni saltos de línea. Mientras esté cerrado, servidor debe rechazar toda mutación de notas o asistencia que afecte evidencia oficial. Reabrir no desbloquea componentes/pesos congelados de Fase 7.
 - Cada cierre genera una versión/snapshot inmutable con timestamp, UUID y nombre del actor en el momento del cierre; no se vuelve a resolver el nombre desde el perfil actual. Reabrir y volver a cerrar crea una versión nueva y conserva la anterior. Exportar PDF y CSV con roster, componentes/notas, resultados y elegibilidad final; PDF incluye resumen de resultados y asistencia. Los adapters utilizan DTO autorizado por actor/contexto: CSV incluye CI solo ADMIN, instructor recibe allowlist académica sin CI/contacto/categoría/finanzas. Las rutas SSR y descargas están en el árbol integrado; el owner verificó focalmente los seis GET/download paths en QA. El gate/release completo de PR 286 se registra en `TESTING.md`; no se hizo smoke autenticado ADMIN en producción. No se exige formato institucional ni firma. Certificados pertenecen a Fase 9.
 - Todo alta/preinscripción o transferencia hacia grupo cerrado se rechaza aunque la ventana F5 siga abierta. Reabrir previamente requiere ADMIN y razón. La operación fallida no deja participante, registro, movimiento, receipt ni auditoría parcial; un replay exacto de comando ya completado devuelve el resultado original. No se añade restricción a transferir fuera del grupo cerrado, pagos existentes, cancelaciones/refunds ni historial de caja; sus reglas F5 continúan vigentes.
 - En las correcciones previas, la búsqueda de conversión solo ofrece interesados `ACTIVE` del curso seleccionado, no participantes generales. La fila de interés vinculada a cualquier preinscripción queda consumida permanentemente —también si la preinscripción se cancela o se reactiva el interés— y se excluye de listas operativas, métricas y búsquedas. Se conserva la fila y el vínculo histórico; solo se consume el interés del curso elegido, no los intereses independientes de otros cursos. La búsqueda por CI/email/nombre normaliza acentos, mayúsculas y espacios; CI sigue siendo identidad única, no se fusiona por email ni nombre. Una alta manual conserva la posibilidad de usar a una persona global por CI y no duplicarla.
@@ -398,8 +404,8 @@ excepciones manuales. No depende de saldo/deuda ni de una boleta física. El
 certificado de instructor es independiente de las notas/asistencia estudiantil y
 se destina al instructor del snapshot de cierre. Ambos requieren el grupo
 cerrado en su última versión oficial. ADMIN gestiona generación,
-impresión/trámite de firmas manuales, carga del PDF final, emisión, revocación y
-reemplazo; INSTRUCTOR consulta y descarga de forma autenticada solo sus
+impresión/trámite de firmas manuales, guardado/sustitución del PDF firmado y
+revocación; INSTRUCTOR consulta y descarga de forma autenticada solo sus
 certificados/grupos según ownership histórico del snapshot, sin permiso de
 gestionar certificados.
 
@@ -457,8 +463,14 @@ instructor, fechas/horario nominal del grupo. Ambos usan duración nominal de la
 revisión de formato. Estos valores se congelan separados de cierre, generación
 y emisión. Si el grupo se reabre, certificados ya emitidos no se revocan
 automáticamente; nuevas generaciones/emisiones requieren la última versión
-cerrada. Se conserva reemplazo/revocación explícita y como máximo un certificado
-activo por curso/tipo/destinatario.
+cerrada. Se conserva revocación explícita y como máximo un certificado actual por
+grupo/tipo/destinatario en todos los estados. Se genera solo desde detalle
+individual con POST explícito, sin selección masiva ni ordinal editable.
+Regenerar un borrador cambia su ID público e invalida el anterior; guardar un
+PDF con atestación ADMIN publica el firmado atómicamente. Después solo se
+descarga el firmado y se puede sustituir su archivo conservando ID y metadata,
+con hash actualizado, auditoría mínima y limpieza después del commit. No hay
+versiones ni historial de certificados en UI.
 
 ## CIERRE
 

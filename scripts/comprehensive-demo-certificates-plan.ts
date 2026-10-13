@@ -9,7 +9,7 @@ import type { CertificateConfiguration } from "@/domain/certificates/types";
 export const CERTIFICATE_DEMO_OWNER = "skillbase-comprehensive-certificates-v1";
 export const DEMO_PDF_NOTICE = "[DEMO - SIN FIRMA INSTITUCIONAL]";
 export const DEMO_CERTIFICATE_REASON =
-  "[DEMO] Fixture de revisión/emisión sintética; no acredita firma física ni institucional.";
+  "[DEMO] Documento de prueba sin firma institucional; atestación técnica sintética.";
 export function certificateDemoId(key: string) {
   const h = createHash("sha256")
     .update(`${CERTIFICATE_DEMO_OWNER}:${key}`)
@@ -55,7 +55,7 @@ export function assertDemoCertificateConfiguration(
   ] as const)
     if (configuration[key] !== defaultCertificateConfiguration[key])
       throw new Error(
-        "PLAN BLOCK: existing configuration is incompatible with phase9-v1; do not overwrite it.",
+        "PLAN BLOCK: existing configuration is incompatible with the current certificate template; do not overwrite it.",
       );
 }
 /** This is a synthetic final fixture, NOT a signed scan. Stamp actual page content. */

@@ -1,0 +1,26 @@
+---
+interface Props {
+  hidden: boolean;
+  message: string;
+  resetHref: string;
+}
+const { hidden, message, resetHref } = Astro.props;
+---
+
+<div
+  data-list-empty
+  {hidden}
+  role="status"
+  class="mt-8 flex flex-col items-start gap-3"
+>
+  <p data-list-empty-message class="text-muted-foreground">
+    {message}
+  </p>
+  <a
+    data-list-reset
+    href={resetHref}
+    class="inline-flex min-h-11 items-center rounded-lg border px-4 text-sm font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+  >
+    Ver todos
+  </a>
+</div>

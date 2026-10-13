@@ -14,7 +14,7 @@ export interface ClosureCommand {
   revision: number;
 }
 export interface ReopenGroupInput extends ClosureCommand {
-  reason: string;
+  reason?: string | null;
 }
 export type ClosureBlocker =
   "SESSIONS_UNFINISHED" | "GRADES_PENDING" | "ATTENDANCE_PENDING";
@@ -31,7 +31,8 @@ export interface ClosureSessionDto {
   participants: {
     registrationId: string;
     firstName: string;
-    lastName: string;
+    paternalSurname: string;
+    maternalSurname: string;
     attendance: AttendanceMarkDto;
   }[];
 }
@@ -74,7 +75,8 @@ export type InstructorClosureParticipantDto = Pick<
   | "registrationId"
   | "groupId"
   | "firstName"
-  | "lastName"
+  | "paternalSurname"
+  | "maternalSurname"
   | "membershipStatus"
   | "canGrade"
   | "grades"
@@ -125,7 +127,7 @@ export interface ClosureStateDto {
     reopenedAt: string;
     actorId: string;
     actorName: string;
-    reason: string;
+    reason: string | null;
   }[];
 }
 export interface ClosureCommandResult {

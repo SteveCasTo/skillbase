@@ -483,3 +483,25 @@ separados de los ocho E2E controlados con enforcement activo. Se conservan los
 límites de operador exclusivo/sin CAS externo, file owner1000/readonly no inmune
 a chmod, rollback false sin restaurar ausencia física y falta de vigilancia
 continua de CLI alternativo. No es una certificación global de seguridad.
+
+### Estado después del release combinado PR 342 — 2026-10-12
+
+PR 342 promovió a `master` el guard común de identidad autorizado y el source de
+enforcement nativo; CI del PR y del release pasó, y Vercel quedó `READY` para el
+SHA exacto. Una lectura filtrada posterior confirmó que el boolean nativo cloud
+continúa `true`. En producción se aceptó navegación PASSWORD ordinaria de una
+cuenta sintética autorizada, con el mismo UUID Auth, hash de credencial,
+identidad y roles antes/después. La autorización de primera contraseña Google
+para la misma identidad legítima es una excepción nativa aprobada y no una
+concesión a identidades no aprobadas. Esto valida la regla aprobada, no certifica
+globalmente el sistema.
+
+No se probaron en este release Google OAuth real, recovery/cambio autenticado,
+primera contraseña Google ni entrega SMTP. No afirmar que todo riesgo de
+seguridad está eliminado; la auditoría estática acotada conserva sus límites y
+los hallazgos de dependencias requieren su propio estado. La aceptación local
+del helper mantiene además sus límites de ventana exclusiva Docker, ownership
+UID 1000 no resistente a chmod del servicio/host, rollback al literal `false`
+(no ausencia física original) y falta de monitorización de recreaciones por CLI
+alternativo. La evidencia operativa está resumida en
+[`AUTHENTICATION.md`](AUTHENTICATION.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).

@@ -275,8 +275,8 @@ void pageErrorCode; // Astro's frontmatter checker omits references in returned 
           <CourseBreadcrumbs
             current="Grupos"
             parents={[
-              { label: "Resumen", href: "/app" },
-              { label: "Cursos", href: "/app/cursos" },
+              { label: "Inicio", href: "/app" },
+              { label: "Cursos", href: `/app/cursos?status=${course.status}` },
               { label: course.name, href: `/app/cursos/${course.id}/editar` },
             ]}
           />

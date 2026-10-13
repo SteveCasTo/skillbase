@@ -74,13 +74,58 @@ test("academic result card role projections preserve ADMIN identity and exclude 
     <ResultCards report={privateClosureReport(value, true)} />,
   );
   expect(admin).toContain("001234QA");
-  expect(admin).toContain("Saldo informativo");
-  expect(admin.split("</summary>")[0]).not.toContain("Saldo informativo");
+  expect(admin).not.toContain("Saldo informativo");
+  value.participants[0]!.balanceCents = 5000;
+  expect(renderToStaticMarkup(<ResultCards report={value} />)).not.toContain(
+    "Saldo informativo",
+  );
   const instructor = renderToStaticMarkup(
     <ResultCards report={privateClosureReport(value, false)} />,
   );
   expect(instructor).not.toContain("001234QA");
   expect(instructor).not.toContain("Saldo informativo");
   expect(instructor).toContain("María sintética");
-  expect(instructor).toContain("No elegible");
+  expect(instructor).toContain("Asistencia no elegible");
+  expect(instructor).toContain("racha de 2");
+  const person = value.participants[0]!;
+  person.result.passed = true;
+  person.attendance = {
+    ...person.attendance,
+    present: 1,
+    absent: 4,
+    excused: 2,
+    pending: 1,
+    maximumConsecutiveAbsences: 4,
+    academicallyEligible: false,
+  };
+  const blocked = renderToStaticMarkup(<ResultCards report={value} />);
+  expect(blocked).toMatch(/data-variant="default"[^>]*>Aprobado/u);
+  expect(blocked).toContain(
+    "1 presentes, 4 ausentes, 2 justificadas, 1 pendientes; 8 sesiones en total",
+  );
+  expect(blocked).toContain("1/8 presentes");
+  expect(blocked).toContain("2/8 justificadas");
+  expect(blocked).toContain("1/8 pendientes");
+  person.attendance.academicallyEligible = true;
+  person.result.passed = false;
+  const eligible = renderToStaticMarkup(<ResultCards report={value} />);
+  expect(eligible).toContain("Asistencia elegible");
+  expect(eligible).toMatch(/data-variant="destructive"[^>]*>No aprobado/u);
+  expect(eligible).not.toContain("racha de");
+  person.result.finalGrade = "54.25";
+  const insufficient = renderToStaticMarkup(<ResultCards report={value} />);
+  expect(insufficient).toContain("54,25");
+  expect(insufficient).toContain("Mín. 70");
+  expect(insufficient).not.toContain("racha de");
+  person.attendance = {
+    ...person.attendance,
+    present: 0,
+    absent: 0,
+    excused: 0,
+    pending: 0,
+    maximumConsecutiveAbsences: 0,
+  };
+  const empty = renderToStaticMarkup(<ResultCards report={value} />);
+  expect(empty).toContain("sin sesiones computables");
+  expect(empty).not.toMatch(/NaN|Infinity|racha de/u);
 });

@@ -1,5 +1,13 @@
 ---
 import { BookOpen, Plus } from "lucide-react";
+import SearchToolbar from "@/components/lists/SearchToolbar.astro";
+import ListSearchEmpty from "@/components/lists/ListSearchEmpty.astro";
+import {
+  courseFilters,
+  matchesListFilter,
+  selectedListFilter,
+} from "@/components/lists/filters";
+import { normalizeRegistrationSearch } from "@/domain/pre-registrations/search";
 
 import { listAdminCourses } from "@/application/courses/manage-courses";
 import type { AdminCourseDto } from "@/domain/courses/types";
@@ -45,13 +53,27 @@ const levelLabel = {
   INTERMEDIATE: "Medio",
   ADVANCED: "Avanzado",
 } as const;
+const search = Astro.url.searchParams.get("search") ?? "";
+const query = normalizeRegistrationSearch(search);
+const status = selectedListFilter(
+  Astro.url.searchParams.get("status"),
+  courseFilters,
+);
+const entries = courses.map((course) => ({
+  course,
+  searchable: normalizeRegistrationSearch(`${course.name} ${course.slug}`),
+}));
+const hasMatches = entries.some(
+  ({ course, searchable }) =>
+    searchable.includes(query) && matchesListFilter(course.status, status),
+);
 ---
 
 <PrivateLayout title="Cursos">
   <div class="mb-5">
     <CourseBreadcrumbs
       current="Cursos"
-      parents={[{ label: "Resumen", href: "/app" }]}
+      parents={[{ label: "Inicio", href: "/app" }]}
     />
   </div>
   <header class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -81,117 +103,162 @@ const levelLabel = {
     </noscript>
   )}
 
-  {loadError ? (
-    <section
-      class="mt-9 rounded-xl border bg-card p-7 text-center sm:p-10"
-      role="alert"
-    >
-      <h2 class="text-lg font-semibold">No pudimos cargar los cursos</h2>
-      <p class="mt-2 text-sm leading-6 text-muted-foreground">
-        Inténtalo nuevamente en unos minutos.
-      </p>
-    </section>
-  ) : courses.length === 0 ? (
-    <section
-      class="mt-9 rounded-xl border border-dashed bg-card p-7 text-center sm:p-10"
-      aria-labelledby="courses-empty-title"
-    >
-      <BookOpen
-        className="mx-auto text-muted-foreground"
-        size={34}
-        aria-hidden="true"
-      />
-      <h2 id="courses-empty-title" class="mt-4 text-lg font-semibold">
-        Todavía no hay cursos
-      </h2>
-      <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-        Crea el primer borrador para organizar sus fechas, precios y contenido
-        antes de publicarlo.
-      </p>
-      <a
-        href="/app/cursos/nuevo"
-        class="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg border px-4 text-sm font-medium hover:bg-secondary"
+  <div data-search-list="cursos">
+    <SearchToolbar
+      id="course-search"
+      label="Buscar por nombre de curso"
+      {search}
+      {status}
+      options={courseFilters}
+    />
+    {loadError ? (
+      <section
+        class="mt-9 rounded-xl border bg-card p-7 text-center sm:p-10"
+        role="alert"
       >
-        Crear primer curso
-      </a>
-    </section>
-  ) : (
-    <section class="mt-8" aria-labelledby="courses-list-title">
-      <h2 id="courses-list-title" class="sr-only">
-        Listado de cursos
-      </h2>
-      <ul class="grid gap-4 lg:grid-cols-2">
-        {courses.map((course) => (
-          <li class="min-w-0">
-            <article class="h-full rounded-xl border bg-card shadow-xs transition-colors hover:border-primary/50 hover:bg-secondary/30">
-              <a
-                href={`/app/cursos/${course.id}/editar`}
-                class="flex h-full flex-col rounded-xl p-5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:p-6"
+        <h2 class="text-lg font-semibold">No pudimos cargar los cursos</h2>
+        <p class="mt-2 text-sm leading-6 text-muted-foreground">
+          Inténtalo nuevamente en unos minutos.
+        </p>
+        <a
+          href={`${Astro.url.pathname}${Astro.url.search}`}
+          class="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg border px-4 text-sm font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          Reintentar
+        </a>
+      </section>
+    ) : courses.length === 0 ? (
+      <section
+        class="mt-9 rounded-xl border border-dashed bg-card p-7 text-center sm:p-10"
+        aria-labelledby="courses-empty-title"
+      >
+        <BookOpen
+          className="mx-auto text-muted-foreground"
+          size={34}
+          aria-hidden="true"
+        />
+        <h2 id="courses-empty-title" class="mt-4 text-lg font-semibold">
+          Todavía no hay cursos
+        </h2>
+        <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+          Crea el primer borrador para organizar sus fechas, precios y contenido
+          antes de publicarlo.
+        </p>
+        <a
+          href="/app/cursos/nuevo"
+          class="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg border px-4 text-sm font-medium hover:bg-secondary"
+        >
+          Crear primer curso
+        </a>
+      </section>
+    ) : (
+      <>
+        <ListSearchEmpty
+          hidden={hasMatches}
+          message={
+            query
+              ? "No hay cursos que coincidan con la búsqueda."
+              : `No hay cursos en «${courseFilters.find((option) => option.value === status)?.label}».`
+          }
+          resetHref="/app/cursos?status=ALL"
+        />
+        <section
+          data-list-results
+          hidden={!hasMatches}
+          class="mt-8"
+          aria-labelledby="courses-list-title"
+        >
+          <h2 id="courses-list-title" class="sr-only">
+            Listado de cursos
+          </h2>
+          <ul class="grid gap-4 lg:grid-cols-2">
+            {entries.map(({ course, searchable }) => (
+              <li
+                data-list-entry={searchable}
+                data-list-status={course.status}
+                hidden={
+                  !searchable.includes(query) ||
+                  !matchesListFilter(course.status, status)
+                }
+                class="min-w-0"
               >
-                <div class="flex items-start justify-between gap-4">
-                  <div class="min-w-0">
-                    <h3 class="text-lg font-semibold leading-snug [overflow-wrap:anywhere]">
-                      {course.name}
-                    </h3>
-                    <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
-                      /{course.slug}
-                    </p>
-                  </div>
-                  <span
-                    class:list={[
-                      "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold",
-                      course.status === "PUBLISHED"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-secondary-foreground",
-                    ]}
+                <article class="h-full rounded-xl border bg-card shadow-xs transition-colors hover:border-primary/50 hover:bg-secondary/30">
+                  <a
+                    href={`/app/cursos/${course.id}/editar`}
+                    class="flex h-full flex-col rounded-xl p-5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:p-6"
                   >
-                    {statusLabel[course.status]}
-                  </span>
-                  {course.featured && (
-                    <span class="text-xs font-semibold text-primary">
-                      Destacado
-                    </span>
-                  )}
-                </div>
-                <dl class="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                  <div>
-                    <dt class="text-muted-foreground">Nivel</dt>
-                    <dd class="mt-1 font-medium">{levelLabel[course.level]}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-muted-foreground">Formato · duración</dt>
-                    <dd class="mt-1 font-medium">{course.totalHours} horas</dd>
-                  </div>
-                  <div>
-                    <dt class="text-muted-foreground">Estudiante</dt>
-                    <dd class="mt-1 font-medium tabular-nums">
-                      {
-                        course.prices.find(
-                          (p) => p.participantType === "STUDENT",
-                        )?.amount
-                      }{" "}
-                      BOB
-                    </dd>
-                  </div>
-                  <div>
-                    <dt class="text-muted-foreground">Externo</dt>
-                    <dd class="mt-1 font-medium tabular-nums">
-                      {
-                        course.prices.find(
-                          (p) => p.participantType === "EXTERNAL",
-                        )?.amount
-                      }{" "}
-                      BOB
-                    </dd>
-                  </div>
-                </dl>
-              </a>
-            </article>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )}
+                    <div class="flex items-start justify-between gap-4">
+                      <div class="min-w-0">
+                        <h3 class="text-lg font-semibold leading-snug [overflow-wrap:anywhere]">
+                          {course.name}
+                        </h3>
+                        <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
+                          /{course.slug}
+                        </p>
+                      </div>
+                      <span
+                        class:list={[
+                          "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold",
+                          course.status === "PUBLISHED"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-secondary-foreground",
+                        ]}
+                      >
+                        {statusLabel[course.status]}
+                      </span>
+                      {course.featured && (
+                        <span class="text-xs font-semibold text-primary">
+                          Destacado
+                        </span>
+                      )}
+                    </div>
+                    <dl class="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                      <div>
+                        <dt class="text-muted-foreground">Nivel</dt>
+                        <dd class="mt-1 font-medium">
+                          {levelLabel[course.level]}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt class="text-muted-foreground">
+                          Formato · duración
+                        </dt>
+                        <dd class="mt-1 font-medium">
+                          {course.totalHours} horas
+                        </dd>
+                      </div>
+                      <div>
+                        <dt class="text-muted-foreground">Estudiante</dt>
+                        <dd class="mt-1 font-medium tabular-nums">
+                          {
+                            course.prices.find(
+                              (p) => p.participantType === "STUDENT",
+                            )?.amount
+                          }{" "}
+                          BOB
+                        </dd>
+                      </div>
+                      <div>
+                        <dt class="text-muted-foreground">Externo</dt>
+                        <dd class="mt-1 font-medium tabular-nums">
+                          {
+                            course.prices.find(
+                              (p) => p.participantType === "EXTERNAL",
+                            )?.amount
+                          }{" "}
+                          BOB
+                        </dd>
+                      </div>
+                    </dl>
+                  </a>
+                </article>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </>
+    )}
+  </div>
   <script>
     import { notifications } from "@/lib/notifications";
     document.addEventListener("astro:page-load", () => {

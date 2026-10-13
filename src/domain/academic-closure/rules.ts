@@ -45,15 +45,18 @@ export function validateClosureCommand(input: ClosureCommand): void {
 export function validateReopen(input: ReopenGroupInput): void {
   validateClosureCommand(input);
   if (
-    typeof input.reason !== "string" ||
-    !input.reason.trim() ||
-    input.reason.trim().length > 500 ||
-    /[\p{Cc}]/u.test(input.reason)
+    input.reason != null &&
+    (typeof input.reason !== "string" ||
+      input.reason.trim().length > 500 ||
+      /[\p{Cc}]/u.test(input.reason))
   )
     throw new ClosureError(
       "VALIDATION_FAILED",
-      "Indica el motivo de reapertura.",
-      { reason: "Introduce un motivo de 1 a 500 caracteres." },
+      "Revisa el motivo de reapertura.",
+      {
+        reason:
+          "Usa hasta 500 caracteres, sin saltos de línea ni caracteres de control.",
+      },
     );
 }
 /** Uses the existing attendance projection: yesterday's inferred absence is resolved,

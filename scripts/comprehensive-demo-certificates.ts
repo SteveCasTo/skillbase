@@ -21,7 +21,6 @@ import {
 import { fingerprint } from "./financial-demo-plan";
 import {
   assertApprovedDemoMigrationLedger,
-  readApprovedDemoMigrations,
   type DemoMigrationLedgerRow,
 } from "./approved-demo-migration-ledger";
 import {
@@ -35,13 +34,7 @@ import {
 
 const manifestId = certificateDemoId("manifest");
 const completeId = certificateDemoId("complete");
-const scenarios = [
-  "generated",
-  "awaiting_signature",
-  "issued",
-  "revoked",
-  "replaced",
-] as const;
+const scenarios = ["generated", "issued", "revoked"] as const;
 type Fixture = {
   key: string;
   scenario: (typeof scenarios)[number];
@@ -70,10 +63,6 @@ async function planCertificates(
       sql`select id,hash,created_at::text as "createdAt" from drizzle.__drizzle_migrations order by id`,
     );
     assertApprovedDemoMigrationLedger(ledger);
-    if (readApprovedDemoMigrations().length !== 24)
-      throw new Error(
-        "F9 requires source/schema ledger 24; no migrations performed",
-      );
     const [operator] = await tx
       .select()
       .from(s.users)
@@ -296,9 +285,7 @@ async function planCertificates(
       existing: !!manifest,
       completed: !!complete,
       verificationOrigin: options.verificationOrigin,
-      plannedCount:
-        fixtures.length +
-        fixtures.filter((f) => f.scenario === "replaced").length,
+      plannedCount: fixtures.length,
     };
   });
 }
@@ -415,7 +402,7 @@ export async function runComprehensiveCertificates(
   async function issue(row: CertificateDto, key: string) {
     // Always consult current records, not stale receipt DTOs; never upload/re-render an issued artifact.
     row = await repository.get(plan.actorId, row.id);
-    if (["issued", "revoked", "replaced"].includes(row.state)) return row;
+    if (["issued", "revoked"].includes(row.state)) return row;
     if (!row.hasSignedPdf)
       row = await service.uploadSigned(
         plan.actorId,
@@ -424,29 +411,13 @@ export async function runComprehensiveCertificates(
           await service.download(plan.actorId, row.id, "UNSIGNED"),
         ),
       );
-    if (!row.reviewed)
-      row = await repository.review(
-        plan.actorId,
-        command(row, `review:${key}`),
-      );
-    return repository.issue(plan.actorId, command(row, `issue:${key}`));
+    return row;
   }
   for (const fixture of plan.fixtures) {
     const [prepared] = await service.generate(plan.actorId, fixture.input);
     if (!prepared) throw new Error("Missing prepared fixture");
     let row = await repository.get(plan.actorId, prepared.id);
     if (fixture.scenario === "generated") continue;
-    if (fixture.scenario === "awaiting_signature") {
-      if (!row.hasSignedPdf)
-        await service.uploadSigned(
-          plan.actorId,
-          command(row, `upload:${fixture.key}`),
-          await stampDemoFinalPdf(
-            await service.download(plan.actorId, row.id, "UNSIGNED"),
-          ),
-        );
-      continue;
-    }
     row = await issue(row, fixture.key);
     if (fixture.scenario === "revoked" && row.state === "issued")
       await repository.revoke(
@@ -454,17 +425,6 @@ export async function runComprehensiveCertificates(
         command(row, `revoke:${fixture.key}`),
         DEMO_CERTIFICATE_REASON,
       );
-    if (fixture.scenario === "replaced") {
-      if (row.state === "replaced") continue;
-      const [replacement] = await service.generate(plan.actorId, {
-        ...fixture.input,
-        requestKey: certificateDemoId(`replacement:${fixture.key}`),
-        replacementForId: row.id,
-        reason: DEMO_CERTIFICATE_REASON,
-      });
-      if (!replacement) throw new Error("Missing replacement fixture");
-      await issue(replacement, `replacement:${fixture.key}`);
-    }
   }
   await db.transaction(async (tx) => {
     await requireFreshRegistrationActor(tx, plan.actorId);

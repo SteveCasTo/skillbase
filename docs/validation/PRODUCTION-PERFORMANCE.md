@@ -175,3 +175,39 @@ slug was also excluded; the valid local detail was used for the comparison.
   navigation cohort and inspect the deployed lambda region. Until then,
   **production-after latency is pending**, and private navigation is not declared
   fixed by the public-query change alone.
+
+## Post-release observation — 2026-10-12
+
+The coordinated PR 342 release is `4e3c827e8cc5f7b05df182e90b450d256f2c85aa`,
+with Vercel deployment `dpl_6RhZNN7sus7B8jo36TRPmMqsHYgP` `READY` for that exact
+SHA. The deployed lambda reports `gru1` (São Paulo); runtime metadata remains
+`nodejs22.x` although the build source uses Node 24. A low-volume follow-up used
+the same Windows Chromium/Playwright workstation, ordinary navigation, and no
+CPU/network throttling. It was not a controlled function-cold test: prior
+requests may have warmed functions, and network/startup variance remains
+uncontrolled.
+
+| Surface                | Baseline n | Baseline remaining HTML (ms) | After remaining HTML (ms) |
+| ---------------------- | ---------: | ---------------------------- | ------------------------- |
+| Landing, browser-first |          1 | 2165                         | 295 (not function-cold)   |
+| Landing, subsequent    |          2 | 1918 / 1908                  | 126 / 107                 |
+| Catalog                |          2 | 1996 / 1910                  | 141 / 160                 |
+| Published detail       |          2 | 2699 / 2644                  | 185 / 148                 |
+| Instructor courses     |          2 | 2123 / 2085                  | 227 / 208                 |
+| Instructor profile     |          1 | 2444                         | 191                       |
+
+The observed cohort was faster. First-byte timings, DOM-ready, and actual
+ClientRouter requests were also captured in the private acceptance record; the
+three post-release samples per route and one warm 390×844 landing are small
+diagnostic samples, not an SLO, p95, load test, or universal speedup guarantee.
+Do not infer that all cold starts or private loaders are fixed, or attribute
+every millisecond to region alignment or SQL consolidation alone. Private pages
+retained `private, no-store` and their authorization path. No cache policy, auth
+guard, or request-scoped connection safeguard was removed.
+
+The production source and lambda region are now aligned with Supabase `sa-east-1`.
+The 3-to-1 public SQL statement reduction remains a source-level fact; measured
+latency is an observed before/after cohort with the limitations above. Further
+comparable repetitions and a controlled cold-start method would be needed for
+stronger claims. The release witness is recorded in `docs/DEPLOYMENT.md`; private
+acceptance artifacts are not committed.

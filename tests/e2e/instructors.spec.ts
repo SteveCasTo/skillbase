@@ -92,7 +92,7 @@ test("ADMIN creates and edits a registered instructor with a semantic full-card 
   await expect(
     page.getByRole("button", { name: "Buscar", exact: true }),
   ).toHaveCount(0);
-  await expect(page.locator("[data-instructor-search]")).toHaveAttribute(
+  await expect(page.locator("[data-list-search]")).toHaveAttribute(
     "data-bound",
     "true",
   );
@@ -114,6 +114,17 @@ test("ADMIN creates and edits a registered instructor with a semantic full-card 
   await search.fill("");
   await expect(card).toBeVisible();
   await search.fill(email);
+  await expect(card).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Filtrar por estado: Activos" })
+    .click();
+  await page.getByRole("option", { name: "Desactivados", exact: true }).click();
+  await expect(card).toBeHidden();
+  await expect(search).toHaveValue(email);
+  await page
+    .getByRole("combobox", { name: "Filtrar por estado: Desactivados" })
+    .click();
+  await page.getByRole("option", { name: "Todos", exact: true }).click();
   await expect(card).toBeVisible();
   expect(searchRequests).toBe(0);
   await card.focus();

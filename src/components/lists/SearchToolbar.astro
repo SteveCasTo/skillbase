@@ -1,0 +1,100 @@
+---
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { buttonVariants } from "@/components/ui/button";
+import ListStatusFilter from "./ListStatusFilter";
+import type { ListFilterOption } from "./filters";
+interface Props {
+  id: string;
+  label: string;
+  search: string;
+  status?: string;
+  options?: readonly ListFilterOption[];
+}
+const { id, label, search, status = "ALL", options = [] } = Astro.props;
+const filterHref = (value: string) => {
+  const url = new URL(Astro.url);
+  url.searchParams.set("status", value);
+  url.searchParams.delete("success");
+  return `${url.pathname}${url.search}`;
+};
+---
+
+<form
+  method="get"
+  role="search"
+  aria-label={label}
+  data-list-search
+  class="mt-8 flex min-w-0 flex-col gap-2"
+>
+  <label for={id} class="text-sm font-medium">
+    {label}
+  </label>
+  <div class="flex min-w-0 flex-wrap items-center gap-3">
+    <div class="relative min-w-0 flex-1 basis-48">
+      <Search
+        aria-hidden="true"
+        size={18}
+        className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+      />
+      <Input
+        id={id}
+        name="search"
+        type="search"
+        autoComplete="off"
+        defaultValue={search}
+        className="min-h-11 w-full min-w-0 pl-10"
+      />
+    </div>
+    {options.length > 0 && (
+      <div
+        class="ml-auto shrink-0"
+        data-list-filter-options={JSON.stringify(options)}
+      >
+        <input type="hidden" name="status" value={status} data-list-status />
+        <ListStatusFilter client:load value={status} {options} />
+      </div>
+    )}
+    <noscript>
+      <button
+        type="submit"
+        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+      >
+        Buscar
+      </button>
+    </noscript>
+  </div>
+  {options.length > 0 && (
+    <noscript>
+      <nav aria-label="Filtrar por estado" class="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <a
+            href={filterHref(option.value)}
+            aria-current={option.value === status ? "true" : undefined}
+            class="inline-flex min-h-11 items-center rounded-lg border px-3 text-sm underline-offset-4 hover:underline"
+          >
+            {option.label}
+          </a>
+        ))}
+      </nav>
+    </noscript>
+  )}
+</form>
+<p data-list-count aria-live="polite" aria-atomic="true" class="sr-only"></p>
+<script>
+  import { bindListSearch } from "./search-client";
+  let disposers: (() => void)[] = [];
+  const dispose = () => {
+    disposers.forEach((cleanup) => cleanup());
+    disposers = [];
+  };
+  const init = () => {
+    dispose();
+    disposers = [
+      ...document.querySelectorAll<HTMLElement>("[data-search-list]"),
+    ].map(bindListSearch);
+  };
+  document.addEventListener("astro:page-load", init);
+  document.addEventListener("astro:before-swap", dispose);
+  init();
+</script>
