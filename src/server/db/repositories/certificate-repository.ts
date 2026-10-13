@@ -105,8 +105,6 @@ async function dto(tx: AttendanceTransaction, r: Row): Promise<CertificateDto> {
     issuedAt: r.issuedAt?.toISOString() ?? null,
     revokedAt: r.revokedAt?.toISOString() ?? null,
     reason: r.reason,
-    replacementForId: null,
-    replacedById: null,
   };
 }
 async function receipt(

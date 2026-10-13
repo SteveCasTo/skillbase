@@ -261,8 +261,9 @@ completos, sin normalizar/re-renderizar el archivo.
 ## Verificación pública y privacidad
 
 La página pública de verificación recibe el identificador impredecible y consulta
-el registro autoritativo actual. Presenta claramente estado vigente, revocado o
-reemplazado. Su DTO de allowlist contiene únicamente estado,
+el registro autoritativo actual. Presenta claramente estado vigente o revocado;
+un identificador unsigned invalidado por regeneración ya no existe. Su DTO de
+allowlist contiene únicamente estado,
 nombre real del titular, tipo, curso, horas nominales, fecha de finalización,
 `publicCredentialId`/URL y el hash oficial necesario para comparar bytes. No
 exponer CI, email, teléfono, notas, asistencia/participación parcial, finanzas,
@@ -290,8 +291,8 @@ auténtica.
 Para LinkedIn ofrecer copiar/compartir URL, ID, nombre real del titular,
 organización, curso y fecha; no foto/imagen de identidad ni integración API u
 OAuth. El QR incluye solo la URL pública y no requiere imprimir la URL larga.
-Si un código corresponde a un registro todavía no emitido (`pending`, `generated`
-o `awaiting_signature`), no presentarlo como credencial válida ni mostrar datos
+Si un código corresponde a un registro todavía no firmado (`pending`, `generated`),
+no presentarlo como credencial válida ni mostrar datos
 adicionales. La validez positiva corresponde a registro `issued` vigente, no
 revocado ni reemplazado.
 

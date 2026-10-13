@@ -73,8 +73,6 @@ export interface CertificateDto {
   issuedAt: string | null;
   revokedAt: string | null;
   reason: string | null;
-  replacementForId: string | null;
-  replacedById: string | null;
 }
 export type PublicCertificateDto =
   | { state: "not_found" | "not_issued"; valid: false }

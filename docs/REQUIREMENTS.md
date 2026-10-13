@@ -398,8 +398,8 @@ excepciones manuales. No depende de saldo/deuda ni de una boleta física. El
 certificado de instructor es independiente de las notas/asistencia estudiantil y
 se destina al instructor del snapshot de cierre. Ambos requieren el grupo
 cerrado en su última versión oficial. ADMIN gestiona generación,
-impresión/trámite de firmas manuales, carga del PDF final, emisión, revocación y
-reemplazo; INSTRUCTOR consulta y descarga de forma autenticada solo sus
+impresión/trámite de firmas manuales, guardado/sustitución del PDF firmado y
+revocación; INSTRUCTOR consulta y descarga de forma autenticada solo sus
 certificados/grupos según ownership histórico del snapshot, sin permiso de
 gestionar certificados.
 
