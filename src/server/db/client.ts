@@ -10,6 +10,8 @@ interface DatabaseConnectionOptions {
   readonly idleTimeout?: number;
   readonly connectTimeout?: number;
   readonly maxPipeline?: number;
+  /** Operator diagnostics only: receives no SQL, parameters or credentials. */
+  readonly onQuery?: () => void;
 }
 
 export const RUNTIME_DATABASE_OPTIONS = {
@@ -35,6 +37,7 @@ export function createDatabase(
     ...(options.maxPipeline === undefined
       ? {}
       : { max_pipeline: options.maxPipeline }),
+    ...(options.onQuery ? { debug: () => options.onQuery?.() } : {}),
   });
 
   return {
