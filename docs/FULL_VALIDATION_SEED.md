@@ -13,6 +13,13 @@ No se ejecuta en CI ordinaria, deploy, Vercel, middleware ni automáticamente.
 Toda operación canónica requiere PLAN separado local/cloud, revisión del hash y
 APPLY explícito. Un PLAN viejo de solo ocho certificados no autoriza este reset.
 
+El job manual tiene un plazo operativo de 40 minutos, no un timeout de tests.
+El intento observado con 20 minutos avanzó continuamente de 91 a 3755 queries,
+sin locks ni queries estancadas, antes de rollback por deadline. El mismo flujo
+real en el caso gestionado existente envía 4525 queries; a las ~3.1 queries/s
+observadas necesita ~24 minutos. El margen finito evita cancelar trabajo sano.
+No se modifican plazos de CI/E2E, retries, casos o guards para ocultar defectos.
+
 ## Orden operativo obligatorio
 
 1. Integrar todos los PR aprobados en `development`, con gates verdes y revisión.

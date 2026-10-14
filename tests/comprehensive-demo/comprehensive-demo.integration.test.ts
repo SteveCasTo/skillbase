@@ -54,7 +54,13 @@ import {
 
 test("real owned Auth/domain fixtures fill F8, preserve every original row, remain idempotent and retain edits", async () => {
   const environment = getTestSupabaseEnvironment();
-  const connection = createDatabase(environment.databaseUrl, { max: 1 });
+  let observedQueries = 0;
+  const connection = createDatabase(environment.databaseUrl, {
+    max: 1,
+    onQuery: () => {
+      observedQueries++;
+    },
+  });
   const auth = createClient(environment.apiUrl, environment.serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -709,6 +715,7 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
         .set({ name: `${name.firstName} ${name.lastName}` })
         .where(eq(s.users.id, profile.id));
     }
+    const businessQueryStart = observedQueries;
     const fullSeed = await seedFullValidationBusiness(db, auth, {
       ...fullOptions,
       apply: true,
@@ -716,6 +723,12 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
     });
     if (fullSeed.mode !== "APPLIED")
       throw new Error("Expected fresh full validation seed");
+    console.info(
+      JSON.stringify({
+        fullValidationBusinessQueries: observedQueries - businessQueryStart,
+        noSqlOrParametersLogged: true,
+      }),
+    );
     expect(await db.select().from(s.courses)).toHaveLength(12);
     expect(await db.select().from(s.groups)).toHaveLength(18);
     expect(await db.select().from(s.preRegistrations)).toHaveLength(34);
