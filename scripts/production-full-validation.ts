@@ -48,14 +48,63 @@ if (import.meta.main) {
     if (env.VALIDATION_SYNTHETIC_FINAL === "true")
       args.push("--allow-synthetic-final");
     const child = Bun.spawn([process.execPath, ...args], {
-      env,
+      env: { ...env, VALIDATION_SAFE_PROGRESS: "true" },
       stdout: "pipe",
       stderr: "pipe",
     });
-    await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
+    // Stream ONLY schema-validated counters/known phases. Never forward raw
+    // child stderr/stdout, SQL, bound values, provider errors or environment.
+    const knownPhases = new Set([
+      "arguments",
+      "release-proof",
+      "prepare",
+      "business",
+      "invitations",
+      "coverage",
+      "certificates",
     ]);
+    const drain = async (stream: ReadableStream<Uint8Array>) => {
+      let pending = "";
+      for await (const bytes of stream) {
+        pending += new TextDecoder().decode(bytes);
+        let end: number;
+        while ((end = pending.indexOf("\n")) >= 0) {
+          const line = pending.slice(0, end);
+          pending = pending.slice(end + 1);
+          let value: unknown;
+          try {
+            value = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (
+            !value ||
+            typeof value !== "object" ||
+            !("validationProgress" in value) ||
+            value.validationProgress !== true ||
+            !("phase" in value) ||
+            typeof value.phase !== "string" ||
+            !knownPhases.has(value.phase) ||
+            !("queryCount" in value) ||
+            typeof value.queryCount !== "number" ||
+            !Number.isSafeInteger(value.queryCount) ||
+            !("elapsedMs" in value) ||
+            typeof value.elapsedMs !== "number" ||
+            !Number.isSafeInteger(value.elapsedMs)
+          )
+            continue;
+          console.info(
+            JSON.stringify({
+              validationProgress: true,
+              phase: value.phase,
+              queryCount: value.queryCount,
+              elapsedMs: value.elapsedMs,
+            }),
+          );
+        }
+      }
+    };
+    await Promise.all([drain(child.stdout), drain(child.stderr)]);
     if ((await child.exited) !== 0)
       throw new Error(
         "Protected stage failed; inspect durable receipts without blind repetition",

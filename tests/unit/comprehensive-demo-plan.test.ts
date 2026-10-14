@@ -164,6 +164,12 @@ test("production cannot run from an unreleased feature tree or a dirty/unapprove
   );
   expect(operatorSource).toMatch(/"--experimental",\s*"--yes"/u);
   expect(operatorSource).toContain("do not record false completion");
+  const transport = readFileSync(
+    new URL("../../scripts/production-full-validation.ts", import.meta.url),
+    "utf8",
+  );
+  expect(transport).toContain("VALIDATION_SAFE_PROGRESS");
+  expect(transport).toContain("Never forward raw");
   const names = [
     ...FULL_VALIDATION_BUSINESS_TABLES,
     ...FULL_VALIDATION_RETAINED_TABLES,

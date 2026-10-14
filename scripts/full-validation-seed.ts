@@ -83,6 +83,22 @@ function editList(value: unknown): ValidationNameEdit[] {
 if (import.meta.main) {
   let connection: ReturnType<typeof createDatabase> | undefined;
   let stage = "arguments";
+  const startedAt = Date.now();
+  let queryCount = 0;
+  const progress = () =>
+    console.info(
+      JSON.stringify({
+        validationProgress: true,
+        phase: stage,
+        queryCount,
+        elapsedMs: Date.now() - startedAt,
+      }),
+    );
+  const timer =
+    process.env.VALIDATION_SAFE_PROGRESS === "true"
+      ? setInterval(progress, 30000)
+      : undefined;
+  timer?.unref();
   try {
     const { values } = parseArgs({
       strict: true,
@@ -164,6 +180,7 @@ if (import.meta.main) {
         env.DEMO_APPROVED_RELEASE_SHA ?? "",
       );
       stage = "release-proof";
+      if (timer) progress();
       await releaseProof(env);
       databaseUrl = env.DEMO_DATABASE_URL ?? "";
       apiUrl = env.DEMO_SUPABASE_URL ?? "";
@@ -180,7 +197,16 @@ if (import.meta.main) {
       throw new Error(
         "Clean source and exact reviewed stage hash required for APPLY",
       );
-    connection = createDatabase(databaseUrl, { max: 1 });
+    connection = createDatabase(databaseUrl, {
+      max: 1,
+      ...(timer
+        ? {
+            onQuery: () => {
+              queryCount++;
+            },
+          }
+        : {}),
+    });
     const db = connection.db;
     const auth = createClient(apiUrl, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -194,6 +220,7 @@ if (import.meta.main) {
         : {}),
     };
     stage = selected!;
+    if (timer) progress();
     let result: unknown;
     if (selected === "prepare") {
       const edits = editList(
@@ -321,6 +348,10 @@ if (import.meta.main) {
     );
     process.exitCode = 1;
   } finally {
+    if (timer) {
+      progress();
+      clearInterval(timer);
+    }
     if (connection) await connection.close();
   }
 }
