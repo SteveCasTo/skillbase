@@ -181,7 +181,54 @@ if (import.meta.main) {
       );
       stage = "release-proof";
       if (timer) progress();
-      await releaseProof(env);
+      const verifiedRelease = await releaseProof(env);
+      // Provider-owned response, not CDN/build-location inference. Export only
+      // public deployment identifiers and validated region names, NEVER env.
+      const deployment = verifiedRelease.deployment as unknown as Record<
+        string,
+        unknown
+      >;
+      const regions = (value: unknown): string[] =>
+        Array.isArray(value)
+          ? (value as unknown[]).filter(
+              (region): region is string =>
+                typeof region === "string" && /^[a-z0-9]{3,12}$/u.test(region),
+            )
+          : [];
+      const deployedTo: string[] = [];
+      if (Array.isArray(deployment.lambdas))
+        for (const entry of deployment.lambdas as unknown[]) {
+          if (
+            !entry ||
+            typeof entry !== "object" ||
+            !("output" in entry) ||
+            !Array.isArray(entry.output)
+          )
+            continue;
+          for (const output of entry.output as unknown[]) {
+            if (
+              output &&
+              typeof output === "object" &&
+              "type" in output &&
+              output.type === "lambda" &&
+              "deployedTo" in output
+            )
+              deployedTo.push(...regions(output.deployedTo));
+          }
+        }
+      console.info(
+        JSON.stringify({
+          validationDeploymentEvidence: true,
+          sourceSha: verifiedRelease.approvedSha,
+          deploymentId:
+            typeof deployment.id === "string" &&
+            /^dpl_[A-Za-z0-9]+$/u.test(deployment.id)
+              ? deployment.id
+              : null,
+          providerDeploymentRegions: regions(deployment.regions),
+          functionDeployedTo: [...new Set(deployedTo)],
+        }),
+      );
       databaseUrl = env.DEMO_DATABASE_URL ?? "";
       apiUrl = env.DEMO_SUPABASE_URL ?? "";
       serviceKey = env.DEMO_SUPABASE_SERVICE_ROLE_KEY ?? "";

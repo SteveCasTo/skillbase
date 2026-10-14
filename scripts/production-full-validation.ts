@@ -63,6 +63,7 @@ if (import.meta.main) {
       "coverage",
       "certificates",
     ]);
+    let deploymentEvidence: unknown = null;
     const drain = async (stream: ReadableStream<Uint8Array>) => {
       let pending = "";
       for await (const bytes of stream) {
@@ -75,6 +76,42 @@ if (import.meta.main) {
           try {
             value = JSON.parse(line);
           } catch {
+            continue;
+          }
+          if (
+            value &&
+            typeof value === "object" &&
+            "validationDeploymentEvidence" in value &&
+            value.validationDeploymentEvidence === true &&
+            "sourceSha" in value &&
+            value.sourceSha === env.GITHUB_SHA &&
+            "deploymentId" in value &&
+            (value.deploymentId === null ||
+              (typeof value.deploymentId === "string" &&
+                /^dpl_[A-Za-z0-9]+$/u.test(value.deploymentId))) &&
+            "providerDeploymentRegions" in value &&
+            Array.isArray(value.providerDeploymentRegions) &&
+            "functionDeployedTo" in value &&
+            Array.isArray(value.functionDeployedTo) &&
+            [
+              ...value.providerDeploymentRegions,
+              ...value.functionDeployedTo,
+            ].every(
+              (region: unknown) =>
+                typeof region === "string" && /^[a-z0-9]{3,12}$/u.test(region),
+            )
+          ) {
+            deploymentEvidence = {
+              sourceSha: value.sourceSha,
+              deploymentId: value.deploymentId,
+              providerDeploymentRegions: value.providerDeploymentRegions,
+              functionDeployedTo: value.functionDeployedTo,
+            };
+            console.info(
+              JSON.stringify({
+                validationDeploymentEvidence: deploymentEvidence,
+              }),
+            );
             continue;
           }
           if (
@@ -129,6 +166,7 @@ if (import.meta.main) {
       project: "fvzxqlezdrlzykyoevub",
       operationId: env.VALIDATION_OPERATION_ID,
       anchorDay: env.VALIDATION_ANCHOR,
+      deploymentEvidence,
       notice:
         "Synthetic validation data; signed-current files have a non-institutional test notice. No Auth/provider reset, schema migration or business RESET occurs in this workflow.",
     };

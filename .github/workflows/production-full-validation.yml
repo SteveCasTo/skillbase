@@ -62,7 +62,10 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && github.repository == 'SteveCasTo/skillbase'
     environment: production
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Observed cloud stage sends ~4525 validated service queries; at measured
+    # ~3.1 queries/s it needs ~24min. Keep a finite operator-only margin.
+    # Product/CI/E2E test timeouts and retries are intentionally unchanged.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
