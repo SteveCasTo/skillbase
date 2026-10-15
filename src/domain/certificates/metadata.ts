@@ -30,7 +30,12 @@ export function freezeCertificateData(
 ): CertificateTemplateData {
   return composeCertificateData(input, true);
 }
-/** Non-credential sample; no identifier or verification link can escape this mode. */
+// The dot is outside the base64url alphabet used for issued credential IDs.
+// Together with the reserved .invalid host, this sample cannot verify a credential.
+export const CERTIFICATE_PREVIEW_ID = "S6kN9vQ2.r4Yb8Hc3Lw5Xj7Fp0Tz1DaM";
+export const CERTIFICATE_PREVIEW_URL = `https://preview.invalid/certificados/${CERTIFICATE_PREVIEW_ID}`;
+
+/** Non-credential sample, deliberately outside the issued identifier namespace. */
 export function certificatePreviewData(
   configuration: CertificateConfiguration,
   type: CertificateType,
@@ -39,7 +44,7 @@ export function certificatePreviewData(
     {
       type,
       configuration,
-      publicCredentialId: "",
+      publicCredentialId: CERTIFICATE_PREVIEW_ID,
       verificationOrigin: "https://preview.invalid",
       recipientName:
         type === "APPROVAL"
@@ -57,7 +62,7 @@ export function certificatePreviewData(
     },
     false,
   );
-  return { ...data, publicCredentialId: "", verificationUrl: "" };
+  return data;
 }
 function composeCertificateData(
   input: CertificateDataInput,

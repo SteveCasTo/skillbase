@@ -37,8 +37,12 @@ vigente y conserva la auditoría; los PDFs históricos no cambian. La ruta antig
 redirige a `#firmantes` en GET y conserva compatibilidad de POST.
 
 Las vistas previas de aprobación e instructor usan la configuración **guardada**
-y datos de curso/destinatario de muestra. El PDF se abre en un visor, con una sola
-marca «Vista previa», sin QR, folio ni enlace verificable. El endpoint ADMIN privado
+y datos de curso/destinatario de muestra. El PDF se abre en un visor y presenta
+el ID y QR con la misma composición que los certificados emitidos, sin texto
+inferior «Vista previa» ni otra marca sustituta. El identificador de muestra
+contiene un punto, fuera del alfabeto base64url de emisión, y su QR apunta a
+`https://preview.invalid/certificados/<ID-de-muestra>`: no verifica una credencial
+real ni utiliza el dominio oficial. El endpoint ADMIN privado
 `/app/configuracion/certificados/vista-previa.pdf` responde inline y no-store:
 solo lee ajustes, incluso con revisión cero; no genera registros, artefactos,
 receipts, eventos ni escrituras en Storage. No añade un tipo de participación.
