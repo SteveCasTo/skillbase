@@ -1,5 +1,64 @@
 # Contrato de evaluaciones y notas (Fase 7)
 
+## Componente opcional de asistencia (2026-10-15)
+
+Esta ampliación admite `ATTENDANCE` junto a `THEORY`/`PRACTICAL`. No convierte
+componentes por su nombre, no añade componentes a cursos existentes ni distribuye
+pesos: la suma exacta de 100 % y el congelamiento permanente al primer valor
+persistido (incluido cero) continúan. Se admiten varios componentes de asistencia,
+cada uno con peso y override independiente, compartiendo la misma fuente.
+
+La nota derivada es `100 × (PRESENT + EXCUSED) / (PRESENT + EXCUSED + ABSENT)`
+para el roster legítimo del participante. Se redondea half-up a centésimas de
+nota. Se excluyen sesiones futuras, canceladas (también originales reemplazadas)
+y marcas `PENDING`. Sin denominador computable se devuelve `null`, nunca cero o
+cien inventado. La inferencia de ausencia conserva el final del día civil de
+Bolivia y la revisión histórica explícita. El roster ordinario se deriva usando
+la misma cronología de activación de asistencia, sin insertarlo desde estas
+lecturas; el roster histórico revisado es exclusivamente el establecido.
+
+GET de evaluación y cierre no escriben notas, roster ni congelamiento. La nota
+AUTO persistida no actúa como caché autoritativa de un grupo abierto: correcciones
+de asistencia se reflejan en lectura. La persistencia automática se realiza
+**solo en la mutación de cierre**, después de validar todos sus blockers, bajo
+la barrera compartida de horarios y locks de curso/grupo. Se guardan los AUTO
+faltantes/cambiados, se vuelve a construir el reporte con revisiones y freeze
+vigentes y se publica el snapshot en la misma transacción. Un fallo revierte
+también estas notas. Así un curso solo con asistencia se congela al primer cierre
+exitoso, nunca por abrir la hoja. Los snapshots anteriores no se recalculan.
+
+La edición de asistencia requiere grupo abierto y todas las sesiones activas
+terminadas, roster/revisión y asistencia de participantes/instructor resueltos.
+ADMIN y el instructor propietario conservan permisos/ventanas actuales. Guardar
+una nota de asistencia establece `MANUAL`; AUTO nunca pisa ese override, ni tras
+corregir asistencia o reabrir. Vacío conserva el significado actual: no borra ni
+convierte una nota a cero. La nota y resultado efectivos se derivan en servidor;
+`evaluation_results` sigue siendo evidencia de las escrituras, no autoridad live
+para componentes AUTO después de correcciones.
+
+El POST contextual de grupo acepta `action: "reset-attendance"`, `requestKey`
+y `schemeRevision`. Restablece únicamente los overrides ATTENDANCE del grupo
+actual como AUTO, mantiene identidad/revisión/historia, no borra notas, y aplica
+revalidación de actor/ownership, guard cerrado e idempotencia por receipt. No toca
+THEORY/PRACTICAL ni otros grupos. Una fila AUTO con score previo conserva ese
+valor como evidencia de la última escritura; lecturas lo sustituyen por la
+derivación actual o `null`. Auditoría adicional registra origen anterior/nuevo,
+nota anterior/nueva, actor, componente, inscripción y revisión, incluido reset.
+
+UI: únicamente tipo Asistencia, valor en las celdas existentes y control
+deshabilitado hasta resolución. Sin ayudas, leyendas, badges o tooltips de cálculo.
+«Restablecer cálculo automático» aparece solo si hay overrides de asistencia,
+al extremo derecho de «Notas de participantes», con wrap móvil. La etiqueta de
+búsqueda se mantiene solo para tecnologías asistivas. La elegibilidad por rachas
+no cambia y no se añade un gate porcentual de certificación.
+
+Migración aditiva candidata `0029_attendance_grade.sql` (journal idx 29, después
+de 0028): añade enum ATTENDANCE y origen AUTO/MANUAL, default MANUAL para legados;
+añade check y trigger auditado con search_path vacío y ejecución pública revocada.
+Es replayable; no reescribe hashes, componentes, notas ni snapshots históricos.
+Su aplicación se limita a fixtures aisladas y los gates; no acredita aplicación
+en canónico/cloud ni release.
+
 ## Estado y alcance
 
 Contrato funcional/técnico aprobado antes de comenzar la implementación de

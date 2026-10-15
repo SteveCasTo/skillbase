@@ -247,10 +247,14 @@ export function GradeRow({
                       autoFocus={rowIndex === 0 && index === 0}
                       id={id}
                       inputMode="decimal"
-                      title="Introduce una nota de 0 a 100 con punto decimal y hasta dos decimales."
+                      title={
+                        component.type === "ATTENDANCE"
+                          ? undefined
+                          : "Introduce una nota de 0 a 100 con punto decimal y hasta dos decimales."
+                      }
                       className="min-h-11 w-20 max-w-full self-center px-2 tabular-nums"
                       value={draft.score}
-                      disabled={saving}
+                      disabled={saving || grade?.canEdit === false}
                       aria-invalid={Boolean(error)}
                       aria-describedby={error ? `${id}-error` : undefined}
                       onPaste={(event) => {

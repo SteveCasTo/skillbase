@@ -3,29 +3,39 @@ import type { EvaluationLoadResult } from "@/server/evaluations/loaders";
 import type {
   SaveEvaluationSchemeInput,
   SaveEvaluationRowInput,
+  EvaluationCommand,
   CourseEvaluationsDto,
 } from "@/domain/evaluations/types";
 import type { EvaluationSaveResult } from "./mutation-types";
 
 export async function saveEvaluation(
   path: string,
-  input: SaveEvaluationSchemeInput | SaveEvaluationRowInput,
+  input:
+    | SaveEvaluationSchemeInput
+    | SaveEvaluationRowInput
+    | (EvaluationCommand & { action: "reset-attendance" }),
   currentData?: CourseEvaluationsDto,
 ): Promise<EvaluationSaveResult> {
   // Course/group and actor are authoritative route/session context, not body fields.
   const body =
-    "grades" in input
+    "action" in input
       ? {
           requestKey: input.requestKey,
           schemeRevision: input.schemeRevision,
-          registrationId: input.registrationId,
-          grades: input.grades,
+          action: input.action,
         }
-      : {
-          requestKey: input.requestKey,
-          schemeRevision: input.schemeRevision,
-          components: input.components,
-        };
+      : "grades" in input
+        ? {
+            requestKey: input.requestKey,
+            schemeRevision: input.schemeRevision,
+            registrationId: input.registrationId,
+            grades: input.grades,
+          }
+        : {
+            requestKey: input.requestKey,
+            schemeRevision: input.schemeRevision,
+            components: input.components,
+          };
   const response = await fetch(path, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },

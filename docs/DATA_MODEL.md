@@ -199,13 +199,17 @@ no afirmar preservación cloud completa. Evidencia y límites en
 - `evaluation_schemes`: una fila por curso, con revisión, `frozen_at`, actor y
   timestamp de actualización.
 - `evaluation_components`: componentes del curso con `name`, tipo enum
-  `THEORY`/`PRACTICAL`, `weight_hundredths` entero y `sort_order`; nombre/rango/
+  `THEORY`/`PRACTICAL` (0029 añade `ATTENDANCE` opcional), `weight_hundredths` entero y `sort_order`; nombre/rango/
   orden acotados, máximo 100 componentes y pesos con suma diferida exactamente
   10 000 (100 %).
 - `evaluation_grades`: una fila por curso/participante/componente; vincula la
   inscripción válida y conserva nota en centésimas enteras, revisión, actor y
   timestamp. Una FK compuesta asegura curso/componente; los triggers comprueban
   que la inscripción asociada corresponda al mismo curso y participante.
+  0029 añade origen `MANUAL`/`AUTO` (default MANUAL para legados), check y
+  auditoría de transiciones. AUTO se deriva live para grupos abiertos y se
+  finaliza transaccionalmente al cerrar; MANUAL es override protegido. No se
+  borra evidencia al restablecer origen AUTO ni se modifican snapshots previos.
 - `evaluation_results`: proyección por curso/participante. `final_hundredths`
   queda `NULL` mientras falte cualquier componente; al completar, persiste el
   resultado final en centésimas. La decisión explícita de incompleto=`0.00` es

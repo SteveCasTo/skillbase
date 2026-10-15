@@ -3,6 +3,7 @@ import type { EvaluationType } from "@/domain/evaluations/types";
 export const evaluationTypeLabels: Record<EvaluationType | "MIXED", string> = {
   THEORY: "Teórica",
   PRACTICAL: "Práctica",
+  ATTENDANCE: "Asistencia",
   MIXED: "Mixta",
 };
 

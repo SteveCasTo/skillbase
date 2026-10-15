@@ -97,6 +97,17 @@ export async function saveEvaluationRow(
   validateSaveRow(input);
   return repo.saveRow(actor.id, input);
 }
+export async function resetAttendanceGrades(
+  repo: EvaluationRepository,
+  actor: InternalUser,
+  input: EvaluationCommand,
+) {
+  requireEvaluationActor(actor);
+  validateEvaluationCommand(input);
+  if (!input.groupId)
+    throw new EvaluationError("VALIDATION_FAILED", "Selecciona un grupo.");
+  return repo.resetAttendance(actor.id, input);
+}
 export async function getCourseEvaluations(
   repo: EvaluationRepository,
   actor: InternalUser,

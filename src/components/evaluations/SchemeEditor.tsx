@@ -345,6 +345,9 @@ export function SchemeEditor({
                             <SelectContent>
                               <SelectGroup>
                                 <SelectItem value="THEORY">Teórica</SelectItem>
+                                <SelectItem value="ATTENDANCE">
+                                  Asistencia
+                                </SelectItem>
                                 <SelectItem value="PRACTICAL">
                                   Práctica
                                 </SelectItem>

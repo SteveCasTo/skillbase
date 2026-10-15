@@ -38,6 +38,7 @@ export const userStatus = pgEnum("user_status", [
 export const evaluationType = pgEnum("evaluation_type", [
   "THEORY",
   "PRACTICAL",
+  "ATTENDANCE",
 ]);
 export const evaluationSchemes = pgTable(
   "evaluation_schemes",
@@ -97,6 +98,10 @@ export const evaluationGrades = pgTable(
       .notNull()
       .references(() => preRegistrations.id, { onDelete: "restrict" }),
     scoreHundredths: integer("score_hundredths").notNull(),
+    origin: text("origin")
+      .$type<"AUTO" | "MANUAL">()
+      .notNull()
+      .default("MANUAL"),
     revision: integer("revision").notNull().default(1),
     recordedBy: uuid("recorded_by")
       .notNull()
@@ -120,6 +125,10 @@ export const evaluationGrades = pgTable(
     check(
       "evaluation_grade_score_check",
       sql`${t.scoreHundredths} between 0 and 10000 and ${t.revision} > 0`,
+    ),
+    check(
+      "evaluation_grade_origin_check",
+      sql`${t.origin} in ('AUTO', 'MANUAL')`,
     ),
   ],
 ).enableRLS();

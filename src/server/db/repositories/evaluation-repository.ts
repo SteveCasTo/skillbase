@@ -8,6 +8,7 @@ import {
   validateSaveGrade,
   validateSaveRow,
   validateSaveScheme,
+  validateEvaluationCommand,
 } from "@/application/evaluations/manage-evaluations";
 import {
   EvaluationError,
@@ -29,6 +30,10 @@ import { membershipStatus } from "@/domain/pre-registrations/policies";
 import { lockInstructorSchedules } from "./instructor-schedule";
 import { registrationGroupName } from "./registration-support";
 import { academicGroupClosed } from "./academic-closure-guard";
+import {
+  effectiveEvaluationGrades,
+  loadAttendanceGradeEvidence,
+} from "./attendance-grade";
 
 type Database = PostgresJsDatabase<typeof s>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -177,6 +182,24 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
         .where(eq(s.groups.courseId, courseId))
         .orderBy(asc(s.groups.startsAt), asc(s.groups.id));
       const people = await loadEvaluationRoster(tx, ctx.course, ctx.now);
+      const attendance = new Map(
+        await Promise.all(
+          (items.some((c) => c.type === "ATTENDANCE") ? groups : [])
+            .filter((g) => groupId === undefined || g.id === groupId)
+            .map(
+              async (g) =>
+                [
+                  g.id,
+                  await loadAttendanceGradeEvidence(
+                    tx,
+                    ctx.course,
+                    g.id,
+                    ctx.now,
+                  ),
+                ] as const,
+            ),
+        ),
+      );
       const states = await tx
         .select({ state: s.academicGroupStates })
         .from(s.academicGroupStates)
@@ -222,6 +245,18 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
             grades.some((g) => g.participantId === p.participantId)),
       );
       const data: CourseEvaluationsDto = {
+        hasAttendanceOverrides:
+          groupId !== undefined &&
+          grades.some(
+            (g) =>
+              g.origin === "MANUAL" &&
+              items.some(
+                (c) => c.id === g.componentId && c.type === "ATTENDANCE",
+              ) &&
+              people.some(
+                (p) => p.id === g.registrationId && p.groupId === groupId,
+              ),
+          ),
         courseId,
         courseName: ctx.course.name,
         startsAt: ctx.course.startsAt.toISOString(),
@@ -290,6 +325,10 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
             const marks = grades.filter(
               (g) => g.participantId === p.participantId,
             );
+            const evidence = attendance.get(p.groupId);
+            const effective = evidence
+              ? effectiveEvaluationGrades(items, marks, p.id, evidence)
+              : marks;
             return {
               participantId: p.participantId,
               registrationId: p.id,
@@ -303,14 +342,26 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
                 const g = marks.find((m) => m.componentId === c.id);
                 return {
                   componentId: c.id,
-                  score: g ? evaluationDecimal(g.scoreHundredths) : null,
+                  origin:
+                    c.type === "ATTENDANCE" ? (g?.origin ?? "AUTO") : "MANUAL",
+                  canEdit: c.type !== "ATTENDANCE" || Boolean(evidence?.ready),
+                  score: effective.find((m) => m.componentId === c.id)
+                    ? evaluationDecimal(
+                        effective.find((m) => m.componentId === c.id)!
+                          .scoreHundredths,
+                      )
+                    : null,
                   revision: g?.revision ?? 0,
                   recordedBy: ctx.admin ? (g?.recordedBy ?? null) : null,
                   recordedByName: g?.actorName ?? null,
                   recordedAt: g?.recordedAt.toISOString() ?? null,
                 };
               }),
-              result: evaluationResult(items, marks, ctx.course.minimumGrade),
+              result: evaluationResult(
+                items,
+                effective,
+                ctx.course.minimumGrade,
+              ),
             };
           }),
       };
@@ -486,6 +537,24 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
             "GROUP_CLOSED",
             "Reabre el grupo antes de corregir notas.",
           );
+        const attendance = await loadAttendanceGradeEvidence(
+          tx,
+          ctx.course,
+          person.groupId,
+          ctx.now,
+        );
+        if (
+          input.grades.some((g) =>
+            items.some(
+              (c) => c.id === g.componentId && c.type === "ATTENDANCE",
+            ),
+          ) &&
+          !attendance.ready
+        )
+          throw new EvaluationError(
+            "VALIDATION_FAILED",
+            "La asistencia no está resuelta.",
+          );
         const previous = await tx
           .select()
           .from(s.evaluationGrades)
@@ -528,10 +597,13 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
             };
           })
           .filter(
-            (change) => change.old?.scoreHundredths !== change.scoreHundredths,
+            (change) =>
+              change.old?.scoreHundredths !== change.scoreHundredths ||
+              change.old?.origin !== "MANUAL",
           );
         for (const change of changes) {
           const value = {
+            origin: "MANUAL" as const,
             scoreHundredths: change.scoreHundredths,
             revision: change.revision,
             recordedBy: actorId,
@@ -572,6 +644,12 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
           .from(s.evaluationSchemes)
           .where(eq(s.evaluationSchemes.courseId, input.courseId));
         if (!scheme) throw new Error("Evaluation scheme unavailable");
+        const effective = effectiveEvaluationGrades(
+          items,
+          marks.map((m) => m.grade),
+          person.id,
+          attendance,
+        );
         return {
           kind: "row",
           schemeRevision: scheme.revision,
@@ -581,8 +659,16 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
             const mark = marks.find((m) => m.grade.componentId === item.id);
             return {
               componentId: item.id,
-              score: mark
-                ? evaluationDecimal(mark.grade.scoreHundredths)
+              origin:
+                item.type === "ATTENDANCE"
+                  ? (mark?.grade.origin ?? "AUTO")
+                  : "MANUAL",
+              canEdit: item.type !== "ATTENDANCE" || attendance.ready,
+              score: effective.find((m) => m.componentId === item.id)
+                ? evaluationDecimal(
+                    effective.find((m) => m.componentId === item.id)!
+                      .scoreHundredths,
+                  )
                 : null,
               revision: mark?.grade.revision ?? 0,
               recordedBy: mark?.grade.recordedBy ?? null,
@@ -590,11 +676,7 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
               recordedAt: mark?.grade.recordedAt.toISOString() ?? null,
             };
           }),
-          result: evaluationResult(
-            items,
-            marks.map((m) => m.grade),
-            ctx.course.minimumGrade,
-          ),
+          result: evaluationResult(items, effective, ctx.course.minimumGrade),
         };
       });
     });
@@ -638,6 +720,22 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
             "GROUP_CLOSED",
             "Reabre el grupo antes de corregir notas.",
           );
+        const attendance = await loadAttendanceGradeEvidence(
+          tx,
+          ctx.course,
+          person.groupId,
+          ctx.now,
+        );
+        if (
+          items.some(
+            (c) => c.id === input.componentId && c.type === "ATTENDANCE",
+          ) &&
+          !attendance.ready
+        )
+          throw new EvaluationError(
+            "VALIDATION_FAILED",
+            "La asistencia no está resuelta.",
+          );
         const [previous] = await tx
           .select()
           .from(s.evaluationGrades)
@@ -657,6 +755,7 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
           );
         const revision = input.gradeRevision + 1;
         const value = {
+          origin: "MANUAL" as const,
           scoreHundredths: evaluationHundredths(input.score, "score"),
           revision,
           recordedBy: actorId,
@@ -701,9 +800,82 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
           participantId: person.participantId,
           componentId: input.componentId,
           gradeRevision: revision,
-          result: evaluationResult(items, marks, ctx.course.minimumGrade),
+          result: evaluationResult(
+            items,
+            effectiveEvaluationGrades(items, marks, person.id, attendance),
+            ctx.course.minimumGrade,
+          ),
         };
       });
+    });
+  }
+  async resetAttendance(actorId: string, input: EvaluationCommand) {
+    validateEvaluationCommand(input);
+    if (!input.groupId)
+      throw new EvaluationError("VALIDATION_FAILED", "Selecciona un grupo.");
+    const groupId = input.groupId;
+    return this.db.transaction(async (tx) => {
+      const ctx = await context(
+        tx,
+        actorId,
+        input.courseId,
+        this.clock,
+        groupId,
+      );
+      return this.command(
+        tx,
+        actorId,
+        input,
+        "RESET_ATTENDANCE",
+        input,
+        async () => {
+          if (await academicGroupClosed(tx, groupId))
+            throw new EvaluationError(
+              "GROUP_CLOSED",
+              "Reabre el grupo antes de corregir notas.",
+            );
+          assertSchemeRevision(ctx.scheme?.revision ?? 0, input.schemeRevision);
+          const items = await components(tx, input.courseId);
+          const registrations = await tx
+            .select({ id: s.preRegistrations.id })
+            .from(s.preRegistrations)
+            .where(eq(s.preRegistrations.groupId, groupId));
+          const grades = await tx
+            .select()
+            .from(s.evaluationGrades)
+            .where(
+              and(
+                eq(s.evaluationGrades.courseId, input.courseId),
+                eq(s.evaluationGrades.origin, "MANUAL"),
+              ),
+            );
+          for (const grade of grades) {
+            if (
+              !registrations.some((r) => r.id === grade.registrationId) ||
+              !items.some(
+                (c) => c.id === grade.componentId && c.type === "ATTENDANCE",
+              )
+            )
+              continue;
+            await tx
+              .update(s.evaluationGrades)
+              .set({
+                origin: "AUTO",
+                revision: grade.revision + 1,
+                recordedBy: actorId,
+                recordedAt: ctx.now,
+              })
+              .where(
+                and(
+                  eq(s.evaluationGrades.courseId, input.courseId),
+                  eq(s.evaluationGrades.participantId, grade.participantId),
+                  eq(s.evaluationGrades.componentId, grade.componentId),
+                ),
+              );
+          }
+          return { kind: "reset", schemeRevision: ctx.scheme?.revision ?? 0 };
+        },
+      );
     });
   }
 }

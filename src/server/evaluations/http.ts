@@ -5,6 +5,7 @@ import {
   saveEvaluationGrade,
   saveEvaluationRow,
   saveEvaluationScheme,
+  resetAttendanceGrades,
 } from "@/application/evaluations/manage-evaluations";
 import { EvaluationError } from "@/domain/evaluations/rules";
 import type {
@@ -139,7 +140,7 @@ function componentList(value: unknown): EvaluationComponentInput[] {
     const row = object(item);
     allowFields(row, ["id", "name", "type", "weight"]);
     const type = text(row.type, `components.${index}.type`);
-    if (type !== "THEORY" && type !== "PRACTICAL")
+    if (type !== "THEORY" && type !== "PRACTICAL" && type !== "ATTENDANCE")
       throw new EvaluationError(
         "VALIDATION_FAILED",
         "Tipo de componente no válido.",
@@ -205,9 +206,11 @@ export async function handleEvaluationPost(input: {
     const raw = object(await readInterestRequest(input.request, 65536));
     // Existing group POST routes accept the row payload without changing legacy grade forms.
     const operation =
-      input.operation === "grade" && raw.grades !== undefined
-        ? "row"
-        : input.operation;
+      input.operation === "grade" && raw.action === "reset-attendance"
+        ? "reset"
+        : input.operation === "grade" && raw.grades !== undefined
+          ? "row"
+          : input.operation;
     allowFields(raw, [
       "requestKey",
       "courseId",
@@ -215,9 +218,11 @@ export async function handleEvaluationPost(input: {
       "schemeRevision",
       ...(operation === "scheme"
         ? ["components"]
-        : operation === "row"
-          ? ["registrationId", "grades"]
-          : ["registrationId", "componentId", "gradeRevision", "score"]),
+        : operation === "reset"
+          ? ["action"]
+          : operation === "row"
+            ? ["registrationId", "grades"]
+            : ["registrationId", "componentId", "gradeRevision", "score"]),
     ]);
     if (
       (raw.courseId !== undefined && raw.courseId !== input.courseId) ||
@@ -234,24 +239,26 @@ export async function handleEvaluationPost(input: {
       schemeRevision: revision(raw.schemeRevision, "schemeRevision"),
     };
     const value =
-      operation === "scheme"
-        ? await saveEvaluationScheme(input.repository, input.actor, {
-            ...command,
-            components: componentList(raw.components),
-          })
-        : operation === "row"
-          ? await saveEvaluationRow(input.repository, input.actor, {
+      operation === "reset"
+        ? await resetAttendanceGrades(input.repository, input.actor, command)
+        : operation === "scheme"
+          ? await saveEvaluationScheme(input.repository, input.actor, {
               ...command,
-              registrationId: text(raw.registrationId, "registrationId"),
-              grades: gradeList(raw.grades),
+              components: componentList(raw.components),
             })
-          : await saveEvaluationGrade(input.repository, input.actor, {
-              ...command,
-              registrationId: text(raw.registrationId, "registrationId"),
-              componentId: text(raw.componentId, "componentId"),
-              gradeRevision: revision(raw.gradeRevision, "gradeRevision"),
-              score: text(raw.score, "score"),
-            });
+          : operation === "row"
+            ? await saveEvaluationRow(input.repository, input.actor, {
+                ...command,
+                registrationId: text(raw.registrationId, "registrationId"),
+                grades: gradeList(raw.grades),
+              })
+            : await saveEvaluationGrade(input.repository, input.actor, {
+                ...command,
+                registrationId: text(raw.registrationId, "registrationId"),
+                componentId: text(raw.componentId, "componentId"),
+                gradeRevision: revision(raw.gradeRevision, "gradeRevision"),
+                score: text(raw.score, "score"),
+              });
     return {
       status: 200,
       payload: {

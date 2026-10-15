@@ -10,6 +10,9 @@ import { signInFixture } from "./auth-helper";
 import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { createDatabase } from "@/server/db/client";
+import { DrizzleAttendanceRepository } from "@/server/db/repositories/attendance-repository";
+import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 
 test.setTimeout(60_000);
 
@@ -18,7 +21,7 @@ async function capture(page: Page, surface: string, matrix = false) {
   if (!directory) return;
   await mkdir(directory, { recursive: true });
   await page.evaluate(() => document.fonts.ready);
-  for (const width of matrix ? [390, 768, 1440] : [1440]) {
+  for (const width of matrix ? [375, 768, 1440] : [1440]) {
     for (const theme of matrix ? ["light", "dark"] : ["light"]) {
       await page.setViewportSize({ width, height: 960 });
       await page.evaluate((theme) => {
@@ -192,10 +195,151 @@ test("ADMIN saves exact course-wide weights and can edit the scheme before gradi
     );
     await capture(page, "scheme");
     await verifySsr(browser, fixture);
+    await verifyAttendanceGrades(page, fixture);
   } finally {
     await fixture.close();
   }
 });
+
+async function verifyAttendanceGrades(
+  page: Page,
+  fixture: Awaited<ReturnType<typeof createAttendanceFlowFixture>>,
+) {
+  const connection = createDatabase(getTestSupabaseEnvironment().databaseUrl);
+  let now = fixture.now;
+  try {
+    const path = gradePath(fixture.courseId, fixture.groupId);
+    const current = await read(page, path);
+    const components: EvaluationComponentInput[] = [
+      {
+        id: crypto.randomUUID(),
+        name: "Asistencia",
+        type: "ATTENDANCE",
+        weight: "50",
+      },
+      { id: crypto.randomUUID(), name: "Teoría", type: "THEORY", weight: "50" },
+    ];
+    const configured = await page.request.post(schemePath(fixture.courseId), {
+      headers: { Accept: "application/json", Origin: e2eSiteUrl() },
+      data: {
+        requestKey: crypto.randomUUID(),
+        schemeRevision: current.scheme.revision,
+        components,
+      },
+    });
+    expect(configured.status()).toBe(200);
+    await page.goto(path);
+    const edit = page.getByRole("button", {
+      name: "Editar notas de Enrolled Attendance Quispe",
+      exact: true,
+    });
+    await edit.click();
+    const attendanceInput = page.getByRole("textbox", {
+      name: /Asistencia.*Enrolled Attendance/,
+    });
+    await expect(attendanceInput).toBeDisabled();
+    await expect(
+      page.getByRole("searchbox", { name: "Buscar participante" }),
+    ).toBeVisible();
+    await expect(page.locator('label[for="evaluation-search"]')).toHaveClass(
+      "sr-only",
+    );
+    await expect(
+      page.getByRole("button", {
+        name: "Restablecer cálculo automático",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    const repository = new DrizzleAttendanceRepository(
+      connection.db,
+      () => now,
+    );
+    const calendar = await repository.getGroup(
+      fixture.adminId,
+      fixture.courseId,
+      fixture.groupId,
+    );
+    const first = calendar.sessions[0]!;
+    now = new Date(
+      Math.max(
+        fixture.now.getTime(),
+        new Date(first.startsAt).getTime() + 60000,
+      ),
+    );
+    expect(
+      (
+        await page.request.post(
+          `/__e2e/clock?now=${encodeURIComponent(now.toISOString())}`,
+        )
+      ).status(),
+    ).toBe(204);
+    await repository.record(fixture.adminId, {
+      courseId: fixture.courseId,
+      groupId: fixture.groupId,
+      sessionId: first.id,
+      requestKey: crypto.randomUUID(),
+      revision: first.revision,
+      marks: [{ registrationId: fixture.paid.id, status: "EXCUSED" }],
+    });
+    await page.reload();
+    expect((await read(page, path)).participants[0]!.grades[0]!.score).toBe(
+      "100.00",
+    );
+    expect((await read(page, path)).scheme.frozenAt).toBeNull();
+    now = new Date(fixture.now.getTime() + 3 * 86400000);
+    expect(
+      (
+        await page.request.post(
+          `/__e2e/clock?now=${encodeURIComponent(now.toISOString())}`,
+        )
+      ).status(),
+    ).toBe(204);
+    await page.reload();
+    await edit.click();
+    await expect(attendanceInput).toBeEnabled();
+    await expect(attendanceInput).toHaveValue("50.00");
+    await attendanceInput.fill("80.25");
+    await page
+      .getByRole("textbox", { name: /Teoría.*Enrolled Attendance/ })
+      .fill("90");
+    await page
+      .getByRole("button", {
+        name: "Guardar notas de Enrolled Attendance Quispe",
+        exact: true,
+      })
+      .click();
+    const reset = page.getByRole("button", {
+      name: "Restablecer cálculo automático",
+      exact: true,
+    });
+    await expect(reset).toBeVisible();
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 960 });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+    }
+    await capture(page, "attendance-overridden", true);
+    await reset.click();
+    await expect(reset).toHaveCount(0);
+    const refreshed = await read(page, path);
+    expect(refreshed.participants[0]!.grades.map((g) => g.score)).toEqual([
+      "50.00",
+      "90.00",
+    ]);
+    await edit.click();
+    await expect(attendanceInput).toHaveValue("50.00");
+    expect(await attendanceInput.getAttribute("title")).toBeNull();
+    await capture(page, "attendance-restored", true);
+    expect(await page.locator("main").innerText()).not.toMatch(
+      /provisional|calculada automáticamente/iu,
+    );
+  } finally {
+    await connection.close();
+  }
+}
 
 test("INSTRUCTOR saves rows atomically with pending distinct from zero, and corrections update weighted results and ADMIN history", async ({
   page,

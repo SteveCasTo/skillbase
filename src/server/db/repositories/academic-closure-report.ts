@@ -17,10 +17,9 @@ import {
 import type { AttendanceMarkDto } from "@/domain/attendance/types";
 import type { AttendanceTransaction, SessionRow } from "./attendance-calendar";
 import {
-  ensureGroupSessions,
-  loadGroupEligibility,
-  materializeSessionRoster,
-} from "./attendance-calendar";
+  effectiveEvaluationGrades,
+  loadAttendanceGradeEvidence,
+} from "./attendance-grade";
 import { loadEvaluationRoster } from "./evaluation-repository";
 import { registrationGroupName } from "./registration-support";
 export { privateClosureReport } from "@/server/academic-closure/projection";
@@ -44,29 +43,12 @@ export async function buildClosureReport(
   course: typeof s.courses.$inferSelect,
   group: typeof s.groups.$inferSelect,
   now: Date,
-  actorId: string,
 ): Promise<ClosureReportDto> {
-  await ensureGroupSessions(tx, group, now, actorId);
   const sessions = await tx
     .select()
     .from(s.groupSessions)
     .where(eq(s.groupSessions.groupId, group.id))
     .orderBy(asc(s.groupSessions.startsAt), asc(s.groupSessions.id));
-  const eligibility = await loadGroupEligibility(
-    tx,
-    group.id,
-    course.startsAt,
-    now,
-  );
-  for (const session of sessions)
-    await materializeSessionRoster(
-      tx,
-      group.id,
-      course.startsAt,
-      session,
-      now,
-      eligibility,
-    );
   const [settings] = await tx
     .select()
     .from(s.attendanceSettings)
@@ -126,6 +108,40 @@ export async function buildClosureReport(
     )
     .leftJoin(s.users, eq(s.users.id, s.instructorAttendance.markedBy))
     .where(eq(s.groupSessions.groupId, group.id));
+  const attendanceEvidence = await loadAttendanceGradeEvidence(
+    tx,
+    course,
+    group.id,
+    now,
+    {
+      sessions,
+      roster: roster.map((row) => ({ row })),
+      marks: marks.map(({ mark }) => ({ row: mark })),
+      instructors: instructorMarks.map(({ mark }) => ({ row: mark })),
+    },
+  );
+  for (const { session, participants } of attendanceEvidence.evidence)
+    for (const participant of participants) {
+      if (
+        roster.some(
+          (r) =>
+            r.sessionId === session.id &&
+            r.registrationId === participant.registrationId,
+        )
+      )
+        continue;
+      const person = attendanceEvidence.eligibility.find(
+        (p) => p.registration.id === participant.registrationId,
+      );
+      if (person)
+        roster.push({
+          sessionId: session.id,
+          registrationId: participant.registrationId,
+          firstName: person.firstName,
+          paternalSurname: person.paternalSurname,
+          maternalSurname: person.maternalSurname,
+        });
+    }
   function markDto(
     session: SessionRow,
     mark?: {
@@ -289,7 +305,12 @@ export async function buildClosureReport(
         };
         const result = evaluationResult(
           components,
-          personGrades.map((g) => g.grade),
+          effectiveEvaluationGrades(
+            components,
+            personGrades.map((g) => g.grade),
+            person.id,
+            attendanceEvidence,
+          ),
           course.minimumGrade,
         );
         return {
@@ -316,9 +337,15 @@ export async function buildClosureReport(
             );
             return {
               componentId: component.id,
-              score: grade
-                ? evaluationDecimal(grade.grade.scoreHundredths)
-                : null,
+              score:
+                grade &&
+                (component.type !== "ATTENDANCE" ||
+                  grade.grade.origin === "MANUAL")
+                  ? evaluationDecimal(grade.grade.scoreHundredths)
+                  : component.type === "ATTENDANCE" &&
+                      attendanceEvidence.score(person.id) !== null
+                    ? evaluationDecimal(attendanceEvidence.score(person.id)!)
+                    : null,
               revision: grade?.grade.revision ?? 0,
               recordedBy: grade?.grade.recordedBy ?? null,
               recordedByName: grade?.actorName ?? null,
