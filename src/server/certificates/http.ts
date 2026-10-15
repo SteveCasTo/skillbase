@@ -331,13 +331,7 @@ export async function handleCertificateUpload(input: {
     if (
       [...form.keys()].some(
         (k) =>
-          ![
-            "file",
-            "revision",
-            "requestKey",
-            "purpose",
-            "attestation",
-          ].includes(k),
+          !["file", "revision", "requestKey", "purpose", "intent"].includes(k),
       ) ||
       [...new Set(form.keys())].some((k) => form.getAll(k).length !== 1)
     )
@@ -346,11 +340,12 @@ export async function handleCertificateUpload(input: {
         "Campos duplicados o no admitidos.",
       );
     const file = form.get("file");
-    if (form.get("attestation") !== "true")
+    // The named submit action is the ADMIN's explicit attestation, not a
+    // pre-checked/hidden boolean. Authorization and publication remain server-side.
+    if (form.get("intent") !== "save-signed-pdf")
       throw new CertificateError(
         "VALIDATION_FAILED",
-        "Confirma que es el certificado firmado.",
-        { attestation: "Confirma que es el certificado firmado." },
+        "Envía la acción de guardar el PDF firmado para confirmar el documento.",
       );
     if (!(file instanceof File) || form.get("purpose") !== "SIGNED")
       throw new CertificateError(
@@ -403,5 +398,42 @@ export async function downloadCertificate(input: {
   } catch (error) {
     const f = certificateFailure(error);
     return certificateJson(f.payload, f.status);
+  }
+}
+
+/** POST is a download action, not a user-selected regeneration command. */
+export async function prepareCertificateDownload(input: {
+  request: Request;
+  actor: InternalUser;
+  siteUrl: URL;
+  certificateId: string;
+  service: ManageCertificates;
+}) {
+  try {
+    requireCertificateActor(input.actor);
+    if (!requestHasExpectedOrigin(input.request, input.siteUrl))
+      throw new CertificateError("FORBIDDEN", "Origen no válido.");
+    const fields = object(await readInterestRequest(input.request, 4096));
+    allow(fields, ["revision", "requestKey"]);
+    const { bytes, revision } = await input.service.prepareDownload(
+      input.actor.id,
+      {
+        certificateId: input.certificateId,
+        revision: number(fields.revision),
+        requestKey: text(fields.requestKey),
+      },
+    );
+    return new Response(new Uint8Array(bytes), {
+      headers: {
+        ...certificateHeaders,
+        "Content-Type": "application/pdf",
+        "Content-Disposition":
+          'attachment; filename="certificate-unsigned.pdf"',
+        "X-Certificate-Revision": String(revision),
+      },
+    });
+  } catch (error) {
+    const failure = certificateFailure(error);
+    return certificateJson(failure.payload, failure.status);
   }
 }

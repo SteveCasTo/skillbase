@@ -189,7 +189,7 @@ export default function RevokeCertificate({
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline" className="min-h-11">
+        <Button variant="destructive" className="min-h-11">
           Revocar certificado
         </Button>
       </DialogTrigger>

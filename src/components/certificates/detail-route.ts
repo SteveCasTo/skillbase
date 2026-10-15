@@ -1,10 +1,6 @@
 import type { AstroGlobal } from "astro";
 import { requireInternalUser } from "@/server/auth/context";
-import {
-  loadCertificate,
-  loadCertificateSettings,
-} from "@/server/certificates/loaders";
-import { loadAcademicClosure } from "@/server/academic-closure/loaders";
+import { loadCertificate } from "@/server/certificates/loaders";
 import { certificateJson } from "@/server/certificates/http";
 import {
   certificateMethodNotAllowed,
@@ -47,22 +43,8 @@ export async function prepareCertificateDetail(
   if (!load.available) astro.response.status = load.status;
   if (astro.request.headers.get("Accept")?.includes("application/json"))
     return certificateJson(load, load.available ? 200 : load.status);
-  const closure =
-    !instructorRoute && load.available && !load.data.hasSignedPdf
-      ? await loadAcademicClosure({
-          actor,
-          courseId: load.data.courseId,
-          groupId: load.data.groupId,
-        })
-      : null;
-  const settings =
-    closure?.available && closure.data.status === "CLOSED"
-      ? await loadCertificateSettings({ actor })
-      : null;
   return {
     load,
-    closure,
-    settings,
     feedback,
     instructorRoute,
     path: astro.url.pathname,

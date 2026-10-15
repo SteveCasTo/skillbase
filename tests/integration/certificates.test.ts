@@ -21,6 +21,7 @@ import { defaultCertificateConfiguration } from "@/domain/certificates/rules";
 import {
   handleCertificatePost,
   handleCertificateUpload,
+  prepareCertificateDownload,
 } from "@/server/certificates/http";
 import type { CertificateDto } from "@/domain/certificates/types";
 import { createClosureFixture } from "../fixtures/academic-closure";
@@ -390,13 +391,54 @@ test("concurrent generation keeps one current record; draft regeneration invalid
   ]);
   expect(preparations[0]![0]!.id).toBe(preparations[1]![0]!.id);
   const [generated] = await f.service.generate(f.admin.id, f.input);
+  const unchanged = await f.service.prepareDownload(
+    f.admin.id,
+    command(generated!),
+  );
+  expect(unchanged.revision).toBe(generated!.revision);
+  expect(
+    (await repository.get(f.admin.id, generated!.id)).publicCredentialId,
+  ).toBe(generated!.publicCredentialId);
+  const settings = await repository.getSettings(f.admin.id);
+  const unrelated = await repository.updateSettings(
+    f.admin.id,
+    settings.revision,
+    {
+      ...settings.configuration,
+      departmentHead: {
+        ...settings.configuration.departmentHead,
+        name: "Unprinted fictitious head",
+      },
+    },
+  );
+  const stillCurrent = await f.service.prepareDownload(
+    f.admin.id,
+    command(generated!),
+  );
+  expect(stillCurrent.revision).toBe(generated!.revision);
+  const updated = await repository.updateSettings(
+    f.admin.id,
+    unrelated.revision,
+    {
+      ...settings.configuration,
+      director: {
+        ...settings.configuration.director,
+        name: "Updated fictitious director",
+      },
+    },
+  );
+  await expect(
+    f.service.uploadSigned(f.admin.id, command(generated!), signed),
+  ).rejects.toMatchObject({ code: "CONCURRENT_UPDATE" });
   const regeneration = {
     ...f.input,
+    configurationRevision: updated.revision,
     regenerate: true,
     certificateRevision: generated!.revision,
     requestKey: crypto.randomUUID(),
   };
-  const [one] = await f.service.generate(f.admin.id, regeneration);
+  await f.service.prepareDownload(f.admin.id, command(generated!));
+  const one = await repository.get(f.admin.id, generated!.id);
   expect(one!.id).toBe(generated!.id);
   expect(one!.publicCredentialId).not.toBe(generated!.publicCredentialId);
   expect(await repository.verify(generated!.publicCredentialId)).toEqual({
@@ -466,6 +508,26 @@ test("Storage failure and stale attach compensate only new object and leave dura
   const f = await setup();
   const [row] = await f.service.generate(f.admin.id, f.input);
   const originalPaths = [...f.storage.objects.keys()];
+  const settings = await repository.getSettings(f.admin.id);
+  f.storage.afterPut = async () => {
+    await repository.updateSettings(f.admin.id, settings.revision, {
+      ...settings.configuration,
+      director: {
+        ...settings.configuration.director,
+        name: "Racing fictitious authority",
+      },
+    });
+  };
+  await expect(
+    f.service.uploadSigned(f.admin.id, command(row!), signed),
+  ).rejects.toMatchObject({ code: "CONCURRENT_UPDATE" });
+  expect((await repository.get(f.admin.id, row!.id)).hasSignedPdf).toBe(false);
+  expect([...f.storage.objects.keys()]).toEqual(originalPaths);
+  await repository.updateSettings(
+    f.admin.id,
+    settings.revision + 1,
+    settings.configuration,
+  );
   f.storage.afterPut = async () => {
     await closure.reopen(f.admin.id, {
       courseId: f.course.id,
@@ -485,6 +547,7 @@ test("Storage failure and stale attach compensate only new object and leave dura
     .where(eq(s.certificateArtifacts.certificateId, row!.id));
   expect(artifacts.map((a) => a.status).sort()).toEqual([
     "attached",
+    "cleaned",
     "cleanup_pending",
   ]);
   expect(f.storage.objects.size).toBe(2);
@@ -538,7 +601,7 @@ test("HTTP mutation and upload adapters validate origin, allowlist, purpose and 
     new File(["not a PDF"], "scan.pdf", { type: "application/pdf" }),
   );
   form.set("purpose", "SIGNED");
-  form.set("attestation", "true");
+  form.set("intent", "save-signed-pdf");
   form.set("revision", String(row!.revision));
   form.set("requestKey", crypto.randomUUID());
   const result = await handleCertificateUpload({
@@ -558,7 +621,7 @@ test("HTTP mutation and upload adapters validate origin, allowlist, purpose and 
     "file",
     new File([new Uint8Array(signed)], "qa.pdf", { type: "application/pdf" }),
   );
-  form.delete("attestation");
+  form.delete("intent");
   const unconfirmed = await handleCertificateUpload({
     request: new Request(`${siteUrl}upload`, {
       method: "POST",
@@ -572,6 +635,38 @@ test("HTTP mutation and upload adapters validate origin, allowlist, purpose and 
   });
   expect(unconfirmed.status).toBe(422);
   expect((await repository.get(f.admin.id, row!.id)).hasSignedPdf).toBe(false);
+  const crossSiteDownload = await prepareCertificateDownload({
+    request: request(
+      { revision: row!.revision, requestKey: crypto.randomUUID() },
+      "https://foreign.invalid",
+    ),
+    actor,
+    siteUrl,
+    certificateId: row!.id,
+    service: f.service,
+  });
+  expect(crossSiteDownload.status).toBe(403);
+  form.set("intent", "save-signed-pdf");
+  const saved = await handleCertificateUpload({
+    request: new Request(`${siteUrl}upload`, {
+      method: "POST",
+      headers: { Origin: siteUrl.origin },
+      body: form,
+    }),
+    actor,
+    siteUrl,
+    certificateId: row!.id,
+    service: f.service,
+  });
+  expect(saved.status).toBe(200);
+  expect((await repository.get(f.admin.id, row!.id)).state).toBe("issued");
+  expect(
+    (await repository.history(f.admin.id, row!.id)).some(
+      (entry) =>
+        entry.action === "SIGNED_PDF_SAVED" &&
+        entry.reason?.includes("explicit save action"),
+    ),
+  ).toBe(true);
   const { courseId: _course, groupId: _group, ...generation } = f.input;
   void _course;
   void _group;

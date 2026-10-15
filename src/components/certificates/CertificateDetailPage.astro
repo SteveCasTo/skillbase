@@ -11,20 +11,15 @@ import {
   civilDateLabel,
 } from "./presentation";
 import FormFeedback from "./FormFeedback.astro";
-import CertificateFilePicker from "./CertificateFilePicker.astro";
+import SignedPdfUpload from "./SignedPdfUpload.astro";
 import RevokeCertificate from "./RevokeCertificate";
 type Props = CertificateDetailProps;
-const { load, closure, settings, feedback, instructorRoute, path, requestKey } =
-  Astro.props;
+const { load, feedback, instructorRoute, path, requestKey } = Astro.props;
 const record = load.available ? load.data : null;
 const title = record ? certificateTypeLabel[record.type] : "Certificado";
 const groupPath = record
   ? `${instructorRoute ? "/app/mis-cursos" : "/app/cursos"}/${record.courseId}/grupos/${record.groupId}/certificados`
   : "/app/certificados";
-const current =
-  closure?.available && closure.data.status === "CLOSED"
-    ? closure.data.official
-    : null;
 const signed = record?.hasSignedPdf;
 const editable = record && record.state !== "revoked" && !record.obsolete;
 ---
@@ -40,14 +35,71 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
   />
   {record ? (
     <article class="mt-5 flex min-w-0 flex-col gap-7">
-      <header class="flex flex-wrap items-baseline gap-x-4 gap-y-2">
-        <h1 class="text-3xl font-semibold tracking-tight">{title}</h1>
-        <p class="min-w-0 break-words text-lg text-muted-foreground">
-          {record.data.recipientName}
-        </p>
-        <span class="text-sm font-medium">
-          {certificateStateLabel[record.state]}
-        </span>
+      <header class="flex flex-wrap items-start justify-between gap-4">
+        <div class="flex min-w-0 flex-1 basis-80 flex-col gap-2">
+          <h1 class="text-3xl font-semibold tracking-tight">{title}</h1>
+          <div class="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-2">
+            <p class="min-w-0 break-words text-lg text-muted-foreground">
+              {record.data.recipientName}
+            </p>
+            <span class="text-sm font-medium">
+              {certificateStateLabel[record.state]}
+            </span>
+          </div>
+        </div>
+        {signed ? (
+          <a
+            data-astro-reload
+            href={`${path}/firmado.pdf`}
+            data-feedback-download
+            class={buttonVariants({ className: "min-h-11 shrink-0" })}
+          >
+            Descargar firmado
+          </a>
+        ) : (
+          ["pending", "generated"].includes(record.state) &&
+          (instructorRoute ? (
+            <a
+              data-astro-reload
+              href={`${path}/generado.pdf`}
+              data-feedback-download
+              class={buttonVariants({ className: "min-h-11 shrink-0" })}
+            >
+              Descargar para firmar
+            </a>
+          ) : (
+            <form
+              method="post"
+              action={`${path}/generado.pdf`}
+              data-prepare-download
+              class="shrink-0"
+            >
+              <input type="hidden" name="revision" value={record.revision} />
+              <input
+                type="hidden"
+                name="requestKey"
+                value={crypto.randomUUID()}
+              />
+              <button
+                type="submit"
+                class={buttonVariants({ className: "min-h-11" })}
+              >
+                Descargar para firmar
+              </button>
+              <p
+                data-download-status
+                role="status"
+                class="mt-2 text-sm empty:hidden"
+              ></p>
+              <p
+                data-download-error
+                role="alert"
+                tabindex="-1"
+                class="mt-2 max-w-sm text-sm text-destructive empty:hidden"
+              ></p>
+            </form>
+          ))
+        )}
       </header>
       <dl class="grid gap-x-8 gap-y-5 border-b pb-6 sm:grid-cols-2 xl:grid-cols-4">
         <div>
@@ -76,139 +128,30 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
       </dl>
       {!signed && record.obsolete && (
         <p role="status" class="text-sm">
-          El cierre cambió. Regenera el PDF desde el cierre oficial vigente
-          antes de firmarlo.
+          El cierre cambió. La descarga preparará el PDF desde el cierre oficial
+          vigente. Si el grupo está abierto, ciérralo antes de continuar.
         </p>
       )}
       <section aria-label="Documento" class="flex min-w-0 flex-col gap-5">
-        <div class="flex flex-wrap items-start gap-3">
-          {signed ? (
-            <a
-              data-astro-reload
-              href={`${path}/firmado.pdf`}
-              data-feedback-download
-              class={buttonVariants({ className: "min-h-11" })}
-            >
-              Descargar firmado
-            </a>
-          ) : (
-            record.hasUnsignedPdf && (
-              <a
-                data-astro-reload
-                href={`${path}/generado.pdf`}
-                data-feedback-download
-                class={buttonVariants({ className: "min-h-11" })}
-              >
-                Descargar para firmar
-              </a>
-            )
-          )}
-          {!instructorRoute &&
-            !signed &&
-            record.state !== "revoked" &&
-            current &&
-            settings?.available && (
-              <form
-                method="post"
-                action={`${groupPath}/${record.type.toLowerCase()}/${record.recipientId}`}
-                data-certificate-form
-                data-pending-label="Regenerando PDF…"
-                data-success-label="PDF regenerado."
-                class="flex flex-col gap-3"
-              >
-                <input type="hidden" name="type" value={record.type} />
-                <input
-                  type="hidden"
-                  name="recipientId"
-                  value={record.recipientId}
-                />
-                <input type="hidden" name="versionId" value={current.id} />
-                <input
-                  type="hidden"
-                  name="closureRevision"
-                  value={closure?.available ? closure.data.revision : 0}
-                />
-                <input
-                  type="hidden"
-                  name="configurationRevision"
-                  value={settings.data.revision}
-                />
-                <input
-                  type="hidden"
-                  name="requestKey"
-                  value={crypto.randomUUID()}
-                />
-                <input type="hidden" name="regenerate" value="true" />
-                <input
-                  type="hidden"
-                  name="certificateRevision"
-                  value={record.revision}
-                />
-                <button
-                  type="submit"
-                  class={buttonVariants({
-                    variant: "outline",
-                    className: "min-h-11",
-                  })}
-                >
-                  Regenerar PDF
-                </button>
-                <FormFeedback {feedback} />
-              </form>
-            )}
-        </div>
+        {Astro.url.searchParams.get("prepared") === "updated" && !signed && (
+          <p role="status" class="text-sm leading-6">
+            El PDF se actualizó con los datos vigentes. Tramita las firmas sobre
+            esta nueva descarga antes de guardarlo.
+          </p>
+        )}
+        {Astro.url.searchParams.get("signed") === "saved" && signed && (
+          <p role="status" class="text-sm">
+            PDF firmado guardado.
+          </p>
+        )}
+        <FormFeedback {feedback} />
         {!instructorRoute && editable && (signed || record.hasUnsignedPdf) && (
-          <form
-            method="post"
-            action={`${path}/cargar`}
-            enctype="multipart/form-data"
-            data-certificate-form
-            data-pending-label="Guardando firmado…"
-            data-success-label="Certificado firmado guardado."
-            class="flex w-full min-w-0 flex-col gap-4"
-          >
-            <input type="hidden" name="revision" value={record.revision} />
-            <input type="hidden" name="requestKey" value={requestKey} />
-            <input type="hidden" name="purpose" value="SIGNED" />
-            <CertificateFilePicker
-              id="signed-pdf"
-              name="file"
-              required
-              title={signed ? "Sustituir firmado" : "PDF firmado"}
-              describedby="signed-file-error"
-            />
-            <p
-              id="signed-file-error"
-              data-field-error="file"
-              class="text-sm text-destructive empty:hidden"
-            ></p>
-            <label class="flex min-h-11 items-center gap-3">
-              <input
-                type="checkbox"
-                name="attestation"
-                value="true"
-                required
-                data-review-confirmation
-                aria-describedby="attestation-error"
-                class="size-5 shrink-0 accent-primary"
-              />
-              <span class="text-sm">
-                Confirmo que es el certificado firmado.
-              </span>
-            </label>
-            <p
-              id="attestation-error"
-              data-field-error="attestation"
-              class="text-sm text-destructive empty:hidden"
-            ></p>
-            <FormFeedback />
-            <button
-              type="submit"
-              class={buttonVariants({ className: "min-h-11 self-start" })}
-            >
-              {signed ? "Sustituir firmado" : "Guardar firmado"}
-            </button>
-          </form>
+          <SignedPdfUpload
+            {path}
+            revision={record.revision}
+            {requestKey}
+            signed={Boolean(signed)}
+          />
         )}
       </section>
       {signed && (
@@ -216,12 +159,6 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
           aria-label="Credencial pública"
           class="flex min-w-0 flex-col gap-3 border-t pt-6"
         >
-          <a
-            href={`/certificados/${record.publicCredentialId}`}
-            class="inline-flex min-h-11 items-center self-start text-sm underline underline-offset-4"
-          >
-            Consultar estado público
-          </a>
           <dl class="min-w-0">
             <dt class="text-sm text-muted-foreground">
               SHA-256 del PDF firmado
@@ -230,7 +167,18 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
               {record.signedSha256}
             </dd>
           </dl>
-          {record.state === "issued" && (
+          {(!instructorRoute || record.state !== "issued") && (
+            <a
+              href={`/certificados/${record.publicCredentialId}`}
+              class={buttonVariants({
+                variant: "outline",
+                className: "min-h-11 self-start",
+              })}
+            >
+              Consultar estado público
+            </a>
+          )}
+          {instructorRoute && record.state === "issued" && (
             <>
               <label for="credential-share" class="text-sm font-medium">
                 Datos para compartir o añadir a LinkedIn
@@ -241,16 +189,27 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
                 rows={5}
                 class="w-full rounded-lg border bg-card p-4 text-sm leading-6 focus-visible:outline-2 focus-visible:outline-ring"
               >{`${record.data.courseName}\n${record.data.organization}\nTitular: ${record.data.recipientName}\nFinalización: ${civilDateLabel(record.data.endsOn)}\nID: ${record.publicCredentialId}\nURL: ${record.data.verificationUrl}`}</textarea>
-              <button
-                type="button"
-                data-copy-credential
-                class={buttonVariants({
-                  variant: "outline",
-                  className: "min-h-11 self-start",
-                })}
-              >
-                Copiar datos de credencial
-              </button>
+              <div class="flex flex-wrap gap-3">
+                <a
+                  href={`/certificados/${record.publicCredentialId}`}
+                  class={buttonVariants({
+                    variant: "outline",
+                    className: "min-h-11 whitespace-normal text-center",
+                  })}
+                >
+                  Consultar estado público
+                </a>
+                <button
+                  type="button"
+                  data-copy-credential
+                  class={buttonVariants({
+                    variant: "outline",
+                    className: "min-h-11 self-start",
+                  })}
+                >
+                  Copiar datos de credencial
+                </button>
+              </div>
               <p
                 data-copy-status
                 role="status"
@@ -283,6 +242,101 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
   )}
 </PrivateLayout>
 <script>
+  import { navigate } from "astro:transitions/client";
+  let downloadController: AbortController | undefined;
+  function enablePreparedDownload() {
+    downloadController?.abort();
+    downloadController = new AbortController();
+    const signal = downloadController.signal;
+    document
+      .querySelectorAll<HTMLFormElement>("[data-prepare-download]")
+      .forEach((form) => {
+        let pending = false;
+        form.addEventListener(
+          "submit",
+          async (event) => {
+            event.preventDefault();
+            if (pending) return;
+            pending = true;
+            const button = form.querySelector<HTMLButtonElement>(
+              'button[type="submit"]',
+            )!;
+            const status = form.querySelector<HTMLElement>(
+              "[data-download-status]",
+            )!;
+            const error = form.querySelector<HTMLElement>(
+              "[data-download-error]",
+            )!;
+            button.disabled = true;
+            form.setAttribute("aria-busy", "true");
+            status.textContent = "Preparando descarga…";
+            error.textContent = "";
+            try {
+              const body = new URLSearchParams(
+                [...new FormData(form)].map(([name, value]) => [
+                  name,
+                  String(value),
+                ]),
+              );
+              const response = await fetch(form.action, {
+                method: "POST",
+                credentials: "same-origin",
+                body,
+              });
+              if (
+                !response.ok ||
+                !response.headers
+                  .get("Content-Type")
+                  ?.includes("application/pdf")
+              ) {
+                const result: unknown = await response.json();
+                error.textContent =
+                  result &&
+                  typeof result === "object" &&
+                  "message" in result &&
+                  typeof result.message === "string"
+                    ? result.message
+                    : "No se pudo preparar la descarga. Reintenta.";
+                error.focus();
+                return;
+              }
+              const url = URL.createObjectURL(await response.blob());
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = "certificate-unsigned.pdf";
+              document.body.append(link);
+              link.click();
+              link.remove();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+              const revision = response.headers.get("X-Certificate-Revision");
+              if (
+                revision !==
+                form.querySelector<HTMLInputElement>('[name="revision"]')?.value
+              ) {
+                await navigate(`${location.pathname}?prepared=updated`, {
+                  history: "replace",
+                });
+              } else {
+                status.textContent = "PDF preparado. Descarga iniciada.";
+                form.querySelector<HTMLInputElement>(
+                  '[name="requestKey"]',
+                )!.value = crypto.randomUUID();
+              }
+            } catch {
+              error.textContent =
+                "No se pudo preparar la descarga. Reintenta; si los datos cambiaron, recarga la página.";
+              error.focus();
+            } finally {
+              pending = false;
+              button.disabled = false;
+              form.removeAttribute("aria-busy");
+              if (error.textContent) status.textContent = "";
+            }
+          },
+          { signal },
+        );
+      });
+  }
   function enableCredentialCopy() {
     const button = document.querySelector<HTMLButtonElement>(
       "[data-copy-credential]",
@@ -304,4 +358,9 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
     });
   }
   document.addEventListener("astro:page-load", enableCredentialCopy);
+  document.addEventListener("astro:before-swap", () =>
+    downloadController?.abort(),
+  );
+  document.addEventListener("astro:page-load", enablePreparedDownload);
+  enablePreparedDownload();
 </script>
