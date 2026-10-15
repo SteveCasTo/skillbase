@@ -231,7 +231,7 @@ export async function renderCoursesPdf(
   lines(filters, M, y, 9, MUTED);
   y -= filters.length * 13 + 12;
   text(
-    `${report.courses.length} cursos   /   ${report.groupCount} grupos   /   ${report.uniqueEnrolled} estudiantes únicos`,
+    `${report.courses.length} ${report.courses.length === 1 ? "curso" : "cursos"}   /   ${report.groupCount} ${report.groupCount === 1 ? "grupo" : "grupos"}   /   ${report.uniqueEnrolled} ${report.uniqueEnrolled === 1 ? "estudiante único" : "estudiantes únicos"}`,
     M,
     y,
     9,
