@@ -1,12 +1,13 @@
 ---
-import { BookOpen, Plus } from "lucide-react";
+import { BookOpen, Plus, FileText, Sheet } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  courseListStatus,
+  matchesCourseSearch,
+} from "@/domain/courses/report-filters";
 import SearchToolbar from "@/components/lists/SearchToolbar.astro";
 import ListSearchEmpty from "@/components/lists/ListSearchEmpty.astro";
-import {
-  courseFilters,
-  matchesListFilter,
-  selectedListFilter,
-} from "@/components/lists/filters";
+import { courseFilters, matchesListFilter } from "@/components/lists/filters";
 import { normalizeRegistrationSearch } from "@/domain/pre-registrations/search";
 
 import { listAdminCourses } from "@/application/courses/manage-courses";
@@ -56,17 +57,17 @@ const levelLabel = {
 } as const;
 const search = Astro.url.searchParams.get("search") ?? "";
 const query = normalizeRegistrationSearch(search);
-const status = selectedListFilter(
-  Astro.url.searchParams.get("status"),
-  courseFilters,
-);
+const status = courseListStatus(Astro.url.searchParams.get("status"));
+const reportHref = (format: string) =>
+  `/app/cursos/exportar?${new URLSearchParams({ format, search, status })}`;
 const entries = courses.map((course) => ({
   course,
   searchable: normalizeRegistrationSearch(`${course.name} ${course.slug}`),
 }));
 const hasMatches = entries.some(
-  ({ course, searchable }) =>
-    searchable.includes(query) && matchesListFilter(course.status, status),
+  ({ course }) =>
+    matchesCourseSearch(course, search) &&
+    matchesListFilter(course.status, status),
 );
 ---
 
@@ -85,12 +86,30 @@ const hasMatches = entries.some(
         curso.
       </p>
     </div>
-    <a
-      href="/app/cursos/nuevo"
-      class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-xs hover:opacity-90"
-    >
-      <Plus size={18} aria-hidden="true" /> Nuevo curso
-    </a>
+    <div class="flex shrink-0 flex-wrap items-center gap-2">
+      <a
+        href={reportHref("PDF")}
+        data-course-report="PDF"
+        aria-label="Descargar informe de cursos PDF"
+        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+      >
+        <FileText aria-hidden="true" data-icon="inline-start" /> PDF
+      </a>
+      <a
+        href={reportHref("CSV")}
+        data-course-report="CSV"
+        aria-label="Descargar informe de cursos CSV"
+        class={buttonVariants({ variant: "outline", className: "min-h-11" })}
+      >
+        <Sheet aria-hidden="true" data-icon="inline-start" /> CSV
+      </a>
+      <a
+        href="/app/cursos/nuevo"
+        class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-xs hover:opacity-90"
+      >
+        <Plus size={18} aria-hidden="true" /> Nuevo curso
+      </a>
+    </div>
   </header>
 
   {successMessage && (
@@ -246,7 +265,10 @@ const hasMatches = entries.some(
   </div>
   <script>
     import { notifications } from "@/lib/notifications";
+    import { initializeCourseReports } from "@/components/courses/report-download";
+    initializeCourseReports();
     document.addEventListener("astro:page-load", () => {
+      initializeCourseReports();
       if (window.location.pathname !== "/app/cursos") return;
       const success = new URLSearchParams(window.location.search).get(
         "success",

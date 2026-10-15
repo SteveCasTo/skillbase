@@ -1,20 +1,10 @@
-import type { AdminCourseDto } from "@/domain/courses/types";
+export { courseFilters } from "@/domain/courses/report-filters";
 import type { AdminAccountDto } from "@/domain/admin-accounts/types";
 
 export interface ListFilterOption {
   readonly value: string;
   readonly label: string;
 }
-
-export const courseFilters = [
-  { value: "PUBLISHED", label: "Publicados" },
-  { value: "DRAFT", label: "Borradores" },
-  { value: "ARCHIVED", label: "Archivados" },
-  { value: "ALL", label: "Todos" },
-] as const satisfies readonly {
-  value: AdminCourseDto["status"] | "ALL";
-  label: string;
-}[];
 
 export const accountFilters = [
   { value: "ACTIVE", label: "Activos" },

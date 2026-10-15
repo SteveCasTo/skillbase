@@ -103,6 +103,7 @@ describe("private route policies and caching", () => {
       "/app/configuracion/certificados",
       "/app/configuracion/certificados/vista-previa.pdf",
       "/app/cursos",
+      "/app/cursos/exportar",
       "/app/cursos/imagen",
       "/app/cursos/nuevo",
       "/app/formatos",
@@ -120,6 +121,10 @@ describe("private route policies and caching", () => {
     ]);
     expect(getPrivateRoutePolicy("/app")).toEqual({ access: "ACTIVE_USER" });
     expect(getPrivateRoutePolicy("/app/cursos")).toEqual({
+      access: "ROLES",
+      roles: ["ADMIN"],
+    });
+    expect(getPrivateRoutePolicy("/app/cursos/exportar")).toEqual({
       access: "ROLES",
       roles: ["ADMIN"],
     });

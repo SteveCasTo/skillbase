@@ -11,6 +11,8 @@ import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { createInstructorFixture } from "../fixtures/instructors";
 import { evaluationFixtureTables } from "../fixtures/evaluation-cleanup";
 import { lookupRegistrationPeople as lookupPeople } from "@/server/pre-registrations/loaders";
+import { DrizzleCourseReportRepository } from "@/server/db/repositories/course-report-repository";
+import { buildCourseReport } from "@/application/courses/course-report";
 
 const lookupRegistrationPeople: typeof lookupPeople = (...args) =>
   withRequestDatabase(() => lookupPeople(...args), undefined, testDatabaseUrl);
@@ -583,6 +585,27 @@ test("Bolivia first-day full-pay exception and overdue retain seats; backdated c
     f.actor.id,
   );
   expect(late.membershipStatus).toBe("INSCRITO");
+  const reports = new DrizzleCourseReportRepository(db);
+  const filter = { search: f.course.slug, status: "PUBLISHED" as const };
+  const report = buildCourseReport(
+    await reports.read(f.actor.id, filter, now),
+    filter,
+    now,
+  );
+  expect(report).toMatchObject({
+    uniqueEnrolled: 1,
+    netCents: "8001",
+    groupCount: 2,
+  });
+  expect(report.courses[0]).toMatchObject({
+    enrolled: 1,
+    netCents: "8001",
+    groups: [
+      { enrolled: 1, netCents: "8001" },
+      { enrolled: 0, netCents: "0" },
+    ],
+  });
+  expect(report.courses[0]!.instructorName).not.toBe("Sin asignar");
   now = new Date("2099-03-03T04:00:00.000Z");
   expect(
     (await repository.detail(row.id, f.actor.id))!.registration
