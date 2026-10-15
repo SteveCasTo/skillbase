@@ -31,10 +31,10 @@ test("published course is public end-to-end and withdrawal removes every public 
     await page.getByRole("link", { name: "Nuevo formato" }).click();
     const createFormat = page.getByRole("form", { name: "Crear formato" });
     await createFormat.getByLabel("Nombre").fill(formatName);
-    await createFormat.getByLabel("Duración total (horas)").fill("20");
-    await createFormat.getByLabel("Duración de sesión (minutos)").fill("90");
-    await createFormat.getByLabel("Precio estudiante (BOB)").fill("80");
-    await createFormat.getByLabel("Precio externo (BOB)").fill("100.50");
+    await createFormat.getByLabel("Duración total").fill("20");
+    await createFormat.getByLabel("Duración de sesión").fill("90");
+    await createFormat.getByLabel("Precio estudiante").fill("80");
+    await createFormat.getByLabel("Precio externo").fill("100.50");
     await createFormat.getByRole("button", { name: "Crear formato" }).click();
     await expect(page).toHaveURL(/\/app\/formatos$/);
     await expect(

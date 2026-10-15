@@ -144,10 +144,10 @@ test("new courses preserve values and can be corrected after server validation w
   await page.getByRole("link", { name: "Nuevo formato" }).click();
   const format = page.getByRole("form", { name: "Crear formato" });
   await format.getByLabel("Nombre").fill(formatName);
-  await format.getByLabel("Duración total (horas)").fill("24");
-  await format.getByLabel("Duración de sesión (minutos)").fill("90");
-  await format.getByLabel("Precio estudiante (BOB)").fill("80");
-  await format.getByLabel("Precio externo (BOB)").fill("100");
+  await format.getByLabel("Duración total").fill("24");
+  await format.getByLabel("Duración de sesión").fill("90");
+  await format.getByLabel("Precio estudiante").fill("80");
+  await format.getByLabel("Precio externo").fill("100");
   await format.getByRole("button", { name: "Crear formato" }).click();
 
   await page.goto("/app/cursos/nuevo");
@@ -297,14 +297,14 @@ test("unused formats can be created, edited and deleted without JavaScript", asy
   const name = `Formato sin JavaScript ${Date.now()}`;
   const create = page.getByRole("form", { name: "Crear formato" });
   await create.getByLabel("Nombre").fill(name);
-  await create.getByLabel("Duración total (horas)").fill("24");
-  await create.getByLabel("Duración de sesión (minutos)").fill("90");
-  await create.getByLabel("Precio estudiante (BOB)").fill("invalid");
-  await create.getByLabel("Precio externo (BOB)").fill("100");
+  await create.getByLabel("Duración total").fill("24");
+  await create.getByLabel("Duración de sesión").fill("90");
+  await create.getByLabel("Precio estudiante").fill("invalid");
+  await create.getByLabel("Precio externo").fill("100");
   await create.getByRole("button", { name: "Crear formato" }).click();
   expect(
     await create
-      .getByLabel("Precio estudiante (BOB)")
+      .getByLabel("Precio estudiante")
       .evaluate((input: HTMLInputElement) => input.validity.patternMismatch),
   ).toBe(true);
   await expect(create.getByLabel("Nombre")).toHaveValue(name);
@@ -319,7 +319,7 @@ test("unused formats can be created, edited and deleted without JavaScript", asy
   });
   expect(invalidServerResponse.status()).toBe(422);
   expect(await invalidServerResponse.text()).toContain("Revisa los campos");
-  await create.getByLabel("Precio estudiante (BOB)").fill("80");
+  await create.getByLabel("Precio estudiante").fill("80");
   await create.getByRole("button", { name: "Crear formato" }).click();
   await expect(page).toHaveURL(/success=created/);
   const card = page.getByRole("link", { name: new RegExp(name) });
@@ -381,10 +381,10 @@ test("used formats require confirmation to deactivate without JavaScript", async
   await page.goto("/app/formatos/nuevo");
   const name = `Formato usado sin JS ${Date.now()}`;
   await page.getByLabel("Nombre").fill(name);
-  await page.getByLabel("Duración total (horas)").fill("20");
-  await page.getByLabel("Duración de sesión (minutos)").fill("90");
-  await page.getByLabel("Precio estudiante (BOB)").fill("80");
-  await page.getByLabel("Precio externo (BOB)").fill("100");
+  await page.getByLabel("Duración total").fill("20");
+  await page.getByLabel("Duración de sesión").fill("90");
+  await page.getByLabel("Precio estudiante").fill("80");
+  await page.getByLabel("Precio externo").fill("100");
   await page.getByRole("button", { name: "Crear formato" }).click();
   await page.getByRole("link", { name: new RegExp(name) }).click();
   const path = new URL(page.url()).pathname;
@@ -431,10 +431,10 @@ test("format mutations reject stale revisions, invalid origins and non-admin use
   await page.goto("/app/formatos/nuevo");
   const name = `Formato concurrencia ${Date.now()}`;
   await page.getByLabel("Nombre").fill(name);
-  await page.getByLabel("Duración total (horas)").fill("20");
-  await page.getByLabel("Duración de sesión (minutos)").fill("90");
-  await page.getByLabel("Precio estudiante (BOB)").fill("80");
-  await page.getByLabel("Precio externo (BOB)").fill("100");
+  await page.getByLabel("Duración total").fill("20");
+  await page.getByLabel("Duración de sesión").fill("90");
+  await page.getByLabel("Precio estudiante").fill("80");
+  await page.getByLabel("Precio externo").fill("100");
   await page.getByRole("button", { name: "Crear formato" }).click();
   await page.getByRole("link", { name: new RegExp(name) }).click();
   const path = new URL(page.url()).pathname;
