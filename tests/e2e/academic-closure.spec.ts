@@ -21,9 +21,8 @@ const basePath = (course: string, group: string, instructor = false) =>
   `/app/${instructor ? "mis-cursos" : "cursos"}/${course}/grupos/${group}`;
 
 const documents = [
-  ["planilla.pdf", "Planilla PDF"],
+  ["informe.pdf", "Descargar PDF"],
   ["planilla.csv", "Planilla CSV"],
-  ["informe.pdf", "Informe PDF"],
 ] as const;
 async function exportParticipant(
   fixture: Awaited<ReturnType<typeof createAttendanceFlowFixture>>,
@@ -62,6 +61,11 @@ async function downloadOfficialDocuments(
   enhanced = true,
 ) {
   let csv = "";
+  await expect(
+    page
+      .getByRole("navigation", { name: "Documentos del cierre" })
+      .getByRole("link"),
+  ).toHaveCount(2);
   for (const [artifact, label] of documents) {
     const url = `${path}/${version.version}/${artifact}`;
     const link = page.getByRole("link", { name: label, exact: true });
@@ -157,6 +161,15 @@ async function downloadOfficialDocuments(
       });
       expect(pdf.getPageCount()).toBeGreaterThan(0);
       expect(pdf.getAuthor()).toBe(version.actorName);
+      expect(pdf.getTitle()).toBe("Informe de cierre académico");
+      const legacy = await page.request.get(
+        `${path}/${version.version}/planilla.pdf`,
+      );
+      expect(legacy.status()).toBe(200);
+      expect(legacy.headers()["content-disposition"]).toBe(
+        `attachment; filename="cierre-v${version.version}-informe.pdf"`,
+      );
+      expect(await legacy.body()).toEqual(bytes);
       // PDF date strings preserve the frozen instant at their supported
       // second precision; CSV retains the full ISO timestamp.
       const pdfInstant = new Date(version.closedAt);
@@ -355,8 +368,8 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     await expect(page.locator(`a[href="${path}/1"]`)).toHaveCount(0);
     expect(official.report.participants[0]!.result.finalGrade).toBe("80.00");
     await expect(
-      page.getByRole("link", { name: "Planilla PDF" }),
-    ).toHaveAttribute("href", `${path}/1/planilla.pdf`);
+      page.getByRole("link", { name: "Descargar PDF" }),
+    ).toHaveAttribute("href", `${path}/1/informe.pdf`);
     const originalCsv = await downloadOfficialDocuments(
       page,
       path,

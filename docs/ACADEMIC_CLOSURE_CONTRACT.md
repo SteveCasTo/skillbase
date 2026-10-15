@@ -152,3 +152,32 @@ el release se detallan en `TESTING.md`. El backend multi-ADMIN está integrado
 por PR 283 y su UI por PR 285; `closureActorDependencies` forma parte del
 inventario de actividad usado por lifecycle. No se implementan certificados,
 firmas, QR, emisión o verificación de Fase 9.
+
+## Documento PDF unificado (2026-10-14)
+
+Esta sección sustituye la distinción anterior entre planilla PDF e informe PDF.
+El workspace y cada versión ADMIN presentan una sola acción **Descargar PDF**,
+que apunta a `/:version/informe.pdf`. Incluye resumen agregado de resultados y
+asistencia, criterios históricos, trazabilidad y planilla de participantes/notas.
+`/:version/planilla.pdf` permanece como alias compatible: devuelve exactamente el
+mismo PDF y nombre `cierre-vN-informe.pdf`, sin redirección ni bypass de permisos.
+El CSV conserva su ruta, contenido y acción existentes.
+
+El documento usa A4 horizontal, márgenes de 36 pt, jerarquía Montserrat, fallback
+Noto Sans para Unicode y derivados de impresión de los tres assets institucionales
+existentes de `assets/certificates` (procedencia/reproducción en
+`src/server/academic-closure/exports/assets/README.md`). Los recursos se embeben en el bundle SSR; no hay fetch de
+fuentes/logos, almacenamiento de documentos ni dependencias nuevas. Tiene
+cabecera/pie en cada página, tabla con encabezados repetidos, filas ordinarias
+indivisibles y continuación explícita para filas mayores que una página. No
+inventa firmas, autoridades, certificados, métodos de pago ni categoría ausente
+del contrato histórico.
+
+El renderer sigue recibiendo exclusivamente `ClosureVersionDto` autorizado; no
+consulta datos actuales ni altera snapshots. ADMIN conserva CI y saldo histórico
+informativo cuando existe. INSTRUCTOR no recibe CI, categoría ni finanzas. Ambos
+paths PDF pasan por el mismo loader/ownership: INSTRUCTOR solo puede descargar el
+cierre oficial vigente de un grupo propio cerrado, nunca versiones anteriores o
+después de reabrir; ADMIN conserva acceso histórico. Se mantienen `private,
+no-store`, `nosniff`, nombre fijo y rechazo de evidencia inválida/glifos sin
+soporte. La unión de artefactos no cambia estas guardas ni el historial ADMIN-only.

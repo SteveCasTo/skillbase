@@ -98,20 +98,28 @@ test("academic exports use authorized closed snapshots and retain historical fil
   expect(privateCsv).not.toContain('"CI"');
   expect(privateCsv).not.toContain("closure@test.invalid");
   let originalPdf: Uint8Array<ArrayBuffer> | undefined;
-  for (const user of [admin, instructor])
+  for (const user of [admin, instructor]) {
+    let aliasPdf: Uint8Array<ArrayBuffer> | undefined;
     for (const artifact of ["planilla.pdf", "informe.pdf"] as const) {
       const response = await download(user, artifact);
       expect(response.status).toBe(200);
       expect(response.headers.get("Content-Type")).toBe("application/pdf");
+      expect(response.headers.get("Content-Disposition")).toBe(
+        'attachment; filename="cierre-v1-informe.pdf"',
+      );
       const bytes = new Uint8Array(await response.arrayBuffer());
+      if (aliasPdf) expect(bytes).toEqual(aliasPdf);
+      else aliasPdf = bytes;
       if (user === admin && artifact === "informe.pdf") originalPdf = bytes;
       const pdf = await PDFDocument.load(bytes, {
         updateMetadata: false,
       });
       expect(pdf.getPageCount()).toBeGreaterThan(0);
       expect(pdf.getAuthor()).toBe(f.instructor.name);
+      expect(pdf.getTitle()).toBe("Informe de cierre académico");
       expect(pdf.getCreationDate()).toEqual(now);
     }
+  }
   expect((await download(foreign, "planilla.csv")).status).toBe(404);
   expect((await download(admin, "planilla.csv", "2")).status).toBe(404);
   await repo.reopen(f.admin.id, {

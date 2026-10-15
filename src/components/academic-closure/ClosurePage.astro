@@ -171,9 +171,8 @@ const unavailable =
         {selected && (
           <nav aria-label="Documentos del cierre" class="flex flex-wrap gap-2">
             {[
-              ["planilla.pdf", "Planilla PDF"],
+              ["informe.pdf", "Descargar PDF"],
               ["planilla.csv", "Planilla CSV"],
-              ["informe.pdf", "Informe PDF"],
             ].map(([suffix, label]) => (
               <a
                 href={`${base}/cierre/${selected.version}/${suffix}`}
