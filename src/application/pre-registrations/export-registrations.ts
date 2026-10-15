@@ -1,16 +1,14 @@
 import type { InternalUser } from "@/domain/auth/types";
 import { RegistrationError } from "@/domain/pre-registrations/errors";
 import { boliviaToday } from "@/domain/pre-registrations/time";
-import type {
-  AdminRegistrationDto,
-  RegistrationFilter,
-} from "@/domain/pre-registrations/types";
+import type { RegistrationFilter } from "@/domain/pre-registrations/types";
 import { validateRegistrationId } from "@/domain/pre-registrations/validation";
 import { requireRegistrationAdmin } from "./authorization";
+import type { RegistrationExportPort } from "./registration-repository";
 import type {
-  RegistrationExportPort,
-  RegistrationRepository,
-} from "./registration-repository";
+  RegistrationExportRepository,
+  RegistrationExportRow,
+} from "./export-finance";
 
 export const MAX_REGISTRATION_EXPORT_ROWS = 1_000;
 const PAGE_SIZE = 100;
@@ -77,7 +75,7 @@ function validateFilter(filter: RegistrationFilter): RegistrationFilter {
  * Reject changed/incomplete pages rather than returning a truncated artifact.
  */
 export async function exportRegistrations(
-  repository: Pick<RegistrationRepository, "list">,
+  repository: RegistrationExportRepository,
   renderer: RegistrationExportPort,
   actor: InternalUser | null,
   input: {
@@ -90,7 +88,7 @@ export async function exportRegistrations(
   if (input.format !== "CSV" && input.format !== "PDF")
     throw new RegistrationError("VALIDATION_FAILED", "Selecciona CSV o PDF.");
   const filter = validateFilter(input.filter);
-  const rows: AdminRegistrationDto[] = [];
+  const rows: RegistrationExportRow[] = [];
   const ids = new Set<string>();
   let total: number | undefined;
   for (let page = 1; page <= MAX_REGISTRATION_EXPORT_ROWS / PAGE_SIZE; page++) {
@@ -121,12 +119,13 @@ export async function exportRegistrations(
     }
     if (rows.length === total) break;
   }
-  const date = boliviaToday(clock());
+  const generatedAt = clock();
+  const date = boliviaToday(generatedAt);
   return {
     mediaType:
       input.format === "CSV" ? "text/csv; charset=utf-8" : "application/pdf",
     filename: `preinscripciones-${date}.${input.format.toLowerCase()}`,
-    bytes: await renderer.render(input.format, rows),
+    bytes: await renderer.render(input.format, rows, { generatedAt, filter }),
     rowCount: rows.length,
   };
 }
