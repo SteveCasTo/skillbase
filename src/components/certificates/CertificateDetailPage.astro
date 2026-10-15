@@ -52,6 +52,7 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
             data-astro-reload
             href={`${path}/firmado.pdf`}
             data-feedback-download
+            data-certificate-download
             class={buttonVariants({ className: "min-h-11 shrink-0" })}
           >
             Descargar firmado
@@ -63,6 +64,7 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
               data-astro-reload
               href={`${path}/generado.pdf`}
               data-feedback-download
+              data-certificate-download
               class={buttonVariants({ className: "min-h-11 shrink-0" })}
             >
               Descargar para firmar
@@ -86,17 +88,6 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
               >
                 Descargar para firmar
               </button>
-              <p
-                data-download-status
-                role="status"
-                class="mt-2 text-sm empty:hidden"
-              ></p>
-              <p
-                data-download-error
-                role="alert"
-                tabindex="-1"
-                class="mt-2 max-w-sm text-sm text-destructive empty:hidden"
-              ></p>
             </form>
           ))
         )}
@@ -243,6 +234,8 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
 </PrivateLayout>
 <script>
   import { navigate } from "astro:transitions/client";
+  import { notifications } from "@/lib/notifications";
+  import { downloadCertificatePdf } from "./download-pdf";
   let downloadController: AbortController | undefined;
   function enablePreparedDownload() {
     downloadController?.abort();
@@ -261,76 +254,69 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
             const button = form.querySelector<HTMLButtonElement>(
               'button[type="submit"]',
             )!;
-            const status = form.querySelector<HTMLElement>(
-              "[data-download-status]",
-            )!;
-            const error = form.querySelector<HTMLElement>(
-              "[data-download-error]",
-            )!;
+            const hadFocus = button === document.activeElement;
             button.disabled = true;
+            button.setAttribute("aria-busy", "true");
             form.setAttribute("aria-busy", "true");
-            status.textContent = "Preparando descarga…";
-            error.textContent = "";
             try {
-              const body = new URLSearchParams(
-                [...new FormData(form)].map(([name, value]) => [
-                  name,
-                  String(value),
-                ]),
+              await notifications.promise(
+                async () => {
+                  const body = new URLSearchParams(
+                    [...new FormData(form)].map(([name, value]) => [
+                      name,
+                      String(value),
+                    ]),
+                  );
+                  const response = await fetch(form.action, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    signal,
+                    body,
+                  });
+                  await downloadCertificatePdf(response, signal);
+                  const revision = response.headers.get(
+                    "X-Certificate-Revision",
+                  );
+                  if (
+                    revision !==
+                    form.querySelector<HTMLInputElement>('[name="revision"]')
+                      ?.value
+                  ) {
+                    await navigate(`${location.pathname}?prepared=updated`, {
+                      history: "replace",
+                    });
+                  } else {
+                    form.querySelector<HTMLInputElement>(
+                      '[name="requestKey"]',
+                    )!.value = crypto.randomUUID();
+                  }
+                },
+                {
+                  loading: { title: "Preparando descarga…" },
+                  success: { title: "PDF listo." },
+                  error: (failure: unknown) => ({
+                    title: signal.aborted
+                      ? "Descarga cancelada."
+                      : failure instanceof Error &&
+                          !(failure instanceof TypeError)
+                        ? failure.message
+                        : "No se pudo preparar la descarga. Reintenta.",
+                  }),
+                },
               );
-              const response = await fetch(form.action, {
-                method: "POST",
-                credentials: "same-origin",
-                body,
-              });
-              if (
-                !response.ok ||
-                !response.headers
-                  .get("Content-Type")
-                  ?.includes("application/pdf")
-              ) {
-                const result: unknown = await response.json();
-                error.textContent =
-                  result &&
-                  typeof result === "object" &&
-                  "message" in result &&
-                  typeof result.message === "string"
-                    ? result.message
-                    : "No se pudo preparar la descarga. Reintenta.";
-                error.focus();
-                return;
-              }
-              const url = URL.createObjectURL(await response.blob());
-              const link = document.createElement("a");
-              link.href = url;
-              link.download = "certificate-unsigned.pdf";
-              document.body.append(link);
-              link.click();
-              link.remove();
-              setTimeout(() => URL.revokeObjectURL(url), 1000);
-              const revision = response.headers.get("X-Certificate-Revision");
-              if (
-                revision !==
-                form.querySelector<HTMLInputElement>('[name="revision"]')?.value
-              ) {
-                await navigate(`${location.pathname}?prepared=updated`, {
-                  history: "replace",
-                });
-              } else {
-                status.textContent = "PDF preparado. Descarga iniciada.";
-                form.querySelector<HTMLInputElement>(
-                  '[name="requestKey"]',
-                )!.value = crypto.randomUUID();
-              }
             } catch {
-              error.textContent =
-                "No se pudo preparar la descarga. Reintenta; si los datos cambiaron, recarga la página.";
-              error.focus();
+              // The same promise toast reports the failure; preserve the form for retry.
             } finally {
               pending = false;
               button.disabled = false;
+              button.removeAttribute("aria-busy");
               form.removeAttribute("aria-busy");
-              if (error.textContent) status.textContent = "";
+              if (
+                hadFocus &&
+                button.isConnected &&
+                document.activeElement === document.body
+              )
+                button.focus({ preventScroll: true });
             }
           },
           { signal },
