@@ -42,6 +42,7 @@ export function ledgerDto(row: LedgerRow, actorName?: string): LedgerEntryDto {
   return {
     id: row.id,
     kind: row.kind,
+    paymentMethod: row.paymentMethod,
     amountCents: Number(row.amountCents),
     effectiveDate: row.effectiveDate,
     actorId: row.actorId,

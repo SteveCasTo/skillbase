@@ -1,6 +1,7 @@
-import { and, asc, eq, ne, sql, inArray } from "drizzle-orm";
+import { and, asc, eq, ne, sql, inArray, getTableColumns } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { GroupRepository } from "@/application/groups/group-repository";
+import type { Group } from "@/domain/groups/types";
 import {
   assertCapacity,
   GroupError,
@@ -28,6 +29,33 @@ type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 import { requireFreshRegistrationActor } from "./registration-support";
 type Row = typeof schema.groups.$inferSelect;
 
+// Only pristine, never-exposed plans may be discarded. Generated future
+// sessions are a plan, but reviewed/changed sessions and dependent evidence
+// must survive (the session FK otherwise cascades on group deletion).
+// Explicit correlation qualifiers survive Drizzle's single-table SELECT
+// projection, which otherwise removes qualification from interpolated columns.
+const outerGroupId = sql.raw('"groups"."id"');
+const outerSessionId = sql.raw('"group_sessions"."id"');
+// Revalidation runs after the schedule gate and row locks. Transaction-time
+// now() would predate those waits and could cascade-delete a session that
+// started while waiting; read the actual database clock at the check instead.
+const canDeleteGroup = sql<boolean>`${schema.groups.publishedAt} is null
+  and not exists (select 1 from ${schema.preRegistrations} where ${schema.preRegistrations.groupId} = ${outerGroupId})
+  and not exists (select 1 from ${schema.interestRegistrations} where ${schema.interestRegistrations.preferredGroupId} = ${outerGroupId})
+  and not exists (select 1 from ${schema.academicGroupStates} where ${schema.academicGroupStates.groupId} = ${outerGroupId})
+  and not exists (
+    select 1 from ${schema.groupSessions}
+    where ${schema.groupSessions.groupId} = ${outerGroupId} and (
+      ${schema.groupSessions.startsAt} <= clock_timestamp()
+      or ${schema.groupSessions.revision} > 1
+      or ${schema.groupSessions.rosterReviewedAt} is not null
+      or ${schema.groupSessions.cancelledAt} is not null
+      or ${schema.groupSessions.replacementForSessionId} is not null
+      or exists (select 1 from ${schema.sessionRoster} where ${schema.sessionRoster.sessionId} = ${outerSessionId})
+      or exists (select 1 from ${schema.instructorAttendance} where ${schema.instructorAttendance.sessionId} = ${outerSessionId})
+    )
+  )`;
+
 function nextVersion(previous: Date): Date {
   return new Date(Math.max(Date.now(), previous.getTime() + 1));
 }
@@ -38,12 +66,20 @@ export class DrizzleGroupRepository implements GroupRepository {
     private readonly clock: () => Date = () => new Date(),
   ) {}
 
-  async list(courseId: string): Promise<readonly Row[]> {
+  async list(courseId: string): Promise<readonly Group[]> {
     return this.db
-      .select()
+      .select({ ...getTableColumns(schema.groups), canDelete: canDeleteGroup })
       .from(schema.groups)
       .where(eq(schema.groups.courseId, courseId))
       .orderBy(asc(schema.groups.createdAt), asc(schema.groups.id));
+  }
+
+  private async present(tx: Transaction, row: Row) {
+    const [permission] = await tx
+      .select({ canDelete: canDeleteGroup })
+      .from(schema.groups)
+      .where(eq(schema.groups.id, row.id));
+    return { ...row, canDelete: permission?.canDelete ?? false };
   }
 
   private async lockedCourse(
@@ -211,7 +247,7 @@ export class DrizzleGroupRepository implements GroupRepository {
         capacity,
         startTime,
       });
-      return row;
+      return this.present(tx, row);
     });
   }
 
@@ -273,7 +309,7 @@ export class DrizzleGroupRepository implements GroupRepository {
       if (operation === "schedule") {
         const plan = groupPlan(course, revision, value as string);
         if (previous.startsAt.getTime() === plan.startsAt.getTime())
-          return previous;
+          return this.present(tx, previous);
         await this.assertFree(tx, course.id, plan.startsAt, plan.endsAt, id);
         try {
           await replanFutureGroupSessions(
@@ -296,7 +332,7 @@ export class DrizzleGroupRepository implements GroupRepository {
             "VALIDATION_FAILED",
             "El cupo no puede ser menor que la cantidad de registros vigentes. Cambia participantes de grupo antes de reducirlo.",
           );
-        if (previous.capacity === value) return previous;
+        if (previous.capacity === value) return this.present(tx, previous);
         changes = { capacity: value as number };
       } else if (operation === "reactivate") {
         if (previous.courseTypeRevisionId !== revision.id)
@@ -365,7 +401,7 @@ export class DrizzleGroupRepository implements GroupRepository {
                   : row.startsAt.toISOString(),
             },
       );
-      return row;
+      return this.present(tx, row);
     });
   }
 
@@ -426,15 +462,10 @@ export class DrizzleGroupRepository implements GroupRepository {
           "Un grupo que ya fue publicado no puede eliminarse; desactívalo.",
         );
       await this.assertCanRemovePlannedGroup(tx, course, previous);
-      const [history] = await tx
-        .select({ id: schema.preRegistrations.id })
-        .from(schema.preRegistrations)
-        .where(eq(schema.preRegistrations.groupId, id))
-        .limit(1);
-      if (history)
+      if (!(await this.present(tx, previous)).canDelete)
         throw new GroupError(
           "GROUP_PUBLISHED",
-          "El grupo tiene historial de participantes y no puede eliminarse; cancélalo.",
+          "El grupo tiene historial y no puede eliminarse; desactívalo.",
         );
       const [deleted] = await tx
         .delete(schema.groups)

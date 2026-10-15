@@ -294,36 +294,24 @@ export async function renderCertificatePdf(
     10,
   );
   signatures(page, input, regular, bold);
-  const qrX = approval ? 112 : 42;
-  if (options.preview) {
-    drawCertificateText(page, "Vista previa", regular, {
-      x: qrX,
-      top: page.getHeight() - 35,
-      width: 160,
-      height: 20,
-      size: 9,
-      minimumSize: 9,
-    });
-  } else {
-    const verification = approval
-      ? { x: 538, top: 105, width: 220, codeHeight: 60 }
-      : { x: 414, top: 140, width: 180, codeHeight: 70 };
-    drawCertificateQr(
-      doc,
-      page,
-      input.verificationUrl,
-      verification.x + (verification.width - CERTIFICATE_QR_SIZE) / 2,
-      page.getHeight() - verification.top - CERTIFICATE_QR_SIZE,
-    );
-    drawCertificateText(page, `ID: ${input.publicCredentialId}`, regular, {
-      x: verification.x,
-      top: verification.top + CERTIFICATE_QR_SIZE + 6,
-      width: verification.width,
-      height: verification.codeHeight,
-      size: 8,
-      minimumSize: 7,
-      align: "center",
-    });
-  }
+  const verification = approval
+    ? { x: 538, top: 105, width: 220, codeHeight: 60 }
+    : { x: 414, top: 140, width: 180, codeHeight: 70 };
+  drawCertificateQr(
+    doc,
+    page,
+    input.verificationUrl,
+    verification.x + (verification.width - CERTIFICATE_QR_SIZE) / 2,
+    page.getHeight() - verification.top - CERTIFICATE_QR_SIZE,
+  );
+  drawCertificateText(page, `ID: ${input.publicCredentialId}`, regular, {
+    x: verification.x,
+    top: verification.top + CERTIFICATE_QR_SIZE + 6,
+    width: verification.width,
+    height: verification.codeHeight,
+    size: 8,
+    minimumSize: 7,
+    align: "center",
+  });
   return doc.save({ useObjectStreams: false });
 }

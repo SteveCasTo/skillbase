@@ -59,12 +59,52 @@ test("official CSV preserves frozen metadata, two decimals, BOM, leading-zero CI
   ])
     expect(csv).toContain(text);
   expect(csv).not.toContain("12345");
+  expect(csv).not.toContain("UUID responsable");
+  expect(csv).not.toContain(id);
+  expect(csv).toContain('"No registrada"');
+  expect(csv).toContain('"Sin método registrado"');
   if (v.report.access !== "ADMIN") throw new Error();
+  const person = v.report.participants[0]!;
+  person.receivedPayments = {
+    cashCents: "8001",
+    qrCents: "-251",
+    unregisteredCents: "49",
+    totalCents: "7799",
+  };
+  for (const [category, label] of [
+    ["STUDENT", "Estudiante"],
+    ["EXTERNAL", "Externo"],
+    ["AUXILIARY", "Auxiliar"],
+  ] as const) {
+    person.participantCategory = category;
+    const enriched = new TextDecoder().decode(renderClosureCsv(v));
+    expect(enriched).toContain(`"${label}";"80.01";"-2.51";"0.49";"77.99"`);
+    expect(enriched).not.toContain("'-2.51");
+  }
+  person.receivedPayments = {
+    cashCents: "9007199254740993",
+    qrCents: "-1",
+    unregisteredCents: "1",
+    totalCents: "9007199254740993",
+  };
+  expect(new TextDecoder().decode(renderClosureCsv(v))).toContain(
+    '"90071992547409.93";"-0.01";"0.01";"90071992547409.93"',
+  );
   v.report = privateClosureReport(v.report, false);
   const instructor = new TextDecoder().decode(renderClosureCsv(v));
   expect(instructor).not.toContain('"CI"');
   expect(instructor).not.toContain("001234QA");
   expect(instructor).not.toContain("balance");
+  for (const sensitive of [
+    "Categoría",
+    "Efectivo",
+    "QR",
+    "percibido",
+    "registrado",
+    "Auxiliar",
+    "90071992547409.93",
+  ])
+    expect(instructor).not.toContain(sensitive);
 });
 test("CSV escapes quotes, semicolons, newlines and disguised spreadsheet formula values", () => {
   const v = closureExportFixture();
@@ -80,6 +120,19 @@ test("official exports refuse missing or inconsistent historical evidence rather
   const v = closureExportFixture();
   v.report.participants[0]!.grades[0]!.score = null;
   expect(() => renderClosureCsv(v)).toThrow();
+  const financial = closureExportFixture();
+  if (financial.report.access !== "ADMIN") throw new Error();
+  const person = financial.report.participants[0]!;
+  person.receivedPayments = {
+    cashCents: "100",
+    qrCents: "0",
+    unregisteredCents: "0",
+    totalCents: "99",
+  };
+  expect(() => renderClosureCsv(financial)).toThrow();
+  person.receivedPayments.totalCents = "100";
+  person.receivedPayments.cashCents = "=100";
+  expect(() => renderClosureCsv(financial)).toThrow();
   await expect(renderClosurePdf(v, "planilla")).rejects.toThrow();
   v.report.participants[0]!.grades[0]!.score = "0";
   v.report.participants[0]!.result.status = "PENDING";
@@ -97,6 +150,7 @@ test("PDF embeds Unicode font, historical timestamps and paginates long unbroken
   const doc = await PDFDocument.load(bytes, { updateMetadata: false });
   expect(doc.getPageCount()).toBeGreaterThan(5);
   expect(doc.getAuthor()).toBe(v.actorName);
+  expect(doc.getTitle()).toBe("Informe de cierre académico");
   expect(doc.getCreationDate()).toEqual(new Date(v.closedAt));
   expect(doc.getModificationDate()).toEqual(new Date(v.closedAt));
   const unsupported = closureExportFixture();
@@ -134,7 +188,8 @@ test("PDF paginates a single participant with 100 components without losing the 
   const bytes = await renderClosurePdf(v, "planilla");
   const document = await PDFDocument.load(bytes, { updateMetadata: false });
   expect(document.getPageCount()).toBeGreaterThanOrEqual(3);
-  expect(bytes).toEqual(await renderClosurePdf(v, "planilla"));
+  expect(document.getTitle()).toBe("Informe de cierre académico");
+  expect(bytes).toEqual(await renderClosurePdf(v, "informe"));
 });
 test("attendance summary uses persisted participant projection, excluding cancelled session marks", () => {
   const v = closureExportFixture();

@@ -47,6 +47,10 @@ export interface Course extends CourseData {
   readonly updatedAt: Date;
 }
 
+export interface AdminCourseCardDto extends AdminCourseDto {
+  readonly academicPhase: import("./academic-phase").CourseAcademicPhase;
+}
+
 export interface AdminCourseDto extends Course {
   readonly registrationAvailability: RegistrationAvailability;
 }

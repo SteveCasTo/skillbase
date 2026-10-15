@@ -22,6 +22,7 @@ export function cashFormState(
   try {
     const cash = validateCashInput(
       {
+        paymentMethod: values.paymentMethod,
         amountCents: parseMoneyInput(values.amount ?? ""),
         effectiveDate: values.effectiveDate || null,
         reason: values.reason,

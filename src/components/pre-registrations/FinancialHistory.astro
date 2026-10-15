@@ -8,11 +8,11 @@ interface Props {
 const { detail, actorLabels = {} } = Astro.props;
 ---
 
-<section aria-label="Historial de efectivo" class="min-w-0">
-  <h2 class="mb-5 text-lg font-semibold">Historial de efectivo</h2>
+<section aria-label="Historial de pagos y devoluciones" class="min-w-0">
+  <h2 class="mb-5 text-lg font-semibold">Historial de pagos y devoluciones</h2>
   {detail.ledger.length === 0 ? (
     <p class="rounded-lg border p-5 text-sm text-muted-foreground">
-      No hay movimientos de efectivo.
+      No hay movimientos de pago ni devolución.
     </p>
   ) : (
     <ol class="flex min-w-0 flex-col divide-y rounded-xl border px-5">
@@ -23,6 +23,14 @@ const { detail, actorLabels = {} } = Astro.props;
               {entry.kind === "PAYMENT"
                 ? "Pago recibido"
                 : "Devolución registrada"}
+            </p>
+            <p class="mt-1 text-sm text-muted-foreground">
+              Método:{" "}
+              {entry.paymentMethod === "CASH"
+                ? "Efectivo"
+                : entry.paymentMethod === "QR"
+                  ? "QR"
+                  : "No registrado"}
             </p>
             <p class="mt-1 text-sm text-muted-foreground">
               Fecha efectiva:{" "}

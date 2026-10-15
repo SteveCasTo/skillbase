@@ -101,7 +101,7 @@ test("interests availability is publication-based with exclusive deadline, not o
 });
 test("interests mutations require closed intent, UUID and strict millisecond ISO revision", () => {
   const mutation = {
-    intent: "cancel" as const,
+    intent: "delete" as const,
     interestRegistrationId: crypto.randomUUID(),
     revision: "2030-01-01T00:00:00.000Z",
   };
@@ -115,7 +115,7 @@ test("interests mutations require closed intent, UUID and strict millisecond ISO
   ])
     expect(() => validateInterestMutation({ ...mutation, revision })).toThrow();
   expect(() =>
-    validateInterestMutation({ ...mutation, intent: "delete" }),
+    validateInterestMutation({ ...mutation, intent: "reactivate" }),
   ).toThrow();
 });
 test("interests admin guards and exact routes are fail closed", () => {

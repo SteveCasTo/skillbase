@@ -9,7 +9,6 @@ import type {
   AdminInterestPostPayload,
   AdminInterestSummaryDto,
   InterestFormValues,
-  InterestStatus,
   PublicInterestFormDto,
   PublicInterestPostPayload,
 } from "@/domain/interests/types";
@@ -125,10 +124,9 @@ export function loadAdminInterestSummary(
 export function loadAdminInterestCourse(
   actor: InternalUser,
   courseId: string,
-  status?: InterestStatus,
 ): Promise<AdminInterestCourseDto | null> {
   requireInterestAdmin(actor);
-  return getInterestCourse(repo(), actor, courseId, status);
+  return getInterestCourse(repo(), actor, courseId);
 }
 export async function handleAdminInterestPost({
   request,

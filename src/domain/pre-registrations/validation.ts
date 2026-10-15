@@ -4,6 +4,8 @@ import { validateParticipant } from "./participant";
 import { validateCashEffectiveDate } from "./time";
 import {
   REGISTRATION_PARTICIPANT_TYPES,
+  PAYMENT_METHODS,
+  type PaymentMethod,
   type CashInput,
   type CreateRegistrationInput,
   type RegistrationParticipantType,
@@ -11,6 +13,15 @@ import {
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+export function validatePaymentMethod(value: unknown): PaymentMethod {
+  if (!PAYMENT_METHODS.includes(value as PaymentMethod))
+    throw new RegistrationError(
+      "VALIDATION_FAILED",
+      "Selecciona el método del movimiento.",
+      { paymentMethod: "Selecciona Efectivo o QR." },
+    );
+  return value as PaymentMethod;
+}
 export function validateRegistrationId(value: unknown, field: string): string {
   if (typeof value !== "string" || !uuid.test(value))
     throw new RegistrationError(
@@ -80,6 +91,7 @@ export function validateCashInput(
       { reason: "Introduce un motivo de hasta 500 caracteres." },
     );
   return {
+    paymentMethod: validatePaymentMethod(input.paymentMethod),
     amountCents: input.amountCents,
     effectiveDate,
     reason: reason || null,

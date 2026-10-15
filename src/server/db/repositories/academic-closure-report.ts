@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, lte, sql } from "drizzle-orm";
 import { compareParticipantNames } from "@/domain/pre-registrations/participant-name";
 import * as s from "@/server/db/schema";
 import type {
@@ -196,6 +196,37 @@ export async function buildClosureReport(
     (person) =>
       person.groupId === group.id && person.membershipStatus === "INSCRITO",
   );
+  // One grouped query for the group, under the same close/finance locks.
+  // Do not reuse balance: it is price minus payments, not net cash received.
+  const ledger = s.registrationLedger;
+  const net = sql`case when ${ledger.kind} = 'PAYMENT' then ${ledger.amountCents} else -${ledger.amountCents} end`;
+  const financialRows = await tx
+    .select({
+      registrationId: s.preRegistrations.id,
+      category: s.preRegistrations.participantType,
+      cashCents: sql<string>`coalesce(sum(${net}) filter (where ${ledger.paymentMethod} = 'CASH'), 0)::text`,
+      qrCents: sql<string>`coalesce(sum(${net}) filter (where ${ledger.paymentMethod} = 'QR'), 0)::text`,
+      unregisteredCents: sql<string>`coalesce(sum(${net}) filter (where ${ledger.paymentMethod} is null), 0)::text`,
+      totalCents: sql<string>`coalesce(sum(${net}), 0)::text`,
+    })
+    .from(s.preRegistrations)
+    .leftJoin(
+      ledger,
+      and(
+        eq(ledger.registrationId, s.preRegistrations.id),
+        lte(ledger.recordedAt, now),
+      ),
+    )
+    .where(
+      and(
+        eq(s.preRegistrations.courseId, course.id),
+        eq(s.preRegistrations.groupId, group.id),
+      ),
+    )
+    .groupBy(s.preRegistrations.id, s.preRegistrations.participantType);
+  const finances = new Map(
+    financialRows.map((row) => [row.registrationId, row]),
+  );
   const [instructor] = course.instructorId
     ? await tx
         .select({ name: s.users.name })
@@ -236,6 +267,9 @@ export async function buildClosureReport(
           a.participantId.localeCompare(b.participantId),
       )
       .map((person) => {
+        const financial = finances.get(person.id);
+        if (!financial)
+          throw new Error("Closure financial evidence unavailable");
         const personGrades = grades.filter(
           (row) => row.grade.participantId === person.participantId,
         );
@@ -266,6 +300,13 @@ export async function buildClosureReport(
           paternalSurname: person.paternalSurname,
           maternalSurname: person.maternalSurname,
           ci: person.ci,
+          participantCategory: financial.category,
+          receivedPayments: {
+            cashCents: financial.cashCents,
+            qrCents: financial.qrCents,
+            unregisteredCents: financial.unregisteredCents,
+            totalCents: financial.totalCents,
+          },
           balanceCents: Number(person.balance),
           membershipStatus: person.membershipStatus,
           canGrade: false,

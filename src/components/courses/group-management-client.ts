@@ -9,6 +9,7 @@ interface GroupDto {
   capacity: number;
   status: "PLANNED" | "CANCELLED";
   published: boolean;
+  canDelete: boolean;
 }
 
 function isGroup(value: unknown): value is GroupDto {
@@ -27,7 +28,9 @@ function isGroup(value: unknown): value is GroupDto {
     "status" in value &&
     ["PLANNED", "CANCELLED"].includes(String(value.status)) &&
     "published" in value &&
-    typeof value.published === "boolean"
+    typeof value.published === "boolean" &&
+    "canDelete" in value &&
+    typeof value.canDelete === "boolean"
   );
 }
 
@@ -237,7 +240,7 @@ function initializeGroupManagement() {
         }
       }
     }
-    const action = !group.published
+    const action = group.canDelete
       ? "delete"
       : group.status === "CANCELLED"
         ? "reactivate"

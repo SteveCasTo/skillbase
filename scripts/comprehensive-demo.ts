@@ -228,7 +228,7 @@ async function interests(
                 .id,
       });
     }
-    const [cancelled] = await tx
+    const [removed] = await tx
       .select()
       .from(s.interestRegistrations)
       .where(
@@ -237,11 +237,11 @@ async function interests(
           `comprehensive.v1.interest.${interestKey}.${count - 1}@example.test`,
         ),
       );
-    if (!cancelled) throw new Error("Demo interest missing");
+    if (!removed) throw new Error("Demo interest missing");
     await mutateInterest(repo, actor, course.course.id, {
-      interestRegistrationId: cancelled.id,
-      intent: "cancel",
-      revision: cancelled.updatedAt.toISOString(),
+      interestRegistrationId: removed.id,
+      intent: "delete",
+      revision: removed.updatedAt.toISOString(),
     });
   }
   if (!converted || !sample) return null;
@@ -362,6 +362,7 @@ export async function createBusinessFixtures(
           initialPayment: amount
             ? {
                 amountCents: amount,
+                paymentMethod: "CASH",
                 effectiveDate: null,
                 reason: legacyLabels
                   ? "[DEMO] Efectivo ficticio autorizado"
@@ -399,6 +400,7 @@ export async function createBusinessFixtures(
               revision: row.revision,
               cash: {
                 amountCents: amount,
+                paymentMethod: "QR",
                 effectiveDate: null,
                 reason: legacyLabels
                   ? "[DEMO] Devolución ficticia registrada"
@@ -425,6 +427,7 @@ export async function createBusinessFixtures(
             revision: row.revision,
             cash: {
               amountCents: total - amount,
+              paymentMethod: "QR",
               effectiveDate: null,
               reason: legacyLabels
                 ? "[DEMO] Segundo abono ficticio"

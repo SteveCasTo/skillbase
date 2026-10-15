@@ -81,16 +81,13 @@ export async function handleClosureDownload(
     const csv = artifact === "planilla.csv";
     const bytes = csv
       ? renderClosureCsv(result.data)
-      : await renderClosurePdf(
-          result.data,
-          artifact === "informe.pdf" ? "informe" : "planilla",
-        );
+      : await renderClosurePdf(result.data);
     // Only validated numeric version and fixed constants enter headers; no user-supplied names/paths.
     return new Response(new Uint8Array(bytes), {
       headers: {
         ...closureHeaders,
         "Content-Type": csv ? "text/csv; charset=utf-8" : "application/pdf",
-        "Content-Disposition": `attachment; filename="cierre-v${version}-${artifact}"`,
+        "Content-Disposition": `attachment; filename="cierre-v${version}-${csv ? "planilla.csv" : "informe.pdf"}"`,
       },
     });
   } catch (error) {

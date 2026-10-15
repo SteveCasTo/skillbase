@@ -5,6 +5,8 @@ export interface Group {
   readonly capacity: number;
   readonly status: "PLANNED" | "CANCELLED";
   readonly publishedAt: Date | null;
+  /** Server-derived lifecycle permission; absent on legacy command projections. */
+  readonly canDelete?: boolean;
   readonly startsAt: Date;
   readonly endsAt: Date;
   readonly createdAt: Date;

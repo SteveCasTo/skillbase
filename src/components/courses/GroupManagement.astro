@@ -47,6 +47,7 @@ const prototype: Group = {
   capacity: 1,
   status: "PLANNED",
   publishedAt: null,
+  canDelete: true,
   startsAt: new Date(0),
   endsAt: new Date(0),
   createdAt: new Date(0),
@@ -194,8 +195,8 @@ const prototype: Group = {
   </p>
   <ul data-groups-list class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
     {[...groups, prototype].map((group, index) => {
-      const published = group.publishedAt !== null;
-      const intent = published
+      const canDelete = group.canDelete === true;
+      const intent = !canDelete
         ? group.status === "CANCELLED"
           ? "reactivate"
           : "cancel"

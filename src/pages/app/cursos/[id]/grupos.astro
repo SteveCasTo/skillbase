@@ -78,6 +78,7 @@ const groupDto = (group: Group) => ({
   capacity: group.capacity,
   status: group.status,
   published: group.publishedAt !== null,
+  canDelete: group.canDelete ?? false,
 });
 void groupDto;
 if (wantsJson && Astro.request.method === "GET")

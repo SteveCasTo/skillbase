@@ -154,6 +154,11 @@ test("isolated renewal preserves ADMIN identity/session and all accounts, reruns
         await courseRepository.transition(course.id, "DRAFT", admin!.id);
       await courseRepository.transition(course.id, "PUBLISHED", admin!.id);
     }
+    // Withdrawal now permanently removes never-converted demand, also across republication.
+    const interestsAfterRepublication = await database.db
+      .select()
+      .from(schema.interestRegistrations);
+    expect(interestsAfterRepublication).toHaveLength(0);
     // Existing owned accounts still authenticate using the external credential.
     const instructorLogin = createClient(
       environment.apiUrl,
@@ -181,7 +186,7 @@ test("isolated renewal preserves ADMIN identity/session and all accounts, reruns
     expect(await database.db.select().from(schema.courses)).toHaveLength(6);
     expect(
       await database.db.select().from(schema.interestRegistrations),
-    ).toHaveLength(35);
+    ).toEqual(interestsAfterRepublication);
     expect(
       (await login.auth.getUser(signed.data.session!.access_token)).data.user
         ?.id,
@@ -316,6 +321,7 @@ test("isolated demo reset refuses CANCELLED cash history without changing legacy
         kind: "PAYMENT",
         amountCents: "2000",
         effectiveDate: "2026-10-02",
+        paymentMethod: "CASH",
         reason: "Actual synthetic cash",
       })
       .returning();

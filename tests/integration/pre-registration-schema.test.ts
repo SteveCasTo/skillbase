@@ -504,10 +504,18 @@ test("phase5 schema cash ledger positive-only, immutable, actor/request audited 
       amountCents: "1001",
       actorId: f.actor.id,
       effectiveDate: "2026-10-02",
+      paymentMethod: "CASH" as const,
       recordedAt: new Date("2026-10-03T03:59:59Z"),
       reason: "Synthetic cash",
     };
     const other = await fixtures(tx);
+    for (const paymentMethod of [null, sql`'TRANSFER'`])
+      await rejects(
+        tx,
+        (sp) =>
+          sp.insert(registrationLedger).values({ ...cash, paymentMethod }),
+        "23514",
+      );
     await rejects(
       tx,
       (sp) =>
@@ -536,6 +544,7 @@ test("phase5 schema cash ledger positive-only, immutable, actor/request audited 
       .returning();
     expect(entry!.amountCents).toBe("1001");
     expect(entry!.effectiveDate).toBe("2026-10-02");
+    expect(entry!.paymentMethod).toBe("CASH");
     await rejects(
       tx,
       (sp) =>
@@ -590,11 +599,13 @@ test("phase5 schema cash ledger positive-only, immutable, actor/request audited 
         ...cash,
         commandReceiptId: refundReceipt!.id,
         kind: "REFUND",
+        paymentMethod: "QR",
         reason: "Cash physically returned",
       })
       .returning();
     expect(refund!.kind).toBe("REFUND");
     expect(refund!.amountCents).toBe("1001");
+    expect(refund!.paymentMethod).toBe("QR");
     // Later audited refund can update the optimistic revision without rewriting cancellation history.
     await tx
       .update(preRegistrations)

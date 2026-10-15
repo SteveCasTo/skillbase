@@ -6,6 +6,7 @@ import { createDatabase } from "@/server/db/client";
 import * as s from "@/server/db/schema";
 import { DrizzleClosureRepository } from "@/server/db/repositories/academic-closure-repository";
 import { DrizzleEvaluationRepository } from "@/server/db/repositories/evaluation-repository";
+import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
 import {
   handleClosureDownload,
   type ClosureDownload,
@@ -29,6 +30,20 @@ afterAll(async () => {
 });
 test("academic exports use authorized closed snapshots and retain historical files after reopen/settings/name changes", async () => {
   const f = await createClosureFixture(db, clock);
+  await createRegistrationRepository(db, clock).recordPayment(
+    {
+      requestKey: crypto.randomUUID(),
+      registrationId: f.unpaid.id,
+      revision: f.unpaid.revision,
+      cash: {
+        amountCents: 6000,
+        effectiveDate: null,
+        paymentMethod: "QR",
+        reason: "Synthetic balance payment",
+      },
+    },
+    f.admin.id,
+  );
   const courseId = f.course.id,
     groupId = f.groups[0]!.id;
   const evaluation = new DrizzleEvaluationRepository(db, clock);
@@ -52,16 +67,20 @@ test("academic exports use authorized closed snapshots and retain historical fil
     reason: "Synthetic cancellation",
   });
   now = new Date("2099-03-06T12:00:00Z");
-  await evaluation.saveRow(f.instructor.id, {
-    courseId,
-    groupId,
-    registrationId: f.paid.id,
-    requestKey: crypto.randomUUID(),
-    schemeRevision: 1,
-    grades: [
-      { componentId: f.components[0]!.id, gradeRevision: 0, score: "70" },
-    ],
-  });
+  let schemeRevision = 1;
+  for (const registrationId of [f.paid.id, f.unpaid.id]) {
+    const saved = await evaluation.saveRow(f.instructor.id, {
+      courseId,
+      groupId,
+      registrationId,
+      requestKey: crypto.randomUUID(),
+      schemeRevision,
+      grades: [
+        { componentId: f.components[0]!.id, gradeRevision: 0, score: "70" },
+      ],
+    });
+    schemeRevision = saved.schemeRevision;
+  }
   const actor = (
     user: typeof f.admin,
     roles: InternalUser["roles"],
@@ -88,30 +107,86 @@ test("academic exports use authorized closed snapshots and retain historical fil
   const full = await repo.getVersion(f.admin.id, courseId, groupId, 1);
   if (full.report.access !== "ADMIN")
     throw new Error("Expected admin projection");
-  const ci = full.report.participants[0]!.ci;
+  const paid = full.report.participants.find(
+    (person) => person.registrationId === f.paid.id,
+  )!;
+  const ci = paid.ci;
+  expect(full.report.participants).toHaveLength(2);
+  expect(paid).toMatchObject({
+    registrationId: f.paid.id,
+    participantCategory: "STUDENT",
+    receivedPayments: {
+      cashCents: "8000",
+      qrCents: "0",
+      unregisteredCents: "0",
+      totalCents: "8000",
+    },
+  });
+  expect(
+    full.report.participants.find(
+      (person) => person.registrationId === f.unpaid.id,
+    )!.receivedPayments,
+  ).toEqual({
+    cashCents: "2000",
+    qrCents: "6000",
+    unregisteredCents: "0",
+    totalCents: "8000",
+  });
   const original = new Uint8Array(
     await (await download(admin, "planilla.csv")).arrayBuffer(),
   );
   expect(new TextDecoder().decode(original)).toContain(ci);
+  expect(new TextDecoder().decode(original)).toContain(
+    '"Estudiante";"20.00";"60.00";"0.00";"80.00"',
+  );
+  expect(new TextDecoder().decode(original)).not.toContain("UUID responsable");
   const privateCsv = await (await download(instructor, "planilla.csv")).text();
   expect(privateCsv).not.toContain(ci);
   expect(privateCsv).not.toContain('"CI"');
   expect(privateCsv).not.toContain("closure@test.invalid");
+  for (const sensitive of [
+    "Categoría",
+    "Efectivo",
+    "QR",
+    "percibido",
+    '"20.00";"60.00"',
+  ])
+    expect(privateCsv).not.toContain(sensitive);
+  const projected = await repo.getVersion(
+    f.instructor.id,
+    courseId,
+    groupId,
+    1,
+  );
+  expect(projected.report.participants[0]).not.toHaveProperty(
+    "participantCategory",
+  );
+  expect(projected.report.participants[0]).not.toHaveProperty(
+    "receivedPayments",
+  );
   let originalPdf: Uint8Array<ArrayBuffer> | undefined;
-  for (const user of [admin, instructor])
+  for (const user of [admin, instructor]) {
+    let aliasPdf: Uint8Array<ArrayBuffer> | undefined;
     for (const artifact of ["planilla.pdf", "informe.pdf"] as const) {
       const response = await download(user, artifact);
       expect(response.status).toBe(200);
       expect(response.headers.get("Content-Type")).toBe("application/pdf");
+      expect(response.headers.get("Content-Disposition")).toBe(
+        'attachment; filename="cierre-v1-informe.pdf"',
+      );
       const bytes = new Uint8Array(await response.arrayBuffer());
+      if (aliasPdf) expect(bytes).toEqual(aliasPdf);
+      else aliasPdf = bytes;
       if (user === admin && artifact === "informe.pdf") originalPdf = bytes;
       const pdf = await PDFDocument.load(bytes, {
         updateMetadata: false,
       });
       expect(pdf.getPageCount()).toBeGreaterThan(0);
       expect(pdf.getAuthor()).toBe(f.instructor.name);
+      expect(pdf.getTitle()).toBe("Informe de cierre académico");
       expect(pdf.getCreationDate()).toEqual(now);
     }
+  }
   expect((await download(foreign, "planilla.csv")).status).toBe(404);
   expect((await download(admin, "planilla.csv", "2")).status).toBe(404);
   await repo.reopen(f.admin.id, {

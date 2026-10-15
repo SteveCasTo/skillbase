@@ -51,6 +51,13 @@ function report(): ClosureReportDto {
         canGrade: false,
         ci: "PRIVATE-CI-ONLY",
         balanceCents: 98765,
+        participantCategory: "AUXILIARY",
+        receivedPayments: {
+          cashCents: "43210",
+          qrCents: "-1234",
+          unregisteredCents: "100",
+          totalCents: "42076",
+        },
         grades: [
           {
             componentId: "component",
@@ -112,6 +119,12 @@ function assertInstructorPrivacy(value: unknown): void {
     "phone",
     "balanceCents",
     "participantType",
+    "participantCategory",
+    "receivedPayments",
+    "cashCents",
+    "qrCents",
+    "unregisteredCents",
+    "totalCents",
     "minimumPaymentCents",
     "totalPriceCents",
     "ledger",
@@ -177,6 +190,9 @@ test("academic closure instructor projection recursively excludes private identi
     "98765",
     "54321",
     "123456",
+    "43210",
+    "-1234",
+    "42076",
   ])
     expect(json).not.toContain(secret);
   expect(instructor.participants[0]).toMatchObject({
@@ -194,5 +210,9 @@ test("academic closure instructor projection recursively excludes private identi
   if (admin.access !== "ADMIN") throw new Error("Expected admin projection");
   expect(admin.participants[0]!.ci).toBe("PRIVATE-CI-ONLY");
   expect(admin.participants[0]!.balanceCents).toBe(98765);
+  expect(admin.participants[0]!.participantCategory).toBe("AUXILIARY");
+  expect(admin.participants[0]!.receivedPayments).toEqual(
+    stored.participants[0]!.receivedPayments,
+  );
   expect(JSON.stringify(admin)).toContain("future-private@test.invalid");
 });

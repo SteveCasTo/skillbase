@@ -3,7 +3,7 @@ import {
   isAdminMetrics,
   isAdminRegistration,
   preferenceDemand,
-  visibleAfterMutation,
+  isAdminDeletion,
 } from "@/components/interests/admin-presentation";
 
 const courseId = "10000000-0000-4000-8000-000000000001";
@@ -74,7 +74,7 @@ describe("admin interest presentation reconciliation", () => {
       isAdminRegistration(
         {
           ...registration,
-          status: "CANCELLED",
+          status: "ACTIVE",
           preferredGroupId: groupId,
           phone: "+591 70000000",
         },
@@ -88,6 +88,7 @@ describe("admin interest presentation reconciliation", () => {
       { ...registration, id: groupId },
       { ...registration, courseId: groupId },
       { ...registration, status: "PLANNED" },
+      { ...registration, status: "CANCELLED" },
       { ...registration, updatedAt: new Date() },
       { ...registration, updatedAt: "2026-02-30T10:00:00.000Z" },
       { ...registration, phone: 123 },
@@ -128,11 +129,26 @@ describe("admin interest presentation reconciliation", () => {
     }
   });
 
-  test("retains all-status rows and excludes a changed row from the selected status", () => {
-    expect(visibleAfterMutation("", "ACTIVE")).toBe(true);
-    expect(visibleAfterMutation("", "CANCELLED")).toBe(true);
-    expect(visibleAfterMutation("ACTIVE", "CANCELLED")).toBe(false);
-    expect(visibleAfterMutation("CANCELLED", "ACTIVE")).toBe(false);
-    expect(visibleAfterMutation("ACTIVE", "ACTIVE")).toBe(true);
+  test("accepts only the requested deleted row with authorized coherent metrics", () => {
+    const payload = {
+      ok: true,
+      deletedId: id,
+      metrics: {
+        courseId,
+        activeTotal: 0,
+        byPreference: [{ preferredGroupId: null, activeCount: 0 }],
+      },
+    };
+    expect(isAdminDeletion(payload, courseId, id)).toBe(true);
+    expect(
+      isAdminDeletion({ ...payload, deletedId: groupId }, courseId, id),
+    ).toBe(false);
+    expect(isAdminDeletion({ ...payload, ok: false }, courseId, id)).toBe(
+      false,
+    );
+    expect(isAdminDeletion(payload, groupId, id)).toBe(false);
+    expect(isAdminDeletion({ ...payload, metrics: {} }, courseId, id)).toBe(
+      false,
+    );
   });
 });

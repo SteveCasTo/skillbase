@@ -99,6 +99,7 @@ async function fixture() {
         initialPayment: {
           amountCents: full ? 8000 : 2000,
           effectiveDate: null,
+          paymentMethod: "CASH",
           reason: "Synthetic",
         },
       },

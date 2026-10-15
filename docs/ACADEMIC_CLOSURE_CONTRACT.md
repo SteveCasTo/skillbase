@@ -52,6 +52,27 @@ usuario.
 
 ## Autorización y elegibilidad para cierre
 
+### Ajuste de historial académico (2026-10-14)
+
+- El historial de cierres y las reaperturas son exclusivos de ADMIN. La consulta
+  de estado devuelve `history: []` y `reopenings: []` para INSTRUCTOR, tanto en
+  SSR como JSON; ocultar la sección no es la barrera de autorización.
+- `getVersion` revalida actor/roles/ownership en servidor y permite a INSTRUCTOR
+  únicamente la versión oficial **vigente de un grupo cerrado propio**, incluidas
+  sus descargas existentes. Una versión anterior o cualquier snapshot después
+  de reabrir responde `FORBIDDEN`/403, también por URL directa y por los adapters
+  de documentos que comparten ese loader. No se concede acceso por haber creado
+  el cierre. ADMIN conserva todo el historial inmutable. Los grupos ajenos siguen
+  sin revelar su existencia (404), y las cuentas sin autorización vigente se
+  deniegan antes de consultar el snapshot.
+- La UI ADMIN presenta cierres anteriores como tarjetas enlazadas: tres columnas
+  en escritorio, dos en tablet y una en móvil, tanto con grupo abierto como
+  cerrado. No repite el snapshot oficial vigente; muestra fechas de Bolivia y
+  motivo de reapertura cuando existe, sin ordinales técnicos ni actores visibles.
+- No cambian los snapshots, finanzas, auditoría, reglas de cierre/reapertura ni
+  botones/rutas/renderers PDF/CSV. Los documentos históricos cambian de permiso
+  por el guard compartido, no por una implementación paralela del exporter.
+
 - Actor debe ser usuario interno `ACTIVE`, revalidado en el repositorio durante la transacción. `INSTRUCTOR` puede operar solo sobre sus grupos/cursos y desde el inicio oficial del curso. `ADMIN` activo puede operar sobre cualquier grupo. Solo `ADMIN` puede reabrir.
 - La validación adicional de `course.startsAt` para `INSTRUCTOR` refleja el guard implementado en este backend; la regla de alcance aprobada especifica ownership del grupo y no define por separado esta ventana. No presentarla como requisito de negocio acordado; verificar/ajustar antes de montar la ruta si no es intencional.
 - El cierre es **por grupo**, no por todo el curso. El reporte se construye para la membresía de ese grupo y sus participantes `INSCRITO`; `PREINSCRITO`/`SALDOVENCIDO` no son evaluables ni añaden una nota pendiente al gate.
@@ -131,3 +152,82 @@ el release se detallan en `TESTING.md`. El backend multi-ADMIN está integrado
 por PR 283 y su UI por PR 285; `closureActorDependencies` forma parte del
 inventario de actividad usado por lifecycle. No se implementan certificados,
 firmas, QR, emisión o verificación de Fase 9.
+
+## Documento PDF unificado (2026-10-14)
+
+Esta sección sustituye la distinción anterior entre planilla PDF e informe PDF.
+El workspace y cada versión ADMIN presentan una sola acción **Descargar PDF**,
+que apunta a `/:version/informe.pdf`. Incluye resumen agregado de resultados y
+asistencia, criterios históricos, trazabilidad y planilla de participantes/notas.
+`/:version/planilla.pdf` permanece como alias compatible: devuelve exactamente el
+mismo PDF y nombre `cierre-vN-informe.pdf`, sin redirección ni bypass de permisos.
+El CSV conserva su ruta, contenido y acción existentes.
+
+El documento usa A4 horizontal, márgenes de 36 pt, jerarquía Montserrat, fallback
+Noto Sans para Unicode y derivados de impresión de los tres assets institucionales
+existentes de `assets/certificates` (procedencia/reproducción en
+`src/server/academic-closure/exports/assets/README.md`). Los recursos se embeben en el bundle SSR; no hay fetch de
+fuentes/logos, almacenamiento de documentos ni dependencias nuevas. Tiene
+cabecera/pie en cada página, tabla con encabezados repetidos, filas ordinarias
+indivisibles y continuación explícita para filas mayores que una página. No
+inventa firmas, autoridades, certificados, métodos de pago ni categoría ausente
+del contrato histórico.
+
+El renderer sigue recibiendo exclusivamente `ClosureVersionDto` autorizado; no
+consulta datos actuales ni altera snapshots. ADMIN conserva CI y saldo histórico
+informativo cuando existe. INSTRUCTOR no recibe CI, categoría ni finanzas. Ambos
+paths PDF pasan por el mismo loader/ownership: INSTRUCTOR solo puede descargar el
+cierre oficial vigente de un grupo propio cerrado, nunca versiones anteriores o
+después de reabrir; ADMIN conserva acceso histórico. Se mantienen `private,
+no-store`, `nosniff`, nombre fijo y rechazo de evidencia inválida/glifos sin
+soporte. La unión de artefactos no cambia estas guardas ni el historial ADMIN-only.
+
+### CSV de cierre: categoría y percepción neta por participante
+
+El CSV conserva UTF-8 BOM, separador `;`, CRLF, quoting y protección de fórmulas
+en textos/CI. Conserva el nombre histórico del responsable, pero elimina su
+columna UUID. Solo ADMIN obtiene CI, categoría (Estudiante/Externo/Auxiliar) y
+cuatro columnas BOB: Efectivo neto, QR neto, Sin método registrado neto y Total
+percibido neto. INSTRUCTOR conserva exclusivamente la planilla académica; la
+allowlist recursiva del servidor excluye también los nuevos campos del DTO.
+
+Contrato mínimo aditivo del snapshot JSONB por participante:
+
+- `participantCategory?: RegistrationParticipantType | null`: categoría de la
+  preinscripción incluida en ese cierre, no una categoría inferida de la persona.
+- `receivedPayments?: { cashCents: string; qrCents: string;
+unregisteredCents: string; totalCents: string } | null`: enteros con signo en
+  centavos como strings, sin pérdida de precisión al serializar sumas.
+
+Los nuevos cierres congelan estos campos en su transacción habitual. Una sola
+consulta agrupada para el grupo toma movimientos de cada preinscripción con
+`recorded_at <= closedAt`; suma PAYMENT y resta REFUND según el método **de cada
+movimiento**, incluyendo pago inicial, abonos y devoluciones. Una devolución QR
+de un pago CASH puede dejar QR negativo. NULL se suma en Sin método registrado;
+los tres subtotales siempre suman el total. No se usa saldo/precio como proxy del
+dinero recibido. Las celdas monetarias se formatean con aritmética entera exacta
+y dos decimales; las negativas siguen siendo numéricas/sumables en Excel, no
+texto con apóstrofe. Solo esos literales numéricos validados omiten la protección
+de fórmulas de campos de texto. Un total inconsistente o centavos malformados
+impiden exportar en lugar de corregir la evidencia silenciosamente.
+
+En snapshots anteriores sin estos campos, categoría dice **No registrada** y
+los cuatro importes dicen **Sin método registrado**: no se inventan ceros, no se
+deduce el neto del saldo y no se consulta el ledger vivo para reconstruir una
+versión histórica. Un cierre nuevo sin movimientos sí congela ceros reales.
+La extensión es JSONB aditiva y no requiere migración ni modificación de
+snapshots oficiales. El enriquecimiento separado del seed de métodos de pagos
+no autoriza alterar snapshots: verificar por entorno los métodos NULL, sus
+subtotales y qué versiones ya estaban cerradas antes del enriquecimiento. Una
+reapertura/cierre explícitos crean una nueva versión, nunca reescriben la previa.
+
+Validación del bloque CSV (checkout dependiente de pagos): check y build PASS;
+464 unit/4.806 assertions y 177 integration/1.509 assertions PASS en stack
+temporal aislado. Se adaptaron casos existentes, sin nuevos casos/specs/suites
+ni cambios de timeouts/retries. Dos intentos focales iniciales detectaron errores
+del fixture ampliado (sobrepago sintético y revisión de esquema tras primera
+nota); se sustituyeron por un abono autorizado real antes del inicio y la revisión
+devuelta por el guard, sin relajar assertions ni inventar pagos en snapshots.
+El caso focal final pasó 1/1 con 45 assertions. No se ejecutó backfill, migración
+canónica/cloud ni escritura sobre datos existentes. El gate combinado posterior
+a integrar pagos y PDF debe revalidar el source exacto de release.

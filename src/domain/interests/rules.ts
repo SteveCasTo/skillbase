@@ -123,7 +123,7 @@ export function validateInterestMutation(
     Object.keys(input).some(
       (key) => !["intent", "interestRegistrationId", "revision"].includes(key),
     ) ||
-    (input.intent !== "cancel" && input.intent !== "reactivate") ||
+    input.intent !== "delete" ||
     typeof input.interestRegistrationId !== "string" ||
     !UUID.test(input.interestRegistrationId) ||
     typeof input.revision !== "string"

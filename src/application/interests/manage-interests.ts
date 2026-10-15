@@ -7,7 +7,6 @@ import {
   UUID,
   InterestError,
 } from "@/domain/interests/rules";
-import type { InterestStatus } from "@/domain/interests/types";
 import type { InterestRepository } from "./interest-repository";
 export function requireInterestAdmin(actor: InternalUser): void {
   if (actor.status !== "ACTIVE")
@@ -39,17 +38,10 @@ export async function getInterestCourse(
   repo: InterestRepository,
   actor: InternalUser,
   courseId: string,
-  status?: InterestStatus,
 ) {
   requireInterestAdmin(actor);
   courseIdValid(courseId);
-  if (status !== undefined && status !== "ACTIVE" && status !== "CANCELLED")
-    throw new InterestError(
-      "INVALID_REQUEST",
-      400,
-      "La solicitud no es válida.",
-    );
-  return repo.course(courseId, status);
+  return repo.course(courseId);
 }
 export async function mutateInterest(
   repo: InterestRepository,

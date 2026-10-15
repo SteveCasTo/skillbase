@@ -308,6 +308,7 @@ async function createFixtures(
           initialPayment: fixture.amountCents
             ? {
                 amountCents: fixture.amountCents,
+                paymentMethod: "CASH",
                 effectiveDate: null,
                 reason: "Efectivo ficticio de demostración",
               }
@@ -344,6 +345,7 @@ async function createFixtures(
                 requestKey: financialDemoId(`${fixture.key}:refund`),
                 cash: {
                   amountCents: fixture.amountCents,
+                  paymentMethod: "QR",
                   effectiveDate: null,
                   reason: "Devolución ficticia efectivamente registrada",
                 },
@@ -367,6 +369,7 @@ async function createFixtures(
             requestKey: financialDemoId(`${fixture.key}:payment`),
             cash: {
               amountCents: 8000 - fixture.amountCents,
+              paymentMethod: "QR",
               effectiveDate: null,
               reason: "Saldo ficticio efectivamente registrado",
             },

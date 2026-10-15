@@ -6,6 +6,7 @@ import type {
   EvaluationParticipantDto,
   EvaluationSchemeDto,
 } from "@/domain/evaluations/types";
+import type { RegistrationParticipantType } from "@/domain/pre-registrations/types";
 
 export interface ClosureCommand {
   courseId: string;
@@ -38,6 +39,17 @@ export interface ClosureSessionDto {
 }
 export interface ClosureParticipantDto extends EvaluationParticipantDto {
   ci: string;
+  /** Private, frozen registration category. Absent in legacy snapshots. */
+  participantCategory?: RegistrationParticipantType | null;
+  /** Net PAYMENT minus REFUND at closure, by each movement's method.
+   * Signed integer-cent strings preserve exact aggregate precision in JSON.
+   * Absent/null means no historical evidence, never a zero or a live lookup. */
+  receivedPayments?: {
+    cashCents: string;
+    qrCents: string;
+    unregisteredCents: string;
+    totalCents: string;
+  } | null;
   /** Informative only; never a closing prerequisite. Redacted for instructors. */
   balanceCents: number | null;
   attendance: {

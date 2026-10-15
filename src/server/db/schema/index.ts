@@ -24,6 +24,7 @@ import {
 import type {
   AdminRegistrationDto,
   ParticipantDto,
+  PaymentMethod,
   RegistrationDetailDto,
   RegistrationSettings,
 } from "@/domain/pre-registrations/types";
@@ -1283,6 +1284,7 @@ export const registrationLedger = pgTable(
       .references(() => preRegistrations.id, { onDelete: "restrict" }),
     commandReceiptId: uuid("command_receipt_id").notNull(),
     kind: registrationLedgerKind("kind").notNull(),
+    paymentMethod: text("payment_method").$type<PaymentMethod>(),
     amountCents: decimal("amount_cents", { precision: 12, scale: 0 }).notNull(),
     effectiveDate: date("effective_date", { mode: "string" }).notNull(),
     actorId: uuid("actor_id")
@@ -1310,6 +1312,10 @@ export const registrationLedger = pgTable(
     ),
     index("registration_ledger_actor_idx").on(t.actorId),
     check("registration_ledger_amount_check", sql`${t.amountCents} > 0`),
+    check(
+      "registration_ledger_payment_method_check",
+      sql`${t.paymentMethod} in ('CASH', 'QR')`,
+    ),
     check(
       "registration_ledger_date_check",
       sql`${t.effectiveDate} <= (${t.recordedAt} at time zone 'America/La_Paz')::date`,

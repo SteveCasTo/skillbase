@@ -1,5 +1,6 @@
 import type {
   AdminCourseDto,
+  AdminCourseCardDto,
   CourseData,
   CourseStatus,
   PublicCourseDto,
@@ -28,7 +29,7 @@ export interface CourseRepository {
     actorId: string,
     expectedUpdatedAt?: Date,
   ): Promise<AdminCourseDto>;
-  listAdmin(): Promise<readonly AdminCourseDto[]>;
+  listAdmin(now?: Date): Promise<readonly AdminCourseCardDto[]>;
   getAdmin(id: string): Promise<AdminCourseDto | null>;
   listPublic(now?: Date): Promise<readonly PublicCourseDto[]>;
   getPublic(slug: string, now?: Date): Promise<PublicCourseDto | null>;

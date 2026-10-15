@@ -10,6 +10,13 @@ import {
 } from "../../scripts/financial-demo-plan";
 import { SEED_OWNER, teachers } from "../../scripts/renew-demo-plan";
 import { DrizzleRegistrationRepository } from "@/server/db/repositories/registration-repository";
+import postgres from "postgres";
+import { createHash } from "node:crypto";
+import {
+  seedPaymentMethodMovements,
+  applySeedPaymentMethodManifest,
+  type PaymentMethodManifest,
+} from "../../scripts/seed-payment-methods";
 
 test("isolated demo is read-only by default, atomic, provenance-bound and never doubles cash", async () => {
   const connection = createDatabase(getTestSupabaseEnvironment().databaseUrl, {
@@ -199,6 +206,132 @@ test("isolated demo is read-only by default, atomic, provenance-bound and never 
     expect(await db.select().from(schema.registrationSettings)).toEqual(
       settingsBefore,
     );
+    // Existing case also exercises the bounded, replayable enrichment adapter.
+    // This historical-null fixture exists only in the runner-owned QA database.
+    const client = postgres(getTestSupabaseEnvironment().databaseUrl, {
+      max: 1,
+      prepare: false,
+    });
+    try {
+      const originalLedger = await seedPaymentMethodMovements(client);
+      expect(
+        new Set(originalLedger.map((entry) => entry.paymentMethod)),
+      ).toEqual(new Set(["CASH", "QR"]));
+      const auditBefore = await db.select().from(schema.auditEvents);
+      const registrationBefore = await db
+        .select()
+        .from(schema.preRegistrations);
+      await client.begin(async (tx) => {
+        await tx`alter table registration_ledger disable trigger registration_ledger_append_only`;
+        await tx`update registration_ledger set payment_method = null`;
+        await tx`alter table registration_ledger enable trigger registration_ledger_append_only`;
+      });
+      const manifest: PaymentMethodManifest = {
+        version: "seed-payment-methods-v1",
+        target: "qa",
+        project: process.env.TEST_SUPABASE_PROJECT_ID!,
+        movements: await seedPaymentMethodMovements(client),
+      };
+      expect(await seedPaymentMethodMovements(client)).toEqual(
+        manifest.movements,
+      );
+      for (const entry of manifest.movements)
+        expect(entry.paymentMethod).toBe(
+          parseInt(
+            createHash("sha256")
+              .update(JSON.stringify(entry.id))
+              .digest("hex")
+              .slice(0, 2),
+            16,
+          ) %
+            2 ===
+            0
+            ? "CASH"
+            : "QR",
+        );
+      expect(
+        manifest.movements.every((entry) => entry.previousMethod === null),
+      ).toBe(true);
+      expect(
+        (await detail("future:completed")).ledger.every(
+          (entry) => entry.paymentMethod === null,
+        ),
+      ).toBe(true);
+      await expect(
+        applySeedPaymentMethodManifest(client, {
+          ...manifest,
+          movements: manifest.movements.map((entry, i) =>
+            i === 0 ? { ...entry, identityHash: "forged" } : entry,
+          ),
+        }),
+      ).rejects.toThrow("identity/evidence");
+      expect(await applySeedPaymentMethodManifest(client, manifest)).toBe(12);
+      expect(await applySeedPaymentMethodManifest(client, manifest)).toBe(0);
+      const guards = await client<{ tgname: string; tgenabled: string }[]>`
+        select tgname, tgenabled from pg_trigger
+        where tgrelid = 'public.registration_ledger'::regclass
+          and not tgisinternal order by tgname`;
+      expect(Array.from(guards)).toEqual([
+        { tgname: "registration_ledger_append_only", tgenabled: "O" },
+        {
+          tgname: "registration_ledger_require_payment_method",
+          tgenabled: "O",
+        },
+      ]);
+      const enriched = await seedPaymentMethodMovements(client);
+      expect(enriched.map((entry) => entry.ledgerHash)).toEqual(
+        originalLedger.map((entry) => entry.ledgerHash),
+      );
+      expect(enriched.map((entry) => entry.previousMethod)).toEqual(
+        manifest.movements.map((entry) => entry.paymentMethod),
+      );
+      expect(
+        await db.select().from(schema.registrationCommandReceipts),
+      ).toEqual(receipts);
+      expect(await db.select().from(schema.auditEvents)).toEqual(auditBefore);
+      expect(await db.select().from(schema.preRegistrations)).toEqual(
+        registrationBefore,
+      );
+      const first = manifest.movements[0]!;
+      const [person] = await db
+        .select()
+        .from(schema.participants)
+        .where(eq(schema.participants.id, first.participantId));
+      await db
+        .update(schema.participants)
+        .set({ email: "manual-approved@example.test" })
+        .where(eq(schema.participants.id, person!.id));
+      await expect(seedPaymentMethodMovements(client)).rejects.toThrow(
+        "Unrecognized seed identity",
+      );
+      const approved = await seedPaymentMethodMovements(client, [
+        {
+          participantId: person!.id,
+          courseId: first.courseId,
+          identityHash: createHash("sha256")
+            .update(
+              JSON.stringify([person!.ci, "manual-approved@example.test"]),
+            )
+            .digest("hex"),
+        },
+      ]);
+      expect(
+        approved
+          .filter((entry) => entry.participantId === person!.id)
+          .every((entry) => entry.identityApproval === "EXPLICIT_TEST"),
+      ).toBe(true);
+      await db
+        .update(schema.participants)
+        .set({ email: person!.email })
+        .where(eq(schema.participants.id, person!.id));
+      await expect(
+        Promise.resolve(
+          client`update registration_ledger set payment_method = 'CASH'`,
+        ),
+      ).rejects.toThrow();
+    } finally {
+      await client.end();
+    }
     await expect(
       runFinancialDemo(db, {
         ...options,
