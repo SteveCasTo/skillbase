@@ -1,0 +1,96 @@
+---
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+
+interface Props {
+  page: number;
+  pageSize: number;
+  total: number;
+  /** Same-origin path and existing query. Only `page` is replaced. */
+  href: string;
+  label: string;
+  /** Both current registration list contracts accept pages 1..1000. */
+  maxPage?: number;
+}
+const { page, pageSize, total, href, label, maxPage = 1000 } = Astro.props;
+const totalPages = Math.max(1, Math.ceil(total / pageSize));
+const lastPage = Math.min(totalPages, maxPage);
+const outOfRange = page > totalPages;
+const showNavigation = totalPages > 1 || page > 1;
+const pageHref = (target: number) => {
+  const url = new URL(href, Astro.url);
+  url.searchParams.set("page", String(target));
+  return `${url.pathname}${url.search}${url.hash}`;
+};
+// A bounded window keeps the footer stable even with large result counts.
+// Preserve an out-of-range response rather than silently relabeling its data.
+const anchor = Math.min(page, lastPage);
+const pages = new Set([1, lastPage, page]);
+for (
+  let value = Math.max(1, anchor - 1);
+  value <= Math.min(lastPage, anchor + 1);
+  value++
+)
+  pages.add(value);
+const items: (number | "ellipsis")[] = [];
+for (const value of [...pages].sort((a, b) => a - b)) {
+  const previous = items.at(-1);
+  if (typeof previous === "number") {
+    if (value - previous === 2) items.push(previous + 1);
+    else if (value - previous > 2) items.push("ellipsis");
+  }
+  items.push(value);
+}
+const currentLabel = outOfRange
+  ? `Página ${page} fuera de rango`
+  : `Página ${page} de ${totalPages}`;
+---
+
+{showNavigation && (
+  <div class="@container/pagination mt-6 flex min-w-0 flex-col gap-3">
+    <p class="hidden text-center text-sm tabular-nums text-muted-foreground @[42rem]/pagination:block">
+      {currentLabel}
+    </p>
+    <Pagination aria-label={label}>
+      <PaginationContent className="w-full justify-between @[42rem]/pagination:w-auto">
+        <PaginationItem>
+          <PaginationPrevious
+            href={page > 1 ? pageHref(Math.min(page - 1, lastPage)) : undefined}
+            disabled={page <= 1}
+          />
+        </PaginationItem>
+        <PaginationItem className="min-w-0 flex-1 px-2 text-center text-sm tabular-nums @[42rem]/pagination:hidden">
+          <span aria-current="page">{currentLabel}</span>
+        </PaginationItem>
+        {items.map((item) => (
+          <PaginationItem className="hidden @[42rem]/pagination:list-item">
+            {item === "ellipsis" ? (
+              <PaginationEllipsis />
+            ) : (
+              <PaginationLink
+                href={pageHref(item)}
+                isActive={item === page}
+                aria-label={`Página ${item}`}
+              >
+                {item}
+              </PaginationLink>
+            )}
+          </PaginationItem>
+        ))}
+        <PaginationItem>
+          <PaginationNext
+            href={page < lastPage ? pageHref(page + 1) : undefined}
+            disabled={page >= lastPage}
+          />
+        </PaginationItem>
+      </PaginationContent>
+    </Pagination>
+  </div>
+)}
