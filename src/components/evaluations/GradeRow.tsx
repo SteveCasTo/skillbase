@@ -11,7 +11,12 @@ import type {
 import { notifications } from "@/lib/notifications";
 import { gradeLabel } from "./presentation";
 import { cn } from "@/lib/utils";
-import { changedGrades, gradeDrafts, type GradeDraft } from "./editing";
+import {
+  acceptsGradeDraft,
+  changedGrades,
+  gradeDrafts,
+  type GradeDraft,
+} from "./editing";
 import { EvaluationResult } from "./EvaluationResult";
 import type { EvaluationSaveResult, SaveRow } from "./mutation-types";
 import type { EvaluationRouteData } from "./route";
@@ -138,7 +143,7 @@ export function GradeRow({
       ref={form}
       aria-label={`Notas de ${name}`}
       aria-busy={saving}
-      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 p-4 lg:grid-cols-[minmax(10rem,1fr)_minmax(0,3fr)_auto] lg:grid-rows-[auto_minmax(2.75rem,auto)_auto] lg:gap-y-1"
+      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 p-4 xl:grid-cols-[minmax(10rem,1fr)_minmax(0,3fr)_9rem_5.75rem] xl:grid-rows-[auto_minmax(2.75rem,auto)_auto] xl:gap-y-1"
       onKeyDown={(event) => {
         if (event.key === "Escape" && drafts && !saving) {
           event.preventDefault();
@@ -199,7 +204,7 @@ export function GradeRow({
         }
       }}
     >
-      <div className="col-span-2 min-w-0 self-center lg:col-span-1 lg:row-start-2">
+      <div className="col-span-2 min-w-0 self-center xl:col-span-1 xl:row-start-2">
         <h3 className="text-sm font-semibold break-words">{name}</h3>
         {participant.membershipStatus !== "INSCRITO" && (
           <p className="text-muted-foreground mt-1 text-sm">
@@ -207,17 +212,12 @@ export function GradeRow({
           </p>
         )}
       </div>
-      <div
-        className={cn(
-          "grid min-w-0 gap-y-2 lg:contents",
-          participant.result.status === "COMPLETE" && "col-span-2 row-start-3",
-        )}
-      >
+      <div className="col-span-2 row-start-3 grid min-w-0 gap-y-2 xl:contents">
         {componentRows.map((row, rowIndex) => (
           <div
             key={row[0]!.id}
             className={cn(
-              "grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-x-3 gap-y-1 lg:col-start-2 lg:row-span-3 lg:grid-rows-subgrid",
+              "grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-x-3 gap-y-1 xl:col-start-2 xl:row-span-3 xl:grid-rows-subgrid",
               columns,
             )}
           >
@@ -247,12 +247,24 @@ export function GradeRow({
                       autoFocus={rowIndex === 0 && index === 0}
                       id={id}
                       inputMode="decimal"
-                      className="min-h-11 max-w-26 self-center tabular-nums"
+                      title="Introduce una nota de 0 a 100 con punto decimal y hasta dos decimales."
+                      className="min-h-11 w-20 max-w-full self-center px-2 tabular-nums"
                       value={draft.score}
                       disabled={saving}
                       aria-invalid={Boolean(error)}
                       aria-describedby={error ? `${id}-error` : undefined}
+                      onPaste={(event) => {
+                        const input = event.currentTarget;
+                        const next =
+                          input.value.slice(0, input.selectionStart ?? 0) +
+                          event.clipboardData.getData("text") +
+                          input.value.slice(
+                            input.selectionEnd ?? input.value.length,
+                          );
+                        if (!acceptsGradeDraft(next)) event.preventDefault();
+                      }}
                       onChange={(event) => {
+                        if (!acceptsGradeDraft(event.target.value)) return;
                         setDrafts(
                           (current) =>
                             current?.map((item) =>
@@ -279,7 +291,7 @@ export function GradeRow({
                       }}
                     />
                   ) : (
-                    <p className="flex min-h-11 max-w-26 items-center text-sm tabular-nums">
+                    <p className="flex min-h-11 w-20 max-w-full items-center text-sm tabular-nums">
                       {grade?.score == null ? (
                         <span className="text-muted-foreground">Pendiente</span>
                       ) : (
@@ -302,94 +314,87 @@ export function GradeRow({
           </div>
         ))}
       </div>
-      <div
-        className={cn(
-          "flex min-w-0 items-center gap-3 self-start lg:col-span-1 lg:col-start-3 lg:row-start-2 lg:justify-end lg:self-center lg:pt-0",
-          participant.result.status === "COMPLETE"
-            ? "col-span-2 row-start-2 justify-between"
-            : "justify-end pt-5",
-        )}
-      >
+      <div className="col-start-1 row-start-2 min-w-0 self-center xl:col-start-3">
         {participant.result.status === "COMPLETE" && (
           <EvaluationResult result={participant.result} />
         )}
-        <div className="flex min-h-11 items-center justify-end gap-1">
-          {participant.canGrade &&
-            (drafts ? (
-              <>
-                <Button
-                  type="submit"
-                  variant="ghost"
-                  size="icon"
-                  className="min-h-11 min-w-11"
-                  aria-label={`Guardar notas de ${name}`}
-                  title="Guardar notas"
-                  disabled={
-                    !valid ||
-                    !changes.grades.length ||
-                    conflict ||
-                    pending ||
-                    saving
-                  }
-                >
-                  {saving ? (
-                    <LoaderCircle
-                      className="motion-safe:animate-spin"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <Check aria-hidden="true" />
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="min-h-11 min-w-11"
-                  aria-label={`Cancelar edición de notas de ${name}`}
-                  title="Cancelar edición"
-                  disabled={saving}
-                  onClick={finish}
-                >
-                  <X aria-hidden="true" />
-                </Button>
-              </>
-            ) : (
+      </div>
+      <div className="col-start-2 row-start-2 flex min-h-11 items-center justify-end gap-1 self-center xl:col-start-4">
+        {participant.canGrade &&
+          (drafts ? (
+            <>
               <Button
-                ref={editButton}
+                type="submit"
+                variant="ghost"
+                size="icon"
+                className="min-h-11 min-w-11"
+                aria-label={`Guardar notas de ${name}`}
+                title="Guardar notas"
+                disabled={
+                  !valid ||
+                  !changes.grades.length ||
+                  conflict ||
+                  pending ||
+                  saving
+                }
+              >
+                {saving ? (
+                  <LoaderCircle
+                    className="motion-safe:animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Check aria-hidden="true" />
+                )}
+              </Button>
+              <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 className="min-h-11 min-w-11"
-                aria-label={`Editar notas de ${name}`}
-                title="Editar notas"
-                disabled={pending}
-                onClick={() => {
-                  setDrafts(baseline());
-                  transaction.current = null;
-                }}
+                aria-label={`Cancelar edición de notas de ${name}`}
+                title="Cancelar edición"
+                disabled={saving}
+                onClick={finish}
               >
-                <Pencil aria-hidden="true" />
+                <X aria-hidden="true" />
               </Button>
-            ))}
-          {saving && (
-            <span role="status" className="sr-only">
-              Guardando notas…
-            </span>
-          )}
-        </div>
+            </>
+          ) : (
+            <Button
+              ref={editButton}
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="min-h-11 min-w-11"
+              aria-label={`Editar notas de ${name}`}
+              title="Editar notas"
+              disabled={pending}
+              onClick={() => {
+                setDrafts(baseline());
+                transaction.current = null;
+              }}
+            >
+              <Pencil aria-hidden="true" />
+            </Button>
+          ))}
+        {saving && (
+          <span role="status" className="sr-only">
+            Guardando notas…
+          </span>
+        )}
       </div>
       {message && (
         <p
           role="alert"
           tabIndex={-1}
-          className="text-destructive text-sm sm:col-span-2 lg:col-span-3"
+          className="text-destructive col-span-2 text-sm xl:col-span-4"
         >
           {message}
         </p>
       )}
       {conflict && drafts && (
-        <div className="flex flex-col items-start gap-2 text-sm sm:col-span-2 lg:col-span-3">
+        <div className="col-span-2 flex flex-col items-start gap-2 text-sm xl:col-span-4">
           <p>
             Revisa las notas vigentes antes de volver a guardar. Tu borrador se
             conserva.

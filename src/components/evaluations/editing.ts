@@ -30,6 +30,13 @@ export function acceptsWeightDraft(value: string, maximum: number): boolean {
   }
 }
 
+/** Grade-only input assistance; reject the whole edit, never truncate or rewrite it. */
+export function acceptsGradeDraft(value: string): boolean {
+  if (value === "") return true;
+  if (!/^(?:0|[1-9]\d{0,2})(?:\.\d{0,2})?$/u.test(value)) return false;
+  return Number(value) <= 100;
+}
+
 export interface GradeDraft {
   componentId: string;
   score: string;

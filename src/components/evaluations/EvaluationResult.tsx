@@ -12,8 +12,7 @@ export function EvaluationResult({ result }: { result: EvaluationResultDto }) {
       ) : (
         <>
           <p className="font-semibold tabular-nums">
-            Nota final:{" "}
-            {gradeLabel(result.finalGrade ?? result.decisionGrade)}{" "}
+            Final: {gradeLabel(result.finalGrade ?? result.decisionGrade)}{" "}
           </p>
           <p className="text-muted-foreground">
             {result.passed ? "Aprobado" : "No aprobado"}
