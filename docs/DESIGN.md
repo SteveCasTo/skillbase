@@ -59,6 +59,21 @@ Cuando una tabla sea apropiada en desktop:
 
 Las tablas siguen siendo válidas para datos genuinamente tabulares.
 
+## PAGINACIÓN DE LISTADOS
+
+- Preinscripciones (SSR y fragmentos) y participantes ADMIN del grupo comparten
+  `ListPagination.astro`, compuesto con los primitives `Pagination` de shadcn/ui
+  (`new-york-v4`), sin hidratación adicional. Los enlaces conservan los parámetros
+  del listado y solo sustituyen `page`; búsqueda y filtros siguen siendo server-side.
+- Según el ancho disponible del contenedor, mobile muestra anterior/siguiente con
+  iconos y página actual explícita; desktop añade números, primera/última página
+  accesibles y elipsis. Los controles tienen un objetivo mínimo de 44 px, foco
+  visible, labels españoles, `aria-current` y límites no accionables sin `href`.
+- Con cero/una página se omite la navegación irrelevante y se conserva el resumen
+  existente. Una página solicitada fuera de rango conserva la respuesta vacía del
+  servidor, la identifica y ofrece regreso a páginas disponibles. Los destinos no
+  superan el límite vigente de 1000 páginas del contrato, sin alterar consultas.
+
 ## MODALES
 
 Usar `Dialog` únicamente para:

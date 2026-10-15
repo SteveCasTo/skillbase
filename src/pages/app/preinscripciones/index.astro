@@ -4,6 +4,7 @@ import PrivateBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import RegistrationList from "@/components/pre-registrations/RegistrationList.astro";
 import RegistrationFilters from "@/components/pre-registrations/RegistrationFilters.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
+import ListPagination from "@/components/lists/ListPagination.astro";
 import { buttonVariants } from "@/components/ui/button";
 import { requireInternalUser } from "@/server/auth/context";
 import { listRegistrations } from "@/application/pre-registrations/manage-registrations";
@@ -57,10 +58,6 @@ const query = new URLSearchParams(Astro.url.searchParams);
 query.delete("format");
 const exportHref = (format: string) =>
   `/app/preinscripciones/exportar?${new URLSearchParams([...query, ["format", format]])}`;
-const previous = new URLSearchParams(query);
-previous.set("page", String(filter.page - 1));
-const next = new URLSearchParams(query);
-next.set("page", String(filter.page + 1));
 ---
 
 {fragment ? (
@@ -87,24 +84,13 @@ next.set("page", String(filter.page + 1));
           csvHref={exportHref("CSV")}
           pdfHref={exportHref("PDF")}
         />
-        <nav aria-label="Páginas" class="mt-5 flex flex-wrap gap-5">
-          {filter.page > 1 && (
-            <a
-              href={`/app/preinscripciones?${previous}`}
-              class="min-h-11 underline"
-            >
-              Anterior
-            </a>
-          )}
-          {filter.page * filter.pageSize < page.total && (
-            <a
-              href={`/app/preinscripciones?${next}`}
-              class="min-h-11 underline"
-            >
-              Siguiente
-            </a>
-          )}
-        </nav>
+        <ListPagination
+          page={page.page}
+          pageSize={page.pageSize}
+          total={page.total}
+          href={`${Astro.url.pathname}?${query}`}
+          label="Páginas de preinscripciones"
+        />
       </>
     )}
   </div>
@@ -157,24 +143,13 @@ next.set("page", String(filter.page + 1));
             csvHref={exportHref("CSV")}
             pdfHref={exportHref("PDF")}
           />
-          <nav aria-label="Páginas" class="mt-5 flex flex-wrap gap-5">
-            {filter.page > 1 && (
-              <a
-                href={`/app/preinscripciones?${previous}`}
-                class="min-h-11 underline"
-              >
-                Anterior
-              </a>
-            )}
-            {filter.page * filter.pageSize < page.total && (
-              <a
-                href={`/app/preinscripciones?${next}`}
-                class="min-h-11 underline"
-              >
-                Siguiente
-              </a>
-            )}
-          </nav>
+          <ListPagination
+            page={page.page}
+            pageSize={page.pageSize}
+            total={page.total}
+            href={`${Astro.url.pathname}?${query}`}
+            label="Páginas de preinscripciones"
+          />
         </div>
       )
     )}
