@@ -79,7 +79,9 @@ Mostrar únicamente:
 - credential ID.
 
 La página pública incluye estado, titular, curso, horas nominales, fecha final,
-ID/URL y el hash oficial para comparación local de bytes. La allowlist concreta
+y el hash oficial para comparación local de bytes; omite la fila del código de
+credencial. El identificador público permanece en la URL, el QR, el PDF y la
+búsqueda manual; no se oculta ni se sustituye por el hash. La allowlist concreta
 para Fase 9, que no incluye nivel no impreso en la plantilla, está en
 [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md).
 
