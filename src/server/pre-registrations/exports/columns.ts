@@ -1,5 +1,6 @@
 import { centsToDecimal } from "@/domain/pre-registrations/money";
 import type { AdminRegistrationDto } from "@/domain/pre-registrations/types";
+import type { RegistrationExportRow } from "@/application/pre-registrations/export-finance";
 
 export const PARTICIPANT_LABELS = {
   STUDENT: "Estudiante",
@@ -41,6 +42,34 @@ export const MONEY_COLUMNS = [
 ] as const;
 export function registrationAmounts(row: AdminRegistrationDto): string[] {
   return MONEY_COLUMNS.map((column) => centsToDecimal(column.value(row)));
+}
+
+export const NET_COLUMNS = [
+  {
+    label: "Efectivo neto BOB",
+    value: (row: RegistrationExportRow) => row.cashNetCents,
+  },
+  {
+    label: "QR neto BOB",
+    value: (row: RegistrationExportRow) => row.qrNetCents,
+  },
+  {
+    label: "No registrado neto BOB",
+    value: (row: RegistrationExportRow) => row.unrecordedMethodNetCents,
+  },
+  {
+    label: "Recibido neto BOB",
+    value: (row: RegistrationExportRow) => row.receivedNetCents,
+  },
+] as const;
+
+/** BigInt also formats report-wide sums beyond a single tariff's bound. */
+export function reportDecimal(cents: bigint | number): string {
+  if (typeof cents === "number" && !Number.isSafeInteger(cents))
+    throw new RangeError("Invalid report cents");
+  const amount = BigInt(cents);
+  const absolute = amount < 0n ? -amount : amount;
+  return `${amount < 0n ? "-" : ""}${absolute / 100n}.${(absolute % 100n).toString().padStart(2, "0")}`;
 }
 
 /** Additive private-list labels are supplied by the authorized repository.

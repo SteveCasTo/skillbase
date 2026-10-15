@@ -844,11 +844,18 @@ test("SSR without JS supports a free registration without fake zero cash and exp
     expect(csv.headers()["content-disposition"]).toMatch(
       /^attachment; filename="preinscripciones-[\d-]+\.csv"$/u,
     );
+    const csvText = await csv.text();
+    expect(csvText).toContain(
+      '"Efectivo neto BOB","QR neto BOB","No registrado neto BOB","Recibido neto BOB","Responsable del registro"',
+    );
+    expect(csvText).toMatch(/,0\.00,0\.00,0\.00,0\.00,"[^"]+"\r\n$/u);
+    expect(csvText).not.toContain(AUTH_FIXTURES.admin.email);
     const pdf = await html.request.get(
       `/app/preinscripciones/exportar?format=PDF&courseId=${f.id}`,
     );
     expect(pdf.status()).toBe(200);
     expect(pdf.headers()["content-type"]).toBe("application/pdf");
+    expect((await pdf.body()).subarray(0, 5).toString()).toBe("%PDF-");
   } finally {
     await noJs.close();
   }
@@ -866,6 +873,7 @@ test("SSR without JS supports a free registration without fake zero cash and exp
     "/app/configuracion",
     "/app/preinscripciones/buscar?search=00",
     "/app/preinscripciones/exportar?format=CSV",
+    "/app/preinscripciones/exportar?format=PDF",
   ])
     expect((await page.request.get(path, { maxRedirects: 0 })).status()).toBe(
       303,

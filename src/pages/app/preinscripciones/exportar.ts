@@ -17,8 +17,9 @@ export const GET: APIRoute = async ({ request, locals }) => {
     const format = singleQuery(params, "format");
     if (format !== "CSV" && format !== "PDF")
       throw new RegistrationError("VALIDATION_FAILED", "Selecciona CSV o PDF.");
+    const repository = createRegistrationRepository();
     const artifact = await exportRegistrations(
-      createRegistrationRepository(),
+      { list: repository.listForExport.bind(repository) },
       createRegistrationExportPort(),
       requireInternalUser(locals),
       { filter: parseRegistrationFilter(params), format },

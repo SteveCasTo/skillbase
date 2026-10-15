@@ -10,13 +10,15 @@ import {
   renderRegistrationsPdf,
 } from "@/server/pre-registrations/exports/pdf";
 import { exportNow, exportRow } from "./registration-export-fixture";
+import { registrationExportFinance } from "@/application/pre-registrations/export-finance";
+import type { LedgerEntryDto } from "@/domain/pre-registrations/types";
 
 test("CSV is UTF-8 BOM, comma-separated CRLF, quoted accents and exact integer-cent decimals", () => {
   const bytes = renderRegistrationsCsv([exportRow()]);
   expect([...bytes.slice(0, 3)]).toEqual([239, 187, 191]);
   const value = new TextDecoder().decode(bytes);
   expect(value).toBe(
-    '"Curso","Grupo","Nombres","Apellido paterno","Apellido materno","CI","Categoría","Estado","Estado financiero","Precio BOB","Pagado BOB","Saldo BOB","Devuelto BOB","Por devolver BOB"\r\n"Diseño y programación","Grupo mañana","María José","Muñoz","Rojas","\'000123-LP","Estudiante","Preinscrito","Pago parcial",80.01,20.01,60.00,0.00,0.00\r\n',
+    '"Curso","Grupo","Nombres","Apellido paterno","Apellido materno","CI","Categoría","Estado","Estado financiero","Precio BOB","Pagado BOB","Saldo BOB","Devuelto BOB","Por devolver BOB","Efectivo neto BOB","QR neto BOB","No registrado neto BOB","Recibido neto BOB","Responsable del registro"\r\n"Diseño y programación","Grupo mañana","María José","Muñoz","Rojas","\'000123-LP","Estudiante","Preinscrito","Pago parcial",80.01,20.01,60.00,0.00,0.00,0.00,0.00,20.01,20.01,"Administración sintética"\r\n',
   );
   expect(value).not.toContain("participant-private");
   expect(value).not.toContain("private-interest");
@@ -76,7 +78,7 @@ test("PDF is real paginated A4 landscape with repeated headings, full names and 
       text.filter((value) => value === "Participante / CI / categoría"),
     ).toHaveLength(pdf.getPageCount());
     expect(text.filter((value) => value === "Precio BOB")).toHaveLength(
-      pdf.getPageCount(),
+      pdf.getPageCount() + 1,
     );
     expect(text).toContain("Ángela Ω Иван");
     expect(
@@ -90,9 +92,9 @@ test("PDF is real paginated A4 landscape with repeated headings, full names and 
     expect(text.filter((value) => value.includes("Muñoz")).join("")).toContain(
       "Muñoz ".repeat(19),
     );
-    expect(text.some((value) => value.includes("Precio BOB: 2400.30"))).toBe(
-      true,
-    );
+    expect(text).toContain("2400.30");
+    expect(text).toContain("600.30");
+    expect(text).toContain("No registrado neto BOB");
     expect(
       text.some((value) => value.includes("2099-03-01 22:03 (Bolivia UTC-04)")),
     ).toBe(true);
@@ -130,7 +132,7 @@ test("empty PDF is readable and injected factory clock controls its metadata", a
 
 test("exports projected refund liabilities and exemptions without recalculating finance", () => {
   const row = exportRow();
-  const cancelled = {
+  const cancelledRow = {
     ...row,
     state: "CANCELLED" as const,
     membershipStatus: "CANCELADO" as const,
@@ -139,10 +141,50 @@ test("exports projected refund liabilities and exemptions without recalculating 
     refundDueCents: 1500,
     balanceCents: 0,
   };
+  const entry = (
+    kind: LedgerEntryDto["kind"],
+    paymentMethod: LedgerEntryDto["paymentMethod"],
+    amountCents: number,
+  ): LedgerEntryDto => ({
+    id: "synthetic",
+    kind,
+    paymentMethod,
+    amountCents,
+    effectiveDate: "2099-03-01",
+    actorId: "private-actor",
+    recordedAt: exportNow.toISOString(),
+    reason: null,
+  });
+  const cancelled = registrationExportFinance(cancelledRow, [
+    entry("PAYMENT", "CASH", 1001),
+    entry("PAYMENT", "QR", 700),
+    entry("PAYMENT", null, 300),
+    entry("REFUND", "CASH", 201),
+    entry("REFUND", "QR", 100),
+    entry("REFUND", null, 200),
+  ]);
+  expect(cancelled).toMatchObject({
+    cashNetCents: 800,
+    qrNetCents: 600,
+    unrecordedMethodNetCents: 100,
+    receivedNetCents: 1500,
+  });
   const value = new TextDecoder().decode(renderRegistrationsCsv([cancelled]));
   expect(value).toContain(
     '"Cancelado","Devolución pendiente",80.01,20.01,0.00,5.01,15.00',
   );
+  expect(value).toContain(',8.00,6.00,1.00,15.00,"Administración sintética"');
+  expect(() => registrationExportFinance(cancelledRow, [])).toThrow(
+    "La lista cambió",
+  );
+  const crossMethod = registrationExportFinance(cancelledRow, [
+    entry("PAYMENT", "QR", 2001),
+    entry("REFUND", "CASH", 501),
+  ]);
+  expect(crossMethod.cashNetCents).toBe(-501);
+  expect(
+    new TextDecoder().decode(renderRegistrationsCsv([crossMethod])),
+  ).toContain(",-5.01,20.01,0.00,15.00,");
   const exempt = {
     ...row,
     price: {
@@ -155,7 +197,14 @@ test("exports projected refund liabilities and exemptions without recalculating 
     paidCents: 0,
     balanceCents: 0,
   };
-  expect(new TextDecoder().decode(renderRegistrationsCsv([exempt]))).toContain(
+  const free = registrationExportFinance(exempt, []);
+  expect(free).toMatchObject({
+    cashNetCents: 0,
+    qrNetCents: 0,
+    unrecordedMethodNetCents: 0,
+    receivedNetCents: 0,
+  });
+  expect(new TextDecoder().decode(renderRegistrationsCsv([free]))).toContain(
     '"Auxiliar","Inscrito","Exento",0.00,0.00,0.00,0.00,0.00',
   );
 });
@@ -180,11 +229,13 @@ test("CSV quotes and defangs course/group names rather than exporting UUID-only 
     ...exportRow(),
     courseName: ' \u200b=HYPERLINK("test")',
     groupName: 'Grupo, "Ñ"',
+    registeredByName: ' =HYPERLINK("actor")',
   };
   const text = new TextDecoder().decode(renderRegistrationsCsv([row]));
   expect(text).toContain('"\' \u200b=HYPERLINK(""test"")","Grupo, ""Ñ"""');
   expect(text).not.toContain(row.courseId);
   expect(text).not.toContain(row.groupId);
+  expect(text).toContain('"\' =HYPERLINK(""actor"")"');
 });
 
 test("legacy rows alone use explicitly marked course/group ID fallbacks", async () => {

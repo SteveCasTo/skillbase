@@ -3,7 +3,7 @@ import {
   createPriceSnapshot,
   DEFAULT_REGISTRATION_SETTINGS,
 } from "@/domain/pre-registrations/money";
-import type { AdminRegistrationDto } from "@/domain/pre-registrations/types";
+import type { RegistrationExportRow } from "@/application/pre-registrations/export-finance";
 
 export const exportActor: InternalUser = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -14,7 +14,7 @@ export const exportActor: InternalUser = {
   roles: ["ADMIN"],
 };
 export const exportNow = new Date("2099-03-02T02:03:00Z");
-export function exportRow(index = 1): AdminRegistrationDto & {
+export function exportRow(index = 1): RegistrationExportRow & {
   readonly courseName: string;
   readonly groupName: string;
 } {
@@ -44,6 +44,11 @@ export function exportRow(index = 1): AdminRegistrationDto & {
       settings: DEFAULT_REGISTRATION_SETTINGS,
     }),
     paidCents: 2001,
+    cashNetCents: 0,
+    qrNetCents: 0,
+    unrecordedMethodNetCents: 2001,
+    receivedNetCents: 2001,
+    registeredByName: "Administración sintética",
     refundedCents: 0,
     balanceCents: 6000,
     refundDueCents: 0,

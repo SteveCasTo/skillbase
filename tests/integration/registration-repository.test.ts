@@ -286,6 +286,17 @@ test("payment races enforce optimistic revisions and balance; retries post only 
   expect(a.registration.balanceCents).toBe(0);
   expect(a.ledger).toHaveLength(2);
   expect(a.ledger.map((entry) => entry.paymentMethod)).toEqual(["CASH", "QR"]);
+  const exported = await repository.listForExport(
+    { courseId: f.course.id, page: 1, pageSize: 100 },
+    f.actor.id,
+  );
+  expect(exported.items[0]).toMatchObject({
+    cashNetCents: 2001,
+    qrNetCents: 6000,
+    unrecordedMethodNetCents: 0,
+    receivedNetCents: 8001,
+    balanceCents: 0,
+  });
   await expect(
     repository.recordPayment(
       { ...command, cash: { ...command.cash, paymentMethod: "CASH" } },
@@ -390,6 +401,18 @@ test("cancel releases seat and preserves liability; refund races cannot exceed p
     f.actor.id,
   );
   expect(settled.registration.financialStatus).toBe("REFUNDED");
+  const exported = await repository.listForExport(
+    { courseId: f.course.id, page: 1, pageSize: 100 },
+    f.actor.id,
+  );
+  expect(exported.items[0]).toMatchObject({
+    cashNetCents: 501,
+    qrNetCents: -501,
+    unrecordedMethodNetCents: 0,
+    receivedNetCents: 0,
+    refundedCents: 2001,
+    refundDueCents: 0,
+  });
   const replacement = await repository.create(
     { ...f.input, requestKey: crypto.randomUUID() },
     f.actor.id,
@@ -1131,6 +1154,9 @@ test("actor role revocation denies idempotent retries and all private reads even
   await expect(
     repository.list({ page: 1, pageSize: 10 }, f.actor.id),
   ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  await expect(
+    repository.listForExport({ page: 1, pageSize: 100 }, f.actor.id),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
   await expect(repository.form(f.course.id, f.actor.id)).rejects.toMatchObject({
     code: "FORBIDDEN",
   });
@@ -1208,6 +1234,18 @@ test("ADMIN display labels use joined current course and Bolivia group schedule 
   expect(page.items[0]).toMatchObject({
     courseName: "Synthetic Course",
     groupName: "08:00–09:30",
+  });
+  expect(page.items[0]).not.toHaveProperty("cashNetCents");
+  const exported = await repository.listForExport(
+    { courseId: f.course.id, page: 1, pageSize: 100 },
+    f.actor.id,
+  );
+  expect(exported.items[0]).toMatchObject({
+    registeredByName: f.actor.name,
+    cashNetCents: 2001,
+    qrNetCents: 0,
+    unrecordedMethodNetCents: 0,
+    receivedNetCents: 2001,
   });
   await db
     .update(schema.courses)

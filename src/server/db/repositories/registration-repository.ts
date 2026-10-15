@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { RegistrationRepository } from "@/application/pre-registrations/registration-repository";
+import { registrationExportFinance } from "@/application/pre-registrations/export-finance";
+import type { RegistrationExportRepository } from "@/application/pre-registrations/export-finance";
 import {
   validateMutation,
   validateRegistrationFilter,
@@ -892,6 +894,22 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
     });
   }
   async list(raw: RegistrationFilter, actorId: string) {
+    return this.registrationList(raw, actorId, (row) => row);
+  }
+
+  /** Reuses the authorized transactional gate and batched ledger, never detail N+1. */
+  async listForExport(raw: RegistrationFilter, actorId: string) {
+    return this.registrationList(raw, actorId, registrationExportFinance);
+  }
+
+  private async registrationList<T extends AdminRegistrationDto>(
+    raw: RegistrationFilter,
+    actorId: string,
+    project: (
+      row: AdminRegistrationDto,
+      ledger: readonly LedgerEntryDto[],
+    ) => T,
+  ) {
     const filter = validateRegistrationFilter(raw);
     return this.read(actorId, async (tx, now) => {
       const search = filter.search
@@ -993,20 +1011,23 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
       }
       return {
         items: await Promise.all(
-          rows.map((row) =>
-            registrationDto(
+          rows.map(async (row) => {
+            const ledger =
+              ledgerByRegistration.get(row.pre_registrations.id) ?? [];
+            const registration = await registrationDto(
               tx,
               row.pre_registrations,
               now,
-              ledgerByRegistration.get(row.pre_registrations.id) ?? [],
+              ledger,
               {
                 person: row.participants,
                 registeredByName: row.registeredByName,
                 course: row.courses,
                 group: row.groups,
               },
-            ),
-          ),
+            );
+            return project(registration, ledger);
+          }),
         ),
         total: count?.total ?? 0,
         page: filter.page,
@@ -1109,6 +1130,8 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
 export function createRegistrationRepository(
   db: RegistrationDatabase = getDatabase(),
   clock?: () => Date,
-): RegistrationRepository {
+): RegistrationRepository & {
+  readonly listForExport: RegistrationExportRepository["list"];
+} {
   return new DrizzleRegistrationRepository(db, clock);
 }
