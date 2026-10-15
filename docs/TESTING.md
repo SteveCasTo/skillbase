@@ -12,6 +12,12 @@ el de guardas verifica replay 0029, snapshots intactos y ejecución pública
 revocada. E2E conserva sus dos casos y añade edición deshabilitada, override/reset,
 nombre accesible de búsqueda y capturas 375/768/1440.
 
+La revisión de integración detectó el fallback binario del encabezado CSV, que
+rotulaba ATTENDANCE como Práctica. El caso existente del formatter ahora recorre
+los tres tipos para ADMIN/INSTRUCTOR, conserva la privacidad y falla contra el
+renderer anterior. El caso PDF de 100 componentes también cubre los tres tipos;
+el PDF conserva nombres/pesos/notas, sin añadir rótulos ni prosa a la UI.
+
 QA utiliza exclusivamente stacks efímeros del runner; no aplica migraciones,
 resets ni semillas sobre canónico/cloud. Los primeros intentos bajo carga local
 agotaron límites existentes de PDF/integración, sin ampliar timeouts. Una versión

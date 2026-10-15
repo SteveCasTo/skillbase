@@ -4,11 +4,18 @@ import type {
 } from "@/domain/academic-closure/types";
 import { csvText } from "@/server/pre-registrations/exports/csv";
 import { PARTICIPANT_LABELS } from "@/server/pre-registrations/exports/columns";
+import type { EvaluationType } from "@/domain/evaluations/types";
 import {
   ClosureExportError,
   gradeText,
   validateOfficialVersion,
 } from "./document";
+
+const componentTypeLabels: Record<EvaluationType, string> = {
+  THEORY: "Teoría",
+  PRACTICAL: "Práctica",
+  ATTENDANCE: "Asistencia",
+};
 
 function paymentCells(
   payments: ClosureParticipantDto["receivedPayments"],
@@ -62,7 +69,7 @@ export function renderClosureCsv(version: ClosureVersionDto): Uint8Array {
       : []),
     ...components.map(
       (c) =>
-        `${c.name} (${c.type === "THEORY" ? "Teoría" : "Práctica"}; peso ${gradeText(c.weight)} %)`,
+        `${c.name} (${componentTypeLabels[c.type]}; peso ${gradeText(c.weight)} %)`,
     ),
     "Nota final",
     "Nota aprobada",
