@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { PDFDocument } from "pdf-lib";
 import { createHash } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
@@ -215,31 +215,166 @@ async function uploadReviewIssue(
   page: Page,
   record: CertificateDto,
   bytes: Buffer,
+  visual?: TestInfo,
 ) {
   const path = `/app/certificados/${record.id}`;
+  const shot = (name: string) =>
+    visual!.outputPath(`${record.hasSignedPdf ? "replacement-" : ""}${name}`);
   await page.goto(path);
-  await page.locator('input[type="file"]').setInputFiles({
+  const save = page.getByRole("button", {
+    name: record.hasSignedPdf ? "Sustituir PDF firmado" : "Guardar PDF firmado",
+    exact: true,
+  });
+  await expect(save).toBeHidden();
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
+  const file = page.locator('input[type="file"]');
+  await expect(page.locator("[data-signed-pdf-form]")).toHaveAttribute(
+    "data-enhanced",
+    "true",
+  );
+  if (visual) {
+    await file.focus();
+    await expect(file).toBeFocused();
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: shot(`upload-empty-${width}.png`),
+        fullPage: true,
+      });
+    }
+    await file.setInputFiles({
+      name: "damaged.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.7\nnot a valid PDF\n%%EOF"),
+    });
+    await expect(page.locator("[data-file-error]")).toContainText("dañado");
+    await expect(save).toBeHidden();
+    await page.screenshot({
+      path: shot("upload-rejected.png"),
+      fullPage: true,
+    });
+    await page
+      .getByRole("button", { name: "Quitar archivo", exact: true })
+      .click();
+    await expect(save).toBeHidden();
+    await expect(file).toBeFocused();
+  }
+  const selectedFile = {
     name: "synthetic-qa-signed.pdf",
     mimeType: "application/pdf",
     buffer: bytes,
-  });
+  };
+  if (visual) {
+    const chooser = page.waitForEvent("filechooser");
+    await file.press("Enter");
+    await (await chooser).setFiles(selectedFile);
+  } else await file.setInputFiles(selectedFile);
+  await expect(save).toBeEnabled();
+  if (visual) {
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: shot(`upload-selected-${width}.png`),
+        fullPage: true,
+      });
+    }
+    await page.evaluate(() => document.documentElement.classList.add("dark"));
+    await page.screenshot({
+      path: shot("upload-selected-dark.png"),
+      fullPage: true,
+      animations: "disabled",
+    });
+    await page.evaluate(() =>
+      document.documentElement.classList.remove("dark"),
+    );
+    await page
+      .getByRole("button", { name: "Quitar archivo", exact: true })
+      .click();
+    await expect(save).toBeHidden();
+    // Exercise actual browser File/DataTransfer selection, not a fake success response.
+    await page.locator("[data-dropzone]").evaluate(
+      (zone, contents) => {
+        const transfer = new DataTransfer();
+        transfer.items.add(
+          new File(
+            [new Uint8Array(contents)],
+            "certificado-sintetico-con-firmas-para-validacion-visual.pdf",
+            { type: "application/pdf" },
+          ),
+        );
+        zone.dispatchEvent(
+          new DragEvent("dragenter", { bubbles: true, dataTransfer: transfer }),
+        );
+        zone.dispatchEvent(
+          new DragEvent("drop", { bubbles: true, dataTransfer: transfer }),
+        );
+      },
+      [...bytes],
+    );
+    await expect(save).toBeEnabled();
+    let release: (() => void) | undefined;
+    await page.route(`**${path}/cargar`, async (route) => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: false,
+          message: "Servicio temporalmente no disponible. Reintenta.",
+        }),
+      });
+    });
+    await save.click();
+    await expect(page.locator("[data-signed-pdf-form]")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    await expect(
+      page.getByRole("button", { name: "Guardando PDF firmado…", exact: true }),
+    ).toBeDisabled();
+    await page.screenshot({
+      path: shot("upload-loading.png"),
+      fullPage: true,
+    });
+    await expect.poll(() => Boolean(release)).toBe(true);
+    release!();
+    await expect(page.locator("[data-upload-error]")).toContainText(
+      "Reintenta",
+    );
+    await expect(page.locator("[data-upload-error]")).toBeFocused();
+    await expect(save).toBeEnabled();
+    await page.screenshot({
+      path: shot("upload-error.png"),
+      fullPage: true,
+    });
+    await page.unroute(`**${path}/cargar`);
+  }
   const uploaded = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
       new URL(response.url()).pathname === `${path}/cargar`,
   );
-  const save = page.getByRole("button", {
-    name: record.hasSignedPdf ? "Sustituir firmado" : "Guardar firmado",
-    exact: true,
-  });
-  await expect(save).toBeDisabled();
-  await page
-    .getByRole("checkbox", { name: "Confirmo que es el certificado firmado." })
-    .check();
+  await expect(save).toBeEnabled();
   await save.click();
   expect((await uploaded).status()).toBe(200);
   await expect(
     page.getByRole("link", { name: "Consultar estado público" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Datos para compartir o añadir a LinkedIn", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Copiar datos de credencial",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("SHA-256 del PDF firmado", { exact: true }),
   ).toBeVisible();
 }
 async function assertNoOverflow(page: Page) {
@@ -296,6 +431,55 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     );
     await expect(groupCertificateLink).toBeVisible();
     await expect(
+      courseSearch.getByRole("combobox", { name: "Estado del curso: Activos" }),
+    ).toBeVisible();
+    expect(
+      (await page.request.get("/app/certificados?status=invalid")).status(),
+    ).toBe(400);
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: testInfo.outputPath(`certificate-course-filters-${width}.png`),
+        fullPage: true,
+      });
+    }
+    const picker = courseSearch.getByRole("combobox");
+    await picker.focus();
+    await page.keyboard.press("Space");
+    await page.getByRole("option", { name: "Archivados", exact: true }).click();
+    await expect(groupCertificateLink).toBeHidden();
+    await expect(page).toHaveURL(/status=ARCHIVED/);
+    await picker.click();
+    await page.getByRole("option", { name: "Todos", exact: true }).click();
+    await expect(groupCertificateLink).toBeVisible();
+    await expect(
+      page.locator(
+        `a[href="/app/cursos/${fixture.courseId}/grupos/${fixture.groupId}/certificados"]`,
+      ),
+    ).toHaveCount(0);
+    await page.reload();
+    await expect(courseSearch.getByLabel("Buscar cursos")).toHaveValue(
+      "attendance",
+    );
+    await expect(
+      courseSearch.getByRole("combobox", { name: "Estado del curso: Todos" }),
+    ).toBeVisible();
+    await fixture.database.db
+      .update(courses)
+      .set({ status: "ARCHIVED" })
+      .where(eq(courses.id, fixture.historyCourseId));
+    await page.goto("/app/certificados?search=attendance&status=ARCHIVED");
+    await expect(groupCertificateLink).toBeVisible();
+    await page.goto("/app/certificados?search=attendance");
+    await expect(groupCertificateLink).toBeHidden();
+    await fixture.database.db
+      .update(courses)
+      .set({ status: "PUBLISHED" })
+      .where(eq(courses.id, fixture.historyCourseId));
+    await page.reload();
+    await expect(groupCertificateLink).toBeVisible();
+    await expect(
       page.locator(
         `a[href="/app/cursos/${fixture.courseId}/grupos/${fixture.groupId}/certificados"]`,
       ),
@@ -305,7 +489,9 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     ).toHaveCount(0);
     await courseSearch.getByLabel("Buscar cursos").fill("sin-coincidencia");
     await expect(
-      page.getByText("No hay cursos que coincidan con la búsqueda."),
+      page.getByText(
+        "No hay cursos con cierre académico vigente que coincidan con la búsqueda y el estado seleccionado.",
+      ),
     ).toBeVisible();
     await courseSearch.getByLabel("Buscar cursos").fill("ATTENDANCE");
     await expect(groupCertificateLink).toBeVisible();
@@ -333,17 +519,31 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     });
     let record = await generate(page, fixture);
     const oldCode = record.publicCredentialId;
+    await expect(
+      page.getByRole("button", { name: "Regenerar PDF", exact: true }),
+    ).toHaveCount(0);
+    // A saved material authority change is adopted internally at download time;
+    // visiting/refetching the detail itself must not rotate the credential.
+    await settings(page, `${fixture.historyCourseId.slice(0, 8)} actualizado`);
+    await page.goto(`/app/certificados/${record.id}`);
+    const unchangedDetail = await page.request.get(
+      `/app/certificados/${record.id}`,
+      { headers },
+    );
+    expect(
+      ((await unchangedDetail.json()) as { data: CertificateDto }).data
+        .publicCredentialId,
+    ).toBe(oldCode);
     const regenerated = page.waitForResponse(
       (r) =>
-        r.request().method() === "POST" &&
-        r.url().includes("/certificados/approval/"),
+        r.request().method() === "POST" && r.url().endsWith("/generado.pdf"),
     );
     await page
-      .getByRole("button", { name: "Regenerar PDF", exact: true })
+      .getByRole("button", { name: "Descargar para firmar", exact: true })
       .click();
     expect((await regenerated).status()).toBe(200);
     await expect(
-      page.getByRole("link", { name: "Descargar para firmar", exact: true }),
+      page.getByRole("button", { name: "Descargar para firmar", exact: true }),
     ).toBeVisible();
     const currentResponse = await page.request.get(
       `/app/certificados/${record.id}`,
@@ -370,9 +570,9 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       publicPage.getByText(record.data.recipientName, { exact: true }),
     ).toHaveCount(0);
     const signed = await signedFixture();
-    await uploadReviewIssue(page, record, signed);
+    await uploadReviewIssue(page, record, signed, testInfo);
     await expect(
-      page.getByRole("link", { name: "Descargar para firmar" }),
+      page.getByRole("button", { name: "Descargar para firmar" }),
     ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Regenerar PDF" }),
@@ -419,6 +619,15 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     expect(html).not.toMatch(
       /participantId|registrationId|balanceCents|signedPath|certificate-documents|@test\.invalid/u,
     );
+    await expect(
+      publicPage.getByText(
+        "El registro oficial confirma que esta credencial está vigente.",
+        { exact: true },
+      ),
+    ).toHaveCount(0);
+    await expect(
+      publicPage.getByRole("button", { name: "Quitar archivo", exact: true }),
+    ).toBeHidden();
     let transmitted = 0;
     publicPage.on("request", (request) => {
       if (request.method() !== "GET") transmitted += 1;
@@ -438,11 +647,26 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     ).toHaveText(
       createHash("sha256").update(new Uint8Array(signed)).digest("hex"),
     );
-    await publicPage.getByLabel("Seleccionar PDF firmado").setInputFiles({
-      name: "changed.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from([...signed, 0]),
+    const dropzone = publicPage.locator("[data-local-dropzone]");
+    const changedTransfer = await publicPage.evaluateHandle(
+      (bytes) => {
+        const transfer = new DataTransfer();
+        transfer.items.add(
+          new File([new Uint8Array(bytes)], "changed.pdf", {
+            type: "application/pdf",
+          }),
+        );
+        return transfer;
+      },
+      [...signed, 0],
+    );
+    await dropzone.dispatchEvent("dragenter", {
+      dataTransfer: changedTransfer,
     });
+    await expect(dropzone).toHaveAttribute("data-dragging", "");
+    await dropzone.dispatchEvent("drop", { dataTransfer: changedTransfer });
+    await expect(dropzone).not.toHaveAttribute("data-dragging");
+    await changedTransfer.dispose();
     await expect(
       publicPage.getByRole("status", {
         name: "Resultado de comparación local",
@@ -521,8 +745,15 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
           .releaseRead === "function",
     );
     await publicPage
-      .getByRole("button", { name: "Limpiar archivo", exact: true })
-      .click();
+      .getByRole("button", { name: "Quitar archivo", exact: true })
+      .focus();
+    await publicPage.keyboard.press("Enter");
+    await expect(
+      publicPage.getByLabel("Seleccionar PDF firmado"),
+    ).toBeFocused();
+    await expect(
+      publicPage.getByRole("button", { name: "Quitar archivo", exact: true }),
+    ).toBeHidden();
     await publicPage.evaluate(() =>
       (window as typeof window & { releaseRead?: () => void }).releaseRead?.(),
     );
@@ -545,12 +776,18 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       { maxRedirects: 0 },
     );
     expect(anonymousFile.status()).not.toBe(200);
-    await publicPage.setViewportSize({ width: 390, height: 844 });
-    await assertNoOverflow(publicPage);
-    await publicPage.screenshot({
-      path: testInfo.outputPath("public-mobile.png"),
-      fullPage: true,
-    });
+    for (const width of [375, 768, 1440]) {
+      await publicPage.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(publicPage);
+      const article = publicPage.locator("main > article");
+      const bounds = await article.boundingBox();
+      const mainBounds = await publicPage.locator("main").boundingBox();
+      expect(bounds?.width).toBe(mainBounds?.width);
+      await publicPage.screenshot({
+        path: testInfo.outputPath(`public-${width}.png`),
+        fullPage: true,
+      });
+    }
     const replacementBytes = await signedFixture(
       "SYNTHETIC QA: replacement file, no institutional signature",
     );
@@ -561,7 +798,18 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     const signedRecord = (
       (await currentSigned.json()) as { data: CertificateDto }
     ).data;
-    await uploadReviewIssue(page, signedRecord, replacementBytes);
+    expect(
+      (
+        await page.request.post(`/app/certificados/${record.id}/generado.pdf`, {
+          headers,
+          form: {
+            revision: String(signedRecord.revision),
+            requestKey: crypto.randomUUID(),
+          },
+        })
+      ).status(),
+    ).toBe(409);
+    await uploadReviewIssue(page, signedRecord, replacementBytes, testInfo);
     const substituted = (
       (await (
         await page.request.get(`/app/certificados/${record.id}`, { headers })
@@ -662,6 +910,32 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
     const approval = await generate(page, fixture);
     await uploadReviewIssue(page, approval, await signedFixture());
     const teacherCertificate = await generate(page, fixture, "INSTRUCTOR");
+    const htmlContext = await browser.newContext({ javaScriptEnabled: false });
+    try {
+      await htmlContext.clock.setFixedTime(fixture.now);
+      await signInFixture(htmlContext, AUTH_FIXTURES.admin.email);
+      const htmlPage = await htmlContext.newPage();
+      await htmlPage.goto(`/app/certificados/${approval.id}`);
+      const htmlSave = htmlPage.getByRole("button", {
+        name: "Sustituir PDF firmado",
+        exact: true,
+      });
+      await expect(htmlSave).toBeHidden();
+      await expect(htmlPage.getByRole("checkbox")).toHaveCount(0);
+      await htmlPage.locator('input[type="file"]').setInputFiles({
+        name: "synthetic-html.pdf",
+        mimeType: "application/pdf",
+        buffer: await signedFixture(),
+      });
+      await expect(htmlSave).toBeVisible();
+      await htmlSave.click();
+      await expect(
+        htmlPage.getByRole("link", { name: "Descargar firmado", exact: true }),
+      ).toBeVisible();
+      await expect(htmlSave).toBeHidden();
+    } finally {
+      await htmlContext.close();
+    }
     const foreignCourse = await fixture.database.db
       .select({ instructorId: courses.instructorId })
       .from(courses)
@@ -720,6 +994,10 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
       },
     );
     expect(reopened.status()).toBe(200);
+    await page.goto("/app/certificados?status=ALL");
+    await expect(
+      page.locator(`a[href="${groupPath(fixture)}/certificados"]`),
+    ).toHaveCount(0);
     await page.goto(`/app/certificados/${teacherCertificate.id}`);
     await expect(page.getByText(/El cierre cambió/)).toBeVisible();
     await expect(
@@ -733,7 +1011,7 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
           requestKey: crypto.randomUUID(),
           revision: teacherCertificate.revision,
           purpose: "SIGNED",
-          attestation: "true",
+          intent: "save-signed-pdf",
           file: {
             name: "qa.pdf",
             mimeType: "application/pdf",

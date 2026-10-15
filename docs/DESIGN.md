@@ -59,6 +59,21 @@ Cuando una tabla sea apropiada en desktop:
 
 Las tablas siguen siendo válidas para datos genuinamente tabulares.
 
+## PAGINACIÓN DE LISTADOS
+
+- Preinscripciones (SSR y fragmentos) y participantes ADMIN del grupo comparten
+  `ListPagination.astro`, compuesto con los primitives `Pagination` de shadcn/ui
+  (`new-york-v4`), sin hidratación adicional. Los enlaces conservan los parámetros
+  del listado y solo sustituyen `page`; búsqueda y filtros siguen siendo server-side.
+- Según el ancho disponible del contenedor, mobile muestra anterior/siguiente con
+  iconos y página actual explícita; desktop añade números, primera/última página
+  accesibles y elipsis. Los controles tienen un objetivo mínimo de 44 px, foco
+  visible, labels españoles, `aria-current` y límites no accionables sin `href`.
+- Con cero/una página se omite la navegación irrelevante y se conserva el resumen
+  existente. Una página solicitada fuera de rango conserva la respuesta vacía del
+  servidor, la identifica y ofrece regreso a páginas disponibles. Los destinos no
+  superan el límite vigente de 1000 páginas del contrato, sin alterar consultas.
+
 ## MODALES
 
 Usar `Dialog` únicamente para:
@@ -578,7 +593,7 @@ Antes de crear un componente:
 - La navegación privada tiene un control de sidebar compacto con iconos sin texto visual en el rail colapsado; al expandir, el rail y el panel animan su ancho hasta ocupar el ancho completo. La transición respeta `prefers-reduced-motion`, el contenido principal conserva su ancho durante el preview overlay y el acceso a cerrar sesión no queda visible ni enfocable en el rail cerrado. En desktop, cerrar sesión aparece como botón de icono junto al control de contraer/expandir, alineado al extremo del footer del sidebar; en mobile permanece en el footer del menú dedicado. La página Cursos ofrece una sola acción principal para crear un curso; Formatos sigue accesible desde la navegación.
 - En mobile, el menú dedicado se desliza desde el borde izquierdo al abrir y vuelve al cerrarse, con un backdrop que acompaña la transición. El foco regresa al disparador al cerrarse y `prefers-reduced-motion` suprime el desplazamiento. La corrección de Fase 4 mueve el control de tema a la izquierda del footer móvil y logout a la derecha; el sidebar desktop no se reordena.
 - Los estados vacíos de Cursos y Formatos comparten icono contextual, alineación centrada, anchura de lectura, espaciado y acción secundaria delineada.
-- Cursos, Instructores y Administradores comparten búsqueda de ancho fluido con icono y selector de estado delineado/redondeado a la derecha; en mobile puede envolver sin overflow. Cursos inicia en Publicados (también Borradores, Archivados y Todos); las cuentas inician en Activos (también Invitados, Desactivados y Todos), usando los estados existentes. Búsqueda y estado se reflejan en URL y SSR, se restauran al volver y no alteran autorización. Un resultado vacío ofrece «Ver todos». Los breadcrumbs de edición/grupos vuelven al estado vigente del curso, para no ocultar un borrador recién creado. Interesados ofrece búsqueda por curso sin inventar estados; su descripción ocupa el ancho disponible. Certificados mantiene su búsqueda y el alcance de grupos cerrados, sin filtro editorial que oculte históricos.
+- Cursos, Instructores y Administradores comparten búsqueda de ancho fluido con icono y selector de estado delineado/redondeado a la derecha; en mobile puede envolver sin overflow. Cursos inicia en Publicados (también Borradores, Archivados y Todos); las cuentas inician en Activos (también Invitados, Desactivados y Todos), usando los estados existentes. Búsqueda y estado se reflejan en URL y SSR, se restauran al volver y no alteran autorización. Un resultado vacío ofrece «Ver todos». Los breadcrumbs de edición/grupos vuelven al estado vigente del curso, para no ocultar un borrador recién creado. Interesados ofrece búsqueda por curso sin inventar estados; su descripción ocupa el ancho disponible. Certificados combina búsqueda y selector Activos (no archivados, default), Archivados y Todos, reutilizando el selector del sistema; mantiene siempre el alcance de grupos con cierre oficial vigente. No usa fases académicas ni fechas para distinguir históricos, ni altera acceso a credenciales ya emitidas. El conteo y estado vacío reflejan ambos filtros; «Ver todos» limpia búsqueda y selecciona Todos. Sin JavaScript conserva búsqueda GET y enlaces de estado.
 - Sileo muestra los avisos transitorios en la aplicación privada con la posición inferior derecha, separada de las acciones frecuentes del encabezado, y tema sincronizado con el tema activo. En `/app`, los colores de sus estados usan tokens semánticos de la interfaz privada.
 - Los formatos se presentan como tarjetas enlazadas al detalle individual. Crear formato tiene página dedicada; el botón de creación se habilita con JavaScript únicamente cuando los valores obligatorios cumplen las restricciones del formulario. Sin JavaScript, los controles HTML `required`/`pattern` y la validación del servidor conservan el flujo. En el detalle, cada atributo editable cambia en línea dentro de su misma fila: un control compacto de icono abre el campo y muestra guardar/cancelar sin desplazarse a otra página; errores de envío conservan el valor intentado y los errores de servidor siguen siendo visibles. Los campos admiten asistencia de entrada para rechazar ediciones inválidas, pero no sustituyen la validación del servidor. Activar/desactivar sigue separado, y la opción de eliminación solo se ofrece para formatos sin cursos asociados. La confirmación de eliminación se presenta explícitamente; sin JavaScript, confirmación y cancelación permanecen visibles como fallback HTML.
 - Con JavaScript, guardar un campo de formato o los cambios del editor de curso conserva la página, el scroll y los controles hidratados: ambos envían la solicitud al servidor, actualizan la revisión optimista y muestran feedback o errores persistentes sin recarga. Sin JavaScript se mantiene el POST/redirect y la revalidación del servidor.

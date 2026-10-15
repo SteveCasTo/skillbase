@@ -9,9 +9,13 @@ export function createRegistrationExportPort(
   clock: () => Date = () => new Date(),
 ): RegistrationExportPort {
   return {
-    async render(format, rows) {
+    async render(format, rows, context) {
       if (format === "CSV") return renderRegistrationsCsv(rows);
-      return renderRegistrationsPdf(rows, clock());
+      return renderRegistrationsPdf(
+        rows,
+        context?.generatedAt ?? clock(),
+        context?.filter,
+      );
     },
   };
 }

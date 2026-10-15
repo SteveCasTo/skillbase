@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { and, asc, eq, lt, sql } from "drizzle-orm";
 import * as s from "@/server/db/schema";
 import type {
@@ -9,6 +10,7 @@ import type {
   CertificateCommand,
   CertificateConfiguration,
   CertificateDto,
+  CertificateTemplateData,
   GenerateCertificatesInput,
 } from "@/domain/certificates/types";
 import {
@@ -33,6 +35,25 @@ import {
 } from "./certificate-context";
 
 type Row = typeof s.certificates.$inferSelect;
+function sameMaterial(
+  left: CertificateTemplateData,
+  right: CertificateTemplateData,
+) {
+  // Group label/time are printed only on instructor certificates. Generation
+  // timestamps are PDF metadata, not a reason to invalidate a credential.
+  const material = (data: CertificateTemplateData) => ({
+    ...data,
+    generatedAt: undefined,
+    ...(data.type === "APPROVAL"
+      ? {
+          groupNumber: undefined,
+          groupStartsAt: undefined,
+          groupEndsAt: undefined,
+        }
+      : {}),
+  });
+  return isDeepStrictEqual(material(left), material(right));
+}
 const digest = (value: unknown) =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex");
 function revision(actual: number, expected: number) {
@@ -134,11 +155,108 @@ async function receipt(
     );
   return r;
 }
+
+/** No writes: compare the effective snapshot, not unrelated settings revisions.
+ * The closure version itself must still be current. Signed metadata is immutable.
+ */
+async function requireFreshUnsigned(tx: AttendanceTransaction, row: Row) {
+  if (row.signedPath) return;
+  const ctx = await currentCertificate(tx, row);
+  const [settings] = await tx
+    .select()
+    .from(s.certificateSettings)
+    .where(eq(s.certificateSettings.id, 1))
+    .for("share");
+  const [format] = await tx
+    .select()
+    .from(s.courseTypeRevisions)
+    .where(eq(s.courseTypeRevisions.id, ctx.group.courseTypeRevisionId));
+  if (!format || ctx.course.courseTypeRevisionId !== format.id)
+    throw new CertificateError(
+      "CONCURRENT_UPDATE",
+      "El formato cambió. Descarga el PDF actualizado antes de firmarlo.",
+    );
+  const groups = await tx
+    .select({ id: s.groups.id })
+    .from(s.groups)
+    .where(eq(s.groups.courseId, row.courseId))
+    .orderBy(asc(s.groups.createdAt), asc(s.groups.id));
+  const fresh = freezeCertificateData({
+    type: row.type,
+    publicCredentialId: row.publicCredentialId,
+    verificationOrigin: new URL(row.data.verificationUrl).origin,
+    recipientName: row.data.recipientName,
+    courseName: row.data.courseName,
+    instructorName: row.data.instructorName,
+    courseStartsAt: ctx.course.startsAt,
+    courseEndsAt: ctx.course.endsAt,
+    groupStartsAt: ctx.group.startsAt,
+    groupEndsAt: ctx.group.endsAt,
+    academicHours: format.totalHours,
+    groupNumber: groups.findIndex((g) => g.id === row.groupId) + 1,
+    configuration: settings?.configuration ?? defaultCertificateConfiguration,
+    generatedAt: new Date(row.data.generatedAt),
+  });
+  if (!sameMaterial(fresh, row.data))
+    throw new CertificateError(
+      "CONCURRENT_UPDATE",
+      "Los datos del PDF cambiaron. Descarga el PDF actualizado, tramita sus firmas y vuelve a seleccionar el archivo.",
+    );
+}
 export class DrizzleCertificateRepository implements CertificateRepository {
   constructor(
     private readonly db: AttendanceDatabase,
     private readonly clock: () => Date = () => new Date(),
   ) {}
+  generationInput(actorId: string, command: CertificateCommand) {
+    commandValid(command);
+    return this.db.transaction(async (tx) => {
+      await certificateActor(tx, actorId);
+      const row = await rowById(tx, command.certificateId);
+      revision(row.revision, command.revision);
+      if (row.signedPath || !["pending", "generated"].includes(row.state))
+        throw new CertificateError(
+          "INVALID_STATE",
+          "Solo está disponible el PDF firmado.",
+        );
+      const ctx = await certificateGroup(tx, row.courseId, row.groupId);
+      if (!ctx.state?.closed)
+        throw new CertificateError(
+          "STALE_CLOSURE",
+          "El grupo necesita un cierre oficial vigente antes de descargar el PDF para firmar.",
+        );
+      const [version] = await tx
+        .select({ id: s.academicClosureVersions.id })
+        .from(s.academicClosureVersions)
+        .where(
+          and(
+            eq(s.academicClosureVersions.groupId, row.groupId),
+            eq(s.academicClosureVersions.version, ctx.state.lastVersion),
+          ),
+        );
+      if (!version)
+        throw new CertificateError(
+          "STALE_CLOSURE",
+          "Versión oficial no disponible.",
+        );
+      const [settings] = await tx
+        .select({ revision: s.certificateSettings.revision })
+        .from(s.certificateSettings)
+        .where(eq(s.certificateSettings.id, 1));
+      return {
+        courseId: row.courseId,
+        groupId: row.groupId,
+        versionId: version.id,
+        closureRevision: ctx.state.revision,
+        configurationRevision: settings?.revision ?? 0,
+        type: row.type,
+        recipientId: row.recipientId,
+        requestKey: command.requestKey,
+        regenerate: true,
+        certificateRevision: command.revision,
+      };
+    });
+  }
   getSettings(actorId: string) {
     return this.db.transaction(async (tx) => {
       await certificateActor(tx, actorId);
@@ -385,8 +503,9 @@ export class DrizzleCertificateRepository implements CertificateRepository {
           );
         if (existing)
           revision(existing.revision, input.certificateRevision ?? -1);
-        const publicCredentialId = randomBytes(24).toString("base64url");
-        const data = freezeCertificateData({
+        const publicCredentialId =
+          existing?.publicCredentialId ?? randomBytes(24).toString("base64url");
+        let data = freezeCertificateData({
           type: input.type,
           publicCredentialId,
           verificationOrigin,
@@ -400,8 +519,27 @@ export class DrizzleCertificateRepository implements CertificateRepository {
           academicHours: format.totalHours,
           groupNumber,
           configuration: config,
-          generatedAt: this.clock(),
+          generatedAt: existing
+            ? new Date(existing.data.generatedAt)
+            : this.clock(),
         });
+        if (
+          existing &&
+          existing.versionId === v.id &&
+          sameMaterial(existing.data, data)
+        ) {
+          result.push(existing);
+          continue;
+        }
+        if (existing) {
+          const nextId = randomBytes(24).toString("base64url");
+          data = {
+            ...data,
+            publicCredentialId: nextId,
+            verificationUrl: `${new URL(verificationOrigin).origin}/certificados/${nextId}`,
+            generatedAt: this.clock().toISOString(),
+          };
+        }
         const values = {
           courseId: input.courseId,
           groupId: input.groupId,
@@ -411,7 +549,7 @@ export class DrizzleCertificateRepository implements CertificateRepository {
           recipientId: recipient.id,
           instructorId: v.report.instructorId!,
           data,
-          publicCredentialId,
+          publicCredentialId: data.publicCredentialId,
           createdBy: actorId,
           provenance: {
             configurationRevision: input.configurationRevision,
@@ -523,6 +661,7 @@ export class DrizzleCertificateRepository implements CertificateRepository {
       const row = await rowById(tx, command.certificateId);
       await currentCertificate(tx, row);
       revision(row.revision, command.revision);
+      if (purpose === "SIGNED") await requireFreshUnsigned(tx, row);
       if (
         !["pending", "generated", "issued"].includes(row.state) ||
         (purpose === "UNSIGNED" && row.state === "issued") ||
@@ -580,6 +719,7 @@ export class DrizzleCertificateRepository implements CertificateRepository {
         throw new CertificateError("INVALID_STATE", "Carga descartada.");
       await currentCertificate(tx, row);
       revision(row.revision, artifact.certificateRevision);
+      await requireFreshUnsigned(tx, row);
       if (
         !["pending", "generated", "issued"].includes(row.state) ||
         (artifact.purpose === "UNSIGNED" && row.state === "issued")
@@ -632,6 +772,9 @@ export class DrizzleCertificateRepository implements CertificateRepository {
           : row.signedPath
             ? "SIGNED_PDF_SUBSTITUTED"
             : "SIGNED_PDF_SAVED",
+        unsigned
+          ? undefined
+          : "ADMIN confirmed the signed PDF through the explicit save action.",
       );
       return dto(tx, updated!);
     });
@@ -749,6 +892,7 @@ export class DrizzleCertificateRepository implements CertificateRepository {
         throw new CertificateError("NOT_FOUND", "Certificado no disponible.");
       if (purpose === "UNSIGNED" && ["issued", "revoked"].includes(row.state))
         throw new CertificateError("NOT_FOUND", "Archivo no disponible.");
+      if (purpose === "UNSIGNED") await requireFreshUnsigned(tx, row);
       const path = purpose === "UNSIGNED" ? row.unsignedPath : row.signedPath;
       if (!path)
         throw new CertificateError("NOT_FOUND", "Archivo no disponible.");

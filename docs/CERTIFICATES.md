@@ -91,6 +91,21 @@ No mostrar:
 - calificaciones parciales;
 - asistencia detallada.
 
+### Presentación del verificador público
+
+`/certificados` y el resultado público aprovechan el contenedor de `CourseShell`
+(máximo 86 rem), sin columnas exteriores estrechas adicionales; sus márgenes
+compactos coinciden con la landing sin cambiar otras páginas públicas. El resultado
+presenta el estado como título, los datos permitidos y «Comprobar tu archivo»;
+los errores de consulta y los resultados de comparación permanecen visibles
+inline, sin un toast duplicado.
+El selector público admite teclado y arrastre, muestra el nombre del archivo
+y ofrece «Quitar archivo» solo tras seleccionarlo; quitarlo limpia también el
+resultado y devuelve el foco al selector. No modifica el selector privado ADMIN.
+La comprobación conserva MIME/extensión PDF, límite de 10 MiB y SHA-256 de todos
+los bytes en el navegador: no transmite ni persiste el archivo ni habilita una
+descarga pública. Una coincidencia no cambia el estado oficial de la credencial.
+
 ## HASH
 
 Calcular SHA-256 del PDF final.
@@ -123,9 +138,48 @@ Registrar:
 ## REGENERACIÓN Y SUSTITUCIÓN
 
 Un único registro por grupo/tipo/destinatario, sin versiones/historial en UI.
-Regenerar antes de firmar cambia el ID público e invalida el anterior. Sustituir
+La actualización interna antes de firmar cambia el ID público e invalida el anterior. Sustituir
 un firmado conserva su ID y metadata, cambia el hash del artefacto actual y deja
 auditoría mínima. La limpieza del objeto previo ocurre después del commit.
+
+### Descarga y guardado del documento firmado
+
+La descarga aparece en el encabezado del detalle. ADMIN solo dispone de
+«Descargar para firmar»: su POST prepara internamente el borrador si cambió
+materialmente la fuente oficial. Abrir/refrescar el detalle y los GET PDF no
+regeneran. La comparación usa el snapshot efectivo (autoridades utilizadas,
+fechas nominales impresas, horas, contenido institucional y versiones de
+plantilla/branding), no el número de revisión de un ajuste no utilizado ni el
+reloj. Un cierre oficial nuevo también invalida el borrador anterior, siempre
+que el destinatario siga siendo elegible. Los assets continúan ligados a su
+versión de branding inmutable; no se introducen assets ni hashes alternativos.
+
+Sin cambios materiales se conservan ID, revisión y bytes; no hay botón de
+regeneración manual. La preparación, reserva y asociación revalidan revisión y
+vigencia en servidor, también si los ajustes cambian durante la carga. Un PDF
+obsoleto se rechaza con una indicación de volver a descargar y tramitar firmas.
+Con JavaScript se actualiza el detalle tras una preparación que cambie revisión;
+sin JavaScript la descarga conserva POST/attachment y, si se actualizó, se debe
+recargar el detalle antes de cargar el firmado (la revisión anterior se deniega).
+
+Seleccionar o arrastrar un PDF legible habilita «Guardar PDF firmado» o
+«Sustituir PDF firmado»; quitarlo oculta la acción. El envío explícito de ese
+botón (`intent=save-signed-pdf`) constituye la confirmación ADMIN, sin checkbox
+ni confirmación oculta preaceptada. Servidor exige la intención, rol vigente,
+revisión, finalidad SIGNED y validación de extensión/MIME/tamaño/contenido PDF.
+Publicación, hash, atestación y auditoría se confirman en la misma transacción.
+La selección cliente no marca el certificado como firmado ni acredita firmas
+institucionales. Sin JavaScript se conservan selector HTML, required y POST;
+la validación completa de contenido sigue siendo del servidor.
+
+Un firmado nunca se actualiza automáticamente. Solo ofrece «Descargar firmado»;
+la descarga unsigned también se deniega por URL directa. Sustituir exige un
+nuevo archivo y mantiene ID/metadata. Los errores y progreso de carga se
+presentan inline, sin toast persistente.
+
+El detalle ADMIN no presenta el bloque de datos para LinkedIn ni la acción de
+copiar credencial. Conserva el SHA-256 y «Consultar estado público» como enlace
+con estilo de botón; la revocación permanece separada y con confirmación.
 
 ## PDF
 
@@ -155,7 +209,7 @@ La ruta de verificación debe consultar el registro actual del certificado.
 
 La interfaz conectada al backend disponible en esta rama incluye:
 
-- Administración de certificados en `/app/certificados` lista solo cursos con al menos un grupo cuyo cierre oficial está `CLOSED`; permite buscar esos cursos por nombre. Los ajustes de firmantes están en `/app/configuracion#firmantes` (la ruta anterior `/app/configuracion/certificados` redirige allí), y las vistas ADMIN e INSTRUCTOR conservan el acceso a certificados del grupo.
+- Administración de certificados en `/app/certificados` lista solo cursos con al menos un grupo cuyo cierre oficial está vigente (`academicGroupStates.closed = true` y versión oficial coincidente con `lastVersion`); el detalle del listado contiene únicamente esos grupos, nunca grupos abiertos o reabiertos. La búsqueda por nombre se combina con el selector editorial: **Activos** (default: `DRAFT`/`PUBLISHED`, es decir, no archivados), **Archivados** (`ARCHIVED`) y **Todos** (unión). No se deduce antigüedad de fechas ni de la fase académica, ni se fija un número de cursos. Este default excluye explícitamente archivados que el listado anterior incluía. `status` acepta solo `ACTIVE`/`ARCHIVED`/`ALL` y rechaza otros valores con 400; sin parámetro usa `ACTIVE`. La selección/búsqueda se conserva en URL y SSR; cambiar filtro reinicia `page` si existía. La consulta de cierres es por lote, no por curso. Estos filtros de candidatos no revocan certificados emitidos ni modifican las rutas privadas históricas o la verificación pública. Los ajustes de firmantes están en `/app/configuracion#firmantes` (la ruta anterior `/app/configuracion/certificados` redirige allí), y las vistas ADMIN e INSTRUCTOR conservan el acceso a certificados del grupo.
 - Detalle privado ADMIN y detalle histórico readonly del instructor en `/app/mis-certificados/[certificateId]`; descargas PDF privadas usan rutas autenticadas.
 - Tarjetas individuales desde elegibilidad oficial, generación explícita POST y carga de un PDF firmado con atestación ADMIN. Guardar/sustituir confirma el firmado en una sola transacción; no existen formularios independientes de revisión/emisión, selector masivo ni campo ordinal. Después de firmar, la descarga unsigned se deniega también en servidor.
 - Página pública `/certificados/[publicCredentialId]` y formulario de búsqueda en `/certificados`. La respuesta pública es una proyección mínima; no expone snapshots privados ni ofrece descarga anónima del PDF.

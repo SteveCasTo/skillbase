@@ -2,6 +2,7 @@
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
 import InstructorRoster from "@/components/pre-registrations/InstructorRoster.astro";
 import RegistrationPageError from "@/components/pre-registrations/RegistrationPageError.astro";
+import ListPagination from "@/components/lists/ListPagination.astro";
 import AttendanceBreadcrumbs from "./AttendanceBreadcrumbs.astro";
 import { membershipLabels } from "@/components/pre-registrations/presentation";
 import { buttonVariants } from "@/components/ui/button";
@@ -20,8 +21,6 @@ const {
   registrations,
   search,
 } = Astro.props;
-const pageHref = (page: number) =>
-  `${Astro.url.pathname}?${new URLSearchParams({ ...(search ? { search } : {}), page: String(page) })}`;
 const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
 ---
 
@@ -164,41 +163,13 @@ const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
                 ))}
               </ul>
             )}
-            {(registrations.page > 1 ||
-              registrations.page * registrations.pageSize <
-                registrations.total) && (
-              <nav
-                aria-label="Páginas de participantes"
-                class="mt-6 flex flex-wrap items-center gap-3"
-              >
-                {registrations.page > 1 && (
-                  <a
-                    href={pageHref(registrations.page - 1)}
-                    class={buttonVariants({
-                      variant: "outline",
-                      className: "min-h-11",
-                    })}
-                  >
-                    Anterior
-                  </a>
-                )}
-                <span class="text-sm text-muted-foreground">
-                  Página {registrations.page}
-                </span>
-                {registrations.page * registrations.pageSize <
-                  registrations.total && (
-                  <a
-                    href={pageHref(registrations.page + 1)}
-                    class={buttonVariants({
-                      variant: "outline",
-                      className: "min-h-11",
-                    })}
-                  >
-                    Siguiente
-                  </a>
-                )}
-              </nav>
-            )}
+            <ListPagination
+              page={registrations.page}
+              pageSize={registrations.pageSize}
+              total={registrations.total}
+              href={Astro.url.pathname + Astro.url.search}
+              label="Páginas de participantes"
+            />
           </div>
         </group-roster-search>
       )
