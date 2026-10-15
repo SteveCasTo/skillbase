@@ -4,12 +4,12 @@ import {
   MAX_REGISTRATION_EXPORT_ROWS,
   RegistrationExportLimitError,
 } from "@/application/pre-registrations/export-registrations";
-import type { RegistrationRepository } from "@/application/pre-registrations/registration-repository";
-import { RegistrationError } from "@/domain/pre-registrations/errors";
 import type {
-  AdminRegistrationDto,
-  RegistrationFilter,
-} from "@/domain/pre-registrations/types";
+  RegistrationExportRepository,
+  RegistrationExportRow,
+} from "@/application/pre-registrations/export-finance";
+import { RegistrationError } from "@/domain/pre-registrations/errors";
+import type { RegistrationFilter } from "@/domain/pre-registrations/types";
 import {
   exportActor,
   exportNow,
@@ -23,8 +23,8 @@ const filter: RegistrationFilter = {
   membershipStatus: "PREINSCRITO",
 };
 function repository(
-  rows: readonly AdminRegistrationDto[],
-): Pick<RegistrationRepository, "list"> {
+  rows: readonly RegistrationExportRow[],
+): RegistrationExportRepository {
   return {
     list: mock(async (query: RegistrationFilter, actorId: string) => {
       expect(actorId).toBe(exportActor.id);
@@ -62,7 +62,10 @@ test("exports all matching authorized pages, retains filters and returns a safe 
     { ...filter, page: 3, pageSize: 100 },
     exportActor.id,
   );
-  expect(render).toHaveBeenCalledWith("CSV", rows);
+  expect(render).toHaveBeenCalledWith("CSV", rows, {
+    generatedAt: exportNow,
+    filter: { ...filter, page: 1, pageSize: 100 },
+  });
 });
 test("empty PDF export still produces an artifact", async () => {
   const render = mock(async () => new Uint8Array([37]));
@@ -76,7 +79,10 @@ test("empty PDF export still produces an artifact", async () => {
   expect(artifact.mediaType).toBe("application/pdf");
   expect(artifact.filename).toBe("preinscripciones-2099-03-01.pdf");
   expect(artifact.rowCount).toBe(0);
-  expect(render).toHaveBeenCalledWith("PDF", []);
+  expect(render).toHaveBeenCalledWith("PDF", [], {
+    generatedAt: exportNow,
+    filter: { ...filter, page: 1, pageSize: 100 },
+  });
 });
 test("exact export limit is complete; oversized export is refused before rendering", async () => {
   const rows = Array.from({ length: MAX_REGISTRATION_EXPORT_ROWS }, (_, i) =>
@@ -118,7 +124,7 @@ test.each([
 });
 test("fresh repository denial defeats a stale ADMIN context", async () => {
   const render = mock(async () => new Uint8Array());
-  const repo: Pick<RegistrationRepository, "list"> = {
+  const repo: RegistrationExportRepository = {
     async list() {
       throw new RegistrationError("FORBIDDEN", "Acceso denegado.");
     },
@@ -156,7 +162,7 @@ test.each(["total", "duplicate", "short", "pagination"] as const)(
   async (kind) => {
     let reads = 0;
     const rows = Array.from({ length: 101 }, (_, i) => exportRow(i));
-    const repo: Pick<RegistrationRepository, "list"> = {
+    const repo: RegistrationExportRepository = {
       async list(query) {
         reads++;
         return {

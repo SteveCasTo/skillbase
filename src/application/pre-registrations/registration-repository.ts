@@ -15,6 +15,10 @@ import type {
   UpdateRegistrationSettingsInput,
   RequestIdentity,
 } from "@/domain/pre-registrations/types";
+import type {
+  RegistrationExportContext,
+  RegistrationExportRow,
+} from "./export-finance";
 
 /**
  * Server-only persistence contract. Application services must require an active
@@ -120,6 +124,7 @@ export interface RegisteredGroupCancellationResult {
 export interface RegistrationExportPort {
   render(
     format: "CSV" | "PDF",
-    rows: readonly AdminRegistrationDto[],
+    rows: readonly RegistrationExportRow[],
+    context?: RegistrationExportContext,
   ): Promise<Uint8Array>;
 }

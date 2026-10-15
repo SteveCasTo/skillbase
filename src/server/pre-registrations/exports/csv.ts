@@ -1,8 +1,10 @@
-import type { AdminRegistrationDto } from "@/domain/pre-registrations/types";
+import type { RegistrationExportRow } from "@/application/pre-registrations/export-finance";
 import {
   FINANCE_LABELS,
   MEMBERSHIP_LABELS,
   MONEY_COLUMNS,
+  NET_COLUMNS,
+  reportDecimal,
   PARTICIPANT_LABELS,
   registrationAmounts,
   registrationDisplayNames,
@@ -19,7 +21,7 @@ export function csvText(value: string, identifier = false): string {
   return `"${safe.replaceAll('"', '""')}"`;
 }
 export function renderRegistrationsCsv(
-  rows: readonly AdminRegistrationDto[],
+  rows: readonly RegistrationExportRow[],
 ): Uint8Array {
   const header = [
     "Curso",
@@ -32,6 +34,8 @@ export function renderRegistrationsCsv(
     "Estado",
     "Estado financiero",
     ...MONEY_COLUMNS.map((column) => column.label),
+    ...NET_COLUMNS.map((column) => column.label),
+    "Responsable del registro",
   ];
   const lines = [header.map((value) => csvText(value)).join(",")];
   for (const row of rows) {
@@ -48,6 +52,10 @@ export function renderRegistrationsCsv(
         csvText(MEMBERSHIP_LABELS[row.membershipStatus]),
         csvText(FINANCE_LABELS[row.financialStatus]),
         ...registrationAmounts(row),
+        ...NET_COLUMNS.map((column) => reportDecimal(column.value(row))),
+        csvText(
+          row.registeredByName?.trim() ? row.registeredByName : "No registrado",
+        ),
       ].join(","),
     );
   }

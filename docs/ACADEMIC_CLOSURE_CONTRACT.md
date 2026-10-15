@@ -181,3 +181,53 @@ cierre oficial vigente de un grupo propio cerrado, nunca versiones anteriores o
 después de reabrir; ADMIN conserva acceso histórico. Se mantienen `private,
 no-store`, `nosniff`, nombre fijo y rechazo de evidencia inválida/glifos sin
 soporte. La unión de artefactos no cambia estas guardas ni el historial ADMIN-only.
+
+### CSV de cierre: categoría y percepción neta por participante
+
+El CSV conserva UTF-8 BOM, separador `;`, CRLF, quoting y protección de fórmulas
+en textos/CI. Conserva el nombre histórico del responsable, pero elimina su
+columna UUID. Solo ADMIN obtiene CI, categoría (Estudiante/Externo/Auxiliar) y
+cuatro columnas BOB: Efectivo neto, QR neto, Sin método registrado neto y Total
+percibido neto. INSTRUCTOR conserva exclusivamente la planilla académica; la
+allowlist recursiva del servidor excluye también los nuevos campos del DTO.
+
+Contrato mínimo aditivo del snapshot JSONB por participante:
+
+- `participantCategory?: RegistrationParticipantType | null`: categoría de la
+  preinscripción incluida en ese cierre, no una categoría inferida de la persona.
+- `receivedPayments?: { cashCents: string; qrCents: string;
+unregisteredCents: string; totalCents: string } | null`: enteros con signo en
+  centavos como strings, sin pérdida de precisión al serializar sumas.
+
+Los nuevos cierres congelan estos campos en su transacción habitual. Una sola
+consulta agrupada para el grupo toma movimientos de cada preinscripción con
+`recorded_at <= closedAt`; suma PAYMENT y resta REFUND según el método **de cada
+movimiento**, incluyendo pago inicial, abonos y devoluciones. Una devolución QR
+de un pago CASH puede dejar QR negativo. NULL se suma en Sin método registrado;
+los tres subtotales siempre suman el total. No se usa saldo/precio como proxy del
+dinero recibido. Las celdas monetarias se formatean con aritmética entera exacta
+y dos decimales; las negativas siguen siendo numéricas/sumables en Excel, no
+texto con apóstrofe. Solo esos literales numéricos validados omiten la protección
+de fórmulas de campos de texto. Un total inconsistente o centavos malformados
+impiden exportar en lugar de corregir la evidencia silenciosamente.
+
+En snapshots anteriores sin estos campos, categoría dice **No registrada** y
+los cuatro importes dicen **Sin método registrado**: no se inventan ceros, no se
+deduce el neto del saldo y no se consulta el ledger vivo para reconstruir una
+versión histórica. Un cierre nuevo sin movimientos sí congela ceros reales.
+La extensión es JSONB aditiva y no requiere migración ni modificación de
+snapshots oficiales. El enriquecimiento separado del seed de métodos de pagos
+no autoriza alterar snapshots: verificar por entorno los métodos NULL, sus
+subtotales y qué versiones ya estaban cerradas antes del enriquecimiento. Una
+reapertura/cierre explícitos crean una nueva versión, nunca reescriben la previa.
+
+Validación del bloque CSV (checkout dependiente de pagos): check y build PASS;
+464 unit/4.806 assertions y 177 integration/1.509 assertions PASS en stack
+temporal aislado. Se adaptaron casos existentes, sin nuevos casos/specs/suites
+ni cambios de timeouts/retries. Dos intentos focales iniciales detectaron errores
+del fixture ampliado (sobrepago sintético y revisión de esquema tras primera
+nota); se sustituyeron por un abono autorizado real antes del inicio y la revisión
+devuelta por el guard, sin relajar assertions ni inventar pagos en snapshots.
+El caso focal final pasó 1/1 con 45 assertions. No se ejecutó backfill, migración
+canónica/cloud ni escritura sobre datos existentes. El gate combinado posterior
+a integrar pagos y PDF debe revalidar el source exacto de release.
