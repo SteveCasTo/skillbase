@@ -1,4 +1,5 @@
 ---
+import "@/styles/public-certificates.css";
 import CourseShell from "@/components/public-courses/CourseShell.astro";
 import VerificationForm from "@/components/certificates/VerificationForm.astro";
 import { validCredentialCode } from "@/components/certificates/presentation";
@@ -19,7 +20,10 @@ if (error) Astro.response.status = 422;
   description="Consulta el estado oficial de un certificado."
   noindex
 >
-  <div class="mx-auto flex w-full max-w-2xl flex-col gap-6 py-8 sm:py-12">
+  <div
+    data-public-verification
+    class="certificate-lookup flex w-full min-w-0 flex-col gap-6 py-8 sm:py-12"
+  >
     <h1 class="text-3xl font-semibold tracking-tight">Verificar certificado</h1>
     <p class="leading-7 text-muted-foreground">
       Consulta el registro oficial mediante el código o el QR de tu certificado.
@@ -30,5 +34,20 @@ if (error) Astro.response.status = 422;
 <style>
   h1 {
     font-family: var(--font-sans);
+  }
+  @media (min-width: 48rem) {
+    .certificate-lookup :global(form) {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: start;
+    }
+    .certificate-lookup :global(label),
+    .certificate-lookup :global(p) {
+      grid-column: 1 / -1;
+    }
+    .certificate-lookup :global(button) {
+      grid-column: 2;
+      grid-row: 2;
+    }
   }
 </style>
