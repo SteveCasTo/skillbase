@@ -547,6 +547,15 @@ El contrato funcional/técnico aprobado está en [`docs/EVALUATIONS_CONTRACT.md`
 
 ## CONSISTENCIA
 
+### Acciones del detalle de certificado
+
+- «Consultar estado público» y «Revocar certificado» comparten una fila flexible
+  junto al hash del firmado; en mobile pueden envolver. La confirmación conserva
+  motivo obligatorio, Escape y retorno del foco.
+- Documento solo ocupa una sección cuando hay carga o feedback real; un firmado
+  revocado conserva snapshot, hash, consulta pública y descarga privada histórica
+  sin una sección vacía ni acciones de carga.
+
 Antes de crear un componente:
 
 1. Revisar si existe en `components/ui`.
