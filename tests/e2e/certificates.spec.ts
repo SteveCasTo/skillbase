@@ -777,7 +777,14 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     publicPage.on("request", (request) => {
       if (request.method() !== "GET") transmitted += 1;
     });
-    await publicPage.getByLabel("Seleccionar PDF firmado").setInputFiles({
+    const publicPicker = publicPage.getByLabel("Seleccionar PDF firmado");
+    await publicPicker.focus();
+    await expect(publicPicker).toBeFocused();
+    const publicChooser = publicPage.waitForEvent("filechooser");
+    await publicPicker.press("Enter");
+    await (
+      await publicChooser
+    ).setFiles({
       name: "synthetic-qa-signed.pdf",
       mimeType: "application/pdf",
       buffer: signed,
@@ -788,10 +795,22 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       }),
     ).toContainText("certificado vigente");
     await expect(
-      publicPage.getByLabel("SHA-256 del archivo seleccionado"),
-    ).toHaveText(
+      publicPage.locator("[data-local-verification]"),
+    ).toHaveAttribute(
+      "data-official-hash",
       createHash("sha256").update(new Uint8Array(signed)).digest("hex"),
     );
+    const localResult = publicPage.getByRole("status", {
+      name: "Resultado de comparación local",
+    });
+    await expect(localResult).toHaveAttribute("data-tone", "valid");
+    await expect(publicPage.locator("[data-local-hash]")).toHaveCount(0);
+    await expect(publicPage.locator("main")).not.toContainText(
+      /[a-f0-9]{64}/iu,
+    );
+    await expect(
+      publicPage.getByText("Código de credencial", { exact: true }),
+    ).toHaveCount(0);
     const dropzone = publicPage.locator("[data-local-dropzone]");
     await expect(dropzone).toBeHidden();
     await expect(publicPage.locator("[data-local-selection]")).toBeVisible();
@@ -832,6 +851,17 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         name: "Resultado de comparación local",
       }),
     ).toContainText("no coincide");
+    await expect(localResult).toHaveAttribute("data-tone", "error");
+    await expect(dropzone).toBeHidden();
+    await expect(publicPage.locator("[data-local-selection]")).toBeVisible();
+    for (const width of [375, 768, 1440]) {
+      await publicPage.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(publicPage);
+      await publicPage.screenshot({
+        path: testInfo.outputPath(`public-mismatch-${width}.png`),
+        fullPage: true,
+      });
+    }
     // Delay a genuine File read, not the digest or registry response. The older
     // calculation must not overwrite the newer selection or a reset.
     await publicPage.evaluate(() => {
@@ -885,10 +915,12 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         (window as typeof window & { completedDigests: number })
           .completedDigests === 2,
     );
-    await expect(
-      publicPage.getByLabel("SHA-256 del archivo seleccionado"),
-    ).toHaveText(
-      createHash("sha256").update(new Uint8Array(signed)).digest("hex"),
+    await expect(localResult).toHaveText(
+      "El archivo coincide con el PDF firmado del certificado vigente.",
+    );
+    await expect(localResult).toHaveAttribute("data-tone", "valid");
+    await expect(publicPage.locator("main")).not.toContainText(
+      /[a-f0-9]{64}/iu,
     );
     await publicPage.evaluate(() => {
       delete (window as typeof window & { releaseRead?: () => void })
@@ -931,7 +963,10 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     ).toHaveText("");
     await expect(
       publicPage.getByLabel("SHA-256 del archivo seleccionado"),
-    ).toBeHidden();
+    ).toHaveCount(0);
+    await expect(publicPage.getByLabel("Seleccionar PDF firmado")).toHaveValue(
+      "",
+    );
     expect(transmitted).toBe(0);
     const anonymousFile = await publicPage.request.get(
       `/app/certificados/${record.id}/firmado.pdf`,
@@ -1038,6 +1073,20 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         name: "Resultado de comparación local",
       }),
     ).toContainText("coincide, pero el certificado no es válido");
+    await expect(localResult).toHaveAttribute("data-tone", "invalid");
+    await expect(dropzone).toBeHidden();
+    await expect(publicPage.locator("main")).not.toContainText(
+      /[a-f0-9]{64}/iu,
+    );
+    expect(transmitted).toBe(0);
+    for (const width of [375, 768, 1440]) {
+      await publicPage.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(publicPage);
+      await publicPage.screenshot({
+        path: testInfo.outputPath(`public-revoked-${width}.png`),
+        fullPage: true,
+      });
+    }
     await expect(
       page.getByRole("link", { name: "Preparar reemplazo" }),
     ).toHaveCount(0);
