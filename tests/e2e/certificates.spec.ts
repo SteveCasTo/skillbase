@@ -1201,6 +1201,39 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         exact: true,
       }),
     ).toBeVisible();
+    const signedReissue = (
+      (await (
+        await page.request.get(`/app/certificados/${newId}`, { headers })
+      ).json()) as { data: CertificateDto }
+    ).data;
+    const secondRevocation = await page.request.post(
+      `/app/certificados/${newId}?operation=revoke`,
+      {
+        headers,
+        form: {
+          revision: String(signedReissue.revision),
+          requestKey: crypto.randomUUID(),
+          reason: "Segunda revocación sintética QA",
+        },
+      },
+    );
+    expect(secondRevocation.status()).toBe(200);
+    await page.reload();
+    await page
+      .getByRole("button", { name: "Emitir nuevo", exact: true })
+      .click();
+    await expect(page).not.toHaveURL(new RegExp(`/app/certificados/${newId}$`));
+    await expect(history.getByRole("link")).toHaveCount(2);
+    await expect(history).toContainText("Corrección sintética QA");
+    await expect(history).toContainText("Segunda revocación sintética QA");
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: testInfo.outputPath(`history-cards-${width}.png`),
+        fullPage: true,
+      });
+    }
   } finally {
     try {
       await anonymous?.close();
