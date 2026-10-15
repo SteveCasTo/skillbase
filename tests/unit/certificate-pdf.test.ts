@@ -317,10 +317,30 @@ test("real vector QR matches every library matrix module, axis orientation, whit
       height: CERTIFICATE_PAGE_SIZES[type][1],
     });
     const lines = extractedLines(preview);
-    expect(lines.filter((line) => line === "Vista previa")).toHaveLength(1);
-    expect(lines.join(" ")).not.toContain("ID:");
+    expect(lines.join(" ")).not.toContain("Vista previa");
+    expect(lines.join("")).toContain(`ID: ${sample.publicCredentialId}`);
     expect(lines.join(" ")).not.toContain("DEMO");
-    expect(preview.getPage(0).node.Annots()?.size() ?? 0).toBe(0);
+    expect(sample.publicCredentialId).not.toMatch(/^[A-Za-z0-9_-]{22,128}$/);
+    const previewUrl = new URL(sample.verificationUrl);
+    expect(previewUrl.hostname).toBe("preview.invalid");
+    expect(previewUrl.pathname).toBe(
+      `/certificados/${sample.publicCredentialId}`,
+    );
+    const annotations = preview.getPage(0).node.Annots()!;
+    expect(annotations.size()).toBe(1);
+    expect(
+      annotations
+        .lookup(0, PDFDict)
+        .lookup(PDFName.of("A"), PDFDict)
+        .lookup(PDFName.of("URI"), PDFString)
+        .decodeText(),
+    ).toBe(sample.verificationUrl);
+    await expect(
+      renderCertificatePdf(
+        { ...sample, verificationUrl: fixture().verificationUrl },
+        { preview: true },
+      ),
+    ).rejects.toMatchObject({ code: "PDF_INVALID_INPUT" });
     await expect(renderCertificatePdf(sample)).rejects.toMatchObject({
       code: "PDF_INVALID_INPUT",
     });
