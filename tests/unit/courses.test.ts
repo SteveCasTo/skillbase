@@ -33,6 +33,7 @@ import {
 import { matchesCourseSearch } from "@/domain/courses/report-filters";
 import { renderCoursesCsv } from "@/server/courses/exports/csv";
 import { renderCoursesPdf } from "@/server/courses/exports/pdf";
+import { groupSchedule } from "@/server/courses/exports/columns";
 import { PDFDocument } from "pdf-lib";
 import {
   courseReportNow,
@@ -333,6 +334,14 @@ describe("course domain", () => {
       netCents: "0",
       passed: null,
     });
+    const legacyGroup = {
+      ...report.courses[0]!.groups[1]!,
+      weekdaysMask: null,
+    };
+    expect(groupSchedule(legacyGroup)).toBe("10:00–11:30");
+    expect(groupSchedule(report.courses[0]!.groups[1]!)).toContain(
+      "Lun, Mar, Mié, Jue, Vie",
+    );
     const csv = renderCoursesCsv(report);
     expect([...csv.slice(0, 3)]).toEqual([239, 187, 191]);
     const content = new TextDecoder().decode(csv);

@@ -26,6 +26,12 @@ export function reportDate(date: Date): string {
   return `${day}/${month}/${year}`;
 }
 export function groupSchedule(group: CourseReportGroup): string {
+  // A lone dated occurrence needs no weekday inference. In particular, legacy
+  // groups without configured weekdays must not be described as Monday-only.
+  if (group.weekdaysMask === null && group.schedules.length === 1) {
+    const session = group.schedules[0]!;
+    return `${instantToBoliviaCivil(session.startsAt).slice(11)}–${instantToBoliviaCivil(session.endsAt).slice(11)}`;
+  }
   const days = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
   const slots = new Map<string, Set<number>>();
   for (const session of group.schedules) {
