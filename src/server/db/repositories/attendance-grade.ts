@@ -161,12 +161,13 @@ export function effectiveEvaluationGrades(
   components: readonly (typeof s.evaluationComponents.$inferSelect)[],
   grades: readonly (typeof s.evaluationGrades.$inferSelect)[],
   registrationId: string,
-  attendance: AttendanceGradeEvidence,
+  attendance: AttendanceGradeEvidence | null,
 ) {
   return components.flatMap((component) => {
     const grade = grades.find((g) => g.componentId === component.id);
     if (component.type !== "ATTENDANCE" || grade?.origin === "MANUAL")
       return grade ? [grade] : [];
+    if (!attendance) throw new Error("Attendance grade evidence unavailable");
     const scoreHundredths = attendance.score(registrationId);
     return scoreHundredths === null
       ? []

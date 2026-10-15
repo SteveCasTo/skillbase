@@ -537,19 +537,21 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
             "GROUP_CLOSED",
             "Reabre el grupo antes de corregir notas.",
           );
-        const attendance = await loadAttendanceGradeEvidence(
-          tx,
-          ctx.course,
-          person.groupId,
-          ctx.now,
-        );
+        const attendance = items.some((c) => c.type === "ATTENDANCE")
+          ? await loadAttendanceGradeEvidence(
+              tx,
+              ctx.course,
+              person.groupId,
+              ctx.now,
+            )
+          : null;
         if (
           input.grades.some((g) =>
             items.some(
               (c) => c.id === g.componentId && c.type === "ATTENDANCE",
             ),
           ) &&
-          !attendance.ready
+          !attendance?.ready
         )
           throw new EvaluationError(
             "VALIDATION_FAILED",
@@ -663,7 +665,7 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
                 item.type === "ATTENDANCE"
                   ? (mark?.grade.origin ?? "AUTO")
                   : "MANUAL",
-              canEdit: item.type !== "ATTENDANCE" || attendance.ready,
+              canEdit: item.type !== "ATTENDANCE" || Boolean(attendance?.ready),
               score: effective.find((m) => m.componentId === item.id)
                 ? evaluationDecimal(
                     effective.find((m) => m.componentId === item.id)!
@@ -720,17 +722,19 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
             "GROUP_CLOSED",
             "Reabre el grupo antes de corregir notas.",
           );
-        const attendance = await loadAttendanceGradeEvidence(
-          tx,
-          ctx.course,
-          person.groupId,
-          ctx.now,
-        );
+        const attendance = items.some((c) => c.type === "ATTENDANCE")
+          ? await loadAttendanceGradeEvidence(
+              tx,
+              ctx.course,
+              person.groupId,
+              ctx.now,
+            )
+          : null;
         if (
           items.some(
             (c) => c.id === input.componentId && c.type === "ATTENDANCE",
           ) &&
-          !attendance.ready
+          !attendance?.ready
         )
           throw new EvaluationError(
             "VALIDATION_FAILED",
