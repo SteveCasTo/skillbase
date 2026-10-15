@@ -9,6 +9,7 @@ import {
   courseTypeRevisions,
   courses,
   groups,
+  groupSessions,
   users,
   userRoles,
 } from "@/server/db/schema";
@@ -99,6 +100,16 @@ afterAll(async () => {
 });
 
 test("adjacency and other courses work; updates, cancellation and audit retain history", async () => {
+  expect(
+    (await courseRepo.listAdmin(new Date("2027-01-01Z"))).find(
+      (course) => course.id === courseId,
+    )?.academicPhase,
+  ).toBe("UPCOMING");
+  expect(
+    (await courseRepo.listAdmin(new Date("2027-04-01Z"))).find(
+      (course) => course.id === courseId,
+    )?.academicPhase,
+  ).toBe("IN_PROGRESS");
   const first = await createGroup(repo, admin, courseId, "08:00", 1);
   const second = await createGroup(repo, admin, courseId, "09:30", 15);
   expect(first.courseTypeRevisionId).toBe(second.courseTypeRevisionId);
@@ -236,9 +247,17 @@ test("withdrawal retains group snapshot and permits new groups with pinned revis
 test("publication is tracked per group, including publication after draft creation", async () => {
   const exposed = await createGroup(repo, admin, courseId, "08:00", 3);
   expect(exposed.publishedAt).toBeInstanceOf(Date);
+  expect(
+    (await repo.list(courseId)).find((group) => group.id === exposed.id)
+      ?.canDelete,
+  ).toBe(false);
   await courseRepo.transition(courseId, "DRAFT", admin.id);
   const draftOnly = await createGroup(repo, admin, courseId, "09:30", 3);
   expect(draftOnly.publishedAt).toBeNull();
+  expect(
+    (await repo.list(courseId)).find((group) => group.id === draftOnly.id)
+      ?.canDelete,
+  ).toBe(true);
   await expect(
     deleteGroup(repo, admin, exposed.id, exposed.updatedAt.toISOString()),
   ).rejects.toMatchObject({ code: "GROUP_PUBLISHED" });
@@ -278,7 +297,7 @@ test("publication is tracked per group, including publication after draft creati
   ).rejects.toMatchObject({ code: "GROUP_PUBLISHED" });
 });
 
-test("cancelled draft groups stay deletable until active on publication", async () => {
+test("cancelled draft groups preserve their recorded session history before publication", async () => {
   await courseRepo.transition(courseId, "DRAFT", admin.id);
   const group = await createGroup(repo, admin, courseId, "08:00", 2);
   const cancelled = await cancelGroup(
@@ -293,7 +312,24 @@ test("cancelled draft groups stay deletable until active on publication", async 
     .from(groups)
     .where(eq(groups.id, group.id));
   expect(stillDraftOnly?.publishedAt).toBeNull();
-  await deleteGroup(repo, admin, group.id, cancelled.updatedAt.toISOString());
+  const sessions = await database.db
+    .select()
+    .from(groupSessions)
+    .where(eq(groupSessions.groupId, group.id));
+  expect(sessions.length).toBeGreaterThan(0);
+  expect(
+    (await repo.list(courseId)).find((entry) => entry.id === group.id)
+      ?.canDelete,
+  ).toBe(false);
+  await expect(
+    deleteGroup(repo, admin, group.id, cancelled.updatedAt.toISOString()),
+  ).rejects.toMatchObject({ code: "GROUP_PUBLISHED" });
+  expect(
+    await database.db
+      .select()
+      .from(groupSessions)
+      .where(eq(groupSessions.groupId, group.id)),
+  ).toEqual(sessions);
 });
 
 test("reactivating a previously unexposed group on a published course records exposure", async () => {
@@ -433,6 +469,67 @@ test("deletion rejects stale revisions and rolls back if audit cannot be written
   await expect(
     deleteGroup(repo, admin, group.id, updated.updatedAt.toISOString()),
   ).rejects.toMatchObject({ code: "GROUP_NOT_FOUND" });
+
+  // Coordinate with the real schedule gate: begin deletion first, establish a
+  // session strictly after its transaction starts, then release the lock.
+  // No wall-clock sleeps or precomputed application clock can satisfy this.
+  const crossing = await createGroup(repo, admin, courseId, "10:00", 2);
+  let deletion: Promise<void> | undefined;
+  let outcome: Promise<unknown> | undefined;
+  try {
+    await database.db.transaction(async (holder) => {
+      await holder.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+      deletion = repo.delete(crossing.id, admin.id, crossing.updatedAt);
+      // Attach the rejection handler before releasing the contender.
+      outcome = deletion.then(
+        () => null,
+        (error: unknown) => error,
+      );
+      let waiting: { pid: number } | undefined;
+      for (let attempt = 0; attempt < 100 && !waiting; attempt++) {
+        await holder.execute(sql`select pg_stat_clear_snapshot()`);
+        const rows = await holder.execute<{ pid: number }>(sql`
+          select pid from pg_stat_activity
+          where datname = current_database() and pid <> pg_backend_pid()
+            and wait_event_type = 'Lock' and wait_event = 'advisory'
+            and query like '%pg_advisory_xact_lock(20260915, 3)%'
+        `);
+        waiting = rows[0];
+      }
+      expect(waiting).toBeDefined();
+      if (!waiting) throw new Error("Deletion did not reach the schedule gate");
+      const [session] = await holder.execute<{
+        id: string;
+        afterStart: boolean;
+      }>(sql`
+        with instant as (select date_trunc('milliseconds', clock_timestamp()) as starts_at)
+        insert into group_sessions (group_id, course_type_revision_id, ordinal, starts_at, ends_at)
+        select ${crossing.id}, ${crossing.courseTypeRevisionId}, 999,
+          instant.starts_at, instant.starts_at + interval '90 minutes' from instant
+        returning id, starts_at > (select xact_start from pg_stat_activity where pid = ${waiting.pid}) as "afterStart"
+      `);
+      expect(session?.afterStart).toBe(true);
+    });
+    expect(await outcome).toMatchObject({ code: "GROUP_PUBLISHED" });
+  } finally {
+    await deletion?.catch(() => {});
+  }
+  expect(
+    (await repo.list(courseId)).find((entry) => entry.id === crossing.id)
+      ?.canDelete,
+  ).toBe(false);
+  const retained = await database.db
+    .select()
+    .from(groupSessions)
+    .where(eq(groupSessions.groupId, crossing.id));
+  expect(retained.some((session) => session.ordinal === 999)).toBe(true);
+  expect(retained.length).toBeGreaterThan(1);
+  expect(
+    await database.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.entityId, crossing.id)),
+  ).not.toContainEqual(expect.objectContaining({ action: "GROUP_DELETED" }));
 });
 
 test("date-only courses accept different group hours and preserve dates on unrelated edits", async () => {

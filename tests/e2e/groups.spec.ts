@@ -448,7 +448,7 @@ test("last planned group cannot be cancelled while published; withdrawing preser
   await expect(group.getByText("Inactivo", { exact: true })).toBeVisible();
 });
 
-test("admin creates and edits groups in place, validates conflicts, and deletes an unpublished group", async ({
+test("admin edits groups in place, preserves schedule history, and deletes a pristine unpublished group", async ({
   page,
   context,
 }) => {
@@ -564,17 +564,58 @@ test("admin creates and edits groups in place, validates conflicts, and deletes 
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
-  await group.getByRole("button", { name: "Eliminar grupo 1" }).click();
+  await expect(
+    group.getByRole("button", { name: "Eliminar grupo 1" }),
+  ).toHaveCount(0);
+  await group.getByRole("button", { name: "Desactivar grupo 1" }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Sí, desactivar grupo" })
+    .click();
+  await expect(group).toContainText("Inactivo");
+  await expect(
+    group.getByRole("button", { name: "Reactivar grupo 1" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Nuevo grupo" }).click();
+  await dialog.getByLabel("Hora de inicio").fill("10:00");
+  await dialog.getByLabel("Capacidad").fill("7");
+  await dialog.getByRole("button", { name: "Crear grupo" }).click();
+  const pristine = page.locator("[data-group-id]").nth(1);
+  await expect(
+    pristine.getByRole("button", { name: "Desactivar grupo 2" }),
+  ).toHaveCount(0);
+  await pristine.getByRole("button", { name: "Eliminar grupo 2" }).click();
   const confirm = page.getByRole("alertdialog");
   await expect(confirm).toContainText("No se puede deshacer");
   await page.keyboard.press("Escape");
   await expect(
-    group.getByRole("button", { name: "Eliminar grupo 1" }),
+    pristine.getByRole("button", { name: "Eliminar grupo 2" }),
   ).toBeFocused();
-  await group.getByRole("button", { name: "Eliminar grupo 1" }).click();
+  await pristine.getByRole("button", { name: "Eliminar grupo 2" }).click();
   await confirm.getByRole("button", { name: "Sí, eliminar grupo" }).click();
-  await expect(page.locator("[data-group-id]")).toHaveCount(0);
+  await expect(page.locator("[data-group-id]")).toHaveCount(1);
+  await expect(group).toContainText("Inactivo");
   expect(groupPageGets).toBe(0);
+  await page.goto("/app/cursos?status=ALL");
+  const courseCard = page.locator(`a[href="${edit}"]`);
+  await expect(courseCard).toContainText("Fase académica");
+  await expect(courseCard).toContainText("Sin grupos activos");
+  await expect(courseCard).toContainText("Borrador");
+  await expect(courseCard).not.toContainText("Estudiante");
+  await expect(courseCard).not.toContainText("Externo");
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+    await courseCard.screenshot({
+      path: test.info().outputPath(`academic-phase-${width}.png`),
+    });
+  }
 });
 
 test("published groups retain history when deactivated and can reactivate", async ({
