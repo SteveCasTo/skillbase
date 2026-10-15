@@ -70,7 +70,7 @@ export async function lookupRegistrationPeople(
     : null;
   const data =
     form && form.course.status === "PUBLISHED" && form.course.instructorActive
-      ? await loadAdminInterestCourse(actor, form.course.id, "ACTIVE")
+      ? await loadAdminInterestCourse(actor, form.course.id)
       : null;
   const interests = filterAvailableInterestCandidates(
     data?.registrations ?? [],

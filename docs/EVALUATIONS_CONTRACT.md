@@ -51,6 +51,18 @@ es una petición para borrar una nota persistida. El fallback SSR/HTML conserva
 formularios individuales de componente. El estado incompleto se distingue de una
 nota completa cero, y ADMIN puede consultar historial de correcciones.
 
+El ajuste de UI de 2026-10-14 mantiene el encabezado de grupo, esquema,
+componentes y acceso a Cierre académico en una fila cuando hay espacio, con
+envoltura responsive, y elimina la línea redundante de versión/solo lectura.
+Las filas reservan columnas constantes para componentes, resultado y acciones,
+independientemente de aprobación, edición o fallback SSR; el resultado se rotula
+«Final». El input de nota compacto admite 0–100 inclusive `100.00`, punto y hasta
+dos decimales. La asistencia JavaScript rechaza la edición/pegado completo (sin
+truncar ni convertir comas) cuando no cumple esos límites, pero permite vacío y
+un punto final durante la escritura. Un vacío nuevo sigue pendiente y no borra
+una nota existente. HTML y servidor conservan validación, errores y autoridad;
+la política de pesos y las entradas financieras no se modifican.
+
 PR 258 integró `saveRow` en dominio/aplicación/repositorio y el adaptador HTTP.
 Las escrituras de notas y sus triggers existentes se ejecutan dentro de la misma
 transacción; un fallo no deja una fila parcialmente persistida. No fue necesaria

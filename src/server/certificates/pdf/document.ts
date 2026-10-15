@@ -1,4 +1,8 @@
 import {
+  CERTIFICATE_PREVIEW_ID,
+  CERTIFICATE_PREVIEW_URL,
+} from "@/domain/certificates/metadata";
+import {
   CERTIFICATE_PDF_TEMPLATE_VERSION,
   CertificatePdfError,
   type CertificateRenderInput,
@@ -68,7 +72,10 @@ export function validateCertificateRenderInput(
     text(value);
   if (input.instructorName !== null) text(input.instructorName);
   if (preview) {
-    if (input.publicCredentialId !== "" || input.verificationUrl !== "")
+    if (
+      input.publicCredentialId !== CERTIFICATE_PREVIEW_ID ||
+      input.verificationUrl !== CERTIFICATE_PREVIEW_URL
+    )
       invalid();
   } else {
     if (!/^[A-Za-z0-9_-]{22,128}$/.test(input.publicCredentialId)) invalid();

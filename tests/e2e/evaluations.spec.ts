@@ -238,6 +238,30 @@ test("INSTRUCTOR saves rows atomically with pending distinct from zero, and corr
       exact: true,
     });
     await expect(save).toBeDisabled();
+    await practical.fill("100.00");
+    await expect(practical).toHaveValue("100.00");
+    for (const invalid of ["101", "100.01", "-1", "1,5", "1.001", "abc"]) {
+      await practical.fill(invalid);
+      await expect(practical).toHaveValue("100.00");
+    }
+    await practical.fill("99.");
+    await expect(practical).toHaveValue("99.");
+    await practical.evaluate((input) => {
+      if (!(input instanceof HTMLInputElement))
+        throw new Error("Expected grade input");
+      input.select();
+      const clipboardData = new DataTransfer();
+      clipboardData.setData("text/plain", "100.001");
+      const accepted = input.dispatchEvent(
+        new ClipboardEvent("paste", {
+          clipboardData,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      if (accepted) throw new Error("Invalid grade paste was not blocked");
+    });
+    await expect(practical).toHaveValue("99.");
     await practical.fill("100");
     await theory.fill("");
     await expect(save).toBeDisabled();
@@ -273,9 +297,7 @@ test("INSTRUCTOR saves rows atomically with pending distinct from zero, and corr
         },
       ],
     });
-    await expect(
-      page.getByText("Nota final: 93,33", { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText("Final: 93,33", { exact: true })).toBeVisible();
     expect(
       (await read(page, path)).participants.find(
         (person) => person.registrationId === fixture.paid.id,
@@ -380,9 +402,7 @@ async function verifySsr(
     await page
       .getByRole("button", { name: "Guardar nota", exact: true })
       .click();
-    await expect(
-      page.getByText("Nota final: 0,00", { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText("Final: 0,00", { exact: true })).toBeVisible();
     expect(
       (await read(page, group)).participants.find(
         (person) => person.registrationId === fixture.historyPaid.id,

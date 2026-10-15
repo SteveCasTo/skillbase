@@ -8,7 +8,6 @@ import type {
   AdminInterestMutationInput,
   AdminInterestPostPayload,
   AdminInterestRegistrationDto,
-  InterestStatus,
   RegisterInterestInput,
 } from "@/domain/interests/types";
 import * as schema from "@/server/db/schema";
@@ -160,6 +159,7 @@ export class DrizzleInterestRepository implements InterestRepository {
           unconsumedInterest(),
         ),
       )
+      .where(eq(courses.status, "PUBLISHED"))
       .groupBy(courses.id, courses.name)
       .orderBy(asc(courses.name), asc(courses.id));
   }
@@ -182,13 +182,13 @@ export class DrizzleInterestRepository implements InterestRepository {
       byPreference,
     };
   }
-  async course(courseId: string, status?: InterestStatus) {
+  async course(courseId: string) {
     return this.db.transaction(async (tx) => {
       // Parent share lock holds writes in all cooperating repositories until this consistent read completes.
       const [course] = await tx
         .select({ id: courses.id, name: courses.name })
         .from(courses)
-        .where(eq(courses.id, courseId))
+        .where(and(eq(courses.id, courseId), eq(courses.status, "PUBLISHED")))
         .for("share");
       if (!course) return null;
       const rows = await tx
@@ -197,7 +197,7 @@ export class DrizzleInterestRepository implements InterestRepository {
         .where(
           and(
             eq(interests.courseId, courseId),
-            status ? eq(interests.status, status) : undefined,
+            eq(interests.status, "ACTIVE"),
             unconsumedInterest(),
           ),
         )
@@ -229,7 +229,7 @@ export class DrizzleInterestRepository implements InterestRepository {
       const [course] = await tx
         .select({ id: courses.id })
         .from(courses)
-        .where(eq(courses.id, courseId))
+        .where(and(eq(courses.id, courseId), eq(courses.status, "PUBLISHED")))
         .for("update");
       if (!course) throw notFound();
       const [previous] = await tx
@@ -239,6 +239,7 @@ export class DrizzleInterestRepository implements InterestRepository {
           and(
             eq(interests.id, input.interestRegistrationId),
             eq(interests.courseId, courseId),
+            eq(interests.status, "ACTIVE"),
             unconsumedInterest(),
           ),
         )
@@ -257,37 +258,17 @@ export class DrizzleInterestRepository implements InterestRepository {
           registration: dto(previous),
           metrics: await this.metrics(tx, courseId),
         };
-      const status = input.intent === "cancel" ? "CANCELLED" : "ACTIVE";
-      let row = previous;
-      if (previous.status !== status) {
-        const [updated] = await tx
-          .update(interests)
-          .set({
-            status,
-            updatedAt: sql`greatest(date_trunc('milliseconds', clock_timestamp()), ${interests.updatedAt} + interval '1 millisecond')`,
-          })
-          .where(eq(interests.id, previous.id))
-          .returning();
-        if (!updated) throw new Error("Interest mutation failed");
-        row = updated;
-        await tx.insert(auditEvents).values({
-          actorId,
-          action:
-            status === "CANCELLED"
-              ? "INTEREST_REGISTRATION_CANCELLED"
-              : "INTEREST_REGISTRATION_REACTIVATED",
-          entityType: "INTEREST_REGISTRATION",
-          entityId: row.id,
-          metadata: {
-            courseId,
-            fromStatus: previous.status,
-            toStatus: status,
-          },
-        });
-      }
+      await tx.delete(interests).where(eq(interests.id, previous.id));
+      await tx.insert(auditEvents).values({
+        actorId,
+        action: "INTEREST_REGISTRATION_DELETED",
+        entityType: "INTEREST_REGISTRATION",
+        entityId: previous.id,
+        metadata: { courseId },
+      });
       return {
         ok: true,
-        registration: dto(row),
+        deletedId: previous.id,
         metrics: await this.metrics(tx, courseId),
       };
     });

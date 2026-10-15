@@ -1,10 +1,28 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GradeRow } from "@/components/evaluations/GradeRow";
-import { changedGrades, gradeDrafts } from "@/components/evaluations/editing";
+import {
+  acceptsGradeDraft,
+  changedGrades,
+  gradeDrafts,
+} from "@/components/evaluations/editing";
 import { closureExportFixture } from "../fixtures/academic-closure-export";
 
 test("grade editing sends changed components together, leaves untouched pending empty and rejects deleting persisted zero", () => {
+  for (const value of ["", "0", "0.", "0.00", "99.99", "100", "100.", "100.00"])
+    expect(acceptsGradeDraft(value)).toBe(true);
+  for (const value of [
+    "-1",
+    "101",
+    "100.01",
+    "10,5",
+    "1.001",
+    "1e2",
+    "abc",
+    " 10",
+    "10 ",
+  ])
+    expect(acceptsGradeDraft(value)).toBe(false);
   const drafts = gradeDrafts(
     ["stored", "changed", "pending"],
     [
