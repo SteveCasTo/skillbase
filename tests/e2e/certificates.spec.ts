@@ -296,6 +296,55 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     );
     await expect(groupCertificateLink).toBeVisible();
     await expect(
+      courseSearch.getByRole("combobox", { name: "Estado del curso: Activos" }),
+    ).toBeVisible();
+    expect(
+      (await page.request.get("/app/certificados?status=invalid")).status(),
+    ).toBe(400);
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: testInfo.outputPath(`certificate-course-filters-${width}.png`),
+        fullPage: true,
+      });
+    }
+    const picker = courseSearch.getByRole("combobox");
+    await picker.focus();
+    await page.keyboard.press("Space");
+    await page.getByRole("option", { name: "Archivados", exact: true }).click();
+    await expect(groupCertificateLink).toBeHidden();
+    await expect(page).toHaveURL(/status=ARCHIVED/);
+    await picker.click();
+    await page.getByRole("option", { name: "Todos", exact: true }).click();
+    await expect(groupCertificateLink).toBeVisible();
+    await expect(
+      page.locator(
+        `a[href="/app/cursos/${fixture.courseId}/grupos/${fixture.groupId}/certificados"]`,
+      ),
+    ).toHaveCount(0);
+    await page.reload();
+    await expect(courseSearch.getByLabel("Buscar cursos")).toHaveValue(
+      "attendance",
+    );
+    await expect(
+      courseSearch.getByRole("combobox", { name: "Estado del curso: Todos" }),
+    ).toBeVisible();
+    await fixture.database.db
+      .update(courses)
+      .set({ status: "ARCHIVED" })
+      .where(eq(courses.id, fixture.historyCourseId));
+    await page.goto("/app/certificados?search=attendance&status=ARCHIVED");
+    await expect(groupCertificateLink).toBeVisible();
+    await page.goto("/app/certificados?search=attendance");
+    await expect(groupCertificateLink).toBeHidden();
+    await fixture.database.db
+      .update(courses)
+      .set({ status: "PUBLISHED" })
+      .where(eq(courses.id, fixture.historyCourseId));
+    await page.reload();
+    await expect(groupCertificateLink).toBeVisible();
+    await expect(
       page.locator(
         `a[href="/app/cursos/${fixture.courseId}/grupos/${fixture.groupId}/certificados"]`,
       ),
@@ -305,7 +354,9 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     ).toHaveCount(0);
     await courseSearch.getByLabel("Buscar cursos").fill("sin-coincidencia");
     await expect(
-      page.getByText("No hay cursos que coincidan con la búsqueda."),
+      page.getByText(
+        "No hay cursos con cierre académico vigente que coincidan con la búsqueda y el estado seleccionado.",
+      ),
     ).toBeVisible();
     await courseSearch.getByLabel("Buscar cursos").fill("ATTENDANCE");
     await expect(groupCertificateLink).toBeVisible();
@@ -720,6 +771,10 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
       },
     );
     expect(reopened.status()).toBe(200);
+    await page.goto("/app/certificados?status=ALL");
+    await expect(
+      page.locator(`a[href="${groupPath(fixture)}/certificados"]`),
+    ).toHaveCount(0);
     await page.goto(`/app/certificados/${teacherCertificate.id}`);
     await expect(page.getByText(/El cierre cambió/)).toBeVisible();
     await expect(
