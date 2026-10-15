@@ -115,7 +115,8 @@ export async function renderClosurePdf(
     "T",
     " ",
   );
-  let page: PDFPage;
+  // newPage initializes this before any drawing; callbacks share the active page.
+  let page!: PDFPage;
   let y = 0;
   function draw(
     value: string,
