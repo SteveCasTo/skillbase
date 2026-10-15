@@ -1,19 +1,37 @@
 import { InterestError } from "@/domain/interests/rules";
-import type { InterestStatus } from "@/domain/interests/types";
 
-/** Omitted status is the historical Todos URL; never widen invalid filters. */
+export const interestCourseFilters = [
+  { value: "WITH", label: "Con interesados" },
+  { value: "WITHOUT", label: "Sin interesados" },
+  { value: "ALL", label: "Todos" },
+] as const;
+export type InterestCourseFilter =
+  (typeof interestCourseFilters)[number]["value"];
+
 export function parseInterestFilter(
   params: URLSearchParams,
-): InterestStatus | undefined {
+): InterestCourseFilter {
   const values = params.getAll("status");
-  if (values.length === 0) return undefined;
+  if (values.length === 0) return "WITH";
   if (values.length === 1) {
-    if (values[0] === "ALL") return undefined;
-    if (values[0] === "ACTIVE" || values[0] === "CANCELLED") return values[0];
+    const option = interestCourseFilters.find(
+      (item) => item.value === values[0],
+    );
+    if (option) return option.value;
   }
   throw new InterestError(
     "INVALID_REQUEST",
     400,
-    "El filtro no es válido. Elige Todos, Activos o Cancelados.",
+    "El filtro no es válido. Elige Con interesados, Sin interesados o Todos.",
+  );
+}
+
+export function matchesInterestCourseFilter(
+  activeTotal: number,
+  filter: InterestCourseFilter,
+): boolean {
+  return (
+    filter === "ALL" ||
+    (filter === "WITH" ? activeTotal > 0 : activeTotal === 0)
   );
 }
