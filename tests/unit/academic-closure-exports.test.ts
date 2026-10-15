@@ -97,6 +97,7 @@ test("PDF embeds Unicode font, historical timestamps and paginates long unbroken
   const doc = await PDFDocument.load(bytes, { updateMetadata: false });
   expect(doc.getPageCount()).toBeGreaterThan(5);
   expect(doc.getAuthor()).toBe(v.actorName);
+  expect(doc.getTitle()).toBe("Informe de cierre académico");
   expect(doc.getCreationDate()).toEqual(new Date(v.closedAt));
   expect(doc.getModificationDate()).toEqual(new Date(v.closedAt));
   const unsupported = closureExportFixture();
@@ -134,7 +135,8 @@ test("PDF paginates a single participant with 100 components without losing the 
   const bytes = await renderClosurePdf(v, "planilla");
   const document = await PDFDocument.load(bytes, { updateMetadata: false });
   expect(document.getPageCount()).toBeGreaterThanOrEqual(3);
-  expect(bytes).toEqual(await renderClosurePdf(v, "planilla"));
+  expect(document.getTitle()).toBe("Informe de cierre académico");
+  expect(bytes).toEqual(await renderClosurePdf(v, "informe"));
 });
 test("attendance summary uses persisted participant projection, excluding cancelled session marks", () => {
   const v = closureExportFixture();
