@@ -271,7 +271,7 @@ test("isolated demo is read-only by default, atomic, provenance-bound and never 
         select tgname, tgenabled from pg_trigger
         where tgrelid = 'public.registration_ledger'::regclass
           and not tgisinternal order by tgname`;
-      expect(guards).toEqual([
+      expect(Array.from(guards)).toEqual([
         { tgname: "registration_ledger_append_only", tgenabled: "O" },
         {
           tgname: "registration_ledger_require_payment_method",
