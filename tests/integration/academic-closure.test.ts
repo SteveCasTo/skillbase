@@ -381,6 +381,22 @@ async function attendanceGradeLifecycle() {
     components,
   });
   let data = await evaluations.getCourse(f.admin.id, courseId, groupId);
+  await f.attendance.cancel(f.admin.id, {
+    courseId,
+    groupId,
+    sessionId: f.calendar.sessions[3]!.id,
+    revision: f.calendar.sessions[3]!.revision,
+    requestKey: crypto.randomUUID(),
+    reason: "Synthetic cancelled encounter",
+  });
+  await f.attendance.replace(f.admin.id, {
+    courseId,
+    groupId,
+    sessionId: f.calendar.sessions[2]!.id,
+    revision: f.calendar.sessions[2]!.revision,
+    requestKey: crypto.randomUUID(),
+    startsAt: "2099-03-10T08:00",
+  });
   expect(data.scheme.frozenAt).toBeNull();
   expect(data.hasAttendanceOverrides).toBe(false);
   expect(data.participants).toHaveLength(0);
@@ -434,13 +450,22 @@ async function attendanceGradeLifecycle() {
   ).toBe("100.00");
   now = new Date("2099-03-06T12:00:00Z");
   data = await evaluations.getCourse(f.instructor.id, courseId, groupId);
+  expect(data.participants[0]!.grades[0]).toMatchObject({
+    score: "50.00",
+    canEdit: false,
+  });
+  expect(
+    (await repo.getGroup(f.admin.id, courseId, groupId)).blockers,
+  ).toContain("SESSIONS_UNFINISHED");
+  now = new Date("2099-03-11T12:00:00Z");
+  data = await evaluations.getCourse(f.instructor.id, courseId, groupId);
   person = data.participants.find((p) => p.registrationId === f.paid.id)!;
   expect(person.grades[0]).toMatchObject({
-    score: "25.00",
+    score: "33.33",
     canEdit: true,
     revision: 0,
   });
-  expect(person.grades[1]!.score).toBe("25.00");
+  expect(person.grades[1]!.score).toBe("33.33");
   // No GET, including the closure read, may persist/freeze an automatic grade.
   await repo.getGroup(f.admin.id, courseId, groupId);
   expect(
@@ -455,10 +480,20 @@ async function attendanceGradeLifecycle() {
       { componentId: components[2]!.id, gradeRevision: 0, score: "80" },
     ],
   });
-  expect(saved).toMatchObject({ kind: "row", result: { finalGrade: "46.25" } });
+  expect(saved).toMatchObject({ kind: "row", result: { finalGrade: "48.33" } });
   data = await evaluations.getCourse(f.admin.id, courseId, groupId);
   expect(data.scheme.frozenAt).not.toBeNull();
   expect(data.hasAttendanceOverrides).toBe(true);
+  await evaluations.saveGrade(f.admin.id, {
+    courseId,
+    groupId: f.groups[1]!.id,
+    schemeRevision: data.scheme.revision,
+    requestKey: crypto.randomUUID(),
+    registrationId: f.otherGroup.id,
+    componentId: components[0]!.id,
+    gradeRevision: 0,
+    score: "88",
+  });
   const reset = {
     ...command,
     schemeRevision: data.scheme.revision,
@@ -480,7 +515,7 @@ async function attendanceGradeLifecycle() {
   const original = await repo.getVersion(f.admin.id, courseId, groupId, 1);
   expect(original.report.participants[0]!.grades.map((g) => g.score)).toEqual([
     "0.00",
-    "25.00",
+    "33.33",
     "80.00",
   ]);
   const persisted = await db
@@ -514,6 +549,16 @@ async function attendanceGradeLifecycle() {
   );
   data = await evaluations.getCourse(f.admin.id, courseId, groupId);
   expect(data.hasAttendanceOverrides).toBe(false);
+  const otherGroup = await evaluations.getCourse(
+    f.admin.id,
+    courseId,
+    f.groups[1]!.id,
+  );
+  expect(otherGroup.hasAttendanceOverrides).toBe(true);
+  expect(otherGroup.participants[0]!.grades[0]).toMatchObject({
+    origin: "MANUAL",
+    score: "88.00",
+  });
   expect(data.participants[0]!.grades[2]).toMatchObject({
     score: "80.00",
     origin: "MANUAL",
