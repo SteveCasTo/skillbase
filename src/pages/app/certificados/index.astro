@@ -1,6 +1,12 @@
 ---
-import { listAdminCourses } from "@/application/courses/manage-courses";
-import { listClosedAcademicGroups } from "@/application/academic-closure/manage-closure";
+import { listCertificateCourses } from "@/application/certificates/list-certificate-courses";
+import {
+  certificateCourseFilters,
+  parseCertificateCourseFilter,
+  matchesCertificateCourseFilter,
+} from "@/domain/certificates/course-filters";
+import ListStatusFilter from "@/components/lists/ListStatusFilter";
+import type { AdminCourseDto } from "@/domain/courses/types";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 import { normalizeRegistrationSearch } from "@/domain/pre-registrations/search";
 import type { ClosedAcademicGroup } from "@/application/academic-closure/closure-repository";
@@ -23,33 +29,29 @@ if (Astro.request.method !== "GET") return certificateMethodNotAllowed("GET");
 const actor = requireInternalUser(Astro.locals);
 const search = Astro.url.searchParams.get("search") ?? "";
 const query = normalizeRegistrationSearch(search);
+let status: ReturnType<typeof parseCertificateCourseFilter> = "ACTIVE";
+try {
+  status = parseCertificateCourseFilter(Astro.url.searchParams.get("status"));
+} catch {
+  return new Response("Selecciona Activos, Archivados o Todos.", {
+    status: 400,
+    headers: Astro.response.headers,
+  });
+}
 let courses: {
   id: string;
   name: string;
+  status: AdminCourseDto["status"];
   groups: readonly ClosedAcademicGroup[];
 }[] = [];
 let error = false;
 try {
   const database = getDatabase();
-  const source = await listAdminCourses(
+  courses = await listCertificateCourses(
     new DrizzleCourseRepository(database),
-    actor,
-  );
-  const closedGroups = await listClosedAcademicGroups(
     new DrizzleClosureRepository(database),
     actor,
-    source.map(({ id }) => id),
   );
-  const groupsByCourse = new Map<string, ClosedAcademicGroup[]>();
-  for (const group of closedGroups) {
-    const groups = groupsByCourse.get(group.courseId) ?? [];
-    groups.push(group);
-    groupsByCourse.set(group.courseId, groups);
-  }
-  courses = source.flatMap((course) => {
-    const groups = groupsByCourse.get(course.id) ?? [];
-    return groups.length ? [{ id: course.id, name: course.name, groups }] : [];
-  });
 } catch {
   error = true;
   Astro.response.status = 503;
@@ -58,7 +60,12 @@ const entries = courses.map((course) => ({
   course,
   searchable: normalizeRegistrationSearch(course.name),
 }));
-const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
+const matches = entries.filter(
+  ({ course, searchable }) =>
+    searchable.includes(query) &&
+    matchesCertificateCourseFilter(course.status, status),
+);
+const hasMatches = matches.length > 0;
 ---
 
 <PrivateLayout title="Certificados">
@@ -68,8 +75,12 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
   />
   <header class="mt-5">
     <h1 class="text-3xl font-semibold tracking-tight">Certificados</h1>
+    <p class="mt-2 text-sm text-muted-foreground">
+      Solo grupos con cierre académico vigente. Activos muestra cursos no
+      archivados.
+    </p>
   </header>
-  {!error && courses.length > 0 && (
+  {!error && (
     <form
       data-certificate-course-search
       method="get"
@@ -80,15 +91,34 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
       <label for="certificate-course-search" class="text-sm font-medium">
         Buscar cursos
       </label>
-      <Input
-        id="certificate-course-search"
-        name="search"
-        type="search"
-        autoComplete="off"
-        defaultValue={search}
-        className="min-h-11 min-w-0 w-full"
-      />
+      <div class="flex min-w-0 flex-wrap items-center gap-3">
+        <Input
+          id="certificate-course-search"
+          name="search"
+          type="search"
+          autoComplete="off"
+          defaultValue={search}
+          className="min-h-11 min-w-0 flex-1 basis-48"
+        />
+        <input type="hidden" name="status" value={status} data-list-status />
+        <ListStatusFilter
+          client:load
+          value={status}
+          options={certificateCourseFilters}
+          label="Estado del curso"
+        />
+      </div>
       <noscript>
+        <div class="flex flex-wrap gap-3">
+          {certificateCourseFilters.map((option) => (
+            <a
+              href={`?${new URLSearchParams({ search, status: option.value })}`}
+              class="underline underline-offset-4"
+            >
+              {option.label}
+            </a>
+          ))}
+        </div>
         <button
           type="submit"
           class={buttonVariants({
@@ -104,21 +134,28 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
   {error ? (
     <RegistrationPageError
       message="No se pudieron cargar los grupos cerrados. Intenta de nuevo."
-      retryHref="/app/certificados"
+      retryHref={Astro.url.pathname + Astro.url.search}
     />
-  ) : !courses.length ? (
-    <p role="status" class="mt-8 rounded-xl border border-dashed p-6">
-      No hay grupos cerrados disponibles para gestionar certificados.
-    </p>
   ) : (
     <>
+      <p
+        data-certificate-course-count
+        role="status"
+        class="mt-6 text-sm text-muted-foreground"
+      >
+        {matches.length} {matches.length === 1 ? "curso" : "cursos"}
+      </p>
       <p
         data-certificate-course-search-empty
         role="status"
         hidden={hasMatches}
         class="mt-8 text-muted-foreground"
       >
-        No hay cursos que coincidan con la búsqueda.
+        No hay cursos con cierre académico vigente que coincidan con la búsqueda
+        y el estado seleccionado.
+        <a href="?status=ALL" class="underline underline-offset-4">
+          Ver todos
+        </a>
       </p>
       <ul
         data-certificate-course-search-results
@@ -128,7 +165,11 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
         {entries.map(({ course, searchable }) => (
           <li
             data-certificate-course-search-entry={searchable}
-            hidden={!searchable.includes(query)}
+            data-certificate-course-status={course.status}
+            hidden={
+              !searchable.includes(query) ||
+              !matchesCertificateCourseFilter(course.status, status)
+            }
             class="min-w-0"
           >
             <h2 class="break-words text-xl font-semibold">{course.name}</h2>
@@ -155,6 +196,11 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
 
 <script>
   import { normalizeRegistrationSearch } from "@/domain/pre-registrations/search";
+  import {
+    parseCertificateCourseFilter,
+    matchesCertificateCourseFilter,
+  } from "@/domain/certificates/course-filters";
+  import type { AdminCourseDto } from "@/domain/courses/types";
 
   let dispose: (() => void) | undefined;
   const init = () => {
@@ -163,13 +209,18 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
       "[data-certificate-course-search]",
     );
     const input = form?.querySelector<HTMLInputElement>('input[name="search"]');
+    const statusInput =
+      form?.querySelector<HTMLInputElement>("[data-list-status]");
+    const countLabel = document.querySelector<HTMLElement>(
+      "[data-certificate-course-count]",
+    );
     const results = document.querySelector<HTMLElement>(
       "[data-certificate-course-search-results]",
     );
     const empty = document.querySelector<HTMLElement>(
       "[data-certificate-course-search-empty]",
     );
-    if (!form || !input || !results || !empty) return;
+    if (!form || !input || !statusInput || !results || !empty) return;
 
     const entries = [
       ...results.querySelectorAll<HTMLElement>(
@@ -179,22 +230,34 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
     const controller = new AbortController();
     const apply = (updateUrl: boolean) => {
       const query = normalizeRegistrationSearch(input.value);
+      const status = parseCertificateCourseFilter(statusInput.value);
       let count = 0;
       for (const entry of entries) {
         entry.hidden =
-          !entry.dataset.certificateCourseSearchEntry?.includes(query);
+          !entry.dataset.certificateCourseSearchEntry?.includes(query) ||
+          !matchesCertificateCourseFilter(
+            entry.dataset.certificateCourseStatus as AdminCourseDto["status"],
+            status,
+          );
         if (!entry.hidden) count++;
       }
       results.hidden = count === 0;
       empty.hidden = count > 0;
+      if (countLabel)
+        countLabel.textContent = `${count} ${count === 1 ? "curso" : "cursos"}`;
       if (updateUrl) {
         const url = new URL(window.location.href);
         if (query) url.searchParams.set("search", input.value);
         else url.searchParams.delete("search");
+        url.searchParams.set("status", status);
+        url.searchParams.delete("page");
         window.history.replaceState(window.history.state, "", url);
       }
     };
     input.addEventListener("input", () => apply(true), {
+      signal: controller.signal,
+    });
+    statusInput.addEventListener("change", () => apply(true), {
       signal: controller.signal,
     });
     form.addEventListener(
@@ -210,6 +273,10 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
       () => {
         input.value =
           new URL(window.location.href).searchParams.get("search") ?? "";
+        statusInput.value = parseCertificateCourseFilter(
+          new URL(window.location.href).searchParams.get("status"),
+        );
+        statusInput.dispatchEvent(new Event("list-status-sync"));
         apply(false);
       },
       { signal: controller.signal },

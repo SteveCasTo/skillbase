@@ -14,6 +14,10 @@ import {
 } from "@/components/certificates/presentation";
 import { getPrivateRoutePolicy } from "@/server/auth/route-policy";
 import { navigationSkeletonVariant } from "@/components/private-nav/navigation-skeleton";
+import {
+  parseCertificateCourseFilter,
+  matchesCertificateCourseFilter,
+} from "@/domain/certificates/course-filters";
 
 describe("certificate public verification", () => {
   test("hashes the entire exact PDF locally and detects a single changed byte", async () => {
@@ -99,6 +103,18 @@ describe("certificate public verification", () => {
 describe("certificate route policy", () => {
   const id = "11111111-1111-4111-8111-111111111111";
   test("ADMIN routes and signed/unsigned delivery are explicit", () => {
+    expect(parseCertificateCourseFilter(null)).toBe("ACTIVE");
+    for (const invalid of ["", "PUBLISHED", "historical", "ACTIVE OR 1=1"])
+      expect(() => parseCertificateCourseFilter(invalid)).toThrow();
+    for (const status of ["DRAFT", "PUBLISHED", "ARCHIVED"] as const) {
+      expect(matchesCertificateCourseFilter(status, "ACTIVE")).toBe(
+        status !== "ARCHIVED",
+      );
+      expect(matchesCertificateCourseFilter(status, "ARCHIVED")).toBe(
+        status === "ARCHIVED",
+      );
+      expect(matchesCertificateCourseFilter(status, "ALL")).toBe(true);
+    }
     expect(civilDateLabel("2026-08-01")).toBe("01/08/2026");
     expect(certificateStateLabel.generated).toBe("Para firmar");
     expect(certificateStateLabel.issued).toBe("Firmado");
