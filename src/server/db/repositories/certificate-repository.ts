@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { and, asc, eq, ne, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ne, lt, sql } from "drizzle-orm";
 import * as s from "@/server/db/schema";
 import type {
   CertificateRepository,
@@ -605,7 +605,8 @@ export class DrizzleCertificateRepository implements CertificateRepository {
                   eq(s.certificates.state, "revoked"),
                 ),
               )
-              .orderBy(asc(s.certificates.revokedAt), asc(s.certificates.id))
+              .orderBy(desc(s.certificates.revokedAt), desc(s.certificates.id))
+              .limit(1)
           : [];
         await event(
           tx,
