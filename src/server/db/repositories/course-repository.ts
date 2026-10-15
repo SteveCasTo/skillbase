@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { CourseRepository } from "@/application/courses/course-repository";
 import { CourseDomainError } from "@/domain/courses/errors";
+import { courseAcademicPhase } from "@/domain/courses/academic-phase";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 import {
   GROUP_SCHEDULE,
@@ -15,6 +16,7 @@ import {
 } from "@/domain/courses/policies";
 import type {
   AdminCourseDto,
+  AdminCourseCardDto,
   CourseData,
   CoursePrice,
   CourseStatus,
@@ -727,14 +729,43 @@ export class DrizzleCourseRepository implements CourseRepository {
     );
   }
 
-  async listAdmin(): Promise<readonly AdminCourseDto[]> {
+  async listAdmin(now = new Date()): Promise<readonly AdminCourseCardDto[]> {
     return persistence("listAdmin", async () => {
       const rows = await this.db
         .select()
         .from(schema.courses)
         .orderBy(desc(schema.courses.createdAt));
       const found = await revisions(this.db, rows);
-      return rows.map((row) => admin(row, revisionFor(row, found)));
+      const groups = rows.length
+        ? await this.db
+            .select({
+              courseId: schema.groups.courseId,
+              status: schema.groups.status,
+              startsAt: schema.groups.startsAt,
+              academicallyClosed: sql<boolean>`coalesce(${schema.academicGroupStates.closed}, false)`,
+            })
+            .from(schema.groups)
+            .leftJoin(
+              schema.academicGroupStates,
+              eq(schema.academicGroupStates.groupId, schema.groups.id),
+            )
+            .where(
+              inArray(
+                schema.groups.courseId,
+                rows.map((row) => row.id),
+              ),
+            )
+        : [];
+      const byCourse = new Map<string, typeof groups>();
+      for (const group of groups) {
+        const bucket = byCourse.get(group.courseId) ?? [];
+        bucket.push(group);
+        byCourse.set(group.courseId, bucket);
+      }
+      return rows.map((row) => ({
+        ...admin(row, revisionFor(row, found), now),
+        academicPhase: courseAcademicPhase(byCourse.get(row.id) ?? [], now),
+      }));
     });
   }
   async getAdmin(id: string): Promise<AdminCourseDto | null> {

@@ -9,6 +9,7 @@ import {
   courseTypeRevisions,
   courses,
   groups,
+  groupSessions,
   users,
   userRoles,
 } from "@/server/db/schema";
@@ -99,6 +100,16 @@ afterAll(async () => {
 });
 
 test("adjacency and other courses work; updates, cancellation and audit retain history", async () => {
+  expect(
+    (await courseRepo.listAdmin(new Date("2027-01-01Z"))).find(
+      (course) => course.id === courseId,
+    )?.academicPhase,
+  ).toBe("UPCOMING");
+  expect(
+    (await courseRepo.listAdmin(new Date("2027-04-01Z"))).find(
+      (course) => course.id === courseId,
+    )?.academicPhase,
+  ).toBe("IN_PROGRESS");
   const first = await createGroup(repo, admin, courseId, "08:00", 1);
   const second = await createGroup(repo, admin, courseId, "09:30", 15);
   expect(first.courseTypeRevisionId).toBe(second.courseTypeRevisionId);
@@ -236,9 +247,17 @@ test("withdrawal retains group snapshot and permits new groups with pinned revis
 test("publication is tracked per group, including publication after draft creation", async () => {
   const exposed = await createGroup(repo, admin, courseId, "08:00", 3);
   expect(exposed.publishedAt).toBeInstanceOf(Date);
+  expect(
+    (await repo.list(courseId)).find((group) => group.id === exposed.id)
+      ?.canDelete,
+  ).toBe(false);
   await courseRepo.transition(courseId, "DRAFT", admin.id);
   const draftOnly = await createGroup(repo, admin, courseId, "09:30", 3);
   expect(draftOnly.publishedAt).toBeNull();
+  expect(
+    (await repo.list(courseId)).find((group) => group.id === draftOnly.id)
+      ?.canDelete,
+  ).toBe(true);
   await expect(
     deleteGroup(repo, admin, exposed.id, exposed.updatedAt.toISOString()),
   ).rejects.toMatchObject({ code: "GROUP_PUBLISHED" });
@@ -278,7 +297,7 @@ test("publication is tracked per group, including publication after draft creati
   ).rejects.toMatchObject({ code: "GROUP_PUBLISHED" });
 });
 
-test("cancelled draft groups stay deletable until active on publication", async () => {
+test("cancelled draft groups preserve their recorded session history before publication", async () => {
   await courseRepo.transition(courseId, "DRAFT", admin.id);
   const group = await createGroup(repo, admin, courseId, "08:00", 2);
   const cancelled = await cancelGroup(
@@ -293,7 +312,24 @@ test("cancelled draft groups stay deletable until active on publication", async 
     .from(groups)
     .where(eq(groups.id, group.id));
   expect(stillDraftOnly?.publishedAt).toBeNull();
-  await deleteGroup(repo, admin, group.id, cancelled.updatedAt.toISOString());
+  const sessions = await database.db
+    .select()
+    .from(groupSessions)
+    .where(eq(groupSessions.groupId, group.id));
+  expect(sessions.length).toBeGreaterThan(0);
+  expect(
+    (await repo.list(courseId)).find((entry) => entry.id === group.id)
+      ?.canDelete,
+  ).toBe(false);
+  await expect(
+    deleteGroup(repo, admin, group.id, cancelled.updatedAt.toISOString()),
+  ).rejects.toMatchObject({ code: "GROUP_PUBLISHED" });
+  expect(
+    await database.db
+      .select()
+      .from(groupSessions)
+      .where(eq(groupSessions.groupId, group.id)),
+  ).toEqual(sessions);
 });
 
 test("reactivating a previously unexposed group on a published course records exposure", async () => {

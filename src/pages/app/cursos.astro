@@ -10,7 +10,8 @@ import {
 import { normalizeRegistrationSearch } from "@/domain/pre-registrations/search";
 
 import { listAdminCourses } from "@/application/courses/manage-courses";
-import type { AdminCourseDto } from "@/domain/courses/types";
+import type { AdminCourseCardDto } from "@/domain/courses/types";
+import { courseAcademicPhaseLabels } from "@/domain/courses/academic-phase";
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
 import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import { requireInternalUser } from "@/server/auth/context";
@@ -23,7 +24,7 @@ import { CourseInfrastructureError } from "@/server/db/repositories/course-infra
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
 
 const user = requireInternalUser(Astro.locals);
-let courses: readonly AdminCourseDto[] = [];
+let courses: readonly AdminCourseCardDto[] = [];
 let loadError = false;
 try {
   courses = await listAdminCourses(
@@ -227,26 +228,10 @@ const hasMatches = entries.some(
                           {course.totalHours} horas
                         </dd>
                       </div>
-                      <div>
-                        <dt class="text-muted-foreground">Estudiante</dt>
-                        <dd class="mt-1 font-medium tabular-nums">
-                          {
-                            course.prices.find(
-                              (p) => p.participantType === "STUDENT",
-                            )?.amount
-                          }{" "}
-                          BOB
-                        </dd>
-                      </div>
-                      <div>
-                        <dt class="text-muted-foreground">Externo</dt>
-                        <dd class="mt-1 font-medium tabular-nums">
-                          {
-                            course.prices.find(
-                              (p) => p.participantType === "EXTERNAL",
-                            )?.amount
-                          }{" "}
-                          BOB
+                      <div class="col-span-2">
+                        <dt class="text-muted-foreground">Fase académica</dt>
+                        <dd class="mt-1 font-medium">
+                          {courseAcademicPhaseLabels[course.academicPhase]}
                         </dd>
                       </div>
                     </dl>

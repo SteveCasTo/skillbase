@@ -1,6 +1,7 @@
 import { describe, expect, spyOn, test } from "bun:test";
 
 import { createCourse } from "@/application/courses/manage-courses";
+import { courseAcademicPhase } from "@/domain/courses/academic-phase";
 import { createFormat } from "@/application/courses/manage-formats";
 import type { FormatRepository } from "@/application/courses/format-repository";
 import type { CourseRepository } from "@/application/courses/course-repository";
@@ -226,7 +227,7 @@ describe("course domain", () => {
     expect(() => assertTransition("DRAFT", "DRAFT")).toThrow();
   });
 
-  test("derives registration availability without persisting it", () => {
+  test("derives registration availability and academic phase without persisting them", () => {
     const now = new Date("2027-01-05T12:00:00Z");
     expect(registrationAvailability(null, null, now)).toBe("UNAVAILABLE");
     expect(
@@ -250,6 +251,24 @@ describe("course domain", () => {
         now,
       ),
     ).toBe("CLOSED");
+    const started = {
+      status: "PLANNED",
+      startsAt: now,
+      academicallyClosed: false,
+    } as const;
+    const future = { ...started, startsAt: new Date(now.getTime() + 1) };
+    const closed = { ...started, academicallyClosed: true };
+    const cancelled = { ...started, status: "CANCELLED" } as const;
+    expect(courseAcademicPhase([], now)).toBe("NO_ACTIVE_GROUPS");
+    expect(courseAcademicPhase([cancelled], now)).toBe("NO_ACTIVE_GROUPS");
+    expect(courseAcademicPhase([closed, future, cancelled], now)).toBe(
+      "UPCOMING",
+    );
+    expect(courseAcademicPhase([started, future], now)).toBe("IN_PROGRESS");
+    expect(courseAcademicPhase([closed, cancelled], now)).toBe("FINISHED");
+    expect(
+      courseAcademicPhase([{ ...closed, academicallyClosed: false }], now),
+    ).toBe("IN_PROGRESS");
   });
 
   test("course use cases reject invited and disabled admins before persistence", async () => {
