@@ -100,8 +100,9 @@ presenta el estado como título, los datos permitidos y «Comprobar tu archivo»
 los errores de consulta y los resultados de comparación permanecen visibles
 inline, sin un toast duplicado.
 El selector público admite teclado y arrastre, muestra el nombre del archivo
-y ofrece «Quitar archivo» solo tras seleccionarlo; quitarlo limpia también el
-resultado y devuelve el foco al selector. No modifica el selector privado ADMIN.
+y ofrece «Quitar archivo» solo tras seleccionarlo. La zona de arrastre y el
+archivo seleccionado son mutuamente excluyentes; quitarlo limpia también el
+resultado y devuelve el foco al selector.
 La comprobación conserva MIME/extensión PDF, límite de 10 MiB y SHA-256 de todos
 los bytes en el navegador: no transmite ni persiste el archivo ni habilita una
 descarga pública. Una coincidencia no cambia el estado oficial de la credencial.
@@ -162,8 +163,11 @@ Con JavaScript se actualiza el detalle tras una preparación que cambie revisió
 sin JavaScript la descarga conserva POST/attachment y, si se actualizó, se debe
 recargar el detalle antes de cargar el firmado (la revisión anterior se deniega).
 
-Seleccionar o arrastrar un PDF legible habilita «Guardar PDF firmado» o
-«Sustituir PDF firmado»; quitarlo oculta la acción. El envío explícito de ese
+La zona de arrastre ADMIN ocupa todo el ancho del contenido, sin panel explicativo.
+Seleccionar o arrastrar un PDF la sustituye por el archivo y su X; una vez validado
+aparece «Guardar PDF firmado» o «Sustituir PDF firmado» a su lado (apilado en mobile).
+Quitarlo limpia selección/errores y devuelve la zona y el foco al selector.
+El envío explícito de ese
 botón (`intent=save-signed-pdf`) constituye la confirmación ADMIN, sin checkbox
 ni confirmación oculta preaceptada. Servidor exige la intención, rol vigente,
 revisión, finalidad SIGNED y validación de extensión/MIME/tamaño/contenido PDF.
@@ -176,6 +180,12 @@ Un firmado nunca se actualiza automáticamente. Solo ofrece «Descargar firmado�
 la descarga unsigned también se deniega por URL directa. Sustituir exige un
 nuevo archivo y mantiene ID/metadata. Los errores y progreso de carga se
 presentan inline, sin toast persistente.
+
+Las descargas privadas de certificados usan una Promise real de Sileo, sin
+«Preparando descarga…» debajo del botón: preparación POST o lectura GET, respuesta
+PDF no redirigida, comprobación de Blob y entrega al navegador. «PDF listo.» no
+afirma que el usuario haya guardado el archivo. Se bloquea el envío duplicado,
+se restaura el control tras error y se mantienen POST/href sin JavaScript.
 
 El detalle ADMIN no presenta el bloque de datos para LinkedIn ni la acción de
 copiar credencial. Conserva el SHA-256 y «Consultar estado público» como enlace

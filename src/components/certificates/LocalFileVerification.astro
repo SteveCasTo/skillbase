@@ -19,15 +19,15 @@ const { officialHash, state } = Astro.props;
     Comprobar tu archivo
   </h2>
   <div data-local-controls hidden>
+    <input
+      id="local-pdf"
+      type="file"
+      accept="application/pdf,.pdf"
+      aria-labelledby="local-pdf-label"
+      aria-describedby="local-pdf-help local-result"
+      class="sr-only"
+    />
     <label for="local-pdf" data-local-dropzone class="local-dropzone">
-      <input
-        id="local-pdf"
-        type="file"
-        accept="application/pdf,.pdf"
-        aria-labelledby="local-pdf-label"
-        aria-describedby="local-pdf-help local-result"
-        class="sr-only"
-      />
       <span class="flex size-14 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
         <FileUp size={28} aria-hidden="true" />
       </span>
@@ -52,7 +52,7 @@ const { officialHash, state } = Astro.props;
     <div
       data-local-selection
       hidden
-      class="local-selection mt-3 flex min-w-0 items-center gap-3 rounded-lg border bg-card p-3"
+      class="local-selection flex min-w-0 items-center gap-3 rounded-lg border bg-card p-3"
     >
       <FileText size={24} className="shrink-0" aria-hidden="true" />
       <span
@@ -100,7 +100,6 @@ const { officialHash, state } = Astro.props;
   const dropzone = root?.querySelector<HTMLElement>("[data-local-dropzone]");
   const selection = root?.querySelector<HTMLElement>("[data-local-selection]");
   const filename = root?.querySelector<HTMLElement>("[data-file-name]");
-  const prompt = root?.querySelector<HTMLElement>("[data-drop-prompt]");
   if (
     root &&
     input &&
@@ -109,8 +108,7 @@ const { officialHash, state } = Astro.props;
     controls &&
     dropzone &&
     selection &&
-    filename &&
-    prompt
+    filename
   ) {
     let latest = 0;
     if (window.crypto?.subtle) controls.hidden = false;
@@ -122,9 +120,9 @@ const { officialHash, state } = Astro.props;
       input.value = "";
       filename.textContent = "";
       selection.hidden = true;
-      prompt.textContent = "Arrastra tu PDF aquí";
+      dropzone.hidden = false;
+      input.tabIndex = 0;
       dropzone.removeAttribute("data-invalid");
-      dropzone.removeAttribute("data-selected");
       input.removeAttribute("aria-invalid");
       result.textContent = "";
       output.textContent = "";
@@ -169,10 +167,10 @@ const { officialHash, state } = Astro.props;
       const file = input.files?.[0];
       filename.textContent = file?.name ?? "";
       selection.hidden = !file;
-      prompt.textContent = file
-        ? "Arrastra otro PDF para cambiarlo"
-        : "Arrastra tu PDF aquí";
-      dropzone.toggleAttribute("data-selected", Boolean(file));
+      dropzone.hidden = Boolean(file);
+      input.tabIndex = file ? -1 : 0;
+      if (file && document.activeElement === input)
+        root.querySelector<HTMLButtonElement>("[data-local-reset]")?.focus();
       dropzone.removeAttribute("data-invalid");
       input.removeAttribute("aria-invalid");
       output.hidden = true;
@@ -238,16 +236,14 @@ const { officialHash, state } = Astro.props;
     border-color: var(--ring);
     background: var(--secondary);
   }
-  .local-dropzone:focus-within {
+  [data-local-controls]:has(input:focus-visible) .local-dropzone {
     outline: 3px solid var(--ring);
     outline-offset: 4px;
   }
   .local-dropzone[data-invalid] {
     border-color: var(--destructive);
   }
-  .local-dropzone[data-selected] {
-    border-style: solid;
-  }
+  .local-dropzone[hidden],
   .local-selection[hidden] {
     display: none;
   }
