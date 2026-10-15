@@ -27,6 +27,36 @@ export interface PaymentMethodManifest {
 }
 const hash = (value: unknown) =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex");
+/** Backfill-only allowlist; do not widen renewal/reseed targets or rewrite URLs. */
+export function assertPaymentMethodTarget(
+  target: string,
+  databaseUrl: string,
+  apiUrl: string,
+  project: string,
+): void {
+  if (target !== "local") {
+    assertFinancialTarget(target, databaseUrl, apiUrl, project);
+    return;
+  }
+  try {
+    const db = new URL(databaseUrl);
+    const api = new URL(apiUrl);
+    if (
+      project !== "local" ||
+      !["postgres:", "postgresql:"].includes(db.protocol) ||
+      db.hostname !== "127.0.0.1" ||
+      db.port !== "55322" ||
+      db.pathname !== "/postgres" ||
+      db.username !== "postgres" ||
+      db.search ||
+      db.hash ||
+      !["http://127.0.0.1:54321/", "http://127.0.0.1:55321/"].includes(api.href)
+    )
+      throw new Error();
+  } catch {
+    throw new Error("Payment-method target identity refused");
+  }
+}
 function args() {
   const values = new Map<string, string>();
   const allowed = [
@@ -65,7 +95,7 @@ function args() {
     throw new Error("Explicit production approval required");
   const databaseUrl =
     process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL ?? "";
-  assertFinancialTarget(
+  assertPaymentMethodTarget(
     target,
     databaseUrl,
     process.env.PUBLIC_SUPABASE_URL ?? "",

@@ -63,6 +63,23 @@ identidades exactas desde el manifiesto revisado. No usar regex genéricas ni da
 método inventado a datos reales. La autorización de los datasets de prueba no es
 autorización para etiquetar identidades desconocidas o saltar el inventario.
 
+El guard exclusivo de este backfill acepta DB `127.0.0.1:55322/postgres`,
+usuario `postgres`, proyecto `local` y únicamente API HTTP `127.0.0.1:54321`
+(entorno autorizado observado) o `127.0.0.1:55321` (layout documentado).
+Rechaza otros hosts/puertos, paths, credenciales API, query y fragmentos; no
+reescribe URLs ni modifica los guards del renewal/reseed. El target cloud
+conserva la validación exacta del proyecto. No cambiar servicios/configuración
+ni falsear `PUBLIC_SUPABASE_URL` para pasar este guard.
+
+El handoff READ-ONLY del 15 de octubre observó 34 movimientos por entorno
+(33 PAYMENT y 1 REFUND), todos requieren inventario explícito completo mediante
+`--approved-identities`; no ampliar namespaces legacy. También registró cloud
+con 19 grupos, 6 versiones oficiales, 7 certificados y 11 objetos privados.
+Preservar ese crecimiento y cada fila presente: no imponer los 18 grupos del
+manifiesto antiguo, resetear ni ejecutar seeds generales. Los 27 hashes y
+timestamps históricos local/cloud coinciden según esa evidencia; después de
+0027 → 0028 el ledger esperado es 29. No se realizaron writes por este handoff.
+
 APPLY exige el hash revisado del manifiesto. Bajo locks verifica el conjunto
 completo, identidades y hash de cada fila sin método. Exige los dos triggers
 esperados activos. Deshabilita **solo** el trigger append-only del ledger dentro

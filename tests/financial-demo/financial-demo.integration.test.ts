@@ -232,6 +232,23 @@ test("isolated demo is read-only by default, atomic, provenance-bound and never 
         project: process.env.TEST_SUPABASE_PROJECT_ID!,
         movements: await seedPaymentMethodMovements(client),
       };
+      expect(await seedPaymentMethodMovements(client)).toEqual(
+        manifest.movements,
+      );
+      for (const entry of manifest.movements)
+        expect(entry.paymentMethod).toBe(
+          parseInt(
+            createHash("sha256")
+              .update(JSON.stringify(entry.id))
+              .digest("hex")
+              .slice(0, 2),
+            16,
+          ) %
+            2 ===
+            0
+            ? "CASH"
+            : "QR",
+        );
       expect(
         manifest.movements.every((entry) => entry.previousMethod === null),
       ).toBe(true);
@@ -250,6 +267,17 @@ test("isolated demo is read-only by default, atomic, provenance-bound and never 
       ).rejects.toThrow("identity/evidence");
       expect(await applySeedPaymentMethodManifest(client, manifest)).toBe(12);
       expect(await applySeedPaymentMethodManifest(client, manifest)).toBe(0);
+      const guards = await client<{ tgname: string; tgenabled: string }[]>`
+        select tgname, tgenabled from pg_trigger
+        where tgrelid = 'public.registration_ledger'::regclass
+          and not tgisinternal order by tgname`;
+      expect(guards).toEqual([
+        { tgname: "registration_ledger_append_only", tgenabled: "O" },
+        {
+          tgname: "registration_ledger_require_payment_method",
+          tgenabled: "O",
+        },
+      ]);
       const enriched = await seedPaymentMethodMovements(client);
       expect(enriched.map((entry) => entry.ledgerHash)).toEqual(
         originalLedger.map((entry) => entry.ledgerHash),
