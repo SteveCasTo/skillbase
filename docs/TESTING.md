@@ -1,5 +1,26 @@
 # TESTING
 
+## Evaluación opcional de asistencia (fuente 2026-10-15)
+
+Los casos existentes de evaluaciones/cierre se amplían sin añadir casos, specs ni
+suites: denominador progresivo y vacío, EXCUSED, corte civil Bolivia, sesiones
+canceladas y reemplazos futuros, tipos repetidos, freeze por nota cero, lectura
+sin persistencia, override protegido tras corrección/reapertura, reset con
+ownership/guard cerrado/idempotencia y aislamiento de grupos y THEORY/PRACTICAL.
+El caso concurrente existente incorpora finalización AUTO y reset frente a cierre;
+el de guardas verifica replay 0029, snapshots intactos y ejecución pública
+revocada. E2E conserva sus dos casos y añade edición deshabilitada, override/reset,
+nombre accesible de búsqueda y capturas 375/768/1440.
+
+QA utiliza exclusivamente stacks efímeros del runner; no aplica migraciones,
+resets ni semillas sobre canónico/cloud. Los primeros intentos bajo carga local
+agotaron límites existentes de PDF/integración, sin ampliar timeouts. Una versión
+inicial del escenario E2E adelantaba el reloj global del servidor tres días y
+expiraba la sesión Auth (trace: redirect `reason=unauthenticated`); el fixture
+corregido usa asistencia histórica legítima ya terminada para el override, sin
+alterar reloj ni validación Auth. Los gates del SHA final y evidencia se registran
+en el PR; este apartado no afirma ejecución en producción ni release.
+
 ## Certificados individuales: QA fuente (2026-10-13)
 
 PR 352 adapta los casos existentes, sin añadir casos/specs/suites: registro
