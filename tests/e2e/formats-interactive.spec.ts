@@ -7,18 +7,51 @@ import { signInFixture } from "./auth-helper";
 test("create form filters edits and enables submit only for valid required values", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   await signInFixture(context, AUTH_FIXTURES.admin.email);
   await page.goto("/app/formatos/nuevo");
   const form = page.getByRole("form", { name: "Crear formato" });
   const submit = form.getByRole("button", { name: "Crear formato" });
   const name = form.getByLabel("Nombre");
-  const hours = form.getByLabel("Duración total (horas)");
-  const session = form.getByLabel("Duración de sesión (minutos)");
-  const student = form.getByLabel("Precio estudiante (BOB)");
-  const external = form.getByLabel("Precio externo (BOB)");
+  const hours = form.getByLabel("Duración total");
+  const session = form.getByLabel("Duración de sesión");
+  const student = form.getByLabel("Precio estudiante");
+  const external = form.getByLabel("Precio externo");
+  await expect(name).not.toHaveAttribute("aria-describedby");
+  await expect(hours).toHaveAccessibleDescription(
+    "Número entero positivo de horas.",
+  );
+  await expect(session).toHaveAccessibleDescription("Entre 15 y 480 minutos.");
+  await expect(student).toHaveAccessibleDescription(
+    "Usa hasta dos decimales; ej. 80.50",
+  );
+  await expect(external).toHaveAccessibleDescription(
+    "Usa hasta dos decimales; ej. 80.50",
+  );
+  await expect(
+    page.getByText(/Los cursos que elijan|Un nombre reconocible/),
+  ).toHaveCount(0);
   await expect(submit).toBeDisabled();
   await expect(submit).toHaveCSS("opacity", "0.4");
+  for (const width of [375, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const theme of ["light", "dark"]) {
+      await page.locator("html").evaluate((element, selected) => {
+        element.dataset.theme = selected;
+        element.classList.toggle("dark", selected === "dark");
+        element.style.colorScheme = selected;
+      }, theme);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await testInfo.attach(`format-create-${width}-${theme}`, {
+        body: await page.screenshot({ animations: "disabled" }),
+        contentType: "image/png",
+      });
+    }
+  }
   await name.fill("Formato humano ñ");
   await hours.pressSequentially("2a4");
   await expect(hours).toHaveValue("24");
@@ -64,6 +97,21 @@ test("create form filters edits and enables submit only for valid required value
   await expect(
     page.getByRole("link", { name: new RegExp(formatName) }),
   ).toBeVisible();
+  const card = page.getByRole("link", { name: new RegExp(formatName) });
+  await expect(card).toContainText("24 horas · 90 minutos/sesión");
+  await expect(card).not.toContainText("Revisión");
+  for (const width of [375, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await testInfo.attach(`format-cards-${width}`, {
+      body: await page.screenshot({ animations: "disabled" }),
+      contentType: "image/png",
+    });
+  }
   await expect(
     page.locator("[data-sileo-toast]").filter({ hasText: "Formato creado" }),
   ).toBeVisible();
@@ -77,10 +125,10 @@ test("inline editing swaps icons in the same row, filters input and cancels with
   await page.goto("/app/formatos/nuevo");
   const name = `Formato iconos ${Date.now()}`;
   await page.getByLabel("Nombre").fill(name);
-  await page.getByLabel("Duración total (horas)").fill("24");
-  await page.getByLabel("Duración de sesión (minutos)").fill("90");
-  await page.getByLabel("Precio estudiante (BOB)").fill("80");
-  await page.getByLabel("Precio externo (BOB)").fill("100");
+  await page.getByLabel("Duración total").fill("24");
+  await page.getByLabel("Duración de sesión").fill("90");
+  await page.getByLabel("Precio estudiante").fill("80");
+  await page.getByLabel("Precio externo").fill("100");
   await page.getByRole("button", { name: "Crear formato" }).click();
   await page.getByRole("link", { name: new RegExp(name) }).click();
   await expect(
@@ -407,10 +455,10 @@ test("used formats toggle availability in place and disable editors while inacti
   await page.goto("/app/formatos/nuevo");
   const name = `Formato en uso ${Date.now()}`;
   await page.getByLabel("Nombre").fill(name);
-  await page.getByLabel("Duración total (horas)").fill("24");
-  await page.getByLabel("Duración de sesión (minutos)").fill("90");
-  await page.getByLabel("Precio estudiante (BOB)").fill("80");
-  await page.getByLabel("Precio externo (BOB)").fill("100");
+  await page.getByLabel("Duración total").fill("24");
+  await page.getByLabel("Duración de sesión").fill("90");
+  await page.getByLabel("Precio estudiante").fill("80");
+  await page.getByLabel("Precio externo").fill("100");
   await page.getByRole("button", { name: "Crear formato" }).click();
   await page.getByRole("link", { name: new RegExp(name) }).click();
   await expect(page).toHaveURL(/\/app\/formatos\/[0-9a-f-]+$/);

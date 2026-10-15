@@ -108,10 +108,10 @@ test("missing format is announced beside the selector and focuses it without an 
   await page.getByRole("link", { name: "Nuevo formato" }).click();
   const formatForm = page.getByRole("form", { name: "Crear formato" });
   await formatForm.getByLabel("Nombre").fill(formatName);
-  await formatForm.getByLabel("Duración total (horas)").fill("20");
-  await page.getByLabel("Duración de sesión (minutos)").fill("90");
-  await formatForm.getByLabel("Precio estudiante (BOB)").fill("80");
-  await formatForm.getByLabel("Precio externo (BOB)").fill("100");
+  await formatForm.getByLabel("Duración total").fill("20");
+  await page.getByLabel("Duración de sesión").fill("90");
+  await formatForm.getByLabel("Precio estudiante").fill("80");
+  await formatForm.getByLabel("Precio externo").fill("100");
   await formatForm.getByRole("button", { name: "Crear formato" }).click();
   await expect(page).toHaveURL(/\/app\/formatos$/);
   await page.goto("/app/cursos/nuevo");
@@ -148,10 +148,10 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
   await page.getByRole("link", { name: "Nuevo formato" }).click();
   const format = page.getByRole("form", { name: "Crear formato" });
   await format.getByLabel("Nombre").fill(formatName);
-  await format.getByLabel("Duración total (horas)").fill("20");
-  await format.getByLabel("Duración de sesión (minutos)").fill("90");
-  await format.getByLabel("Precio estudiante (BOB)").fill("80");
-  await format.getByLabel("Precio externo (BOB)").fill("100");
+  await format.getByLabel("Duración total").fill("20");
+  await format.getByLabel("Duración de sesión").fill("90");
+  await format.getByLabel("Precio estudiante").fill("80");
+  await format.getByLabel("Precio externo").fill("100");
   await page.evaluate(() => {
     (window as Window & { navigationMarker?: boolean }).navigationMarker = true;
   });
@@ -478,10 +478,10 @@ test("retries a persisted initial group after its POST response is lost and crea
   await page.getByRole("link", { name: "Nuevo formato" }).click();
   const format = page.getByRole("form", { name: "Crear formato" });
   await format.getByLabel("Nombre").fill(formatName);
-  await format.getByLabel("Duración total (horas)").fill("20");
-  await format.getByLabel("Duración de sesión (minutos)").fill("90");
-  await format.getByLabel("Precio estudiante (BOB)").fill("80");
-  await format.getByLabel("Precio externo (BOB)").fill("100");
+  await format.getByLabel("Duración total").fill("20");
+  await format.getByLabel("Duración de sesión").fill("90");
+  await format.getByLabel("Precio estudiante").fill("80");
+  await format.getByLabel("Precio externo").fill("100");
   await format.getByRole("button", { name: "Crear formato" }).click();
   await expect(page).toHaveURL(/\/app\/formatos$/);
   await expect(
@@ -548,16 +548,16 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
     .fill(formatName);
   await page
     .getByRole("form", { name: "Crear formato" })
-    .getByLabel("Duración total (horas)")
+    .getByLabel("Duración total")
     .fill("20");
-  await page.getByLabel("Duración de sesión (minutos)").fill("90");
+  await page.getByLabel("Duración de sesión").fill("90");
   await page
     .getByRole("form", { name: "Crear formato" })
-    .getByLabel("Precio estudiante (BOB)")
+    .getByLabel("Precio estudiante")
     .fill("80");
   await page
     .getByRole("form", { name: "Crear formato" })
-    .getByLabel("Precio externo (BOB)")
+    .getByLabel("Precio externo")
     .fill("100.50");
   await page.getByRole("button", { name: "Crear formato" }).click();
   await expect(page).toHaveURL(/\/app\/formatos$/);
