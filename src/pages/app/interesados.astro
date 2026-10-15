@@ -8,6 +8,11 @@ import PrivateLayout from "@/layouts/PrivateLayout.astro";
 import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import { requireInternalUser } from "@/server/auth/context";
 import { loadAdminInterestSummary } from "@/server/interests/http";
+import {
+  interestCourseFilters as options,
+  parseInterestFilter,
+  matchesInterestCourseFilter,
+} from "@/server/interests/filter";
 
 const actor = requireInternalUser(Astro.locals);
 Astro.response.headers.set("Cache-Control", "private, no-store");
@@ -15,6 +20,15 @@ let courses: AdminInterestSummaryDto[] = [];
 let loadError = false;
 const search = Astro.url.searchParams.get("search") ?? "";
 const query = normalizeRegistrationSearch(search);
+let status: ReturnType<typeof parseInterestFilter> = "WITH";
+try {
+  status = parseInterestFilter(Astro.url.searchParams);
+} catch {
+  return new Response("El filtro no es válido.", {
+    status: 400,
+    headers: { "Cache-Control": "private, no-store" },
+  });
+}
 try {
   courses = await loadAdminInterestSummary(actor);
 } catch {
@@ -24,8 +38,14 @@ try {
 const entries = courses.map((course) => ({
   course,
   searchable: normalizeRegistrationSearch(course.name),
+  demand: course.activeTotal > 0 ? "WITH" : "WITHOUT",
 }));
-const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
+const matches = (searchable: string, activeTotal: number) =>
+  searchable.includes(query) &&
+  matchesInterestCourseFilter(activeTotal, status);
+const hasMatches = entries.some(({ searchable, course }) =>
+  matches(searchable, course.activeTotal),
+);
 ---
 
 <PrivateLayout title="Interesados">
@@ -48,6 +68,10 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
       id="interest-course-search"
       label="Buscar por nombre de curso"
       {search}
+      {status}
+      {options}
+      filterLabel="Filtrar cursos por interesados"
+      defaultStatus="WITH"
     />
     {loadError ? (
       <section
@@ -92,7 +116,7 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
       <>
         <ListSearchEmpty
           hidden={hasMatches}
-          message="No hay cursos que coincidan con la búsqueda."
+          message="No hay cursos publicados que coincidan con la búsqueda y el filtro."
           resetHref="/app/interesados"
         />
         <section
@@ -105,10 +129,11 @@ const hasMatches = entries.some(({ searchable }) => searchable.includes(query));
             Selecciona un curso
           </h2>
           <ul class="grid gap-4 lg:grid-cols-2">
-            {entries.map(({ course, searchable }) => (
+            {entries.map(({ course, searchable, demand }) => (
               <li
                 data-list-entry={searchable}
-                hidden={!searchable.includes(query)}
+                data-list-status={demand}
+                hidden={!matches(searchable, course.activeTotal)}
               >
                 <a
                   href={`/app/interesados/${course.courseId}`}

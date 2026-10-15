@@ -10,8 +10,18 @@ interface Props {
   search: string;
   status?: string;
   options?: readonly ListFilterOption[];
+  filterLabel?: string;
+  defaultStatus?: string;
 }
-const { id, label, search, status = "ALL", options = [] } = Astro.props;
+const {
+  id,
+  label,
+  search,
+  status = "ALL",
+  options = [],
+  filterLabel = "Filtrar por estado",
+  defaultStatus = "ALL",
+} = Astro.props;
 const filterHref = (value: string) => {
   const url = new URL(Astro.url);
   url.searchParams.set("status", value);
@@ -25,6 +35,7 @@ const filterHref = (value: string) => {
   role="search"
   aria-label={label}
   data-list-search
+  data-list-default-status={defaultStatus}
   class="mt-8 flex min-w-0 flex-col gap-2"
 >
   <label for={id} class="text-sm font-medium">
@@ -52,7 +63,12 @@ const filterHref = (value: string) => {
         data-list-filter-options={JSON.stringify(options)}
       >
         <input type="hidden" name="status" value={status} data-list-status />
-        <ListStatusFilter client:load value={status} {options} />
+        <ListStatusFilter
+          client:load
+          value={status}
+          {options}
+          label={filterLabel}
+        />
       </div>
     )}
     <noscript>
@@ -66,7 +82,7 @@ const filterHref = (value: string) => {
   </div>
   {options.length > 0 && (
     <noscript>
-      <nav aria-label="Filtrar por estado" class="flex flex-wrap gap-2">
+      <nav aria-label={filterLabel} class="flex flex-wrap gap-2">
         {options.map((option) => (
           <a
             href={filterHref(option.value)}

@@ -28,7 +28,6 @@ import {
   handlePublicInterestPost,
 } from "@/server/interests/http";
 import { getPublicAuthEnvironment } from "@/server/environment";
-import { parseInterestFilter } from "@/server/interests/filter";
 import type { InternalUser } from "@/domain/auth/types";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 const url = getTestSupabaseEnvironment().databaseUrl;
@@ -133,15 +132,16 @@ test("interests concurrent normalized duplicates preserve autonomous first snaps
     email: "a.b+test@example.invalid",
   });
   expect(await firstRegistration()).toEqual(initial);
-  const cancelled = await mutateInterest(repo, actor, course.id, {
-    intent: "cancel",
+  const deleted = await mutateInterest(repo, actor, course.id, {
+    intent: "delete",
     interestRegistrationId: initial.id,
     revision: initial.updatedAt,
   });
-  expect(cancelled.ok).toBe(true);
+  expect(deleted.ok).toBe(true);
+  expect((await repo.course(course.id))!.registrations).toHaveLength(0);
   await registerInterest(repo, course.slug, { ...input, firstName: "Changed" });
-  expect((await firstRegistration()).status).toBe("CANCELLED");
-  expect((await firstRegistration()).firstName).toBe(initial.firstName);
+  expect((await firstRegistration()).id).not.toBe(initial.id);
+  expect((await firstRegistration()).firstName).toBe("Changed");
   const another = await makeCourse();
   await registerInterest(repo, another.slug, input);
   expect((await repo.course(another.id))!.registrations).toHaveLength(1);
@@ -253,46 +253,50 @@ test("interests preferences require same-course published planned group, includi
     }),
   ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
 });
-test("interests administrative audited transitions are monotonic, stale-safe, ownership-safe and independent of publication", async () => {
+test("interests deletion is audited, stale-safe, ownership-safe and restricted to publication", async () => {
   await registerInterest(repo, course.slug, input);
   const initial = await firstRegistration();
-  await db
-    .update(courses)
-    .set({ status: "ARCHIVED" })
-    .where(eq(courses.id, course.id));
-  const cancelled = await mutateInterest(repo, actor, course.id, {
-    intent: "cancel",
-    interestRegistrationId: initial.id,
-    revision: initial.updatedAt,
-  });
-  if (!cancelled.ok) throw new Error("Expected mutation");
-  expect(cancelled.metrics.activeTotal).toBe(0);
-  expect(new Date(cancelled.registration.updatedAt).getTime()).toBeGreaterThan(
-    new Date(initial.updatedAt).getTime(),
-  );
   const stale = await mutateInterest(repo, actor, course.id, {
-    intent: "reactivate",
+    intent: "delete",
     interestRegistrationId: initial.id,
-    revision: initial.updatedAt,
+    revision: "2000-01-01T00:00:00.000Z",
   });
   expect(stale).toMatchObject({
     ok: false,
     code: "STALE_INTEREST_REGISTRATION",
-    registration: cancelled.registration,
+    registration: initial,
   });
-  const noOp = await mutateInterest(repo, actor, course.id, {
-    intent: "cancel",
+  await expect(
+    repo.mutate(
+      course.id,
+      {
+        intent: "delete",
+        interestRegistrationId: initial.id,
+        revision: initial.updatedAt,
+      },
+      crypto.randomUUID(),
+    ),
+  ).rejects.toThrow();
+  expect(await firstRegistration()).toEqual(initial);
+  const another = await makeCourse();
+  await expect(
+    mutateInterest(repo, actor, another.id, {
+      intent: "delete",
+      interestRegistrationId: initial.id,
+      revision: initial.updatedAt,
+    }),
+  ).rejects.toMatchObject({ code: "INTEREST_REGISTRATION_NOT_FOUND" });
+  const deleted = await mutateInterest(repo, actor, course.id, {
+    intent: "delete",
     interestRegistrationId: initial.id,
-    revision: cancelled.registration.updatedAt,
+    revision: initial.updatedAt,
   });
-  expect(noOp).toEqual(cancelled);
-  const active = await mutateInterest(repo, actor, course.id, {
-    intent: "reactivate",
-    interestRegistrationId: initial.id,
-    revision: cancelled.registration.updatedAt,
+  expect(deleted).toMatchObject({
+    ok: true,
+    deletedId: initial.id,
+    metrics: { activeTotal: 0 },
   });
-  if (!active.ok) throw new Error("Expected mutation");
-  expect(active.metrics.activeTotal).toBe(1);
+  expect((await repo.course(course.id))!.registrations).toHaveLength(0);
   const audit = await db
     .select()
     .from(auditEvents)
@@ -309,48 +313,38 @@ test("interests administrative audited transitions are monotonic, stale-safe, ow
       .sort((left, right) => left.action.localeCompare(right.action)),
   ).toEqual([
     {
-      action: "INTEREST_REGISTRATION_CANCELLED",
+      action: "INTEREST_REGISTRATION_DELETED",
       actorId: actor.id,
       entityType: "INTEREST_REGISTRATION",
       entityId: initial.id,
       metadata: {
         courseId: course.id,
-        fromStatus: "ACTIVE",
-        toStatus: "CANCELLED",
-      },
-    },
-    {
-      action: "INTEREST_REGISTRATION_REACTIVATED",
-      actorId: actor.id,
-      entityType: "INTEREST_REGISTRATION",
-      entityId: initial.id,
-      metadata: {
-        courseId: course.id,
-        fromStatus: "CANCELLED",
-        toStatus: "ACTIVE",
       },
     },
   ]);
+  await registerInterest(repo, course.slug, input);
+  const replacement = await firstRegistration();
+  await db
+    .update(courses)
+    .set({ status: "ARCHIVED" })
+    .where(eq(courses.id, course.id));
+  expect(await repo.course(course.id)).toBeNull();
+  expect((await repo.summary()).some((row) => row.courseId === course.id)).toBe(
+    false,
+  );
+  expect(
+    await db
+      .select()
+      .from(interestRegistrations)
+      .where(eq(interestRegistrations.courseId, course.id)),
+  ).toHaveLength(0);
   await expect(
-    repo.mutate(
-      course.id,
-      {
-        intent: "cancel",
-        interestRegistrationId: initial.id,
-        revision: active.registration.updatedAt,
-      },
-      crypto.randomUUID(),
-    ),
-  ).rejects.toThrow();
-  expect(await firstRegistration()).toEqual(active.registration);
-  const another = await makeCourse();
-  await expect(
-    mutateInterest(repo, actor, another.id, {
-      intent: "cancel",
-      interestRegistrationId: initial.id,
-      revision: active.registration.updatedAt,
+    mutateInterest(repo, actor, course.id, {
+      intent: "delete",
+      interestRegistrationId: replacement.id,
+      revision: replacement.updatedAt,
     }),
-  ).rejects.toMatchObject({ code: "INTEREST_REGISTRATION_NOT_FOUND" });
+  ).rejects.toMatchObject({ code: "COURSE_NOT_FOUND" });
   await expect(
     getInterestCourse(repo, { ...actor, roles: ["INSTRUCTOR"] }, course.id),
   ).rejects.toThrow();
@@ -358,7 +352,7 @@ test("interests administrative audited transitions are monotonic, stale-safe, ow
     getInterestCourse(repo, { ...actor, status: "DISABLED" }, course.id),
   ).rejects.toThrow();
 });
-test("interests metrics include historical zero buckets and null independently of status-filtered rows", async () => {
+test("interests metrics include historical zero buckets and null after deletion", async () => {
   await registerInterest(repo, course.slug, input);
   await registerInterest(repo, course.slug, {
     ...input,
@@ -367,39 +361,19 @@ test("interests metrics include historical zero buckets and null independently o
   });
   const initial = await firstRegistration();
   await mutateInterest(repo, actor, course.id, {
-    intent: "cancel",
+    intent: "delete",
     interestRegistrationId: initial.id,
     revision: initial.updatedAt,
   });
-  const active = await getInterestCourse(
-    repo,
-    actor,
-    course.id,
-    parseInterestFilter(new URLSearchParams("status=ACTIVE")),
-  );
-  const cancelled = await getInterestCourse(
-    repo,
-    actor,
-    course.id,
-    parseInterestFilter(new URLSearchParams("status=CANCELLED")),
-  );
-  const all = await getInterestCourse(
-    repo,
-    actor,
-    course.id,
-    parseInterestFilter(new URLSearchParams("status=ALL")),
-  );
-  expect(all!.registrations).toHaveLength(2);
-  expect(all!.metrics).toEqual(active!.metrics);
+  const active = await getInterestCourse(repo, actor, course.id);
+  expect(active!.metrics.byPreference).toContainEqual({
+    preferredGroupId: null,
+    activeCount: 0,
+  });
   await expect(
-    getInterestCourse(repo, actor, "invalid-course", "ACTIVE"),
+    getInterestCourse(repo, actor, "invalid-course"),
   ).rejects.toMatchObject({ status: 404, code: "COURSE_NOT_FOUND" });
-  expect(() =>
-    parseInterestFilter(new URLSearchParams("status=INVALID")),
-  ).toThrow("El filtro no es válido");
   expect(active!.registrations).toHaveLength(1);
-  expect(cancelled!.registrations).toHaveLength(1);
-  expect(cancelled!.metrics).toEqual(active!.metrics);
   expect(active!.metrics.activeTotal).toBe(
     active!.metrics.byPreference.reduce(
       (sum, bucket) => sum + bucket.activeCount,
@@ -466,6 +440,10 @@ test("interests parent locks serialize public writes with withdrawal and group c
     const requestStarted = new Promise<void>((resolve) => {
       signalRequest = resolve;
     });
+    await registerInterest(repo, target.slug, {
+      ...input,
+      preferredGroupId: targetGroup!.id,
+    });
     const mutation = db.transaction(async (tx) => {
       await tx
         .select()
@@ -495,33 +473,59 @@ test("interests parent locks serialize public writes with withdrawal and group c
       code: operation === "withdraw" ? "COURSE_NOT_FOUND" : "VALIDATION_FAILED",
     });
     await mutation;
-    expect((await repo.course(target.id))!.registrations).toHaveLength(0);
+    if (operation === "withdraw") {
+      expect(await repo.course(target.id)).toBeNull();
+      expect(
+        await db
+          .select()
+          .from(interestRegistrations)
+          .where(eq(interestRegistrations.courseId, target.id)),
+      ).toHaveLength(0);
+      await db
+        .update(courses)
+        .set({ status: "PUBLISHED" })
+        .where(eq(courses.id, target.id));
+      await registerInterest(repo, target.slug, input);
+      expect((await repo.course(target.id))!.registrations).toHaveLength(1);
+    } else
+      expect((await repo.course(target.id))!.registrations).toHaveLength(1);
   }
 });
 
 test("interests concurrent administrator mutations return coherent metrics and one audited transition", async () => {
   await registerInterest(repo, course.slug, input);
   const initial = await firstRegistration();
-  const results = await Promise.all(
+  const results = await Promise.allSettled(
     Array.from({ length: 6 }, () =>
       mutateInterest(repo, actor, course.id, {
-        intent: "cancel",
+        intent: "delete",
         interestRegistrationId: initial.id,
         revision: initial.updatedAt,
       }),
     ),
   );
-  expect(results.filter((result) => result.ok)).toHaveLength(1);
-  expect(results.filter((result) => !result.ok)).toHaveLength(5);
+  expect(
+    results.filter((result) => result.status === "fulfilled"),
+  ).toHaveLength(1);
+  expect(results.filter((result) => result.status === "rejected")).toHaveLength(
+    5,
+  );
   for (const result of results) {
-    expect(result.metrics!.activeTotal).toBe(0);
-    expect(result.registration!.status).toBe("CANCELLED");
+    if (result.status === "rejected") {
+      expect(result.reason).toMatchObject({
+        code: "INTEREST_REGISTRATION_NOT_FOUND",
+      });
+      continue;
+    }
+    const payload = result.value;
+    expect(payload.ok).toBe(true);
+    expect(payload.metrics!.activeTotal).toBe(0);
     expect(
-      result.metrics!.byPreference.reduce(
+      payload.metrics!.byPreference.reduce(
         (sum, bucket) => sum + bucket.activeCount,
         0,
       ),
-    ).toBe(result.metrics!.activeTotal);
+    ).toBe(payload.metrics!.activeTotal);
   }
   expect(
     await db
@@ -617,7 +621,7 @@ test("interests HTTP new, duplicate-active and duplicate-cancelled are exactly n
   ).toEqual(first);
   const initial = await firstRegistration();
   await mutateInterest(repo, actor, course.id, {
-    intent: "cancel",
+    intent: "delete",
     interestRegistrationId: initial.id,
     revision: initial.updatedAt,
   });
@@ -658,8 +662,8 @@ test("interests HTTP new, duplicate-active and duplicate-cancelled are exactly n
     process.env.INTEREST_RATE_LIMIT_SECRET = saved;
   }
   const mutation = {
-    intent: "reactivate",
-    interestRegistrationId: initial.id,
+    intent: "delete",
+    interestRegistrationId: (await firstRegistration()).id,
     revision: (await firstRegistration()).updatedAt,
   };
   const denied = await handleAdminInterestPost({
@@ -691,15 +695,10 @@ test("interests HTTP new, duplicate-active and duplicate-cancelled are exactly n
       url,
     );
   expect((await adminPost(mutation, "https://invalid.test")).status).toBe(403);
-  const reactivated = await adminPost(mutation);
-  expect(reactivated.status).toBe(200);
-  expect(reactivated.headers!["Cache-Control"]).toBe("private, no-store");
-  expect(reactivated.payload).toMatchObject({
-    ok: true,
-    registration: { status: "ACTIVE" },
-    metrics: { activeTotal: 1 },
+  const staleResponse = await adminPost({
+    ...mutation,
+    revision: "2000-01-01T00:00:00.000Z",
   });
-  const staleResponse = await adminPost({ ...mutation, intent: "cancel" });
   expect(staleResponse.status).toBe(409);
   expect(staleResponse.payload).toMatchObject({
     ok: false,
@@ -707,6 +706,15 @@ test("interests HTTP new, duplicate-active and duplicate-cancelled are exactly n
     registration: { status: "ACTIVE" },
     metrics: { activeTotal: 1 },
   });
+  const deleted = await adminPost(mutation);
+  expect(deleted.status).toBe(200);
+  expect(deleted.headers!["Cache-Control"]).toBe("private, no-store");
+  expect(deleted.payload).toMatchObject({
+    ok: true,
+    deletedId: mutation.interestRegistrationId,
+    metrics: { activeTotal: 0 },
+  });
+  expect((await adminPost(mutation)).status).toBe(404);
   const missingAddress = await withRequestDatabase(
     () =>
       handlePublicInterestPost({

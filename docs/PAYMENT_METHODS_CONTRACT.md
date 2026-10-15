@@ -17,10 +17,11 @@
   de códigos cerrados. Migración forward-only `0028_payment_methods.sql` deja
   nulos los históricos; trigger INSERT rechaza nuevos movimientos sin método.
   No se reescriben migraciones previas. Base inicial origin/development y
-  origin/master: 0000–0026, journal idx 26/27 entradas. El PR de interesados
-  384 propone `0027_interest_operational_cleanup`; pagos reserva exclusivamente 0028. Integrar primero 0027 y regenerar la cadena snapshot/journal de 0028
-  contra ella antes del merge (idx 28, ledger resultante 29); no inventar una
-  migración vacía ni confundir contador de entradas con prefijo del archivo.
+  origin/master: 0000–0026, journal idx 26/27 entradas. PR384 integró
+  `0027_interest_operational_cleanup` en development como `879a082`.
+  La cadena de pagos incorpora 0027 sin modificarla y enlaza el snapshot de
+  0028 con ella: idx 28, journal resultante de 29 entradas. No se inventó una
+  migración vacía ni se confundió el contador con el prefijo del archivo.
 - Append-only, montos, mínimos, estados, permisos, revisiones e idempotencia
   permanecen. El método forma parte del fingerprint canónico: cambiarlo con la
   misma clave de solicitud genera `IDEMPOTENCY_CONFLICT`. Los receipts previos

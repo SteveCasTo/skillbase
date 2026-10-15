@@ -13,13 +13,18 @@ import type { ListFilterOption } from "./filters";
 interface Props {
   value: string;
   options: readonly ListFilterOption[];
+  label?: string;
 }
 const subscribe = () => () => {};
 const clientReady = () => true;
 const serverReady = () => false;
 
 /** Only the accessible picker hydrates; authorization and initial results remain SSR. */
-export default function ListStatusFilter({ value, options }: Props) {
+export default function ListStatusFilter({
+  value,
+  options,
+  label = "Filtrar por estado",
+}: Props) {
   const [selected, setSelected] = useState(value);
   const ready = useSyncExternalStore(subscribe, clientReady, serverReady);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -51,7 +56,7 @@ export default function ListStatusFilter({ value, options }: Props) {
     >
       <SelectTrigger
         ref={trigger}
-        aria-label={`Filtrar por estado: ${options.find((option) => option.value === selected)?.label}`}
+        aria-label={`${label}: ${options.find((option) => option.value === selected)?.label}`}
         className={buttonVariants({
           variant: "outline",
           className: "min-h-11 w-auto rounded-full",

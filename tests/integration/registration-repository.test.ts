@@ -728,7 +728,7 @@ test("interest conversion consumes operational demand permanently while preservi
       (course) => course.courseId === f.course.id,
     )?.activeTotal,
   ).toBe(0);
-  for (const intent of ["cancel", "reactivate"] as const) {
+  for (const intent of ["delete"] as const) {
     await expect(
       interests.mutate(
         f.course.id,
@@ -747,12 +747,8 @@ test("interest conversion consumes operational demand permanently while preservi
   );
   expect(cancelled.registration.state).toBe("CANCELLED");
   expect((await interests.course(f.course.id))!.registrations).toEqual([]);
-  expect(
-    (await interests.course(f.course.id, "ACTIVE"))!.metrics.activeTotal,
-  ).toBe(0);
-  expect(
-    (await interests.course(f.course.id, "CANCELLED"))!.registrations,
-  ).toEqual([]);
+  expect((await interests.course(f.course.id))!.metrics.activeTotal).toBe(0);
+  expect((await interests.course(f.course.id))!.registrations).toEqual([]);
   expect(
     (await interests.course(other.course.id))!.availableForPrefillInterestIds,
   ).toContain(independent!.id);
@@ -772,6 +768,14 @@ test("interest conversion consumes operational demand permanently while preservi
       f.actor.id,
     ),
   ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  await db
+    .update(schema.courses)
+    .set({ status: "DRAFT" })
+    .where(eq(schema.courses.id, f.course.id));
+  expect(await interests.course(f.course.id)).toBeNull();
+  expect((await repository.detail(row.id, f.actor.id))!.ledger).toEqual(
+    cancelled.ledger,
+  );
   expect(
     (
       await db

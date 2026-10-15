@@ -50,7 +50,7 @@ export function isAdminRegistration(
     typeof value.email === "string" &&
     (value.phone === null || typeof value.phone === "string") &&
     (value.preferredGroupId === null || identifier(value.preferredGroupId)) &&
-    (value.status === "ACTIVE" || value.status === "CANCELLED") &&
+    value.status === "ACTIVE" &&
     instant(value.createdAt) &&
     instant(value.updatedAt)
   );
@@ -87,9 +87,16 @@ export function isAdminMetrics(
   );
 }
 
-export function visibleAfterMutation(
-  filter: string,
-  status: AdminInterestRegistrationDto["status"],
-): boolean {
-  return filter === "" || filter === status;
+export function isAdminDeletion(
+  value: unknown,
+  courseId: string,
+  registrationId: string,
+): value is { ok: true; deletedId: string; metrics: AdminInterestMetricsDto } {
+  return (
+    object(value) &&
+    value.ok === true &&
+    identifier(value.deletedId) &&
+    value.deletedId === registrationId &&
+    isAdminMetrics(value.metrics, courseId)
+  );
 }

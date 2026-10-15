@@ -121,93 +121,39 @@ const rowFor = (page: Page, name = "Ana Sintética") =>
     }),
   });
 
-test("filters replace only the authorized list, retain focus and handle history, failure and retry", async ({
+test("course demand filters combine with search without filtering interest states", async ({
   page,
   context,
 }) => {
   const course = await interestCourse(page, context);
-  await page.goto(course.path);
-  const shell = await page.locator("h1").elementHandle();
-  const metrics = await page.locator("[data-interest-metrics]").elementHandle();
-  const all = page.getByRole("button", { name: "Todos", exact: true });
-  const active = page.getByRole("button", { name: "Activos", exact: true });
-  const cancelled = page.getByRole("button", {
-    name: "Cancelados",
-    exact: true,
-  });
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route(`**${course.path}?status=ACTIVE`, async (route) => {
-    await gate;
-    await route.continue();
-  });
-  await active.focus();
-  await active.press("Enter");
-  await expect(page.locator("[data-filter-skeleton]")).toBeVisible();
-  await expect(page.locator("[data-navigation-skeleton]")).toBeHidden();
-  await cancelled.click();
-  await expect(cancelled).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("[data-interests-empty]")).toBeVisible();
-  release();
-  await expect(page).toHaveURL(`${course.path}?status=CANCELLED`);
-  await expect(cancelled).toBeFocused();
-  expect(await shell!.evaluate((node) => node.isConnected)).toBe(true);
-  expect(await metrics!.evaluate((node) => node.isConnected)).toBe(true);
-  await all.click();
-  await expect(page.locator("[data-interest-id]")).toHaveCount(2);
-  await page.goBack();
-  await expect(cancelled).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("[data-interests-empty]")).toBeVisible();
-  expect(await shell!.evaluate((node) => node.isConnected)).toBe(true);
-  await page.goForward();
-  await expect(all).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("[data-interest-id]")).toHaveCount(2);
-  await page.unroute(`**${course.path}?status=ACTIVE`);
-  await page.route(`**${course.path}?status=ACTIVE`, (route) =>
-    route.fulfill({ status: 503, body: "Unavailable" }),
-  );
-  await active.click();
+  await page.goto("/app/interesados");
+  const search = page.getByRole("searchbox");
+  await search.fill(course.name);
+  const card = page.getByRole("link", { name: new RegExp(course.name) });
+  await expect(card).toBeVisible();
+  const filter = page.getByRole("combobox");
+  await expect(filter).toContainText("Con interesados");
+  await filter.click();
+  await page
+    .getByRole("option", { name: "Sin interesados", exact: true })
+    .click();
+  await expect(card).toBeHidden();
+  await expect(page.locator("[data-list-empty]")).toBeVisible();
+  await filter.click();
+  await page.getByRole("option", { name: "Todos", exact: true }).click();
+  await expect(card).toBeVisible();
+  await card.click();
   await expect(
-    page.locator(
-      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
-    ),
-  ).toContainText("Reintenta");
+    page.getByRole("button", { name: "Activos", exact: true }),
+  ).toHaveCount(0);
   await expect(
-    page.locator(
-      '[data-sileo-toast][data-state="error"][data-exiting="false"]',
-    ),
-  ).toBeVisible();
-  await expect(page.locator("[data-interests-error]")).toBeHidden();
-  await expect(all).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("[data-interest-id]")).toHaveCount(2);
-  await expect(page.locator("[data-filter-skeleton]")).toBeHidden();
-  await page.unroute(`**${course.path}?status=ACTIVE`);
-  await page.route(`**${course.path}?status=ACTIVE`, (route) =>
-    route.fulfill({
-      status: 200,
-      headers: { "Content-Type": "text/html", "X-Interest-Fragment": "1" },
-      body: `<div data-admin-interests data-course-id="${crypto.randomUUID()}" data-filter="ACTIVE"><ul data-interest-list></ul></div>`,
-    }),
-  );
-  await page.getByRole("button", { name: "Reintentar filtro" }).click();
-  await expect(
-    page
-      .locator('[data-sileo-toast][data-state="error"][data-exiting="false"]')
-      .filter({ hasText: "validar el listado" }),
-  ).toContainText("validar el listado");
-  await expect(page.locator("[data-interest-id]")).toHaveCount(2);
-  await page.unroute(`**${course.path}?status=ACTIVE`);
-  await page.getByRole("button", { name: "Reintentar filtro" }).click();
-  await expect(active).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("[data-interests-error]")).toBeHidden();
-  // Replaced cards keep the original delegated confirmation/mutation behavior.
-  await confirmAction(page, rowFor(page), "Cancelar interés");
+    page.getByRole("button", { name: "Cancelados", exact: true }),
+  ).toHaveCount(0);
+  await confirmAction(page, rowFor(page), "Eliminar interesado");
   await expect(rowFor(page)).toHaveCount(0);
 });
 
-test("fragment GET validates filters and never grants interest data to non-admin sessions", async ({
+test("fragment GET cannot expose historical states or grant data to non-admin sessions", async ({
   page,
   context,
 }) => {
@@ -220,7 +166,8 @@ test("fragment GET validates filters and never grants interest data to non-admin
   expect(valid.headers()["cache-control"]).toContain("no-store");
   const html = await valid.text();
   expect(html).toContain("data-admin-interests");
-  expect(html).not.toContain("Ana Sintética");
+  expect(html).toContain("Ana Sintética");
+  expect(html).not.toContain("Reactivar interés");
   expect(html).not.toContain("<h1");
   for (const query of [
     "status=invalid",
@@ -230,9 +177,8 @@ test("fragment GET validates filters and never grants interest data to non-admin
     const invalid = await page.request.get(`${course.path}?${query}`, {
       headers: fragmentHeaders,
     });
-    expect(invalid.status()).toBe(400);
-    expect(await invalid.json()).toMatchObject({ code: "INVALID_REQUEST" });
-    expect(await invalid.text()).not.toContain("Ana Sintética");
+    expect(invalid.status()).toBe(200);
+    expect(await invalid.text()).not.toContain("Reactivar interés");
   }
   await signInFixture(context, AUTH_FIXTURES.instructor.email);
   const denied = await page.request.get(course.path, {
@@ -259,7 +205,7 @@ async function confirmAction(page: Page, row: Locator, action: string) {
   await expect(dialog).toBeHidden();
 }
 
-test("public demand reaches ADMIN and cancel/reactivate reconcile locally with row-only pending state", async ({
+test("public demand reaches ADMIN and deletion reconciles locally with row-only pending state", async ({
   page,
   context,
 }) => {
@@ -312,13 +258,12 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
   await row.locator("summary").focus();
   await row.locator("summary").press("Enter");
   await expect(
-    page.getByRole("alertdialog", { name: "Cancelar interés" }),
+    page.getByRole("alertdialog", { name: "Eliminar interesado" }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("alertdialog")).toBeHidden();
   await expect(row.locator("summary")).toBeFocused();
   const originalRow = await row.elementHandle();
-  const revision = await row.locator('input[name="revision"]').inputValue();
   await page.evaluate(() => {
     (window as Window & { interestMarker?: number }).interestMarker = 1;
   });
@@ -330,14 +275,14 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
     if (route.request().method() === "POST") await gate;
     await route.continue();
   });
-  await confirmAction(page, row, "Cancelar interés");
+  await confirmAction(page, row, "Eliminar interesado");
   await expect(row).toHaveAttribute("aria-busy", "true");
   await expect(row.locator("summary")).toHaveAttribute("aria-disabled", "true");
   await expect(
     rowFor(page, "Luis Sintético").locator("summary"),
   ).not.toHaveAttribute("aria-disabled", "true");
   release();
-  await expect(row.locator("[data-interest-status]")).toHaveText("Cancelado");
+  await expect(row).toHaveCount(0);
   await expect(page.locator("[data-active-total]")).toHaveText("1");
   await expect(
     page.locator(`[data-demand-row="${course.groupId}"]`),
@@ -346,15 +291,19 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
     "data-leading",
     "true",
   );
-  await expect(row.locator('input[name="revision"]')).not.toHaveValue(revision);
-  expect(await originalRow?.evaluate((node) => node.isConnected)).toBe(true);
-  await expect(row.locator("summary")).toBeFocused();
-  await confirmAction(page, row, "Reactivar interés");
-  await expect(row.locator("[data-interest-status]")).toHaveText("Activo");
-  await expect(page.locator("[data-active-total]")).toHaveText("2");
+  expect(await originalRow?.evaluate((node) => node.isConnected)).toBe(false);
+  await expect(
+    page.getByRole("heading", { name: "Registros de interés" }),
+  ).toBeFocused();
+  await confirmAction(
+    page,
+    rowFor(page, "Luis Sintético"),
+    "Eliminar interesado",
+  );
+  await expect(page.locator("[data-active-total]")).toHaveText("0");
   await expect(
     page.locator('[data-demand-row][data-leading="true"]'),
-  ).toHaveCount(2);
+  ).toHaveCount(0);
   expect(
     await page.evaluate(
       () => (window as Window & { interestMarker?: number }).interestMarker,
@@ -362,7 +311,7 @@ test("public demand reaches ADMIN and cancel/reactivate reconcile locally with r
   ).toBe(1);
 });
 
-test("409 shows current state and revision without replaying the obsolete intent", async ({
+test("409 shows current revision without replaying the obsolete delete intent", async ({
   page,
   context,
 }) => {
@@ -373,14 +322,10 @@ test("409 shows current state and revision without replaying the obsolete intent
     .locator('input[name="interestRegistrationId"]')
     .inputValue();
   const revision = await row.locator('input[name="revision"]').inputValue();
-  const concurrent = await page.request.post(course.path, {
-    headers,
-    form: { intent: "cancel", interestRegistrationId: id, revision },
+  // A stale observed revision must not delete the currently persisted source.
+  await row.locator('input[name="revision"]').evaluate((input) => {
+    (input as HTMLInputElement).value = "2000-01-01T00:00:00.000Z";
   });
-  expect(concurrent.status()).toBe(200);
-  const current = (await concurrent.json()) as {
-    registration: { updatedAt: string };
-  };
   let posts = 0;
   page.on("request", (request) => {
     if (
@@ -389,7 +334,7 @@ test("409 shows current state and revision without replaying the obsolete intent
     )
       posts++;
   });
-  await confirmAction(page, row, "Cancelar interés");
+  await confirmAction(page, row, "Eliminar interesado");
   await expect(
     page.locator(
       '[data-sileo-toast][data-state="error"][data-exiting="false"]',
@@ -400,34 +345,36 @@ test("409 shows current state and revision without replaying the obsolete intent
       '[data-sileo-toast][data-state="error"][data-exiting="false"]',
     ),
   ).toBeVisible();
-  await expect(row.locator("[data-row-error]")).toBeHidden();
-  await expect(row.locator("[data-interest-status]")).toHaveText("Cancelado");
-  await expect(row.locator('input[name="revision"]')).toHaveValue(
-    current.registration.updatedAt,
+  await expect(row.locator("[data-row-error]")).toContainText(
+    "El registro cambió",
   );
-  await expect(page.locator("[data-active-total]")).toHaveText("1");
+  await expect(row.locator('input[name="revision"]')).toHaveValue(revision);
+  await expect(page.locator("[data-active-total]")).toHaveText("2");
   expect(posts).toBe(1);
-  await confirmAction(page, row, "Reactivar interés");
-  await expect(row.locator("[data-interest-status]")).toHaveText("Activo");
+  await confirmAction(page, row, "Eliminar interesado");
+  await expect(row).toHaveCount(0);
+  await expect(page.locator("[data-active-total]")).toHaveText("1");
+  const replay = await page.request.post(course.path, {
+    headers,
+    form: { intent: "delete", interestRegistrationId: id, revision },
+  });
+  expect(replay.status()).toBe(404);
   expect(posts).toBe(2);
 });
 
-test("status filter removes changed rows, preserves filter and shows local empty state on mobile", async ({
+test("deletion removes rows and shows local empty state on mobile", async ({
   page,
   context,
 }) => {
   const course = await interestCourse(page, context);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`${course.path}?status=ACTIVE`);
+  await page.goto(course.path);
   for (const name of ["Ana Sintética", "Luis Sintético"]) {
     const row = rowFor(page, name);
-    await confirmAction(page, row, "Cancelar interés");
+    await confirmAction(page, row, "Eliminar interesado");
     await expect(row).toHaveCount(0);
   }
-  await expect(page).toHaveURL(`${course.path}?status=ACTIVE`);
-  await expect(
-    page.getByRole("button", { name: "Activos", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page).toHaveURL(course.path);
   await expect(page.locator("[data-interests-empty]")).toBeVisible();
   await expect(page.locator("[data-active-total]")).toHaveText("0");
   await expect(
@@ -495,6 +442,12 @@ test("interest cards and demand use the available width across mobile, tablet an
     await expect(rowFor(page).getByRole("link")).toHaveCount(0);
     await rowFor(page).locator("summary").focus();
     await expect(rowFor(page).locator("summary")).toBeFocused();
+    if (width === 390 || width === 1440)
+      await page.screenshot({
+        path: test.info().outputPath(`interests-${width}.png`),
+        fullPage: true,
+        animations: "disabled",
+      });
   }
 });
 
@@ -550,7 +503,7 @@ test("expired-session redirect is not reported as a successful mutation", async 
     else await route.continue();
   });
   const row = rowFor(page);
-  await confirmAction(page, row, "Cancelar interés");
+  await confirmAction(page, row, "Eliminar interesado");
   await expect(
     page.locator(
       '[data-sileo-toast][data-state="error"][data-exiting="false"]',
@@ -561,11 +514,11 @@ test("expired-session redirect is not reported as a successful mutation", async 
       '[data-sileo-toast][data-state="error"][data-exiting="false"]',
     ),
   ).toBeVisible();
-  await expect(row.locator("[data-row-error]")).toBeHidden();
+  await expect(row.locator("[data-row-error]")).toContainText("sesión");
   await expect(
     page.getByRole("link", { name: "Iniciar sesión", exact: true }),
   ).toBeVisible();
-  await expect(row.locator("[data-interest-status]")).toHaveText("Activo");
+  await expect(row).toBeVisible();
   await expect(page.locator("[data-active-total]")).toHaveText("2");
 });
 
@@ -583,24 +536,22 @@ test("HTML fallback confirms and redirects without JS; errors stay visible", asy
     const row = rowFor(html);
     await row
       .locator("summary")
-      .filter({ hasText: /^Cancelar interés$/u })
+      .filter({ hasText: /^Eliminar interesado$/u })
       .click();
     await row
       .getByRole("form")
-      .getByRole("button", { name: "Cancelar interés", exact: true })
+      .getByRole("button", { name: "Eliminar interesado", exact: true })
       .click();
     await expect(html).toHaveURL(`${course.path}?success=updated`);
-    await expect(rowFor(html).locator("[data-interest-status]")).toHaveText(
-      "Cancelado",
-    );
+    await expect(rowFor(html)).toHaveCount(0);
     await expect(html.getByRole("status")).toContainText(
-      "Estado del interesado actualizado",
+      "Interesado eliminado",
     );
     const response = await html.request.post(course.path, {
       headers: { Origin: headers.Origin },
       form: {
-        intent: "reactivate",
-        interestRegistrationId: await rowFor(html)
+        intent: "delete",
+        interestRegistrationId: await rowFor(html, "Luis Sintético")
           .locator('input[name="interestRegistrationId"]')
           .inputValue(),
         revision: "2020-01-01T00:00:00.000Z",
@@ -609,15 +560,10 @@ test("HTML fallback confirms and redirects without JS; errors stay visible", asy
     expect(response.status()).toBe(409);
     expect(response.headers()["cache-control"]).toBe("private, no-store");
     expect(await response.text()).toContain("El registro cambió");
-    await html.getByRole("button", { name: "Cancelados", exact: true }).click();
-    await expect(html).toHaveURL(`${course.path}?status=CANCELLED`);
     await expect(html.locator("[data-interest-id]")).toHaveCount(1);
     await expect(
-      html.getByRole("button", { name: "Cancelados", exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await html.getByRole("button", { name: "Todos", exact: true }).click();
-    await expect(html).toHaveURL(`${course.path}?status=ALL`);
-    await expect(html.locator("[data-interest-id]")).toHaveCount(2);
+      html.getByRole("button", { name: "Reactivar interés" }),
+    ).toHaveCount(0);
   } finally {
     await fallback.close();
   }

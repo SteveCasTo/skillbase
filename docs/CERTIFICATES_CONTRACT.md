@@ -130,8 +130,11 @@ orientaciones coloca el QR vectorial de 72 pt (incluida su zona de silencio)
 debajo del logo departamental, a la derecha del título, y el ID completo debajo
 del QR. El ID admite 22–128 caracteres con ajuste acotado y fuente mínima de 7 pt;
 no se recorta. Las tres líneas de firma bajan para liberar espacio manuscrito;
-el bloque de verificación ya no ocupa el pie. Las vistas previas ADMIN siguen
-sin QR, ID ni enlace verificable.
+el bloque de verificación ya no ocupa el pie. Las vistas previas ADMIN reutilizan
+esa composición con un ID de muestra fuera del alfabeto base64url de emisión y
+un QR hacia `https://preview.invalid/certificados/<ID-de-muestra>`. No muestran
+texto inferior «Vista previa» ni marca sustituta; no verifican credenciales reales.
+Conservan el endpoint privado/no-store, sin emitir registros ni escribir Storage.
 
 La versión se congela en cada nueva generación. Solo está disponible la plantilla
 `phase9-v2` (versión numérica 2 del renderer); v1 se rechaza, nunca se reinterpreta
