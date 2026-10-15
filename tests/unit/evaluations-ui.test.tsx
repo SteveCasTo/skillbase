@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GradeRow } from "@/components/evaluations/GradeRow";
+import { GradeRoster } from "@/components/evaluations/GradeRoster";
+import type { CourseEvaluationsDto } from "@/domain/evaluations/types";
 import {
   acceptsGradeDraft,
   changedGrades,
@@ -77,4 +79,37 @@ test("pending grade rows have only component pending labels and one participant 
   expect(html.match(/aria-label="Editar notas de/gu)).toHaveLength(1);
   person.canGrade = false;
   expect(render()).not.toContain("Editar notas de");
+  const data: CourseEvaluationsDto = {
+    courseId: value.courseId,
+    courseName: value.courseName,
+    startsAt: "2020-01-01T12:00:00Z",
+    minimumGrade: value.minimumGrade,
+    provisional: true,
+    scheme: value.scheme,
+    groupId: value.groupId,
+    groups: [],
+    participants: [person],
+    academicGroups: [
+      { groupId: value.groupId, closed: false, version: 0, revision: 0 },
+    ],
+  };
+  const roster = () =>
+    renderToStaticMarkup(
+      <GradeRoster
+        data={data}
+        save={async () => {
+          throw new Error("Unexpected mutation");
+        }}
+        reset={async () => {
+          throw new Error("Unexpected mutation");
+        }}
+        onSaved={() => {}}
+      />,
+    );
+  expect(roster()).toContain('for="evaluation-search" class="sr-only"');
+  expect(roster()).not.toContain("Restablecer cálculo automático");
+  data.hasAttendanceOverrides = true;
+  expect(roster()).toContain("Restablecer cálculo automático");
+  data.academicGroups![0]!.closed = true;
+  expect(roster()).not.toContain("Restablecer cálculo automático");
 });

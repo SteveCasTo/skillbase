@@ -308,7 +308,8 @@ const fallbackColumns = [
                                         aria-describedby={
                                           attempted && message
                                             ? `${id}-error`
-                                            : grade?.score == null
+                                            : component.type !== "ATTENDANCE" &&
+                                                grade?.score == null
                                               ? `${id}-help`
                                               : undefined
                                         }

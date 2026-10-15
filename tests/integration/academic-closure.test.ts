@@ -1063,6 +1063,26 @@ test("academic closure private HTTP and database guards preserve snapshots and d
   expect(functions).toHaveLength(2);
   expect(functions.every((r) => !r.granted)).toBe(true);
   await assertCurrentMigrationLedger(db);
+  const beforeReplay = await db
+    .select()
+    .from(s.academicClosureVersions)
+    .orderBy(s.academicClosureVersions.id);
+  const attendanceMigration = await Bun.file(
+    new URL("../../drizzle/0029_attendance_grade.sql", import.meta.url),
+  ).text();
+  for (const statement of attendanceMigration.split("--> statement-breakpoint"))
+    if (statement.trim()) await db.execute(sql.raw(statement));
+  expect(
+    await db
+      .select()
+      .from(s.academicClosureVersions)
+      .orderBy(s.academicClosureVersions.id),
+  ).toEqual(beforeReplay);
+  await assertCurrentMigrationLedger(db);
+  const originFunction = await db.execute<{ granted: boolean }>(
+    sql`select has_function_privilege('anon', 'public.record_attendance_grade_origin()', 'EXECUTE') or has_function_privilege('authenticated', 'public.record_attendance_grade_origin()', 'EXECUTE') or has_function_privilege('service_role', 'public.record_attendance_grade_origin()', 'EXECUTE') as granted`,
+  );
+  expect(originFunction[0]!.granted).toBe(false);
   // Revoked current roles also deny loader access despite a stale ADMIN DTO.
   await db
     .delete(s.userRoles)
