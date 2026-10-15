@@ -88,11 +88,9 @@ export const certificates = pgTable(
       name: "certificates_course_group_fk",
     }).onDelete("restrict"),
     uniqueIndex("certificates_public_id_unique").on(t.publicCredentialId),
-    uniqueIndex("certificates_one_current_unique").on(
-      t.groupId,
-      t.type,
-      t.recipientId,
-    ),
+    uniqueIndex("certificates_one_current_unique")
+      .on(t.groupId, t.type, t.recipientId)
+      .where(sql`${t.state} <> 'revoked'`),
     index("certificates_group_idx").on(t.groupId),
     index("certificates_version_idx").on(t.versionId),
     index("certificates_instructor_idx").on(t.instructorId),

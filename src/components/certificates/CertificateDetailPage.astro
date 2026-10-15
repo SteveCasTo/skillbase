@@ -14,7 +14,8 @@ import FormFeedback from "./FormFeedback.astro";
 import SignedPdfUpload from "./SignedPdfUpload.astro";
 import RevokeCertificate from "./RevokeCertificate";
 type Props = CertificateDetailProps;
-const { load, feedback, instructorRoute, path, requestKey } = Astro.props;
+const { load, feedback, instructorRoute, path, requestKey, history, reissue } =
+  Astro.props;
 const record = load.available ? load.data : null;
 const title = record ? certificateTypeLabel[record.type] : "Certificado";
 const groupPath = record
@@ -191,6 +192,46 @@ const showDocument =
                   initialError={feedback.success ? "" : feedback.message}
                 />
               )}
+              {reissue && (
+                <form
+                  method="post"
+                  action={reissue.path}
+                  data-success-href={reissue.path}
+                  data-certificate-form
+                  data-pending-label="Generando PDF…"
+                  data-success-label="PDF listo para firmar."
+                >
+                  <input type="hidden" name="type" value={record.type} />
+                  <input
+                    type="hidden"
+                    name="recipientId"
+                    value={record.recipientId}
+                  />
+                  <input
+                    type="hidden"
+                    name="versionId"
+                    value={reissue.versionId}
+                  />
+                  <input
+                    type="hidden"
+                    name="closureRevision"
+                    value={reissue.closureRevision}
+                  />
+                  <input
+                    type="hidden"
+                    name="configurationRevision"
+                    value={reissue.configurationRevision}
+                  />
+                  <input type="hidden" name="requestKey" value={requestKey} />
+                  <FormFeedback />
+                  <button
+                    type="submit"
+                    class={buttonVariants({ className: "min-h-11" })}
+                  >
+                    Emitir nuevo
+                  </button>
+                </form>
+              )}
             </div>
           )}
           {instructorRoute && record.state === "issued" && (
@@ -232,6 +273,34 @@ const showDocument =
               ></p>
             </>
           )}
+        </section>
+      )}
+      {history.length > 0 && (
+        <section
+          aria-label="Certificados revocados"
+          class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          {history.map((previous) => (
+            <a
+              href={`${instructorRoute ? "/app/mis-certificados" : "/app/certificados"}/${previous.id}`}
+              class="flex min-w-0 flex-col gap-2 rounded-xl border p-4 focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              <span class="font-medium">Revocado</span>
+              {previous.revokedAt && (
+                <time datetime={previous.revokedAt} class="text-sm">
+                  {new Intl.DateTimeFormat("es-BO", {
+                    dateStyle: "medium",
+                    timeZone: "America/La_Paz",
+                  }).format(new Date(previous.revokedAt))}
+                </time>
+              )}
+              {previous.reason && (
+                <p class="break-words text-sm text-muted-foreground">
+                  {previous.reason}
+                </p>
+              )}
+            </a>
+          ))}
         </section>
       )}
     </article>

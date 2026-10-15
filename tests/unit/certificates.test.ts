@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { PDFDocument } from "pdf-lib";
 import {
   certificateRecipients,
+  canReissueCertificate,
   defaultCertificateConfiguration,
   publicCertificate,
   requireCurrentClosure,
@@ -99,6 +100,36 @@ test("certificate eligibility uses only official combined decision and stable id
   expect(() =>
     certificateRecipients({ ...report, instructorName: null }, "APPROVAL"),
   ).toThrow();
+  const revoked = {
+    state: "revoked" as const,
+    groupId: "group",
+    type: "APPROVAL" as const,
+    recipientId: "eligible",
+  };
+  expect(canReissueCertificate(revoked, [revoked], report)).toBe(true);
+  expect(
+    canReissueCertificate({ ...revoked, state: "issued" }, [], report),
+  ).toBe(false);
+  expect(
+    canReissueCertificate(revoked, [{ ...revoked, state: "pending" }], report),
+  ).toBe(false);
+  expect(
+    canReissueCertificate(
+      revoked,
+      [{ ...revoked, state: "pending", groupId: "other" }],
+      report,
+    ),
+  ).toBe(true);
+  expect(
+    canReissueCertificate(
+      { ...revoked, recipientId: "attendance-failed" },
+      [],
+      report,
+    ),
+  ).toBe(false);
+  expect(
+    canReissueCertificate(revoked, [], { ...report, instructorName: null }),
+  ).toBe(false);
 });
 test("generation freezes nominal civil dates, positive hours, ordinal and all signatories", () => {
   const data = freezeCertificateData(input);
