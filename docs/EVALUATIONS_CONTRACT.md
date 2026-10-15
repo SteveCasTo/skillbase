@@ -38,11 +38,12 @@ para componentes AUTO después de correcciones.
 
 El POST contextual de grupo acepta `action: "reset-attendance"`, `requestKey`
 y `schemeRevision`. Restablece únicamente los overrides ATTENDANCE del grupo
-actual como AUTO, mantiene identidad/revisión/historia, no borra notas, y aplica
+actual como AUTO con la nota derivada vigente cuando es computable, mantiene
+identidad/revisión/historia, no borra notas, y aplica
 revalidación de actor/ownership, guard cerrado e idempotencia por receipt. No toca
-THEORY/PRACTICAL ni otros grupos. Una fila AUTO con score previo conserva ese
-valor como evidencia de la última escritura; lecturas lo sustituyen por la
-derivación actual o `null`. Auditoría adicional registra origen anterior/nuevo,
+THEORY/PRACTICAL ni otros grupos. Solo si no existe denominador, una fila AUTO
+conserva el score previo como evidencia de la última escritura; lecturas lo
+sustituyen por `null`. Auditoría adicional registra origen anterior/nuevo,
 nota anterior/nueva, actor, componente, inscripción y revisión, incluido reset.
 
 UI: únicamente tipo Asistencia, valor en las celdas existentes y control

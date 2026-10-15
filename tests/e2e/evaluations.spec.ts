@@ -317,6 +317,11 @@ async function verifyAttendanceGrades(
       "50.00",
       "90.00",
     ]);
+    expect(
+      refreshed.history?.some(
+        (entry) => entry.fromScore === "80.25" && entry.toScore === "50.00",
+      ),
+    ).toBe(true);
     await edit.click();
     await expect(attendanceInput).toHaveValue("50.00");
     expect(await attendanceInput.getAttribute("title")).toBeNull();

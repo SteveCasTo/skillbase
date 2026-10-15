@@ -836,6 +836,12 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
             );
           assertSchemeRevision(ctx.scheme?.revision ?? 0, input.schemeRevision);
           const items = await components(tx, input.courseId);
+          const attendance = await loadAttendanceGradeEvidence(
+            tx,
+            ctx.course,
+            groupId,
+            ctx.now,
+          );
           const registrations = await tx
             .select({ id: s.preRegistrations.id })
             .from(s.preRegistrations)
@@ -861,6 +867,9 @@ export class DrizzleEvaluationRepository implements EvaluationRepository {
               .update(s.evaluationGrades)
               .set({
                 origin: "AUTO",
+                scoreHundredths:
+                  attendance.score(grade.registrationId) ??
+                  grade.scoreHundredths,
                 revision: grade.revision + 1,
                 recordedBy: actorId,
                 recordedAt: ctx.now,
