@@ -9,6 +9,7 @@ import type {
   RegistrationFilter,
 } from "@/domain/pre-registrations/types";
 import {
+  validatePaymentMethod,
   validateRegistrationId,
   validateRegistrationRevision,
 } from "@/domain/pre-registrations/validation";
@@ -208,6 +209,7 @@ export function flatRegistrationValues(raw: unknown): Record<string, string> {
     "amount",
     "amountCents",
     "effectiveDate",
+    "paymentMethod",
     "reason",
     "registrationId",
     "revision",
@@ -235,6 +237,7 @@ export function cashFromRegistrationValues(
   values: Readonly<Record<string, string>>,
 ): CashInput {
   return {
+    paymentMethod: validatePaymentMethod(values.paymentMethod),
     amountCents: parseMoneyInput(values.amount ?? ""),
     effectiveDate: values.effectiveDate || null,
     reason: values.reason ?? "",

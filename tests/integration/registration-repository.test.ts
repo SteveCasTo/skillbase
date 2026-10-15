@@ -125,6 +125,7 @@ async function fixture(capacity = 3) {
     initialPayment: {
       amountCents: 2001,
       effectiveDate: null,
+      paymentMethod: "CASH",
       reason: "Initial cash",
     },
   };
@@ -248,7 +249,12 @@ test("create idempotency returns original DTO; changed payload or operation reje
       {
         ...mutation(first),
         requestKey: f.input.requestKey,
-        cash: { amountCents: 1, effectiveDate: null, reason: "Cash" },
+        cash: {
+          paymentMethod: "CASH",
+          amountCents: 1,
+          effectiveDate: null,
+          reason: "Cash",
+        },
       },
       f.actor.id,
     ),
@@ -265,7 +271,12 @@ test("payment races enforce optimistic revisions and balance; retries post only 
   const row = await repository.create(f.input, f.actor.id);
   const command = {
     ...mutation(row),
-    cash: { amountCents: 6000, effectiveDate: null, reason: "Balance" },
+    cash: {
+      paymentMethod: "QR" as const,
+      amountCents: 6000,
+      effectiveDate: null,
+      reason: "Balance",
+    },
   };
   const [a, b] = await Promise.all([
     repository.recordPayment(command, f.actor.id),
@@ -274,6 +285,13 @@ test("payment races enforce optimistic revisions and balance; retries post only 
   expect(a).toEqual(b);
   expect(a.registration.balanceCents).toBe(0);
   expect(a.ledger).toHaveLength(2);
+  expect(a.ledger.map((entry) => entry.paymentMethod)).toEqual(["CASH", "QR"]);
+  await expect(
+    repository.recordPayment(
+      { ...command, cash: { ...command.cash, paymentMethod: "CASH" } },
+      f.actor.id,
+    ),
+  ).rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT" });
   await expect(
     repository.recordPayment(
       {
@@ -293,6 +311,7 @@ test("payment races enforce optimistic revisions and balance; retries post only 
           cash: {
             amountCents: 4000,
             effectiveDate: null,
+            paymentMethod: "QR",
             reason: "Racing cash",
           },
         },
@@ -331,6 +350,7 @@ test("cancel releases seat and preserves liability; refund races cannot exceed p
           cash: {
             amountCents: 1500,
             effectiveDate: null,
+            paymentMethod: "CASH",
             reason: "Actual cash returned",
           },
         },
@@ -347,7 +367,12 @@ test("cancel releases seat and preserves liability; refund races cannot exceed p
     repository.recordRefund(
       {
         ...mutation(detail.registration),
-        cash: { amountCents: 502, effectiveDate: null, reason: "Too much" },
+        cash: {
+          paymentMethod: "CASH",
+          amountCents: 502,
+          effectiveDate: null,
+          reason: "Too much",
+        },
       },
       f.actor.id,
     ),
@@ -358,6 +383,7 @@ test("cancel releases seat and preserves liability; refund races cannot exceed p
       cash: {
         amountCents: 501,
         effectiveDate: null,
+        paymentMethod: "QR",
         reason: "Remaining cash returned",
       },
     },
@@ -527,6 +553,7 @@ test("Bolivia first-day full-pay exception and overdue retain seats; backdated c
       initialPayment: {
         amountCents: 8001,
         effectiveDate: "2099-02-01",
+        paymentMethod: "QR",
         reason: "Full cash",
       },
     },
@@ -545,6 +572,7 @@ test("Bolivia first-day full-pay exception and overdue retain seats; backdated c
         cash: {
           amountCents: 6000,
           effectiveDate: "2099-02-01",
+          paymentMethod: "QR",
           reason: "Backdated",
         },
       },
@@ -669,7 +697,11 @@ test("interest conversion consumes operational demand permanently while preservi
   const command = {
     ...f.input,
     sourceInterestId: interest!.id,
-    initialPayment: { amountCents: 2001, effectiveDate: null },
+    initialPayment: {
+      paymentMethod: "CASH" as const,
+      amountCents: 2001,
+      effectiveDate: null,
+    },
   };
   const row = await repository.create(command, f.actor.id);
   expect(await repository.create(command, f.actor.id)).toEqual(row);
@@ -970,6 +1002,7 @@ test("cash date and exact minimum reject atomically; free snapshots never produc
         initialPayment: {
           ...f.input.initialPayment!,
           effectiveDate: "2099-02-02",
+          paymentMethod: "CASH",
         },
       },
       f.actor.id,
@@ -989,6 +1022,7 @@ test("cash date and exact minimum reject atomically; free snapshots never produc
   expect(entry).toMatchObject({
     actorId: f.actor.id,
     effectiveDate: "2099-02-01",
+    paymentMethod: "CASH",
     recordedAt: now.toISOString(),
     amountCents: 2001,
   });
@@ -1103,7 +1137,12 @@ test("actor role revocation denies idempotent retries and all private reads even
     repository.recordPayment(
       {
         ...mutation(row),
-        cash: { amountCents: 1, effectiveDate: null, reason: "Cash" },
+        cash: {
+          paymentMethod: "CASH",
+          amountCents: 1,
+          effectiveDate: null,
+          reason: "Cash",
+        },
       },
       f.actor.id,
     ),

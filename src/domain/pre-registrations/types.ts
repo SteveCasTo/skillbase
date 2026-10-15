@@ -12,6 +12,8 @@ export type FinancialStatus =
   "EXEMPT" | "UNPAID" | "PARTIAL" | "PAID" | "REFUND_DUE" | "REFUNDED";
 export type CancellationReason = "VOLUNTARY" | "GROUP_CANCELLED";
 export type LedgerKind = "PAYMENT" | "REFUND";
+export const PAYMENT_METHODS = ["CASH", "QR"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 export interface ParticipantData {
   readonly ci: string;
@@ -45,6 +47,8 @@ export interface PriceSnapshot {
 export interface LedgerEntryDto {
   readonly id: string;
   readonly kind: LedgerKind;
+  /** Null only for historical movements whose method was never recorded. */
+  readonly paymentMethod: PaymentMethod | null;
   readonly amountCents: number;
   readonly effectiveDate: string;
   readonly actorId: string;
@@ -109,6 +113,7 @@ export interface RequestIdentity {
   readonly requestKey: string;
 }
 export interface CashInput {
+  readonly paymentMethod: PaymentMethod;
   readonly amountCents: number;
   /** Null means today in Bolivia, resolved once by the transaction clock. */
   readonly effectiveDate: string | null;

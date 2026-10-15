@@ -548,10 +548,20 @@ test("course choices require a live registration window or first-day exception a
 test("phase5 command validation preserves null default cash date for stable retry fingerprints", () => {
   expect(
     validateCashInput(
-      { amountCents: 1, reason: " Cash ", effectiveDate: null },
+      {
+        paymentMethod: "CASH",
+        amountCents: 1,
+        reason: " Cash ",
+        effectiveDate: null,
+      },
       before,
     ),
-  ).toEqual({ amountCents: 1, reason: "Cash", effectiveDate: null });
+  ).toEqual({
+    paymentMethod: "CASH",
+    amountCents: 1,
+    reason: "Cash",
+    effectiveDate: null,
+  });
   const input = {
     requestKey: id,
     courseId: id,
@@ -562,7 +572,12 @@ test("phase5 command validation preserves null default cash date for stable retr
     courseRevision: before.toISOString(),
     firstDayException: false,
     sourceInterestId: null,
-    initialPayment: { amountCents: 2001, reason: "Cash", effectiveDate: null },
+    initialPayment: {
+      paymentMethod: "QR",
+      amountCents: 2001,
+      reason: "Cash",
+      effectiveDate: null,
+    },
   };
   expect(validateCreateRegistration(input, before)).toMatchObject({
     participant: { ci: "00AB-LP" },
@@ -570,7 +585,11 @@ test("phase5 command validation preserves null default cash date for stable retr
   });
   const optionalInitialReason = {
     ...input,
-    initialPayment: { amountCents: 2001, effectiveDate: null },
+    initialPayment: {
+      paymentMethod: "CASH",
+      amountCents: 2001,
+      effectiveDate: null,
+    },
   };
   expect(
     validateCreateRegistration(optionalInitialReason, before),
@@ -587,8 +606,26 @@ test("phase5 command validation preserves null default cash date for stable retr
     validateCashInput({ amountCents: 1.5, reason: "Cash" }, before),
   ).toThrow();
   expect(
-    validateCashInput({ amountCents: 1, effectiveDate: null }, before, false),
-  ).toEqual({ amountCents: 1, effectiveDate: null, reason: null });
+    validateCashInput(
+      { paymentMethod: "QR", amountCents: 1, effectiveDate: null },
+      before,
+      false,
+    ),
+  ).toEqual({
+    paymentMethod: "QR",
+    amountCents: 1,
+    effectiveDate: null,
+    reason: null,
+  });
+  for (const paymentMethod of [undefined, null, "", "cash", "TRANSFER", 1]) {
+    expect(() =>
+      validateCashInput(
+        { paymentMethod, amountCents: 1, effectiveDate: null },
+        before,
+        false,
+      ),
+    ).toThrow();
+  }
   expect(() =>
     validateCashInput({ amountCents: 1, effectiveDate: null }, before),
   ).toThrow();

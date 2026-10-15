@@ -7,6 +7,7 @@ import { REGISTRATION_PARTICIPANT_TYPES } from "@/domain/pre-registrations/types
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MoneyInput from "./MoneyInput";
+import PaymentMethodField from "./PaymentMethodField.astro";
 import DatePicker from "@/components/ui/date-picker";
 import { boliviaToday } from "@/domain/pre-registrations/time";
 import ParticipantFields from "./ParticipantFields.astro";
@@ -108,6 +109,7 @@ const unavailable =
       "groupId",
       "participantType",
       "amount",
+      "paymentMethod",
       "effectiveDate",
       "reason",
     ].some((name) => errors[name])
@@ -214,11 +216,17 @@ const unavailable =
       hidden={free}
       class="registration-options grid min-w-0 gap-5"
     >
-      <legend class="sr-only">Efectivo recibido</legend>
+      <legend class="sr-only">Pago recibido</legend>
+      <PaymentMethodField
+        id={id}
+        value={values.paymentMethod}
+        error={errors.paymentMethod}
+        required={cashAlwaysRequired}
+      />
       {[
         {
           name: "amount",
-          label: "Efectivo recibido (Bs)",
+          label: "Pago recibido (Bs)",
           type: "text",
           value: values.amount ?? "",
         },

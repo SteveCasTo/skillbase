@@ -190,6 +190,13 @@
       "when": 1791871851376,
       "tag": "0026_optional_academic_reopening_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792026165834,
+      "tag": "0028_payment_methods",
+      "breakpoints": true
     }
   ]
 }

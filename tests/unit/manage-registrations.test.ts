@@ -38,7 +38,12 @@ const cash: RecordCashInput = {
   requestKey: id,
   registrationId: id,
   revision,
-  cash: { amountCents: 2001, effectiveDate: null, reason: "Cash" },
+  cash: {
+    paymentMethod: "CASH",
+    amountCents: 2001,
+    effectiveDate: null,
+    reason: "Cash",
+  },
 };
 const input: CreateRegistrationInput = {
   requestKey: id,
@@ -166,7 +171,10 @@ test("payment orchestration rejects future cash and invalid optimistic revision 
     recordRegistrationPayment(
       repository,
       admin,
-      { ...cash, cash: { amountCents: 2001, effectiveDate: null } },
+      {
+        ...cash,
+        cash: { paymentMethod: "QR", amountCents: 2001, effectiveDate: null },
+      },
       now,
     ),
   ).rejects.toBe(sentinel);
@@ -174,7 +182,10 @@ test("payment orchestration rejects future cash and invalid optimistic revision 
     recordRegistrationRefund(
       repository,
       admin,
-      { ...cash, cash: { amountCents: 2001, effectiveDate: null } },
+      {
+        ...cash,
+        cash: { paymentMethod: "QR", amountCents: 2001, effectiveDate: null },
+      },
       now,
     ),
   ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });

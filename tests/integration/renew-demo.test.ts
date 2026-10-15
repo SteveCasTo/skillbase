@@ -316,6 +316,7 @@ test("isolated demo reset refuses CANCELLED cash history without changing legacy
         kind: "PAYMENT",
         amountCents: "2000",
         effectiveDate: "2026-10-02",
+        paymentMethod: "CASH",
         reason: "Actual synthetic cash",
       })
       .returning();

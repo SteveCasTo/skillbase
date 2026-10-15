@@ -203,6 +203,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
         registrationId,
         commandReceiptId: receiptId,
         kind,
+        paymentMethod: normalized.paymentMethod,
         amountCents: String(normalized.amountCents),
         effectiveDate,
         actorId,
@@ -212,6 +213,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
       dto: {
         id,
         kind,
+        paymentMethod: normalized.paymentMethod,
         amountCents: normalized.amountCents,
         effectiveDate,
         actorId,
@@ -521,7 +523,11 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
             actorId,
             row.id,
             "REGISTRATION_PAYMENT_RECORDED",
-            { amountCents: cash.dto.amountCents, ledgerId: cash.dto.id },
+            {
+              amountCents: cash.dto.amountCents,
+              ledgerId: cash.dto.id,
+              paymentMethod: cash.dto.paymentMethod,
+            },
           );
         return { result, ...(cash ? { cash: cash.row } : {}) };
       },
@@ -635,7 +641,11 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
           kind === "PAYMENT"
             ? "REGISTRATION_PAYMENT_RECORDED"
             : "REGISTRATION_REFUND_RECORDED",
-          { ledgerId: cash.dto.id, amountCents: input.cash.amountCents },
+          {
+            ledgerId: cash.dto.id,
+            amountCents: input.cash.amountCents,
+            paymentMethod: cash.dto.paymentMethod,
+          },
         );
         return { result, cash: cash.row };
       },
@@ -741,7 +751,11 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
             actorId,
             row.id,
             "REGISTRATION_REFUND_RECORDED",
-            { ledgerId: cash.dto.id, amountCents: cash.dto.amountCents },
+            {
+              ledgerId: cash.dto.id,
+              amountCents: cash.dto.amountCents,
+              paymentMethod: cash.dto.paymentMethod,
+            },
           );
         return { result, ...(cash ? { cash: cash.row } : {}) };
       },

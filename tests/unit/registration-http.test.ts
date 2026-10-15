@@ -51,6 +51,7 @@ const values = {
   phone: "",
   amount: "25.50",
   effectiveDate: "2099-02-01",
+  paymentMethod: "CASH",
   reason: "Efectivo",
 };
 const registration: AdminRegistrationDto = {
@@ -197,6 +198,7 @@ describe("registration HTTP contracts", () => {
       registrationId: id,
       revision,
       amount: "0.01",
+      paymentMethod: "QR",
       effectiveDate: "2099-02-01",
       reason: "Cash",
     };
@@ -211,10 +213,12 @@ describe("registration HTTP contracts", () => {
         repository: repository({
           recordPayment: async (input) => {
             expect(input.cash.amountCents).toBe(1);
+            expect(input.cash.paymentMethod).toBe("QR");
             return detail;
           },
           recordRefund: async (input) => {
             expect(input.cash.amountCents).toBe(1);
+            expect(input.cash.paymentMethod).toBe("QR");
             return detail;
           },
         }),
@@ -223,6 +227,22 @@ describe("registration HTTP contracts", () => {
         ok: true,
         value: { kind: "detail", detail },
       });
+      for (const paymentMethod of ["", "TRANSFER", "cash"]) {
+        const invalid = await handleRegistrationPost({
+          request: request({ ...mutation, paymentMethod }),
+          actor,
+          siteUrl,
+          now,
+          registrationId: id,
+          operation,
+          repository: repository(),
+        });
+        expect(invalid.status).toBe(422);
+        expect(invalid.payload).toMatchObject({
+          ok: false,
+          issues: { paymentMethod: expect.any(String) },
+        });
+      }
     }
     const result = await handleRegistrationPost({
       request: request(mutation),
