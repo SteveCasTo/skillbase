@@ -469,6 +469,67 @@ test("deletion rejects stale revisions and rolls back if audit cannot be written
   await expect(
     deleteGroup(repo, admin, group.id, updated.updatedAt.toISOString()),
   ).rejects.toMatchObject({ code: "GROUP_NOT_FOUND" });
+
+  // Coordinate with the real schedule gate: begin deletion first, establish a
+  // session strictly after its transaction starts, then release the lock.
+  // No wall-clock sleeps or precomputed application clock can satisfy this.
+  const crossing = await createGroup(repo, admin, courseId, "10:00", 2);
+  let deletion: Promise<void> | undefined;
+  let outcome: Promise<unknown> | undefined;
+  try {
+    await database.db.transaction(async (holder) => {
+      await holder.execute(sql`select pg_advisory_xact_lock(20260915, 3)`);
+      deletion = repo.delete(crossing.id, admin.id, crossing.updatedAt);
+      // Attach the rejection handler before releasing the contender.
+      outcome = deletion.then(
+        () => null,
+        (error: unknown) => error,
+      );
+      let waiting: { pid: number } | undefined;
+      for (let attempt = 0; attempt < 100 && !waiting; attempt++) {
+        await holder.execute(sql`select pg_stat_clear_snapshot()`);
+        const rows = await holder.execute<{ pid: number }>(sql`
+          select pid from pg_stat_activity
+          where datname = current_database() and pid <> pg_backend_pid()
+            and wait_event_type = 'Lock' and wait_event = 'advisory'
+            and query like '%pg_advisory_xact_lock(20260915, 3)%'
+        `);
+        waiting = rows[0];
+      }
+      expect(waiting).toBeDefined();
+      if (!waiting) throw new Error("Deletion did not reach the schedule gate");
+      const [session] = await holder.execute<{
+        id: string;
+        afterStart: boolean;
+      }>(sql`
+        with instant as (select date_trunc('milliseconds', clock_timestamp()) as starts_at)
+        insert into group_sessions (group_id, course_type_revision_id, ordinal, starts_at, ends_at)
+        select ${crossing.id}, ${crossing.courseTypeRevisionId}, 999,
+          instant.starts_at, instant.starts_at + interval '90 minutes' from instant
+        returning id, starts_at > (select xact_start from pg_stat_activity where pid = ${waiting.pid}) as "afterStart"
+      `);
+      expect(session?.afterStart).toBe(true);
+    });
+    expect(await outcome).toMatchObject({ code: "GROUP_PUBLISHED" });
+  } finally {
+    await deletion?.catch(() => {});
+  }
+  expect(
+    (await repo.list(courseId)).find((entry) => entry.id === crossing.id)
+      ?.canDelete,
+  ).toBe(false);
+  const retained = await database.db
+    .select()
+    .from(groupSessions)
+    .where(eq(groupSessions.groupId, crossing.id));
+  expect(retained.some((session) => session.ordinal === 999)).toBe(true);
+  expect(retained.length).toBeGreaterThan(1);
+  expect(
+    await database.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.entityId, crossing.id)),
+  ).not.toContainEqual(expect.objectContaining({ action: "GROUP_DELETED" }));
 });
 
 test("date-only courses accept different group hours and preserve dates on unrelated edits", async () => {

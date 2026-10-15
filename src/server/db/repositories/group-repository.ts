@@ -36,6 +36,9 @@ type Row = typeof schema.groups.$inferSelect;
 // projection, which otherwise removes qualification from interpolated columns.
 const outerGroupId = sql.raw('"groups"."id"');
 const outerSessionId = sql.raw('"group_sessions"."id"');
+// Revalidation runs after the schedule gate and row locks. Transaction-time
+// now() would predate those waits and could cascade-delete a session that
+// started while waiting; read the actual database clock at the check instead.
 const canDeleteGroup = sql<boolean>`${schema.groups.publishedAt} is null
   and not exists (select 1 from ${schema.preRegistrations} where ${schema.preRegistrations.groupId} = ${outerGroupId})
   and not exists (select 1 from ${schema.interestRegistrations} where ${schema.interestRegistrations.preferredGroupId} = ${outerGroupId})
@@ -43,7 +46,7 @@ const canDeleteGroup = sql<boolean>`${schema.groups.publishedAt} is null
   and not exists (
     select 1 from ${schema.groupSessions}
     where ${schema.groupSessions.groupId} = ${outerGroupId} and (
-      ${schema.groupSessions.startsAt} <= now()
+      ${schema.groupSessions.startsAt} <= clock_timestamp()
       or ${schema.groupSessions.revision} > 1
       or ${schema.groupSessions.rosterReviewedAt} is not null
       or ${schema.groupSessions.cancelledAt} is not null
