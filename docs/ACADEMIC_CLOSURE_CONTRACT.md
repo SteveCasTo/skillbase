@@ -164,8 +164,9 @@ mismo PDF y nombre `cierre-vN-informe.pdf`, sin redirección ni bypass de permis
 El CSV conserva su ruta, contenido y acción existentes.
 
 El documento usa A4 horizontal, márgenes de 36 pt, jerarquía Montserrat, fallback
-Noto Sans para Unicode y los tres assets institucionales existentes de
-`assets/certificates`. Los recursos se embeben en el bundle SSR; no hay fetch de
+Noto Sans para Unicode y derivados de impresión de los tres assets institucionales
+existentes de `assets/certificates` (procedencia/reproducción en
+`src/server/academic-closure/exports/assets/README.md`). Los recursos se embeben en el bundle SSR; no hay fetch de
 fuentes/logos, almacenamiento de documentos ni dependencias nuevas. Tiene
 cabecera/pie en cada página, tabla con encabezados repetidos, filas ordinarias
 indivisibles y continuación explícita para filas mayores que una página. No

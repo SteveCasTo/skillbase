@@ -99,7 +99,7 @@ test("academic exports use authorized closed snapshots and retain historical fil
   expect(privateCsv).not.toContain("closure@test.invalid");
   let originalPdf: Uint8Array<ArrayBuffer> | undefined;
   for (const user of [admin, instructor]) {
-    let aliasPdf: Uint8Array | undefined;
+    let aliasPdf: Uint8Array<ArrayBuffer> | undefined;
     for (const artifact of ["planilla.pdf", "informe.pdf"] as const) {
       const response = await download(user, artifact);
       expect(response.status).toBe(200);

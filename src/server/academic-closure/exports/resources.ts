@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
-import umss from "../../../../assets/certificates/umss.png?inline";
-import faculty from "../../../../assets/certificates/fcyt.png?inline";
-import department from "../../../../assets/certificates/informatica-sistemas.png?inline";
+import umss from "./assets/umss.png?inline";
+import faculty from "./assets/fcyt.png?inline";
+import department from "./assets/informatica-sistemas.png?inline";
 import regular from "@fontsource/montserrat/files/montserrat-latin-400-normal.woff?inline";
 import bold from "@fontsource/montserrat/files/montserrat-latin-700-normal.woff?inline";
 
