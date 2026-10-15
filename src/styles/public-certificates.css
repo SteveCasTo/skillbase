@@ -1,0 +1,14 @@
+/* Match the landing's compact gutters without changing other public pages. */
+@scope (.public-courses) {
+  @media (max-width: 860px) {
+    main:has(> [data-public-verification]) {
+      width: min(100% - 2.25rem, 86rem);
+    }
+  }
+
+  @media (max-width: 639px) {
+    main:has(> [data-public-verification]) {
+      width: calc(100% - 2rem);
+    }
+  }
+}

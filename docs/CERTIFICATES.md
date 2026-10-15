@@ -91,6 +91,21 @@ No mostrar:
 - calificaciones parciales;
 - asistencia detallada.
 
+### Presentación del verificador público
+
+`/certificados` y el resultado público aprovechan el contenedor de `CourseShell`
+(máximo 86 rem), sin columnas exteriores estrechas adicionales; sus márgenes
+compactos coinciden con la landing sin cambiar otras páginas públicas. El resultado
+presenta el estado como título, los datos permitidos y «Comprobar tu archivo»;
+los errores de consulta y los resultados de comparación permanecen visibles
+inline, sin un toast duplicado.
+El selector público admite teclado y arrastre, muestra el nombre del archivo
+y ofrece «Quitar archivo» solo tras seleccionarlo; quitarlo limpia también el
+resultado y devuelve el foco al selector. No modifica el selector privado ADMIN.
+La comprobación conserva MIME/extensión PDF, límite de 10 MiB y SHA-256 de todos
+los bytes en el navegador: no transmite ni persiste el archivo ni habilita una
+descarga pública. Una coincidencia no cambia el estado oficial de la credencial.
+
 ## HASH
 
 Calcular SHA-256 del PDF final.

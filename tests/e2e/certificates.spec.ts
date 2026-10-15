@@ -619,6 +619,15 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     expect(html).not.toMatch(
       /participantId|registrationId|balanceCents|signedPath|certificate-documents|@test\.invalid/u,
     );
+    await expect(
+      publicPage.getByText(
+        "El registro oficial confirma que esta credencial está vigente.",
+        { exact: true },
+      ),
+    ).toHaveCount(0);
+    await expect(
+      publicPage.getByRole("button", { name: "Quitar archivo", exact: true }),
+    ).toBeHidden();
     let transmitted = 0;
     publicPage.on("request", (request) => {
       if (request.method() !== "GET") transmitted += 1;
@@ -638,11 +647,26 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     ).toHaveText(
       createHash("sha256").update(new Uint8Array(signed)).digest("hex"),
     );
-    await publicPage.getByLabel("Seleccionar PDF firmado").setInputFiles({
-      name: "changed.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from([...signed, 0]),
+    const dropzone = publicPage.locator("[data-local-dropzone]");
+    const changedTransfer = await publicPage.evaluateHandle(
+      (bytes) => {
+        const transfer = new DataTransfer();
+        transfer.items.add(
+          new File([new Uint8Array(bytes)], "changed.pdf", {
+            type: "application/pdf",
+          }),
+        );
+        return transfer;
+      },
+      [...signed, 0],
+    );
+    await dropzone.dispatchEvent("dragenter", {
+      dataTransfer: changedTransfer,
     });
+    await expect(dropzone).toHaveAttribute("data-dragging", "");
+    await dropzone.dispatchEvent("drop", { dataTransfer: changedTransfer });
+    await expect(dropzone).not.toHaveAttribute("data-dragging");
+    await changedTransfer.dispose();
     await expect(
       publicPage.getByRole("status", {
         name: "Resultado de comparación local",
@@ -721,8 +745,15 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
           .releaseRead === "function",
     );
     await publicPage
-      .getByRole("button", { name: "Limpiar archivo", exact: true })
-      .click();
+      .getByRole("button", { name: "Quitar archivo", exact: true })
+      .focus();
+    await publicPage.keyboard.press("Enter");
+    await expect(
+      publicPage.getByLabel("Seleccionar PDF firmado"),
+    ).toBeFocused();
+    await expect(
+      publicPage.getByRole("button", { name: "Quitar archivo", exact: true }),
+    ).toBeHidden();
     await publicPage.evaluate(() =>
       (window as typeof window & { releaseRead?: () => void }).releaseRead?.(),
     );
@@ -745,12 +776,18 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       { maxRedirects: 0 },
     );
     expect(anonymousFile.status()).not.toBe(200);
-    await publicPage.setViewportSize({ width: 390, height: 844 });
-    await assertNoOverflow(publicPage);
-    await publicPage.screenshot({
-      path: testInfo.outputPath("public-mobile.png"),
-      fullPage: true,
-    });
+    for (const width of [375, 768, 1440]) {
+      await publicPage.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(publicPage);
+      const article = publicPage.locator("main > article");
+      const bounds = await article.boundingBox();
+      const mainBounds = await publicPage.locator("main").boundingBox();
+      expect(bounds?.width).toBe(mainBounds?.width);
+      await publicPage.screenshot({
+        path: testInfo.outputPath(`public-${width}.png`),
+        fullPage: true,
+      });
+    }
     const replacementBytes = await signedFixture(
       "SYNTHETIC QA: replacement file, no institutional signature",
     );

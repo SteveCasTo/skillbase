@@ -1,7 +1,6 @@
 ---
-import CertificateFilePicker from "./CertificateFilePicker.astro";
-import { SileoHost } from "@/components/SileoHost";
-import "sileo/styles.css";
+import { FileText, FileUp, X } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 interface Props {
   officialHash: string;
   state: "issued" | "revoked" | "replaced";
@@ -10,7 +9,7 @@ const { officialHash, state } = Astro.props;
 ---
 
 <section
-  class="flex min-w-0 flex-col gap-4 border-t pt-6"
+  class="local-verification flex min-w-0 flex-col gap-5"
   aria-labelledby="local-file-title"
   data-local-verification
   data-official-hash={officialHash}
@@ -19,24 +18,56 @@ const { officialHash, state } = Astro.props;
   <h2 id="local-file-title" class="text-xl font-semibold">
     Comprobar tu archivo
   </h2>
-  <p class="max-w-prose text-sm leading-6 text-muted-foreground">
-    Compara el PDF firmado en tu dispositivo. El archivo no se sube ni se
-    guarda. Una coincidencia confirma los mismos bytes, no la identidad de quien
-    lo presenta.
-  </p>
   <div data-local-controls hidden>
-    <CertificateFilePicker
-      id="local-pdf"
-      title="Seleccionar PDF firmado"
-      describedby="local-result"
-    />
-    <button
-      type="button"
-      data-local-reset
-      class="mt-3 min-h-11 rounded-lg border px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring"
+    <label for="local-pdf" data-local-dropzone class="local-dropzone">
+      <input
+        id="local-pdf"
+        type="file"
+        accept="application/pdf,.pdf"
+        aria-labelledby="local-pdf-label"
+        aria-describedby="local-pdf-help local-result"
+        class="sr-only"
+      />
+      <span class="flex size-14 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
+        <FileUp size={28} aria-hidden="true" />
+      </span>
+      <span class="flex min-w-0 flex-col gap-2">
+        <span class="text-lg font-semibold" data-drop-prompt>
+          Arrastra tu PDF aquí
+        </span>
+        <span id="local-pdf-help" class="text-sm text-muted-foreground">
+          PDF · máximo 10 MiB
+        </span>
+      </span>
+      <span
+        id="local-pdf-label"
+        class:list={[
+          buttonVariants({ variant: "outline" }),
+          "h-auto min-h-11 max-w-full whitespace-normal text-center",
+        ]}
+      >
+        Seleccionar PDF firmado
+      </span>
+    </label>
+    <div
+      data-local-selection
+      hidden
+      class="local-selection mt-3 flex min-w-0 items-center gap-3 rounded-lg border bg-card p-3"
     >
-      Limpiar archivo
-    </button>
+      <FileText size={24} className="shrink-0" aria-hidden="true" />
+      <span
+        data-file-name
+        class="min-w-0 flex-1 text-sm font-medium [overflow-wrap:anywhere]"
+      ></span>
+      <button
+        type="button"
+        data-local-reset
+        aria-label="Quitar archivo"
+        class:list={[buttonVariants({ variant: "ghost" }), "size-11"]}
+      >
+        <X aria-hidden="true" />
+      </button>
+    </div>
   </div>
   <p
     id="local-result"
@@ -44,7 +75,7 @@ const { officialHash, state } = Astro.props;
     aria-label="Resultado de comparación local"
     aria-live="polite"
     aria-atomic="true"
-    class="text-sm leading-6"
+    class="local-result text-sm leading-6 [overflow-wrap:anywhere]"
   ></p>
   <output
     data-local-hash
@@ -59,28 +90,42 @@ const { officialHash, state } = Astro.props;
     </p>
   </noscript>
 </section>
-<SileoHost client:load />
 <script>
   import { hashComparison, localPdfSha256, localPdfError } from "./local-hash";
-  import { notifications } from "@/lib/notifications";
   const root = document.querySelector<HTMLElement>("[data-local-verification]");
   const input = root?.querySelector<HTMLInputElement>("#local-pdf");
   const result = root?.querySelector<HTMLElement>("#local-result");
   const output = root?.querySelector<HTMLOutputElement>("[data-local-hash]");
   const controls = root?.querySelector<HTMLElement>("[data-local-controls]");
-  if (root && input && result && output && controls) {
+  const dropzone = root?.querySelector<HTMLElement>("[data-local-dropzone]");
+  const selection = root?.querySelector<HTMLElement>("[data-local-selection]");
+  const filename = root?.querySelector<HTMLElement>("[data-file-name]");
+  const prompt = root?.querySelector<HTMLElement>("[data-drop-prompt]");
+  if (
+    root &&
+    input &&
+    result &&
+    output &&
+    controls &&
+    dropzone &&
+    selection &&
+    filename &&
+    prompt
+  ) {
     let latest = 0;
-    let notificationId: string | undefined;
     if (window.crypto?.subtle) controls.hidden = false;
     else
       result.textContent =
         "La comparación local requiere un navegador compatible y una conexión segura.";
     const clear = () => {
-      if (notificationId) notifications.dismiss(notificationId);
       latest += 1;
       input.value = "";
-      const filename = root.querySelector<HTMLElement>("[data-file-name]");
-      if (filename) filename.textContent = "Ningún archivo seleccionado";
+      filename.textContent = "";
+      selection.hidden = true;
+      prompt.textContent = "Arrastra tu PDF aquí";
+      dropzone.removeAttribute("data-invalid");
+      dropzone.removeAttribute("data-selected");
+      input.removeAttribute("aria-invalid");
       result.textContent = "";
       output.textContent = "";
       output.hidden = true;
@@ -90,15 +135,46 @@ const { officialHash, state } = Astro.props;
       clear();
       input.focus();
     });
+    let dragDepth = 0;
+    const resetDrag = () => {
+      dragDepth = 0;
+      dropzone.removeAttribute("data-dragging");
+    };
+    dropzone.addEventListener("dragenter", (event) => {
+      event.preventDefault();
+      dragDepth += 1;
+      dropzone.setAttribute("data-dragging", "");
+    });
+    dropzone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    });
+    dropzone.addEventListener("dragleave", () => {
+      dragDepth -= 1;
+      if (dragDepth <= 0) resetDrag();
+    });
+    dropzone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      resetDrag();
+      const files = event.dataTransfer?.files;
+      if (!files?.length) return;
+      // Select exactly one file, as with the native single-file picker.
+      const transfer = new DataTransfer();
+      transfer.items.add(files[0]!);
+      input.files = transfer.files;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
     input.addEventListener("change", async () => {
       const token = ++latest;
-      if (notificationId) notifications.dismiss(notificationId);
       const file = input.files?.[0];
-      const filename = root.querySelector<HTMLElement>("[data-file-name]");
-      if (filename)
-        filename.textContent = file
-          ? file.name.slice(0, 200)
-          : "Ningún archivo seleccionado";
+      filename.textContent = file?.name ?? "";
+      selection.hidden = !file;
+      prompt.textContent = file
+        ? "Arrastra otro PDF para cambiarlo"
+        : "Arrastra tu PDF aquí";
+      dropzone.toggleAttribute("data-selected", Boolean(file));
+      dropzone.removeAttribute("data-invalid");
+      input.removeAttribute("aria-invalid");
       output.hidden = true;
       output.textContent = "";
       result.textContent = "";
@@ -109,13 +185,13 @@ const { officialHash, state } = Astro.props;
       const validation = localPdfError(file);
       if (validation) {
         result.textContent = validation;
+        dropzone.setAttribute("data-invalid", "");
+        input.setAttribute("aria-invalid", "true");
         root.removeAttribute("aria-busy");
         return;
       }
       root.setAttribute("aria-busy", "true");
-      const id = crypto.randomUUID();
-      notificationId = id;
-      notifications.loading({ id, title: "Comprobando tu archivo…" });
+      result.textContent = "Comprobando tu archivo…";
       try {
         const hash = await localPdfSha256(file);
         if (token !== latest) return;
@@ -126,21 +202,14 @@ const { officialHash, state } = Astro.props;
           root.dataset.officialHash ?? "",
           root.dataset.certificateState ?? "",
         );
-        notifications.success({
-          id,
-          title: "Comparación completada.",
-          description:
-            "Revisa el resultado y el estado oficial del certificado.",
-        });
       } catch (error) {
         if (token !== latest) return;
-        notifications.error({
-          id,
-          title:
-            error instanceof Error
-              ? error.message
-              : "No se pudo leer el archivo. Selecciónalo de nuevo.",
-        });
+        result.textContent =
+          error instanceof Error
+            ? error.message
+            : "No se pudo leer el archivo. Selecciónalo de nuevo.";
+        dropzone.setAttribute("data-invalid", "");
+        input.setAttribute("aria-invalid", "true");
       } finally {
         if (token === latest) root.removeAttribute("aria-busy");
       }
@@ -148,6 +217,45 @@ const { officialHash, state } = Astro.props;
   }
 </script>
 <style>
+  .local-dropzone {
+    display: flex;
+    min-width: 0;
+    cursor: pointer;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-xl);
+    background: var(--card);
+    padding: clamp(1.5rem, 4vw, 3rem) 1.25rem;
+    text-align: center;
+    transition:
+      background-color 150ms,
+      border-color 150ms;
+  }
+  .local-dropzone:hover,
+  .local-dropzone[data-dragging] {
+    border-color: var(--ring);
+    background: var(--secondary);
+  }
+  .local-dropzone:focus-within {
+    outline: 3px solid var(--ring);
+    outline-offset: 4px;
+  }
+  .local-dropzone[data-invalid] {
+    border-color: var(--destructive);
+  }
+  .local-dropzone[data-selected] {
+    border-style: solid;
+  }
+  .local-selection[hidden] {
+    display: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .local-dropzone {
+      transition: none;
+    }
+  }
   h2 {
     font-family: var(--font-sans);
   }
