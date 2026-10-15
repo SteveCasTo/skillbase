@@ -99,6 +99,11 @@ compactos coinciden con la landing sin cambiar otras páginas públicas. El resu
 presenta el estado como título, los datos permitidos y «Comprobar tu archivo»;
 los errores de consulta y los resultados de comparación permanecen visibles
 inline, sin un toast duplicado.
+El detalle de una credencial omite «Consultar otro certificado» para centrar la
+atención en su estado y comprobación local, también cuando aún no está emitida.
+La búsqueda inicial sigue disponible en `/certificados`; el desplegable de consulta
+se conserva únicamente como recuperación ante registro no encontrado o consulta
+no disponible. La navegación institucional y las URLs no cambian.
 El selector público admite teclado y arrastre, muestra el nombre del archivo
 y ofrece «Quitar archivo» solo tras seleccionarlo. La zona de arrastre y el
 archivo seleccionado son mutuamente excluyentes; quitarlo limpia también el
