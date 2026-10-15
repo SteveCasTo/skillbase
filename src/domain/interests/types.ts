@@ -53,7 +53,7 @@ export type AdminInterestCourseDto = {
   }[];
 };
 export type AdminInterestMutationInput = {
-  intent: "cancel" | "reactivate";
+  intent: "delete";
   interestRegistrationId: string;
   revision: string;
 };
@@ -63,7 +63,7 @@ export type PublicInterestPostPayload =
 export type AdminInterestPostPayload =
   | {
       ok: true;
-      registration: AdminInterestRegistrationDto;
+      deletedId: string;
       metrics: AdminInterestMetricsDto;
     }
   | {

@@ -1,14 +1,16 @@
 import { expect, test } from "bun:test";
-import { parseInterestFilter } from "@/server/interests/filter";
-import { interestRequestGate } from "@/components/interests/admin-filter-client";
+import {
+  parseInterestFilter,
+  matchesInterestCourseFilter,
+} from "@/server/interests/filter";
 import { InterestError } from "@/domain/interests/rules";
 
-test("interest filters accept only explicit states and the SSR Todos fallback", () => {
+test("interest course filters default to courses with demand", () => {
   for (const [query, expected] of [
-    ["", undefined],
-    ["status=ALL", undefined],
-    ["status=ACTIVE", "ACTIVE"],
-    ["status=CANCELLED", "CANCELLED"],
+    ["", "WITH"],
+    ["status=ALL", "ALL"],
+    ["status=WITH", "WITH"],
+    ["status=WITHOUT", "WITHOUT"],
   ] as const)
     expect(parseInterestFilter(new URLSearchParams(query))).toBe(expected);
 });
@@ -29,16 +31,11 @@ test("invalid, blank and repeated filters fail closed with a typed 400", () => {
     }
   }
 });
-test("only the latest filter response may apply even after earlier fetch resolution", () => {
-  const gate = interestRequestGate();
-  const first = gate.begin();
-  expect(first.isCurrent()).toBe(true);
-  const second = gate.begin();
-  expect(first.signal.aborted).toBe(true);
-  expect(first.isCurrent()).toBe(false);
-  expect(second.isCurrent()).toBe(true);
-  first.abort(); // a previous request's timeout cannot abort its replacement
-  expect(second.signal.aborted).toBe(false);
-  gate.cancel();
-  expect(second.isCurrent()).toBe(false);
+test("course demand filters distinguish zero from positive totals", () => {
+  expect(matchesInterestCourseFilter(0, "WITH")).toBe(false);
+  expect(matchesInterestCourseFilter(1, "WITH")).toBe(true);
+  expect(matchesInterestCourseFilter(0, "WITHOUT")).toBe(true);
+  expect(matchesInterestCourseFilter(2, "WITHOUT")).toBe(false);
+  expect(matchesInterestCourseFilter(0, "ALL")).toBe(true);
+  expect(matchesInterestCourseFilter(2, "ALL")).toBe(true);
 });

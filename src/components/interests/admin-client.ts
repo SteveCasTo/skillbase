@@ -1,15 +1,11 @@
 import { notifications } from "@/lib/notifications";
-import { initializeInterestFilters } from "./admin-filter-client";
 import {
   isAdminMetrics,
   isAdminRegistration,
+  isAdminDeletion,
   preferenceDemand,
-  visibleAfterMutation,
 } from "./admin-presentation";
-import type {
-  AdminInterestMetricsDto,
-  AdminInterestRegistrationDto,
-} from "@/domain/interests/types";
+import type { AdminInterestMetricsDto } from "@/domain/interests/types";
 
 export function initializeAdminInterests(): void {
   document
@@ -25,10 +21,8 @@ export function initializeAdminInterests(): void {
       // Metrics have no revision token. Apply this view's requests in order so
       // overlapping rows cannot replace a newer aggregate with an older response.
       let mutations = Promise.resolve();
-      initializeInterestFilters(root, () => mutations);
       let selected: HTMLFormElement | null = null;
       let trigger: HTMLElement | null = null;
-      const error = root.querySelector<HTMLElement>("[data-interests-error]");
       const login = root.querySelector<HTMLElement>("[data-session-login]");
       const input = (form: HTMLFormElement, name: string) =>
         form.elements.namedItem(name) as HTMLInputElement;
@@ -46,37 +40,11 @@ export function initializeAdminInterests(): void {
         ?.addEventListener("click", close);
 
       function reconcile(
-        row: HTMLElement,
         form: HTMLFormElement,
-        registration: AdminInterestRegistrationDto,
+        revision: string,
         metrics: AdminInterestMetricsDto,
       ) {
-        input(form, "revision").value = registration.updatedAt;
-        input(form, "intent").value =
-          registration.status === "ACTIVE" ? "cancel" : "reactivate";
-        row.dataset.status = registration.status;
-        const status = row.querySelector("[data-interest-status]");
-        if (status)
-          status.textContent =
-            registration.status === "ACTIVE" ? "Activo" : "Cancelado";
-        const summary = row.querySelector("summary");
-        if (summary)
-          summary.textContent =
-            registration.status === "ACTIVE"
-              ? "Cancelar interés"
-              : "Reactivar interés";
-        const button = form.querySelector("button");
-        if (button)
-          button.textContent =
-            registration.status === "ACTIVE"
-              ? "Cancelar interés"
-              : "Reactivar interés";
-        const copy = form.querySelector("[data-confirm-copy]");
-        if (copy)
-          copy.textContent =
-            registration.status === "ACTIVE"
-              ? "¿Cancelar este registro? Se conservará en el historial."
-              : "¿Reactivar este registro de interés?";
+        input(form, "revision").value = revision;
         const total = root.querySelector("[data-active-total]");
         if (total) total.textContent = String(metrics.activeTotal);
         const demand = preferenceDemand(metrics);
@@ -103,16 +71,6 @@ export function initializeAdminInterests(): void {
             );
             if (leading) leading.hidden = !bucket.leading;
           });
-        if (
-          !visibleAfterMutation(root.dataset.filter ?? "", registration.status)
-        ) {
-          const hadFocus = row.contains(document.activeElement);
-          row.remove();
-          if (hadFocus)
-            root
-              .querySelector<HTMLElement>("#interest-list-title")
-              ?.focus({ preventScroll: true });
-        }
         const empty = root.querySelector<HTMLElement>("[data-interests-empty]");
         if (empty) empty.hidden = !!root.querySelector("[data-interest-id]");
       }
@@ -137,7 +95,6 @@ export function initializeAdminInterests(): void {
           rowError.hidden = true;
           rowError.textContent = "";
         }
-        if (error) error.hidden = true;
         if (login) login.hidden = true;
         const notificationId = `notification-${crypto.randomUUID()}`;
         notifications.loading({
@@ -184,12 +141,32 @@ export function initializeAdminInterests(): void {
               "La respuesta no es válida. Revisa el estado antes de reintentar.",
             );
           const courseId = root.dataset.courseId ?? "";
-          const reconciles =
-            (response.ok && payload.ok === true) ||
-            (response.status === 409 &&
-              "code" in payload &&
-              payload.code === "STALE_INTEREST_REGISTRATION");
-          if (reconciles) {
+          if (response.ok && payload.ok === true) {
+            if (!isAdminDeletion(payload, courseId, id))
+              throw new Error(
+                "La respuesta no es válida. Revisa el registro antes de reintentar.",
+              );
+            reconcile(form, input(form, "revision").value, payload.metrics);
+            row.remove();
+            root
+              .querySelector<HTMLElement>("#interest-list-title")
+              ?.focus({ preventScroll: true });
+            const empty = root.querySelector<HTMLElement>(
+              "[data-interests-empty]",
+            );
+            if (empty)
+              empty.hidden = !!root.querySelector("[data-interest-id]");
+            const announcement = root.querySelector(
+              "[data-interest-announcement]",
+            );
+            if (announcement)
+              announcement.textContent = "Interesado eliminado.";
+          }
+          const stale =
+            response.status === 409 &&
+            "code" in payload &&
+            payload.code === "STALE_INTEREST_REGISTRATION";
+          if (stale) {
             if (
               !("registration" in payload) ||
               !("metrics" in payload) ||
@@ -199,7 +176,7 @@ export function initializeAdminInterests(): void {
               throw new Error(
                 "La respuesta no es válida. Revisa el estado antes de reintentar.",
               );
-            reconcile(row, form, payload.registration, payload.metrics);
+            reconcile(form, payload.registration.updatedAt, payload.metrics);
           }
           if (!response.ok || payload.ok !== true) {
             throw new Error(
@@ -210,7 +187,7 @@ export function initializeAdminInterests(): void {
           }
           notifications.success({
             id: notificationId,
-            title: "Estado del interesado actualizado.",
+            title: "Interesado eliminado.",
           });
         } catch (failure) {
           const message =
@@ -218,6 +195,10 @@ export function initializeAdminInterests(): void {
               ? failure.message
               : "No pudimos confirmar el cambio. Revisa el estado antes de reintentar.";
           notifications.error({ id: notificationId, title: message });
+          if (rowError) {
+            rowError.textContent = message;
+            rowError.hidden = false;
+          }
         } finally {
           releaseMutation();
           locks.delete(id);
@@ -235,30 +216,17 @@ export function initializeAdminInterests(): void {
           ?.querySelector<HTMLElement>("summary");
         event.preventDefault();
         const id = input(form, "interestRegistrationId").value;
-        if (
-          locks.has(id) ||
-          dialog?.open ||
-          root.dataset.filterPending === "true"
-        )
-          return;
+        if (locks.has(id) || dialog?.open) return;
         selected = form;
         trigger = summary ?? null;
-        const cancelling = input(form, "intent").value === "cancel";
         const title = dialog?.querySelector("h2");
         const description = dialog?.querySelector("p");
         const accept = dialog?.querySelector("[data-dialog-confirm]");
-        if (accept)
-          accept.textContent = cancelling
-            ? "Cancelar interés"
-            : "Reactivar interés";
-        if (title)
-          title.textContent = cancelling
-            ? "Cancelar interés"
-            : "Reactivar interés";
+        if (accept) accept.textContent = "Eliminar interesado";
+        if (title) title.textContent = "Eliminar interesado";
         if (description)
-          description.textContent = cancelling
-            ? "El registro dejará de contar como activo y se conservará en el historial."
-            : "El registro volverá a contar entre los interesados activos.";
+          description.textContent =
+            "Sus datos se quitarán definitivamente. Esta acción no se puede deshacer.";
         dialog?.showModal();
       }
       root.addEventListener("click", (event) => {
@@ -286,7 +254,7 @@ export function initializeAdminInterests(): void {
           if (form) void mutate(form);
         });
       if (new URL(location.href).searchParams.get("success") === "updated") {
-        notifications.success({ title: "Estado del interesado actualizado." });
+        notifications.success({ title: "Interesado eliminado." });
         const url = new URL(location.href);
         url.searchParams.delete("success");
         history.replaceState(history.state, "", url);

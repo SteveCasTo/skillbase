@@ -21,6 +21,7 @@ export function bindListSearch(root: HTMLElement) {
     ...(results?.querySelectorAll<HTMLElement>("[data-list-entry]") ?? []),
   ];
   const controller = new AbortController();
+  const defaultStatus = form.dataset.listDefaultStatus ?? "ALL";
   const apply = (updateUrl: boolean) => {
     const query = normalizeRegistrationSearch(input.value);
     const selected = status?.value ?? "ALL";
@@ -71,7 +72,7 @@ export function bindListSearch(root: HTMLElement) {
     input.value = url.searchParams.get("search") ?? "";
     if (status) {
       status.value = selectedListFilter(
-        url.searchParams.get("status"),
+        url.searchParams.get("status") ?? defaultStatus,
         options,
       );
       status.dispatchEvent(new Event("list-status-sync"));
@@ -85,7 +86,7 @@ export function bindListSearch(root: HTMLElement) {
       event.preventDefault();
       input.value = "";
       if (status) {
-        status.value = "ALL";
+        status.value = defaultStatus;
         status.dispatchEvent(new Event("list-status-sync"));
       }
       apply(true);

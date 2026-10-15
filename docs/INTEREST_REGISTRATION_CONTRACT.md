@@ -1,5 +1,67 @@
 # INTEREST REGISTRATION CONTRACT
 
+## CONTRATO VIGENTE: LIMPIEZA OPERATIVA (2026-10-14)
+
+Esta sección sustituye las referencias históricas inferiores a cancelar,
+reactivar, filtros de estado de filas y conservación de interesados nunca
+preinscritos. La implementación candidata no implica migración aplicada a
+canónico/cloud ni release.
+
+- La zona ADMIN de interesados muestra exclusivamente cursos `PUBLISHED`,
+  también después de vencer el plazo de solicitudes. El cierre temporal solo
+  impide nuevas solicitudes públicas; no borra demanda por sí mismo.
+- Junto al buscador de cursos se ofrecen «Con interesados» (default, total >=1),
+  «Sin interesados» (total 0) y «Todos». `status=WITH|WITHOUT|ALL` filtra cursos,
+  nunca estados de personas. Búsqueda y filtro se combinan. Los totales cuentan
+  exclusivamente `ACTIVE` sin ningún vínculo `pre_registrations.source_interest_id`.
+- El detalle no tiene filtros de estado ni acciones cancelar/reactivar. Solo
+  ofrece eliminar definitivamente a una persona nunca usada en preinscripción,
+  previa confirmación corta del design system; HTML sin JS confirma en el
+  desplegable de la tarjeta. No se conserva un historial funcional de esa fila.
+- POST ADMIN usa `{ intent: "delete", interestRegistrationId, revision }`.
+  Mantiene Origin exacto, body limitado, rol ADMIN activo fresco, ownership,
+  bloqueo padre → interesado y revisión ISO observada. Éxito 200 devuelve
+  `{ ok: true, deletedId, metrics }` sin PII del registro eliminado. Revisión
+  obsoleta devuelve 409 con fila vigente/métricas, sin borrar ni repetir la
+  intención; fila ya borrada o consumida da 404. Con JS se retira la tarjeta,
+  reconcilian métricas y enfoca el título sin recargar. Errores permanecen junto
+  a la fila; la sesión caducada no se interpreta como éxito. Sin JS: 303.
+- El borrado y el evento `INTEREST_REGISTRATION_DELETED` son atómicos. El evento
+  guarda actor, IDs y `courseId`, nunca nombre/email/teléfono. No hay operación
+  para borrar participantes, registros presenciales, pagos ni devoluciones.
+- GET/POST de un curso no publicado no accede a datos operativos: 404 igual a
+  curso inexistente. Los registros consumidos son invisibles en lista, resumen,
+  métricas y candidatos; cancelar o devolver una preinscripción no los restaura.
+
+### Persistencia y orden de despliegue
+
+`0027_interest_operational_cleanup` es una migración custom de Drizzle,
+forward-only. Primero elimina únicamente filas sin `source_interest_id` entrante
+que sean `CANCELLED` o pertenezcan a cursos no publicados. Luego instala un
+trigger `AFTER UPDATE OF status` de curso: al pasar a `DRAFT` o `ARCHIVED` elimina
+solo intereses nunca vinculados a una preinscripción. La transición y limpieza
+comparten commit/rollback, sin job posterior ni transacción separada desde
+`manage-courses.ts`. No requiere cambios en repositorios de cursos/grupos.
+La función es `SECURITY INVOKER`, con `search_path` vacío y ejecución revocada
+para roles Data API; las políticas/privilegios existentes no se amplían.
+
+Se mantienen las filas fuente ya referenciadas y las FK restrictivas existentes:
+no se rompe la trazabilidad, el snapshot ni la auditoría financiera, incluso
+para registros cancelados/reembolsados. No se copian historiales adicionales ni
+se cambian importes. La unicidad no parcial `(course_id,email)` permanece:
+el borrado de un interés nunca usado libera ese email, incluido tras retirar y
+republicar dentro de plazo; una fuente consumida conservada sigue deduplicando
+su email con la misma respuesta pública neutra y jamás reaparece como demanda.
+
+Alta pública, conversión presencial, eliminación y transición del curso toman
+el mismo bloqueo padre; el borrado no puede ganar después de que la conversión
+haya consumido la fuente. La FK protege también ante escrituras concurrentes
+que no cooperen. Aplicar la migración antes del código de nueva operación.
+El enum `CANCELLED` se conserva solo por compatibilidad de persistencia histórica,
+no como estado gestionable en UI/API administrativa.
+
+## ANTECEDENTE FASE 3 (NO NORMATIVO DONDE CONTRADIGA LO ANTERIOR)
+
 ## ESTADO Y ALCANCE
 
 Contrato técnico de ejecución de Fase 3, basado en RF-PRE-001–004 y ADR-021/022. Backend e interfaces están implementados, validados localmente y desplegados en producción tras PR 113 (`8f5bb2dc45ad373ff12aefd6325456885b20d5c6`). La cobertura E2E local de 95 escenarios se documentó con corrida full más revalidaciones dirigidas; el release CI pasó el full E2E 96/96. Migraciones cloud aplicadas por el pipeline y smoke público de producción completado con los límites de verificación descritos en `docs/TESTING.md`. No hubo prueba manual de ADMIN en producción ni stress 429/HMAC de IP real. Las propuestas operativas señaladas como pendientes no se convierten en políticas legales aprobadas.

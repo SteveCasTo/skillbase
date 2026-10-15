@@ -2,15 +2,13 @@
 import type { AdminInterestCourseDto } from "@/domain/interests/types";
 import { buttonVariants } from "@/components/ui/button";
 import { confirmationFooterClassName } from "@/components/ui/confirmation-footer";
-import { Skeleton } from "@/components/private-nav/Skeleton";
 import { preferenceDemand } from "./admin-presentation";
 import "@/styles/admin-interests.css";
 
 interface Props {
   data: AdminInterestCourseDto;
-  status?: "ACTIVE" | "CANCELLED" | undefined;
 }
-const { data, status } = Astro.props;
+const { data } = Astro.props;
 const path = `/app/interesados/${data.course.id}`;
 const preference = (id: string | null) => {
   if (id === null) return "Sin preferencia";
@@ -24,18 +22,9 @@ const date = (iso: string) =>
     dateStyle: "medium",
     timeZone: "America/La_Paz",
   }).format(new Date(iso));
-const filters = [
-  { label: "Todos", value: undefined },
-  { label: "Activos", value: "ACTIVE" },
-  { label: "Cancelados", value: "CANCELLED" },
-];
 ---
 
-<div
-  data-admin-interests
-  data-course-id={data.course.id}
-  data-filter={status ?? ""}
->
+<div data-admin-interests data-course-id={data.course.id}>
   <section
     data-interest-metrics
     aria-labelledby="interest-metrics-title"
@@ -84,7 +73,7 @@ const filters = [
                 style={`width: ${bucket.share}%`}
               ></div>
             </div>
-            <span class="sr-only">
+            <span data-demand-share class="sr-only">
               {Math.round(bucket.share)} % del total activo
             </span>
           </dd>
@@ -98,58 +87,8 @@ const filters = [
       <h2 id="interest-list-title" tabindex="-1" class="text-xl font-semibold">
         Registros de interés
       </h2>
-      <form
-        method="get"
-        action={path}
-        data-interest-filter
-        aria-label="Filtrar interesados por estado"
-        class="flex flex-wrap gap-2"
-      >
-        {filters.map((filter) => (
-          <button
-            type="submit"
-            name="status"
-            value={filter.value ?? "ALL"}
-            aria-pressed={status === filter.value}
-            class={buttonVariants({
-              variant: status === filter.value ? "secondary" : "outline",
-              className: "min-h-11",
-            })}
-          >
-            {filter.label}
-          </button>
-        ))}
-      </form>
     </div>
-    <p
-      data-interests-error
-      hidden
-      role="alert"
-      class="mt-4 rounded-lg border bg-card p-4 text-sm"
-    ></p>
-    <button
-      data-filter-retry
-      hidden
-      type="button"
-      class={buttonVariants({ variant: "outline", className: "mt-2 min-h-11" })}
-    >
-      Reintentar filtro
-    </button>
-    <p data-filter-announcement aria-live="polite" class="sr-only"></p>
-    <div
-      data-filter-skeleton
-      hidden
-      aria-hidden="true"
-      class="interest-registration-grid mt-5"
-    >
-      {[0, 1, 2].map(() => (
-        <div class="flex flex-col gap-4 rounded-xl border bg-card p-6">
-          <Skeleton className="h-5 w-2/3" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-20 w-full" />
-        </div>
-      ))}
-    </div>
+    <p data-interest-announcement aria-live="polite" class="sr-only"></p>
     <a
       data-session-login
       hidden
@@ -163,10 +102,7 @@ const filters = [
       hidden={data.registrations.length !== 0}
       class="mt-5 rounded-xl border border-dashed bg-card p-7 text-center"
     >
-      <h3 class="font-semibold">No hay registros para este filtro</h3>
-      <p class="mt-2 text-sm text-muted-foreground">
-        Prueba con Todos para consultar el historial completo del curso.
-      </p>
+      <h3 class="font-semibold">No hay interesados activos en este curso</h3>
     </div>
     <ul data-interest-list class="interest-registration-grid mt-5">
       {data.registrations.map((registration) => (
@@ -187,9 +123,6 @@ const filters = [
                 {registration.firstName} {registration.paternalSurname}{" "}
                 {registration.maternalSurname}
               </h3>
-              <p data-interest-status class="mt-2 text-sm font-medium">
-                {registration.status === "ACTIVE" ? "Activo" : "Cancelado"}
-              </p>
               <dl class="mt-3 flex flex-col gap-2 text-sm">
                 <div>
                   <dt class="sr-only">Email</dt>
@@ -227,15 +160,13 @@ const filters = [
                     "min-h-11 w-full cursor-pointer whitespace-normal text-center",
                 })}
               >
-                {registration.status === "ACTIVE"
-                  ? "Cancelar interés"
-                  : "Reactivar interés"}
+                Eliminar interesado
               </summary>
               <form
                 method="post"
-                action={status ? `${path}?status=${status}` : path}
+                action={path}
                 data-interest-form
-                aria-label={`Cambiar estado de ${registration.firstName} ${registration.paternalSurname} ${registration.maternalSurname}`}
+                aria-label={`Eliminar a ${registration.firstName} ${registration.paternalSurname} ${registration.maternalSurname}`}
                 class="mt-3 flex flex-col gap-3"
               >
                 <input
@@ -248,35 +179,23 @@ const filters = [
                   name="revision"
                   value={registration.updatedAt}
                 />
-                <input
-                  type="hidden"
-                  name="intent"
-                  value={
-                    registration.status === "ACTIVE" ? "cancel" : "reactivate"
-                  }
-                />
+                <input type="hidden" name="intent" value="delete" />
                 <p data-confirm-copy class="text-sm text-muted-foreground">
-                  {registration.status === "ACTIVE"
-                    ? "¿Cancelar este registro? Se conservará en el historial."
-                    : "¿Reactivar este registro de interés?"}
+                  ¿Eliminar este interesado? Sus datos se quitarán
+                  definitivamente. Esta acción no se puede deshacer.
                 </p>
                 <div class={confirmationFooterClassName}>
-                  <a
-                    href={status ? `${path}?status=${status}` : path}
-                    class={buttonVariants({ variant: "outline" })}
-                  >
+                  <a href={path} class={buttonVariants({ variant: "outline" })}>
                     Volver
                   </a>
                   <button
                     type="submit"
                     class={buttonVariants({
-                      variant: "secondary",
+                      variant: "destructive",
                       className: "min-h-11",
                     })}
                   >
-                    {registration.status === "ACTIVE"
-                      ? "Cancelar interés"
-                      : "Reactivar interés"}
+                    Eliminar interesado
                   </button>
                 </div>
               </form>
@@ -316,7 +235,10 @@ const filters = [
       <button
         data-dialog-confirm
         type="button"
-        class={buttonVariants({ variant: "secondary", className: "min-h-11" })}
+        class={buttonVariants({
+          variant: "destructive",
+          className: "min-h-11",
+        })}
       >
         Confirmar
       </button>

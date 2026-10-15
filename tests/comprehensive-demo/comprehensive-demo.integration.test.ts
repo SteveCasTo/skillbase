@@ -479,12 +479,12 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
     ).toHaveLength(0);
     const interest = new DrizzleInterestRepository(db);
     expect(
-      (await interest.course(context!.courses.future!.courseId, "ACTIVE"))
-        ?.metrics.activeTotal,
+      (await interest.course(context!.courses.future!.courseId))?.metrics
+        .activeTotal,
     ).toBe(4);
     expect(
-      (await interest.course(context!.courses.free!.courseId, "ACTIVE"))
-        ?.metrics.activeTotal,
+      (await interest.course(context!.courses.free!.courseId))?.metrics
+        .activeTotal,
     ).toBe(5);
     const evaluations = new DrizzleEvaluationRepository(db);
     const roster = await evaluations.getCourse(
@@ -530,8 +530,9 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
       ...options,
       apply: false,
     });
-    // The authored maternal components add 27 edits; the manual description remains retained.
-    expect(refreshPlan.edits).toHaveLength(114);
+    // The two removed, never-converted interests no longer contribute surname edits.
+    // The authored maternal components still add 27 edits; the manual description remains retained.
+    expect(refreshPlan.edits).toHaveLength(112);
     expect(
       refreshPlan.edits.filter((edit) => edit.field === "maternal_surname"),
     ).toHaveLength(27);
