@@ -192,6 +192,7 @@ const unavailable =
       </section>
       <ClosureReport {report} />
       {!version &&
+        report.access === "ADMIN" &&
         state.history.some(
           (entry) => entry.version !== state.official?.version,
         ) && (
@@ -202,35 +203,39 @@ const unavailable =
             <h2 id="closure-history-title" class="text-xl font-semibold">
               Historial de cierres
             </h2>
-            <ol class="flex flex-col divide-y">
+            <ol class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {state.history
                 .filter((entry) => entry.version !== state.official?.version)
                 .map((entry) => (
-                  <li class="flex flex-col gap-2 py-4">
+                  <li class="min-w-0">
                     <a
                       href={`${base}/cierre/${entry.version}`}
-                      class="inline-flex min-h-11 items-center self-start font-medium underline underline-offset-4"
+                      class="flex h-full min-w-0 flex-col gap-3 rounded-xl border bg-card p-5 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
                     >
-                      Cierre ·{" "}
-                      <time datetime={entry.closedAt}>
-                        {closureDateLabel(entry.closedAt)}
-                      </time>
+                      <span class="font-semibold">
+                        Cierre ·{" "}
+                        <time datetime={entry.closedAt}>
+                          {closureDateLabel(entry.closedAt)}
+                        </time>
+                      </span>
+                      {state.reopenings
+                        .filter(
+                          (reopening) => reopening.version === entry.version,
+                        )
+                        .map((reopening) => (
+                          <p class="break-words text-sm text-muted-foreground">
+                            Reapertura ·{" "}
+                            <time datetime={reopening.reopenedAt}>
+                              {closureDateLabel(reopening.reopenedAt)}
+                            </time>
+                            {reopening.reason && (
+                              <span class="mt-2 block text-foreground">
+                                {reopening.reason}
+                              </span>
+                            )}
+                          </p>
+                        ))}
                     </a>
-                    {state.reopenings
-                      .filter(
-                        (reopening) => reopening.version === entry.version,
-                      )
-                      .map((reopening) => (
-                        <p class="break-words text-sm">
-                          Reapertura ·{" "}
-                          <time datetime={reopening.reopenedAt}>
-                            {closureDateLabel(reopening.reopenedAt)}
-                          </time>
-                          {reopening.reason && (
-                            <span class="mt-1 block">{reopening.reason}</span>
-                          )}
-                        </p>
-                      ))}
                   </li>
                 ))}
             </ol>

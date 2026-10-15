@@ -279,6 +279,15 @@ test("academic closure lifecycle validates blockers, permissions and immutable h
   const next = await repo.close(f.admin2.id, nextCommand);
   expect(next).toMatchObject({ version: 2, revision: 3, status: "CLOSED" });
   const official = await repo.getVersion(f.admin.id, f.course.id, f.groupId, 2);
+  await expect(
+    repo.getVersion(f.instructor.id, f.course.id, f.groupId, 1),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  expect(
+    await repo.getVersion(f.instructor.id, f.course.id, f.groupId, 2),
+  ).toMatchObject({ version: 2, report: { access: "INSTRUCTOR" } });
+  expect(
+    await repo.getGroup(f.instructor.id, f.course.id, f.groupId),
+  ).toMatchObject({ history: [], reopenings: [] });
   expect(official.actorId).toBe(f.admin2.id);
   expect(official.report).toMatchObject({
     minimumGrade: 90,
@@ -406,10 +415,17 @@ test("academic closure privacy projects open, official and historical loaders us
     data: {
       status: "CLOSED",
       official: { report: { access: "INSTRUCTOR" } },
-      history: [{ version: 1 }],
+      history: [],
+      reopenings: [],
     },
   });
   privateOutput(closed);
+  expect(
+    await loadAcademicClosureVersion({ ...instructor, version: 1 }),
+  ).toMatchObject({
+    available: true,
+    data: { version: 1, report: { access: "INSTRUCTOR" } },
+  });
   expect(await loadAcademicClosure(admin)).toMatchObject({
     available: true,
     data: {
@@ -448,19 +464,22 @@ test("academic closure privacy projects open, official and historical loaders us
         )
     )[0]!.metadata,
   ).toMatchObject({ reason: null });
-  privateOutput(await loadAcademicClosure(instructor));
+  const reopenedInstructor = await loadAcademicClosure(instructor);
+  expect(reopenedInstructor).toMatchObject({
+    available: true,
+    data: { status: "OPEN", official: null, history: [], reopenings: [] },
+  });
+  privateOutput(reopenedInstructor);
   const historical = await loadAcademicClosureVersion({
     ...instructor,
     version: 1,
   });
   expect(historical).toMatchObject({
-    available: true,
-    data: {
-      version: 1,
-      actorId: f.instructor.id,
-      report: { access: "INSTRUCTOR" },
-    },
+    available: false,
+    status: 403,
+    code: "FORBIDDEN",
   });
+  expect(historical).not.toHaveProperty("data");
   privateOutput(historical);
   expect(
     await loadAcademicClosureVersion({ ...admin, version: 1 }),
