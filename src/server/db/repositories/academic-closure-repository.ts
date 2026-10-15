@@ -182,20 +182,24 @@ export class DrizzleClosureRepository
               }
             : null,
         provisional: report ? privateClosureReport(report, ctx.admin) : null,
-        history: versions.map((row) => ({
-          id: row.id,
-          version: row.version,
-          closedAt: row.closedAt.toISOString(),
-          actorId: row.actorId,
-          actorName: row.actorName,
-        })),
-        reopenings: reopenings.map(({ reopening: r, version }) => ({
-          version,
-          reopenedAt: r.reopenedAt.toISOString(),
-          actorId: r.actorId,
-          actorName: r.actorName,
-          reason: r.reason,
-        })),
+        history: ctx.admin
+          ? versions.map((row) => ({
+              id: row.id,
+              version: row.version,
+              closedAt: row.closedAt.toISOString(),
+              actorId: row.actorId,
+              actorName: row.actorName,
+            }))
+          : [],
+        reopenings: ctx.admin
+          ? reopenings.map(({ reopening: r, version }) => ({
+              version,
+              reopenedAt: r.reopenedAt.toISOString(),
+              actorId: r.actorId,
+              actorName: r.actorName,
+              reason: r.reason,
+            }))
+          : [],
       };
     });
   }
@@ -209,6 +213,16 @@ export class DrizzleClosureRepository
       throw new ClosureError("VALIDATION_FAILED", "Versión no válida.");
     return this.db.transaction(async (tx) => {
       const ctx = await context(tx, actorId, courseId, groupId, this.clock);
+      // Instructors retain their current official closure and its documents,
+      // never an older snapshot (including the latest snapshot after reopening).
+      if (
+        !ctx.admin &&
+        (!ctx.state.closed || version !== ctx.state.lastVersion)
+      )
+        throw new ClosureError(
+          "FORBIDDEN",
+          "El historial de cierres requiere administración.",
+        );
       const [row] = await tx
         .select()
         .from(s.academicClosureVersions)

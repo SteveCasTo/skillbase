@@ -352,6 +352,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
       page.getByRole("heading", { name: "Cierre del grupo", exact: true }),
     ).toBeVisible();
     const official = (await read(page, path)).official!;
+    await expect(page.locator(`a[href="${path}/1"]`)).toHaveCount(0);
     expect(official.report.participants[0]!.result.finalGrade).toBe("80.00");
     await expect(
       page.getByRole("link", { name: "Planilla PDF" }),
@@ -414,6 +415,13 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     await expect(
       page.getByText("Corrección académica documentada", { exact: false }),
     ).toBeVisible();
+    await expect(page.locator(`a[href="${path}/1"]`)).toHaveCount(1);
+    if (process.env.E2E_EVIDENCE_DIR)
+      await page.screenshot({
+        path: testInfo.outputPath("academic-open-history.png"),
+        fullPage: true,
+        animations: "disabled",
+      });
     // A second real request closes the group after this page loaded. The stale
     // confirmation must show the new official state, not a provisional receipt.
     await page
@@ -456,6 +464,12 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
       ),
     ).toContainText(staleMessage);
     await expect(page.locator("#closure-error")).toBeHidden();
+    if (process.env.E2E_EVIDENCE_DIR)
+      await page.screenshot({
+        path: testInfo.outputPath("academic-closed-history.png"),
+        fullPage: true,
+        animations: "disabled",
+      });
     await page.locator(`a[href="${path}/1"]`).click();
     await expect(
       page.getByRole("heading", { name: "Cierre académico", exact: true }),
@@ -490,7 +504,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
   }
 });
 
-test("owned INSTRUCTOR can close but never reopen, and current/history SSR and JSON redact private fields", async ({
+test("owned INSTRUCTOR can close but never reopen, current SSR and JSON redact private fields, and history is ADMIN-only", async ({
   page,
   context,
   browser,
@@ -548,6 +562,11 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
       0,
     );
     const current = await read(page, path);
+    expect(current.history).toEqual([]);
+    expect(current.reopenings).toEqual([]);
+    await expect(
+      page.getByRole("heading", { name: "Historial de cierres", exact: true }),
+    ).toHaveCount(0);
     expect(current.official!.report.access).toBe("INSTRUCTOR");
     expect(JSON.stringify(current)).not.toMatch(
       /balanceCents|"ci"|email|phone|participantType/u,
@@ -581,7 +600,9 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
     await expect(
       page.getByRole("button", { name: /Editar notas/ }),
     ).toHaveCount(0);
-    // Historic links remain authorized after ADMIN reopens the same group.
+    // The current official files remain available; reopening makes them ADMIN-only history.
+    await page.goto(path);
+    await downloadOfficialDocuments(page, path, current.official!, sensitive);
     expect(
       (
         await command(
@@ -593,18 +614,27 @@ test("owned INSTRUCTOR can close but never reopen, and current/history SSR and J
         )
       ).status(),
     ).toBe(200);
-    await page.goto(`${path}/1`);
+    const historicalPage = await page.goto(`${path}/1`);
+    expect(historicalPage?.status()).toBe(403);
     await expect(page.getByText(sensitive, { exact: false })).toHaveCount(0);
     const history = await page.request.get(`${path}/1`, { headers });
+    expect(history.status()).toBe(403);
+    expect(await history.json()).toMatchObject({
+      available: false,
+      code: "FORBIDDEN",
+    });
     expect(JSON.stringify(await history.json())).not.toMatch(
       /balanceCents|"ci"|email|phone|participantType/u,
     );
-    await downloadOfficialDocuments(page, path, current.official!, sensitive);
+    for (const artifact of ["planilla.pdf", "planilla.csv", "informe.pdf"])
+      expect(
+        (await page.request.get(`${path}/1/${artifact}`, { headers })).status(),
+      ).toBe(403);
     expect(
       (
         await page.request.get(`${path}/999999/informe.pdf`, { headers })
       ).status(),
-    ).toBe(404);
+    ).toBe(403);
     // Revoke only the fixture-owned internal actor in this verified ephemeral
     // project. The existing browser session must not retain download permission.
     await fixture.database.db

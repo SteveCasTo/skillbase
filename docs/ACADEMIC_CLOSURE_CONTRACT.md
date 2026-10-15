@@ -52,6 +52,27 @@ usuario.
 
 ## Autorización y elegibilidad para cierre
 
+### Ajuste de historial académico (2026-10-14)
+
+- El historial de cierres y las reaperturas son exclusivos de ADMIN. La consulta
+  de estado devuelve `history: []` y `reopenings: []` para INSTRUCTOR, tanto en
+  SSR como JSON; ocultar la sección no es la barrera de autorización.
+- `getVersion` revalida actor/roles/ownership en servidor y permite a INSTRUCTOR
+  únicamente la versión oficial **vigente de un grupo cerrado propio**, incluidas
+  sus descargas existentes. Una versión anterior o cualquier snapshot después
+  de reabrir responde `FORBIDDEN`/403, también por URL directa y por los adapters
+  de documentos que comparten ese loader. No se concede acceso por haber creado
+  el cierre. ADMIN conserva todo el historial inmutable. Los grupos ajenos siguen
+  sin revelar su existencia (404), y las cuentas sin autorización vigente se
+  deniegan antes de consultar el snapshot.
+- La UI ADMIN presenta cierres anteriores como tarjetas enlazadas: tres columnas
+  en escritorio, dos en tablet y una en móvil, tanto con grupo abierto como
+  cerrado. No repite el snapshot oficial vigente; muestra fechas de Bolivia y
+  motivo de reapertura cuando existe, sin ordinales técnicos ni actores visibles.
+- No cambian los snapshots, finanzas, auditoría, reglas de cierre/reapertura ni
+  botones/rutas/renderers PDF/CSV. Los documentos históricos cambian de permiso
+  por el guard compartido, no por una implementación paralela del exporter.
+
 - Actor debe ser usuario interno `ACTIVE`, revalidado en el repositorio durante la transacción. `INSTRUCTOR` puede operar solo sobre sus grupos/cursos y desde el inicio oficial del curso. `ADMIN` activo puede operar sobre cualquier grupo. Solo `ADMIN` puede reabrir.
 - La validación adicional de `course.startsAt` para `INSTRUCTOR` refleja el guard implementado en este backend; la regla de alcance aprobada especifica ownership del grupo y no define por separado esta ventana. No presentarla como requisito de negocio acordado; verificar/ajustar antes de montar la ruta si no es intencional.
 - El cierre es **por grupo**, no por todo el curso. El reporte se construye para la membresía de ese grupo y sus participantes `INSCRITO`; `PREINSCRITO`/`SALDOVENCIDO` no son evaluables ni añaden una nota pendiente al gate.
