@@ -1,0 +1,24 @@
+---
+import RegistrationSelect from "./RegistrationSelect";
+interface Props {
+  id: string;
+  value?: string | undefined;
+  error?: string | undefined;
+  required?: boolean;
+}
+const { id, value = "", error, required = true } = Astro.props;
+---
+
+<RegistrationSelect
+  client:load
+  id={`${id}-paymentMethod`}
+  name="paymentMethod"
+  label="Método del movimiento"
+  value={value}
+  error={error}
+  required={required}
+  options={[
+    { value: "CASH", label: "Efectivo" },
+    { value: "QR", label: "QR" },
+  ]}
+/>

@@ -327,6 +327,13 @@ El prellenado desde `InterestRegistration` permite editar datos de participante;
 
 PR 179 integra rutas HTTP ADMIN de listado/alta/detalle/participante, búsqueda de interesado/participante, pagos/devoluciones/transfer/cancel, exportes y roster instructor. El roster DTO contiene solo nombre/apellidos del instructor asignado y no se consulta antes del inicio. CSV/PDF exportan curso/grupo, participante/CI, categoría, estados y montos financieros. Al release inicial de Fase 5 (`2e0eecb`), cloud quedó en ledger 18; Fase 6 avanzó después a ledger 20 (ver sección de sesiones). Los cierres documentales históricos de producción (`46fa1c0`, `152f610`) no se incorporan a esta rama.
 
+Método de cada movimiento: `registration_ledger.payment_method` admite `CASH` y
+`QR`; nullable únicamente para históricos sin dato. 0028 añade el campo y exige
+método en nuevos INSERT sin modificar el ledger histórico. DTO administrativo
+expone `paymentMethod: PaymentMethod | null`; UI presenta nulos como «No registrado».
+Contrato, enriquecimiento sintético y límites en
+[`PAYMENT_METHODS_CONTRACT.md`](PAYMENT_METHODS_CONTRACT.md).
+
 ### Enrollment
 
 El boceto `Enrollment`/`Refund`/`PaymentReference` a continuación es histórico/no aprobado y no corresponde a tablas actuales. El modelo implementado de Fase 5 usa `pre_registrations` y `registration_ledger`; no existen tablas separadas de enrollment, payment reference o refund.

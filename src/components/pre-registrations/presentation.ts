@@ -174,6 +174,7 @@ export function registrationFormState(
     if (!free && amount !== null)
       validateCashInput(
         {
+          paymentMethod: values.paymentMethod,
           amountCents: amount,
           effectiveDate: values.effectiveDate || null,
           reason: values.reason,

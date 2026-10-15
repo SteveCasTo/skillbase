@@ -197,6 +197,13 @@
       "when": 1792026165806,
       "tag": "0027_interest_operational_cleanup",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1792026165834,
+      "tag": "0028_payment_methods",
+      "breakpoints": true
     }
   ]
 }

@@ -220,6 +220,7 @@ export async function createAttendanceFlowFixture(
           initialPayment: {
             amountCents: full ? 8000 : 2000,
             effectiveDate: null,
+            paymentMethod: "CASH",
             reason: "Trusted isolated attendance fixture",
           },
         },

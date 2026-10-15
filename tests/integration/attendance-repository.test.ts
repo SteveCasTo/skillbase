@@ -131,6 +131,7 @@ async function enroll(f: Fixture, full = true) {
       initialPayment: {
         amountCents: full ? 8000 : 2000,
         effectiveDate: null,
+        paymentMethod: "CASH",
         reason: "Synthetic cash",
       },
     },
@@ -364,6 +365,7 @@ test("attendance late settlement with backdated effectiveDate does not rewrite h
     kind: "PAYMENT",
     amountCents: "6000",
     effectiveDate: "2099-03-02",
+    paymentMethod: "CASH",
     actorId: f.admin.id,
     reason: "Synthetic immutable late settlement evidence",
     recordedAt: now,

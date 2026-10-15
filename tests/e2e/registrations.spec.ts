@@ -267,7 +267,11 @@ registrationTest.describe(() => {
       const personCi = await fillPerson(page);
       await page.getByRole("combobox", { name: "Grupo", exact: true }).click();
       await page.getByRole("option").first().click();
-      await page.getByLabel("Efectivo recibido (Bs)").fill("25.50");
+      await page.getByLabel("Pago recibido (Bs)").fill("25.50");
+      await page
+        .getByRole("combobox", { name: "Método del movimiento" })
+        .click();
+      await page.getByRole("option", { name: "Efectivo", exact: true }).click();
       await expect(create).toBeEnabled();
       let releaseDetail!: () => void;
       let detailRequested!: () => void;
@@ -340,6 +344,10 @@ registrationTest.describe(() => {
       await expect(payment).toHaveAttribute("data-http-bound", "true");
       await payment.getByLabel("Importe (Bs)").fill("0.01");
       await payment
+        .getByRole("combobox", { name: "Método del movimiento" })
+        .click();
+      await page.getByRole("option", { name: "QR", exact: true }).click();
+      await payment
         .getByLabel("Motivo (opcional)", { exact: true })
         .fill("Segundo pago real");
       const receiptKey = await payment
@@ -380,9 +388,15 @@ registrationTest.describe(() => {
       ).toContainText("Bs 74,49");
       await expect(
         page
-          .getByRole("region", { name: "Historial de efectivo" })
+          .getByRole("region", { name: "Historial de pagos y devoluciones" })
           .getByText("Bs 0,01", { exact: true }),
       ).toHaveCount(1);
+      await expect(
+        page.getByRole("region", { name: "Historial de pagos y devoluciones" }),
+      ).toContainText("Método: Efectivo");
+      await expect(
+        page.getByRole("region", { name: "Historial de pagos y devoluciones" }),
+      ).toContainText("Método: QR");
       expect(
         await page.evaluate(
           () =>
@@ -422,7 +436,7 @@ registrationTest.describe(() => {
         .getByRole("region", { name: "Resumen financiero" })
         .textContent();
       const cashBefore = await page
-        .getByRole("region", { name: "Historial de efectivo" })
+        .getByRole("region", { name: "Historial de pagos y devoluciones" })
         .textContent();
       await page
         .getByRole("button", {
@@ -468,7 +482,7 @@ registrationTest.describe(() => {
       ).toBe(financialBefore);
       expect(
         await page
-          .getByRole("region", { name: "Historial de efectivo" })
+          .getByRole("region", { name: "Historial de pagos y devoluciones" })
           .textContent(),
       ).toBe(cashBefore);
       // Global identity is edited and persisted from this registration, not a
@@ -544,7 +558,7 @@ registrationTest.describe(() => {
       ).toBe(financialBefore);
       expect(
         await page
-          .getByRole("region", { name: "Historial de efectivo" })
+          .getByRole("region", { name: "Historial de pagos y devoluciones" })
           .textContent(),
       ).toBe(cashBefore);
       const cancel = page.locator("#registration-cancel");
@@ -571,6 +585,10 @@ registrationTest.describe(() => {
       await expect(refund).toHaveAttribute("data-http-bound", "true");
       await refund.getByLabel("Importe (Bs)").fill("25.51");
       await refund
+        .getByRole("combobox", { name: "Método del movimiento" })
+        .click();
+      await page.getByRole("option", { name: "QR", exact: true }).click();
+      await refund
         .getByLabel("Motivo", { exact: true })
         .fill("Efectivo entregado");
       await refund
@@ -581,12 +599,12 @@ registrationTest.describe(() => {
       ).toContainText("Devuelto");
       await expect(
         page
-          .getByRole("region", { name: "Historial de efectivo" })
+          .getByRole("region", { name: "Historial de pagos y devoluciones" })
           .getByText("Pago recibido", { exact: true }),
       ).toHaveCount(2);
       await expect(
         page
-          .getByRole("region", { name: "Historial de efectivo" })
+          .getByRole("region", { name: "Historial de pagos y devoluciones" })
           .getByText("Devolución registrada", { exact: true }),
       ).toHaveCount(1);
       for (const width of [320, 768, 1280]) {
@@ -667,7 +685,9 @@ test("same-course interest prefill preserves demand and instructor roster expose
     await page.getByLabel("CI", { exact: true }).fill(ci);
     await page.getByRole("combobox", { name: "Grupo", exact: true }).click();
     await page.getByRole("option").first().click();
-    await page.getByLabel("Efectivo recibido (Bs)").fill("100");
+    await page.getByLabel("Pago recibido (Bs)").fill("100");
+    await page.getByRole("combobox", { name: "Método del movimiento" }).click();
+    await page.getByRole("option", { name: "Efectivo", exact: true }).click();
     await page
       .getByRole("button", { name: "Registrar preinscripción", exact: true })
       .click();
@@ -764,6 +784,7 @@ test("same-course interest prefill preserves demand and instructor roster expose
         initialPayment: {
           amountCents: 10000,
           effectiveDate: null,
+          paymentMethod: "CASH",
           reason: "Historical cash fixture",
         },
       },
@@ -812,7 +833,7 @@ test("SSR without JS supports a free registration without fake zero cash and exp
       html.getByRole("region", { name: "Resumen financiero" }),
     ).toContainText("Gratuito");
     await expect(
-      html.getByRole("region", { name: "Historial de efectivo" }),
+      html.getByRole("region", { name: "Historial de pagos y devoluciones" }),
     ).toContainText("No hay movimientos");
     const csv = await html.request.get(
       `/app/preinscripciones/exportar?format=CSV&courseId=${f.id}`,

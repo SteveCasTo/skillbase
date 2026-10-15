@@ -362,6 +362,7 @@ export async function createBusinessFixtures(
           initialPayment: amount
             ? {
                 amountCents: amount,
+                paymentMethod: "CASH",
                 effectiveDate: null,
                 reason: legacyLabels
                   ? "[DEMO] Efectivo ficticio autorizado"
@@ -399,6 +400,7 @@ export async function createBusinessFixtures(
               revision: row.revision,
               cash: {
                 amountCents: amount,
+                paymentMethod: "QR",
                 effectiveDate: null,
                 reason: legacyLabels
                   ? "[DEMO] Devolución ficticia registrada"
@@ -425,6 +427,7 @@ export async function createBusinessFixtures(
             revision: row.revision,
             cash: {
               amountCents: total - amount,
+              paymentMethod: "QR",
               effectiveDate: null,
               reason: legacyLabels
                 ? "[DEMO] Segundo abono ficticio"

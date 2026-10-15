@@ -7,6 +7,7 @@ import {
   PRODUCTION_PROJECT,
 } from "../../scripts/financial-demo-plan";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+import { assertPaymentMethodTarget } from "../../scripts/seed-payment-methods";
 
 test("only the exact manual production master workflow may run in CI", () => {
   const trusted = {
@@ -111,6 +112,64 @@ test("versioned plan is stable, synthetic, minimum-aware and uses valid group du
 
 test("explicit connection identity rejects other projects and arbitrary local databases", () => {
   const api = `https://${PRODUCTION_PROJECT}.supabase.co`;
+  const localDb = "postgres://postgres:private@127.0.0.1:55322/postgres";
+  for (const port of [54321, 55321])
+    expect(() =>
+      assertPaymentMethodTarget(
+        "local",
+        localDb,
+        `http://127.0.0.1:${port}`,
+        "local",
+      ),
+    ).not.toThrow();
+  // Backfill compatibility must not silently widen other seed operators.
+  expect(() =>
+    assertFinancialTarget("local", localDb, "http://127.0.0.1:54321", "local"),
+  ).toThrow();
+  for (const [db, url, project] of [
+    [localDb, "http://127.0.0.1:54320", "local"],
+    [localDb, "http://localhost:54321", "local"],
+    [localDb, "https://127.0.0.1:54321", "local"],
+    [localDb, "http://127.0.0.1:54321/path", "local"],
+    [localDb, "http://127.0.0.1:54321?target=other", "local"],
+    [localDb, "http://127.0.0.1:54321#target", "local"],
+    [localDb, "http://user@127.0.0.1:54321", "local"],
+    [localDb, "http://127.0.0.1.attacker.test:54321", "local"],
+    [localDb, "http://127.0.0.1:54321", "other"],
+    [localDb.replace("55322", "54322"), "http://127.0.0.1:54321", "local"],
+    [
+      localDb.replace("127.0.0.1", "localhost"),
+      "http://127.0.0.1:54321",
+      "local",
+    ],
+    [localDb.replace("/postgres", "/other"), "http://127.0.0.1:54321", "local"],
+    [
+      localDb.replace("postgres:private", "other:private"),
+      "http://127.0.0.1:54321",
+      "local",
+    ],
+    [`${localDb}?host=other`, "http://127.0.0.1:54321", "local"],
+    [`${localDb}#other`, "http://127.0.0.1:54321", "local"],
+  ])
+    expect(() =>
+      assertPaymentMethodTarget("local", db!, url!, project!),
+    ).toThrow();
+  expect(() =>
+    assertPaymentMethodTarget(
+      "production",
+      `postgres://postgres:private@db.${PRODUCTION_PROJECT}.supabase.co:5432/postgres`,
+      api,
+      PRODUCTION_PROJECT,
+    ),
+  ).not.toThrow();
+  expect(() =>
+    assertPaymentMethodTarget(
+      "production",
+      localDb,
+      "http://127.0.0.1:54321",
+      PRODUCTION_PROJECT,
+    ),
+  ).toThrow();
   expect(() =>
     assertFinancialTarget(
       "production",

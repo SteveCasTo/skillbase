@@ -144,7 +144,7 @@ export function assertRegistrationPayment(
   if (paymentCents === null)
     throw new RegistrationError(
       "INITIAL_PAYMENT_REQUIRED",
-      "Registra el primer pago en efectivo.",
+      "Registra el primer pago.",
     );
   assertCents(paymentCents, "amountCents", true);
   if (paymentCents > price.totalPriceCents)

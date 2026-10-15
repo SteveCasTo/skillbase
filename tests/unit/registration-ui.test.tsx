@@ -68,6 +68,7 @@ const values = {
   participantType: "STUDENT",
   amount: "25.01",
   effectiveDate: "2026-10-03",
+  paymentMethod: "CASH",
   reason: "Primer pago",
 };
 const registration: AdminRegistrationDto = {
@@ -257,6 +258,8 @@ describe("registration component presentation", () => {
       { amount: "0" },
       { amount: "100.04" },
       { effectiveDate: "2026-10-04" },
+      { paymentMethod: "" },
+      { paymentMethod: "TRANSFER" },
     ])
       expect(
         registrationFormState(dto, { ...values, ...overrides }, now).valid,
