@@ -39,7 +39,7 @@ const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
       <h1 class="break-words text-3xl font-semibold tracking-tight">
         {groupLabel}
       </h1>
-      <p class="mt-2 text-sm text-muted-foreground">Participantes del grupo</p>
+      <p class="sr-only">Participantes del grupo</p>
     </div>
     {!message && (
       <div class="flex flex-wrap gap-3">
@@ -153,11 +153,12 @@ const prefix = instructorRoute ? "/app/mis-cursos" : "/app/cursos";
                       <p class="break-all text-sm text-muted-foreground">
                         {registration.participant.email}
                       </p>
-                      {registration.membershipStatus !== "INSCRITO" && (
-                        <p class="text-sm">
-                          {membershipLabels[registration.membershipStatus]}
-                        </p>
-                      )}
+                      {registration.membershipStatus !== "INSCRITO" &&
+                        registration.membershipStatus !== "SALDOVENCIDO" && (
+                          <p class="text-sm">
+                            {membershipLabels[registration.membershipStatus]}
+                          </p>
+                        )}
                     </a>
                   </li>
                 ))}
