@@ -316,10 +316,10 @@ const { path, revision, requestKey, signed } = Astro.props;
             if (event.dataTransfer.files.length !== 1) {
               file.value = "";
               void selected();
-            fileError.textContent = "Selecciona un solo PDF firmado.";
-            zone.dataset.invalid = "true";
-            file.setAttribute("aria-invalid", "true");
-            file.setCustomValidity("Selecciona un solo PDF firmado.");
+              fileError.textContent = "Selecciona un solo PDF firmado.";
+              zone.dataset.invalid = "true";
+              file.setAttribute("aria-invalid", "true");
+              file.setCustomValidity("Selecciona un solo PDF firmado.");
               return;
             }
             file.files = event.dataTransfer.files;
