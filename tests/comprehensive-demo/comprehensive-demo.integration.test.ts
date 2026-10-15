@@ -530,8 +530,9 @@ test("real owned Auth/domain fixtures fill F8, preserve every original row, rema
       ...options,
       apply: false,
     });
-    // The authored maternal components add 27 edits; the manual description remains retained.
-    expect(refreshPlan.edits).toHaveLength(114);
+    // The two removed, never-converted interests no longer contribute surname edits.
+    // The authored maternal components still add 27 edits; the manual description remains retained.
+    expect(refreshPlan.edits).toHaveLength(112);
     expect(
       refreshPlan.edits.filter((edit) => edit.field === "maternal_surname"),
     ).toHaveLength(27);
