@@ -194,8 +194,8 @@ test("ADMIN saves exact course-wide weights and can edit the scheme before gradi
       "Teoría revisada",
     );
     await capture(page, "scheme");
-    await verifySsr(browser, fixture);
     await verifyAttendanceGrades(page, fixture);
+    await verifySsr(browser, fixture);
   } finally {
     await fixture.close();
   }
@@ -204,11 +204,16 @@ test("ADMIN saves exact course-wide weights and can edit the scheme before gradi
 async function verifyAttendanceGrades(
   page: Page,
   fixture: Awaited<ReturnType<typeof createAttendanceFlowFixture>>,
+  historical = false,
 ) {
   const connection = createDatabase(getTestSupabaseEnvironment().databaseUrl);
-  let now = fixture.now;
   try {
-    const path = gradePath(fixture.courseId, fixture.groupId);
+    const courseId = historical ? fixture.historyCourseId : fixture.courseId;
+    const groupId = historical ? fixture.historyGroupId : fixture.groupId;
+    const registrationId = historical
+      ? fixture.historyPaid.id
+      : fixture.paid.id;
+    const path = gradePath(courseId, groupId);
     const current = await read(page, path);
     const components: EvaluationComponentInput[] = [
       {
@@ -219,7 +224,7 @@ async function verifyAttendanceGrades(
       },
       { id: crypto.randomUUID(), name: "Teoría", type: "THEORY", weight: "50" },
     ];
-    const configured = await page.request.post(schemePath(fixture.courseId), {
+    const configured = await page.request.post(schemePath(courseId), {
       headers: { Accept: "application/json", Origin: e2eSiteUrl() },
       data: {
         requestKey: crypto.randomUUID(),
@@ -237,7 +242,6 @@ async function verifyAttendanceGrades(
     const attendanceInput = page.getByRole("textbox", {
       name: /Asistencia.*Enrolled Attendance/,
     });
-    await expect(attendanceInput).toBeDisabled();
     await expect(
       page.getByRole("searchbox", { name: "Buscar participante" }),
     ).toBeVisible();
@@ -250,51 +254,35 @@ async function verifyAttendanceGrades(
         exact: true,
       }),
     ).toHaveCount(0);
+    if (!historical) {
+      await expect(attendanceInput).toBeDisabled();
+      expect((await read(page, path)).scheme.frozenAt).toBeNull();
+      await capture(page, "attendance-in-progress", true);
+      return;
+    }
     const repository = new DrizzleAttendanceRepository(
       connection.db,
-      () => now,
+      () => fixture.now,
     );
     const calendar = await repository.getGroup(
       fixture.adminId,
-      fixture.courseId,
-      fixture.groupId,
+      courseId,
+      groupId,
     );
     const first = calendar.sessions[0]!;
-    now = new Date(
-      Math.max(
-        fixture.now.getTime(),
-        new Date(first.startsAt).getTime() + 60000,
-      ),
-    );
-    expect(
-      (
-        await page.request.post(
-          `/__e2e/clock?now=${encodeURIComponent(now.toISOString())}`,
-        )
-      ).status(),
-    ).toBe(204);
     await repository.record(fixture.adminId, {
-      courseId: fixture.courseId,
-      groupId: fixture.groupId,
+      courseId,
+      groupId,
       sessionId: first.id,
       requestKey: crypto.randomUUID(),
       revision: first.revision,
-      marks: [{ registrationId: fixture.paid.id, status: "EXCUSED" }],
+      marks: [{ registrationId, status: "EXCUSED" }],
     });
     await page.reload();
     expect((await read(page, path)).participants[0]!.grades[0]!.score).toBe(
-      "100.00",
+      "50.00",
     );
     expect((await read(page, path)).scheme.frozenAt).toBeNull();
-    now = new Date(fixture.now.getTime() + 3 * 86400000);
-    expect(
-      (
-        await page.request.post(
-          `/__e2e/clock?now=${encodeURIComponent(now.toISOString())}`,
-        )
-      ).status(),
-    ).toBe(204);
-    await page.reload();
     await edit.click();
     await expect(attendanceInput).toBeEnabled();
     await expect(attendanceInput).toHaveValue("50.00");
@@ -498,6 +486,7 @@ test("INSTRUCTOR saves rows atomically with pending distinct from zero, and corr
       }),
     ).toBeVisible();
     await capture(page, "grades", true);
+    await verifyAttendanceGrades(page, fixture, true);
   } finally {
     await fixture.close();
   }
