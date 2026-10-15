@@ -51,6 +51,8 @@ test("official CSV preserves frozen metadata, two decimals, BOM, leading-zero CI
     ["ATTENDANCE", "Asistencia"],
   ] as const) {
     const variant = closureExportFixture();
+    if (variant.report.access !== "ADMIN")
+      throw new Error("Expected ADMIN fixture");
     variant.report.scheme.components[0]!.type = type;
     variant.report.scheme.components[0]!.name = "Asistencia";
     variant.report.scheme.modality = type;
