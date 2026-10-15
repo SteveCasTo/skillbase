@@ -59,9 +59,10 @@ lee las fuentes institucionales/curriculares que aún no están incluidas en ese
 snapshot. Congelar en el registro de certificado y en el artefacto todos los
 valores efectivamente impresos, su procedencia/versión, fechas, horas, grupo,
 destinatario y firmantes/cargos, además de la versión de plantilla, branding,
-logos y configuración usada. Una edición posterior no cambia el documento por
-sí sola. Antes de firmar, ADMIN puede regenerar explícitamente el borrador: se
-actualiza el mismo registro, se congela la metadata vigente y se cambia el ID
+logos y configuración usada. Una edición posterior no cambia el documento al
+abrir/refrescar su detalle. Antes de descargar para firmar, el proceso interno
+compara las fuentes vigentes y actualiza solo un borrador materialmente obsoleto:
+se actualiza el mismo registro, se congela la metadata vigente y se cambia el ID
 público, invalidando el anterior. Después de guardar el firmado, la metadata y
 el ID permanecen congelados; solo se sustituye el artefacto firmado.
 
@@ -238,8 +239,12 @@ grupo/tipo/destinatario, también antes de firmar; grupos distintos conservan
 certificados independientes.
 
 Los estados operativos visibles son «Para firmar» y «Firmado». ADMIN descarga
-el borrador para obtener firmas y puede regenerarlo solo antes de guardar el
-firmado. Un único PDF y la atestación «Confirmo que es el certificado firmado.»
+el borrador para obtener firmas; no existe botón de regeneración manual. Su
+preparación POST reconcilia automáticamente cambios materiales antes de descargar,
+sin rotar el ID por visitar/refrescar ni por ajustes no utilizados. La revisión
+optimista y la vigencia material se verifican al reservar/asociar un firmado.
+Un único PDF y la intención explícita ADMIN de guardar (`intent=save-signed-pdf`,
+acción submit «Guardar PDF firmado»/«Sustituir PDF firmado», sin checkbox)
 se validan en servidor. Guardar publica atómicamente el firmado con SHA-256 de
 sus bytes completos, sin pasos independientes de revisión/emisión. No verifica
 criptográficamente firmas manuscritas. Una sustitución firmada mantiene el ID

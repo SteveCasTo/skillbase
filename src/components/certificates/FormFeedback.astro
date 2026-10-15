@@ -41,21 +41,11 @@ const { feedback } = Astro.props;
           'button[type="submit"]',
         );
         const blocked = submit?.dataset.certificateBlocked === "true";
-        const confirmation = form.querySelector<HTMLInputElement>(
-          "[data-review-confirmation]",
-        );
         const sync = () => {
           if (submit)
             submit.disabled =
-              blocked ||
-              pending ||
-              (Boolean(confirmation) && !confirmation?.checked) ||
-              (Boolean(file) && !file?.files?.length);
+              blocked || pending || (Boolean(file) && !file?.files?.length);
         };
-        if (confirmation)
-          confirmation.addEventListener("change", sync, {
-            signal,
-          });
         file?.addEventListener(
           "change",
           () => {
@@ -84,7 +74,6 @@ const { feedback } = Astro.props;
             event.preventDefault();
             if (pending || !form.reportValidity()) return;
             const formData = new FormData(form);
-            // The signed-document attestation is also validated by the server.
             pending = true;
             sync();
             form.setAttribute("aria-busy", "true");

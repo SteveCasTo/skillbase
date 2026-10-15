@@ -123,9 +123,48 @@ Registrar:
 ## REGENERACIÓN Y SUSTITUCIÓN
 
 Un único registro por grupo/tipo/destinatario, sin versiones/historial en UI.
-Regenerar antes de firmar cambia el ID público e invalida el anterior. Sustituir
+La actualización interna antes de firmar cambia el ID público e invalida el anterior. Sustituir
 un firmado conserva su ID y metadata, cambia el hash del artefacto actual y deja
 auditoría mínima. La limpieza del objeto previo ocurre después del commit.
+
+### Descarga y guardado del documento firmado
+
+La descarga aparece en el encabezado del detalle. ADMIN solo dispone de
+«Descargar para firmar»: su POST prepara internamente el borrador si cambió
+materialmente la fuente oficial. Abrir/refrescar el detalle y los GET PDF no
+regeneran. La comparación usa el snapshot efectivo (autoridades utilizadas,
+fechas nominales impresas, horas, contenido institucional y versiones de
+plantilla/branding), no el número de revisión de un ajuste no utilizado ni el
+reloj. Un cierre oficial nuevo también invalida el borrador anterior, siempre
+que el destinatario siga siendo elegible. Los assets continúan ligados a su
+versión de branding inmutable; no se introducen assets ni hashes alternativos.
+
+Sin cambios materiales se conservan ID, revisión y bytes; no hay botón de
+regeneración manual. La preparación, reserva y asociación revalidan revisión y
+vigencia en servidor, también si los ajustes cambian durante la carga. Un PDF
+obsoleto se rechaza con una indicación de volver a descargar y tramitar firmas.
+Con JavaScript se actualiza el detalle tras una preparación que cambie revisión;
+sin JavaScript la descarga conserva POST/attachment y, si se actualizó, se debe
+recargar el detalle antes de cargar el firmado (la revisión anterior se deniega).
+
+Seleccionar o arrastrar un PDF legible habilita «Guardar PDF firmado» o
+«Sustituir PDF firmado»; quitarlo oculta la acción. El envío explícito de ese
+botón (`intent=save-signed-pdf`) constituye la confirmación ADMIN, sin checkbox
+ni confirmación oculta preaceptada. Servidor exige la intención, rol vigente,
+revisión, finalidad SIGNED y validación de extensión/MIME/tamaño/contenido PDF.
+Publicación, hash, atestación y auditoría se confirman en la misma transacción.
+La selección cliente no marca el certificado como firmado ni acredita firmas
+institucionales. Sin JavaScript se conservan selector HTML, required y POST;
+la validación completa de contenido sigue siendo del servidor.
+
+Un firmado nunca se actualiza automáticamente. Solo ofrece «Descargar firmado»;
+la descarga unsigned también se deniega por URL directa. Sustituir exige un
+nuevo archivo y mantiene ID/metadata. Los errores y progreso de carga se
+presentan inline, sin toast persistente.
+
+El detalle ADMIN no presenta el bloque de datos para LinkedIn ni la acción de
+copiar credencial. Conserva el SHA-256 y «Consultar estado público» como enlace
+con estilo de botón; la revocación permanece separada y con confirmación.
 
 ## PDF
 

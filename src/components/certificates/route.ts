@@ -8,6 +8,7 @@ import {
   downloadCertificate,
   handleCertificatePost,
   handleCertificateUpload,
+  prepareCertificateDownload,
 } from "@/server/certificates/http";
 import {
   getCertificateRepository,
@@ -162,6 +163,15 @@ export async function certificateDownloadRoute(
     actor: requireInternalUser(context.locals),
     certificateId: context.params.certificateId ?? "",
     purpose,
+    service: getCertificateService(),
+  });
+}
+export async function certificatePrepareDownloadRoute(context: APIContext) {
+  return prepareCertificateDownload({
+    request: context.request,
+    actor: requireInternalUser(context.locals),
+    siteUrl: getPublicAuthEnvironment().siteUrl,
+    certificateId: context.params.certificateId ?? "",
     service: getCertificateService(),
   });
 }

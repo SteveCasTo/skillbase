@@ -104,6 +104,15 @@ export class ManageCertificates {
     const path = await this.repository.downloadPath(actorId, id, purpose);
     return this.storage.get(path);
   }
+  /** Reconcile only materially obsolete drafts; opening the detail never writes. */
+  async prepareDownload(actorId: string, command: CertificateCommand) {
+    const input = await this.repository.generationInput(actorId, command);
+    const [record] = await this.generate(actorId, input);
+    if (!record)
+      throw new Error("Certificate preparation returned no document");
+    const bytes = await this.download(actorId, record.id, "UNSIGNED");
+    return { bytes, revision: record.revision };
+  }
   async cleanup(actorId: string, before: Date) {
     // Reservations have a bounded I/O window; only explicitly expired ones are reclaimed.
     if (before.getTime() > Date.now() - 60 * 60 * 1000)
