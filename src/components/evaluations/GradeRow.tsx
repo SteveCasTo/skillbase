@@ -213,7 +213,7 @@ export function GradeRow({
         )}
       </div>
       <div className="col-span-2 row-start-3 grid min-w-0 gap-y-2 xl:contents">
-        {componentRows.map((row, rowIndex) => (
+        {componentRows.map((row) => (
           <div
             key={row[0]!.id}
             className={cn(
@@ -221,7 +221,7 @@ export function GradeRow({
               columns,
             )}
           >
-            {row.map((component, index) => {
+            {row.map((component) => {
               const draft = drafts?.find(
                 (draft) => draft.componentId === component.id,
               );
@@ -244,7 +244,15 @@ export function GradeRow({
                   </label>
                   {draft && participant.canGrade ? (
                     <Input
-                      autoFocus={rowIndex === 0 && index === 0}
+                      autoFocus={
+                        component.id ===
+                        components.find(
+                          (item) =>
+                            participant.grades.find(
+                              (grade) => grade.componentId === item.id,
+                            )?.canEdit !== false,
+                        )?.id
+                      }
                       id={id}
                       inputMode="decimal"
                       title={

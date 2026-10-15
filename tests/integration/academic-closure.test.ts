@@ -347,7 +347,6 @@ test("academic closure lifecycle validates blockers, permissions and immutable h
   await expect(repo.close(f.admin2.id, nextCommand)).rejects.toMatchObject({
     code: "FORBIDDEN",
   });
-  await attendanceGradeLifecycle();
 });
 async function attendanceGradeLifecycle() {
   now = new Date("2099-02-01T12:00:00Z");
@@ -839,6 +838,7 @@ test("academic closure waits for explicit historical attendance review and never
   expect(
     official.report.sessions[0]!.participants[0]!.attendance,
   ).toMatchObject({ status: "PRESENT", inferred: false, markedBy: f.admin.id });
+  await attendanceGradeLifecycle();
 });
 
 test("academic closure transactions serialize close with grade and attendance writes and competing revisions", async () => {
