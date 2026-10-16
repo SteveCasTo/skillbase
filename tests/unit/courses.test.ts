@@ -34,7 +34,7 @@ import { matchesCourseSearch } from "@/domain/courses/report-filters";
 import { renderCoursesCsv } from "@/server/courses/exports/csv";
 import { renderCoursesPdf } from "@/server/courses/exports/pdf";
 import { groupSchedule } from "@/server/courses/exports/columns";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFPage } from "pdf-lib";
 import {
   courseReportNow,
   courseReportSource,
@@ -389,6 +389,55 @@ describe("course domain", () => {
     const pdf = await renderCoursesPdf(report);
     expect(new TextDecoder().decode(pdf.slice(0, 5))).toBe("%PDF-");
     expect((await PDFDocument.load(pdf)).getPageCount()).toBeGreaterThan(0);
+    const tallSource = courseReportSource();
+    const longName =
+      "Especialización en programación y análisis de sistemas de información para la gestión académica e institucional avanzada y el desarrollo de soluciones de interoperabilidad y automatización de procesos universitarios con gobernanza y planificación de infraestructuras tecnológicas";
+    tallSource.courses = [{ ...tallSource.courses[0]!, name: longName }];
+    tallSource.groups = [tallSource.groups[0]!];
+    tallSource.registrations = [tallSource.registrations[0]!];
+    tallSource.sessions = Array.from({ length: 44 }, (_, index) => ({
+      groupId: tallSource.groups[0]!.id,
+      startsAt: new Date(Date.UTC(2026, 0, 5 + index, 12, index)),
+      endsAt: new Date(Date.UTC(2026, 0, 5 + index, 13, index + 30)),
+    }));
+    const draws: { page: PDFPage; text: string; y: number }[] = [];
+    const originalDraw = PDFPage.prototype.drawText;
+    const draw = spyOn(PDFPage.prototype, "drawText").mockImplementation(
+      function (this: PDFPage, value, options) {
+        draws.push({ page: this, text: value, y: options?.y ?? 0 });
+        return originalDraw.call(this, value, options);
+      },
+    );
+    try {
+      const tallPdf = await renderCoursesPdf(
+        buildCourseReport(tallSource, filter, courseReportNow),
+      );
+      expect((await PDFDocument.load(tallPdf)).getPageCount()).toBeGreaterThan(
+        1,
+      );
+      const body = draws.filter(
+        ({ text }) =>
+          text !== "Informe de cursos" && !/^\d+ \/ \d+$/u.test(text),
+      );
+      expect(body.every(({ y }) => y >= 48)).toBe(true);
+      const allText = draws.map(({ text }) => text).join(" ");
+      expect(allText.replace(/\s/gu, "")).toContain(
+        longName.replace(/\s/gu, ""),
+      );
+      for (let minute = 0; minute < 44; minute++) {
+        const time = `08:${minute.toString().padStart(2, "0")}–`;
+        expect(allText.split(time)).toHaveLength(2);
+      }
+      for (const page of new Set(draws.map((row) => row.page))) {
+        const content = draws
+          .filter((row) => row.page === page)
+          .map((row) => row.text);
+        if (content.includes("Grupo / horario"))
+          expect(content.some((value) => /^Grupo 1/u.test(value))).toBe(true);
+      }
+    } finally {
+      draw.mockRestore();
+    }
     const badText = structuredClone(report);
     badText.courses[0]!.name = "漢字";
     await expect(renderCoursesPdf(badText)).rejects.toMatchObject({

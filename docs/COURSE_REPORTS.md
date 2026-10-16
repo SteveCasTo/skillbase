@@ -49,7 +49,11 @@ se infiere resultado por emisión o ausencia de PDF/certificado.
 PDF institucional independiente del financiero de preinscripciones: A4 vertical,
 títulos Montserrat, Noto Sans embebida para texto y Unicode, encabezado/pie,
 tablas compactas con encabezados y curso repetidos en continuaciones. Nunca
-trunca texto; glifos no soportados o contenido mayor que una página rechazan
+permite que una fila invada el pie: mide el espacio real después de la cabecera;
+un bloque largo de horarios se divide entre páginas, con identificación de grupo
+repetida y sin repetir sus importes/contadores. Se conservan todos los horarios.
+Nunca trunca texto; glifos no soportados o una cabecera que por sí sola no deje
+espacio útil en una página rechazan
 PDF explícitamente, preservando CSV como alternativa. No incluye CI, nombres de
 estudiantes, emails, UUID ni rutas internas.
 

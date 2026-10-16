@@ -135,9 +135,12 @@ export async function renderCoursesPdf(
     const title = wrap(course.name, CONTENT, 15, bold);
     const instructor = wrap(`Instructor: ${course.instructorName}`, CONTENT, 9);
     const height =
-      title.length * 19 + (continuation ? 25 : instructor.length * 13 + 94);
-    if (height > H - 200) throw new PdfTextError();
-    if (y - height - 76 < BOTTOM) newPage();
+      title.length * 19 + (continuation ? 54 : instructor.length * 13 + 120);
+    const reserve = course.groups.length ? 55 : 22;
+    // Measure the actual header and keep at least a useful row fragment with it.
+    // A title too large even on a fresh page fails rather than entering the footer.
+    if (H - 80 - height - reserve < BOTTOM) throw new PdfTextError();
+    if (y - height - reserve < BOTTOM) newPage();
     lines(title, M, y, 15, INK, bold);
     y -= title.length * 19 + 5;
     if (continuation) {
@@ -266,31 +269,72 @@ export async function renderCoursesPdf(
         [group.passed === null ? "—" : String(group.passed)],
         [group.notPassed === null ? "—" : String(group.notPassed)],
       ];
-      const height = Math.max(...cells.map((cell) => cell.length)) * 13 + 16;
-      if (height > H - 230) throw new PdfTextError();
-      if (y - height < BOTTOM) {
+      const totalLines = Math.max(...cells.map((cell) => cell.length));
+      const height = totalLines * 13 + 16;
+      const freshCapacity =
+        H -
+        80 -
+        (wrap(course.name, CONTENT, 15, bold).length * 19 + 54) -
+        BOTTOM;
+      // Ordinary rows stay indivisible. Oversized schedules instead continue in
+      // bounded fragments, with each page's real post-header space remeasured.
+      if (
+        y - height < BOTTOM &&
+        height <= freshCapacity &&
+        group !== course.groups[0]
+      ) {
         newPage();
         courseHeader(course, true);
       }
-      let x = M;
-      cells.forEach((cell, index) => {
-        cell.forEach((value, line) => {
-          const preferred = index === 0 && line === 0 ? bold : font;
-          const width = faceFor(value, preferred).widthOfTextAtSize(value, 9);
-          if (width > widths[index]! - 12) throw new PdfTextError();
-          text(
-            value,
-            index < 2 ? x + 6 : x + widths[index]! - 6 - width,
-            y - 8 - line * 13,
-            9,
-            index === 3 ? ACCENT : INK,
-            preferred,
-          );
+      let offset = 0;
+      while (offset < totalLines) {
+        const repeatedLabel =
+          offset > 0 ? [`Grupo ${group.number} (continuación)`] : [];
+        let capacity =
+          Math.floor((y - BOTTOM - 16) / 13) - repeatedLabel.length;
+        if (capacity < 2) {
+          newPage();
+          courseHeader(course, true);
+          capacity = Math.floor((y - BOTTOM - 16) / 13) - repeatedLabel.length;
+        }
+        if (capacity < 2) throw new PdfTextError();
+        const count = Math.min(capacity, totalLines - offset);
+        const fragment = cells.map((cell, index) => [
+          ...(index === 0 ? repeatedLabel : []),
+          ...cell.slice(offset, offset + count),
+        ]);
+        const fragmentHeight = (count + repeatedLabel.length) * 13 + 16;
+        if (y - fragmentHeight < BOTTOM) throw new PdfTextError();
+        let x = M;
+        fragment.forEach((cell, index) => {
+          cell.forEach((value, line) => {
+            const preferred =
+              index === 0 &&
+              line === 0 &&
+              (offset === 0 || repeatedLabel.length > 0)
+                ? bold
+                : font;
+            const width = faceFor(value, preferred).widthOfTextAtSize(value, 9);
+            if (width > widths[index]! - 12) throw new PdfTextError();
+            text(
+              value,
+              index < 2 ? x + 6 : x + widths[index]! - 6 - width,
+              y - 8 - line * 13,
+              9,
+              index === 3 ? ACCENT : INK,
+              preferred,
+            );
+          });
+          x += widths[index]!;
         });
-        x += widths[index]!;
-      });
-      y -= height;
-      rule(y);
+        y -= fragmentHeight;
+        rule(y);
+        offset += count;
+        if (offset < totalLines) {
+          newPage();
+          courseHeader(course, true);
+        }
+      }
     }
     y -= 26;
   }
