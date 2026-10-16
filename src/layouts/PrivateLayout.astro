@@ -405,6 +405,9 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
           const last = focusable.at(-1);
           if (event.shiftKey && document.activeElement === first) {
             event.preventDefault();
+            // Expand a notice through its stable group before focusing a CTA
+            // that the vendor may replace when keyboard expansion changes.
+            last?.closest<HTMLElement>("[data-sileo-toast]")?.focus();
             last?.focus();
           } else if (!event.shiftKey && document.activeElement === last) {
             event.preventDefault();

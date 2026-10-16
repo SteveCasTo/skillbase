@@ -86,6 +86,13 @@ test("mobile drawer closes with Escape and restores keyboard focus", async ({
   await notice.getByRole("button", { name: "Revisar aviso" }).focus();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Cerrar menú" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    page
+      .getByRole("dialog")
+      .locator("[data-sileo-toast]:focus, [data-sileo-toast] :focus"),
+  ).toHaveCount(1);
+  await notice.getByRole("button", { name: "Revisar aviso" }).focus();
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
