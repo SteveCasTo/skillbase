@@ -338,7 +338,7 @@ async function uploadReviewIssue(
   if (visual) {
     await file.focus();
     await expect(file).toBeFocused();
-    for (const width of [375, 768, 1440]) {
+    for (const width of [375, 768, 1440, 1920]) {
       await page.setViewportSize({ width, height: 1000 });
       await assertNoOverflow(page);
       const zoneBounds = await zone.boundingBox();
@@ -346,6 +346,11 @@ async function uploadReviewIssue(
         .locator("[data-signed-pdf-form]")
         .boundingBox();
       expect(zoneBounds?.width).toBe(formBounds?.width);
+      const minimum = await zone.evaluate((element) => ({
+        minimum: parseFloat(getComputedStyle(element).minHeight),
+        unit: parseFloat(getComputedStyle(document.documentElement).fontSize),
+      }));
+      expect(minimum.minimum).toBe(12.5 * minimum.unit);
       await page.screenshot({
         path: shot(`upload-empty-${width}.png`),
         fullPage: true,
@@ -466,12 +471,16 @@ async function uploadReviewIssue(
       "aria-busy",
       "true",
     );
-    await expect(
-      page.getByRole("button", {
-        name: "Guardando PDF firmado…",
-        exact: true,
-      }),
-    ).toBeDisabled();
+    await expect(save).toBeDisabled();
+    await expect(save).toHaveAttribute("aria-busy", "true");
+    await expect(save.locator("svg")).toHaveCount(0);
+    await expect(page.locator("[data-upload-status]")).toHaveText("");
+    const loadingToast = page
+      .locator('[data-sileo-toast][data-exiting="false"]')
+      .filter({ hasText: "Guardando PDF firmado…" });
+    await expect(loadingToast).toHaveCount(1);
+    await expect(loadingToast).toHaveAttribute("data-state", "loading");
+    const saveNoticeId = await loadingToast.getAttribute("data-sileo-id");
     await page.screenshot({
       path: shot("upload-loading.png"),
       fullPage: true,
@@ -483,6 +492,12 @@ async function uploadReviewIssue(
     );
     await expect(page.locator("[data-upload-error]")).toBeFocused();
     await expect(save).toBeEnabled();
+    await expect(
+      page.locator(`[data-sileo-id="${saveNoticeId}"][data-exiting="false"]`),
+    ).toHaveAttribute("data-state", "error");
+    await expect(details).toContainText(
+      "certificado-sintetico-con-firmas-para-validacion-visual.pdf",
+    );
     await page.screenshot({
       path: shot("upload-error.png"),
       fullPage: true,
@@ -495,8 +510,50 @@ async function uploadReviewIssue(
       new URL(response.url()).pathname === `${path}/cargar`,
   );
   await expect(save).toBeEnabled();
+  let completeUpload: (() => void) | undefined;
+  let uploadCalls = 0;
+  await page.route(`**${path}/cargar`, async (route) => {
+    uploadCalls++;
+    const response = await route.fetch();
+    expect(response.status()).toBe(200);
+    const committed: { ok: boolean; value: CertificateDto } =
+      await response.json();
+    expect(committed.ok).toBe(true);
+    expect(committed.value.state).toBe("issued");
+    expect(committed.value.signedSha256).toBe(
+      createHash("sha256").update(new Uint8Array(bytes)).digest("hex"),
+    );
+    await new Promise<void>((resolve) => {
+      completeUpload = resolve;
+    });
+    await route.fulfill({ response });
+  });
   await save.click();
+  const pendingToast = page
+    .locator('[data-sileo-toast][data-exiting="false"]')
+    .filter({ hasText: "Guardando PDF firmado…" });
+  await expect(pendingToast).toHaveCount(1);
+  const noticeId = await pendingToast.getAttribute("data-sileo-id");
+  await expect(pendingToast).toHaveAttribute("data-state", "loading");
+  await expect(save).toBeDisabled();
+  await expect(save).toHaveText(
+    record.hasSignedPdf ? "Sustituir PDF firmado" : "Guardar PDF firmado",
+  );
+  await page.locator("[data-signed-pdf-form]").dispatchEvent("submit");
+  await expect.poll(() => Boolean(completeUpload)).toBe(true);
+  expect(uploadCalls).toBe(1);
+  await expect(pendingToast).toHaveAttribute("data-state", "loading");
+  if (visual)
+    await page.screenshot({
+      path: shot("upload-confirmation-pending.png"),
+      fullPage: true,
+    });
+  completeUpload!();
   expect((await uploaded).status()).toBe(200);
+  await expect(
+    page.locator(`[data-sileo-id="${noticeId}"][data-exiting="false"]`),
+  ).toHaveAttribute("data-state", "success");
+  await page.unroute(`**${path}/cargar`);
   await expect(
     page.getByRole("link", { name: "Consultar estado público" }),
   ).toBeVisible();
@@ -783,6 +840,12 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       if (request.method() !== "GET") transmitted += 1;
     });
     const publicPicker = publicPage.getByLabel("Seleccionar PDF firmado");
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Comprobar tu archivo",
+        exact: true,
+      }),
+    ).toBeHidden();
     await publicPicker.focus();
     await expect(publicPicker).toBeFocused();
     const publicChooser = publicPage.waitForEvent("filechooser");
@@ -809,6 +872,11 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       name: "Resultado de comparación local",
     });
     await expect(localResult).toHaveAttribute("data-tone", "valid");
+    await expect(
+      publicPage.locator(
+        '[data-sileo-toast][data-exiting="false"][data-state="success"]',
+      ),
+    ).toContainText("El archivo coincide.");
     await expect(publicPage.locator("[data-local-hash]")).toHaveCount(0);
     await expect(publicPage.locator("main")).not.toContainText(
       /[a-f0-9]{64}/iu,
@@ -857,6 +925,11 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       }),
     ).toContainText("no coincide");
     await expect(localResult).toHaveAttribute("data-tone", "error");
+    await expect(
+      publicPage
+        .locator('[data-sileo-toast][data-exiting="false"][data-state="error"]')
+        .last(),
+    ).toContainText("no coincide");
     await expect(dropzone).toBeHidden();
     await expect(publicPage.locator("[data-local-selection]")).toBeVisible();
     for (const width of [375, 768, 1440]) {
@@ -902,6 +975,15 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         typeof (window as typeof window & { releaseRead?: () => void })
           .releaseRead === "function",
     );
+    const hashLoading = publicPage.locator(
+      '[data-sileo-toast][data-exiting="false"][data-state="loading"]',
+    );
+    await expect(hashLoading).toHaveCount(1);
+    const oldHashNotice = await hashLoading.getAttribute("data-sileo-id");
+    await publicPage.screenshot({
+      path: testInfo.outputPath("public-hash-loading.png"),
+      fullPage: true,
+    });
     await publicPage.getByLabel("Seleccionar PDF firmado").setInputFiles({
       name: "newest.pdf",
       mimeType: "application/pdf",
@@ -924,6 +1006,12 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       "El archivo coincide con el PDF firmado del certificado vigente.",
     );
     await expect(localResult).toHaveAttribute("data-tone", "valid");
+    await expect(
+      publicPage.locator(
+        `[data-sileo-id="${oldHashNotice}"][data-exiting="false"]`,
+      ),
+    ).toHaveCount(0);
+    await expect(hashLoading).toHaveCount(0);
     await expect(publicPage.locator("main")).not.toContainText(
       /[a-f0-9]{64}/iu,
     );
@@ -953,6 +1041,7 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     ).toBeHidden();
     await expect(dropzone).toBeVisible();
     await expect(publicPage.locator("[data-local-selection]")).toBeHidden();
+    await expect(hashLoading).toHaveCount(0);
     await publicPage.evaluate(() =>
       (window as typeof window & { releaseRead?: () => void }).releaseRead?.(),
     );
@@ -985,6 +1074,15 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       const bounds = await article.boundingBox();
       const mainBounds = await publicPage.locator("main").boundingBox();
       expect(bounds?.width).toBe(mainBounds?.width);
+      if (width >= 1024) {
+        const information = await publicPage
+          .getByRole("region", { name: "Datos públicos del certificado" })
+          .boundingBox();
+        const emptyZone = await dropzone.boundingBox();
+        expect(emptyZone!.y).toBe(information!.y);
+        expect(emptyZone!.height).toBe(information!.height);
+        expect(emptyZone!.width).toBe(information!.width);
+      }
       await publicPage.screenshot({
         path: testInfo.outputPath(`public-${width}.png`),
         fullPage: true,
@@ -1120,6 +1218,16 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       }),
     ).toContainText("coincide, pero el certificado no es válido");
     await expect(localResult).toHaveAttribute("data-tone", "invalid");
+    await expect(
+      publicPage.locator(
+        '[data-sileo-toast][data-exiting="false"][data-state="success"]',
+      ),
+    ).toHaveCount(0);
+    await expect(
+      publicPage.locator(
+        '[data-sileo-toast][data-exiting="false"][data-state="error"]',
+      ),
+    ).toContainText("Certificado no válido.");
     await expect(dropzone).toBeHidden();
     await expect(publicPage.locator("main")).not.toContainText(
       /[a-f0-9]{64}/iu,
