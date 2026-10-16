@@ -411,6 +411,64 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
       expect(invalidDownloads).toEqual([]);
     }
     page.off("download", recordInvalid);
+    let releaseDownload!: () => void;
+    const heldDownload = new Promise<void>((resolve) => {
+      releaseDownload = resolve;
+    });
+    const downloadRoute = `${e2eSiteUrl()}${path}/1/informe.pdf`;
+    await page.route(
+      downloadRoute,
+      async (request) => {
+        await heldDownload;
+        await request.abort().catch(() => {});
+      },
+      { times: 1 },
+    );
+    const independentId = await page.evaluate(async () => {
+      const moduleUrl = performance
+        .getEntriesByType("resource")
+        .find((entry) =>
+          /\/src\/lib\/notifications\.ts(?:\?|$)/u.test(entry.name),
+        )?.name;
+      if (!moduleUrl) throw new Error("Real notification facade missing");
+      const { notifications }: typeof import("../../src/lib/notifications") =
+        await import(moduleUrl);
+      return notifications.info({
+        title: "Aviso independiente",
+        duration: 60000,
+      });
+    });
+    await page
+      .getByRole("link", { name: "Descargar PDF", exact: true })
+      .click();
+    const pendingDownload = page.locator(
+      '[data-sileo-id^="document-download-"][data-state="loading"][data-exiting="false"]',
+    );
+    await expect(pendingDownload).toHaveCount(1);
+    const pendingId = await pendingDownload.getAttribute("data-sileo-id");
+    try {
+      await page
+        .getByRole("navigation", { name: "Ruta de navegación" })
+        .getByRole("link", { name: "Cursos", exact: true })
+        .click();
+      await expect(page).toHaveURL(/\/app\/cursos$/u);
+    } finally {
+      releaseDownload();
+    }
+    await expect(page.locator(`[data-sileo-id="${pendingId}"]`)).toHaveCount(0);
+    await expect(
+      page.locator(`[data-sileo-id="${independentId}"][data-exiting="false"]`),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator("[data-sileo-toast]")
+        .filter({ hasText: "Descarga cancelada." }),
+    ).toHaveCount(0);
+    await page.goBack();
+    await expect(page).toHaveURL(new RegExp(`${path}$`, "u"));
+    await expect(
+      page.getByRole("link", { name: "Descargar PDF", exact: true }),
+    ).toBeVisible();
     const originalCsv = await downloadOfficialDocuments(
       page,
       path,

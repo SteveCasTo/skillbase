@@ -66,7 +66,10 @@ que abre la confirmación del sistema, no la API nativa.
    `downloadCertificatePdf` (su validación es de documento, no de negocio);
    CSV exige MIME/extensión/BOM y cuerpo no vacío. Ambos esperan bytes y
    comprobación de abort antes de crear la descarga. Se conserva el mismo
-   promise toast y el href HTML sin JavaScript.
+   mismo ID entre loading y resultado y el href HTML sin JavaScript.
+   Navegar aborta y retira únicamente ese ID; el catch de una operación abortada
+   no vuelve a crear un error «cancelada» en el host persistente ni toca avisos
+   independientes. Los fallos reales de transporte/documento siguen mostrando error.
 4. **Dos toasts tras escritura de asistencia confirmada y refresh fallido.**
    La escritura mantiene su único éxito; la necesidad de recuperar la vista
    permanece en el error de página existente con su enlace de reintento.
@@ -95,6 +98,8 @@ Se actualizan únicamente casos existentes, sin añadir specs, suites ni casos:
 - `tests/e2e/academic-closure.spec.ts`: PDF truncado/CSV vacío no descargan ni
   anuncian éxito; los documentos reales mantienen hash browser/disco, contenido,
   privacidad, headers y fallback sin JavaScript del escenario existente.
+  El mismo caso retiene una descarga, navega realmente a Cursos y vuelve;
+  loading se retira sin error cancelado y un aviso independiente permanece.
 - `tests/e2e/attendance.spec.ts`: POST real y GET de fragmento fallido muestran
   un éxito de la operación y recuperación persistente, sin warning duplicado;
   el reintento real recupera revisión/estado y limpia el mensaje de página.

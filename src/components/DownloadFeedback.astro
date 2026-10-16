@@ -25,77 +25,79 @@
           link.setAttribute("aria-busy", "true");
           const certificate = link.hasAttribute("data-certificate-download");
           const controller = new AbortController();
-          const abort = () => controller.abort();
+          const id = `document-download-${crypto.randomUUID()}`;
+          const abort = () => {
+            controller.abort();
+            notifications.dismiss(id);
+          };
           document.addEventListener("astro:before-swap", abort, {
             once: true,
           });
+          notifications.loading({ id, title: "Preparando descarga…" });
           try {
-            await notifications.promise(
-              async () => {
-                const response = await fetch(link.href, {
-                  credentials: "same-origin",
-                  signal: controller.signal,
-                });
-                if (
-                  certificate ||
-                  new URL(link.href).pathname.endsWith(".pdf")
-                ) {
-                  await downloadCertificatePdf(response, controller.signal);
-                  return;
-                }
-                if (!response.ok || response.redirected)
-                  throw new Error(
-                    "La descarga no está disponible. Comprueba tu sesión y reintenta.",
-                  );
-                const type = response.headers.get("content-type") ?? "";
-                const filename = response.headers
-                  .get("content-disposition")
-                  ?.match(/filename="([^"\\/]+)"/u)?.[1];
-                if (
-                  !filename?.endsWith(".csv") ||
-                  !/^text\/csv(?:;|$)/iu.test(type)
-                )
-                  throw new Error(
-                    "No se pudo confirmar el documento. Reintenta la descarga.",
-                  );
-                const blob = await response.blob();
-                const prefix = new Uint8Array(
-                  await blob.slice(0, 3).arrayBuffer(),
+            await (async () => {
+              const response = await fetch(link.href, {
+                credentials: "same-origin",
+                signal: controller.signal,
+              });
+              if (certificate || new URL(link.href).pathname.endsWith(".pdf")) {
+                await downloadCertificatePdf(response, controller.signal);
+                return;
+              }
+              if (!response.ok || response.redirected)
+                throw new Error(
+                  "La descarga no está disponible. Comprueba tu sesión y reintenta.",
                 );
-                if (
-                  blob.size < 20 ||
-                  prefix[0] !== 239 ||
-                  prefix[1] !== 187 ||
-                  prefix[2] !== 191
-                )
-                  throw new Error(
-                    "No se pudo confirmar el documento. Reintenta la descarga.",
-                  );
-                controller.signal.throwIfAborted();
-                const url = URL.createObjectURL(blob);
-                const download = document.createElement("a");
-                download.href = url;
-                download.download = filename;
-                download.click();
-                window.setTimeout(() => URL.revokeObjectURL(url), 30000);
-              },
-              {
-                loading: { title: "Preparando descarga…" },
-                success: {
-                  title: certificate ? "PDF listo." : "Descarga preparada.",
-                },
-                error: (failure: unknown) => ({
-                  title: controller.signal.aborted
-                    ? "Descarga cancelada."
-                    : failure instanceof Error &&
-                        !(certificate && failure instanceof TypeError)
-                      ? failure.message
-                      : "No se pudo descargar el documento. Reintenta.",
-                }),
-              },
-            );
-          } catch {
-            // The promise reports failure; keep the original link available for retry.
+              const type = response.headers.get("content-type") ?? "";
+              const filename = response.headers
+                .get("content-disposition")
+                ?.match(/filename="([^"\\/]+)"/u)?.[1];
+              if (
+                !filename?.endsWith(".csv") ||
+                !/^text\/csv(?:;|$)/iu.test(type)
+              )
+                throw new Error(
+                  "No se pudo confirmar el documento. Reintenta la descarga.",
+                );
+              const blob = await response.blob();
+              const prefix = new Uint8Array(
+                await blob.slice(0, 3).arrayBuffer(),
+              );
+              if (
+                blob.size < 20 ||
+                prefix[0] !== 239 ||
+                prefix[1] !== 187 ||
+                prefix[2] !== 191
+              )
+                throw new Error(
+                  "No se pudo confirmar el documento. Reintenta la descarga.",
+                );
+              controller.signal.throwIfAborted();
+              const url = URL.createObjectURL(blob);
+              const download = document.createElement("a");
+              download.href = url;
+              download.download = filename;
+              download.click();
+              window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+            })();
+            controller.signal.throwIfAborted();
+            notifications.success({
+              id,
+              title: certificate ? "PDF listo." : "Descarga preparada.",
+            });
+          } catch (failure) {
+            // Navigation retires only its own operation. Do not pass an aborted
+            // promise to the vendor updater, which can revive a dismissed toast.
+            if (controller.signal.aborted) notifications.dismiss(id);
+            else
+              notifications.error({
+                id,
+                title:
+                  failure instanceof Error &&
+                  !(certificate && failure instanceof TypeError)
+                    ? failure.message
+                    : "No se pudo descargar el documento. Reintenta.",
+              });
           } finally {
             document.removeEventListener("astro:before-swap", abort);
             delete link.dataset.pending;

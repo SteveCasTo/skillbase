@@ -193,15 +193,15 @@ test("private toast placement leaves top-right page actions clickable", async ({
   });
   const inactive = page.locator("#inactive-notice-modal");
   await expect(inactive.locator("[data-sileo-viewport]")).toHaveCount(0);
-  await inactive.evaluate((element) => {
+  await inactive.evaluate((element: HTMLElement) => {
     element.inert = true;
     element.hidden = false;
   });
   await expect(inactive.locator("[data-sileo-viewport]")).toHaveCount(0);
-  await inactive.evaluate((element) => (element.inert = false));
+  await inactive.evaluate((element: HTMLElement) => (element.inert = false));
   await expect(inactive.locator("[data-sileo-viewport]")).toHaveCount(1);
   await expect(page.locator("[data-sileo-viewport]")).toHaveCount(1);
-  await inactive.evaluate((element) => (element.inert = true));
+  await inactive.evaluate((element: HTMLElement) => (element.inert = true));
   await expect(inactive.locator("[data-sileo-viewport]")).toHaveCount(0);
   await expect(page.locator("[data-sileo-viewport]")).toHaveCount(1);
   await expect(
