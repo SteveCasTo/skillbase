@@ -234,7 +234,7 @@ La vista de grupo presenta solo destinatarios elegibles del snapshot oficial,
 en secciones Participantes e Instructor con las mismas tarjetas; no ofrece
 generación masiva, versiones ni historial. Abrir una tarjeta no escribe datos.
 La primera generación requiere un POST explícito «Generar PDF» desde el detalle
-individual. Solicitudes repetidas recuperan un único registro por
+individual. Solicitudes repetidas recuperan un único registro vigente por
 grupo/tipo/destinatario, también antes de firmar; grupos distintos conservan
 certificados independientes.
 
@@ -315,8 +315,22 @@ una versión antigua ni una versión provisional.
 La reapertura **no revoca automáticamente** certificados ya emitidos: siguen
 válidos hasta una revocación/reemplazo explícito de ADMIN. No modificar el
 snapshot de cierre ni la metadata del firmado. Mantener como máximo
-un registro por grupo/tipo/destinatario, protegido por índice único para todos
-los estados. No conservar entidades completas antiguas ni cadenas de reemplazo.
+un registro no revocado por grupo/tipo/destinatario, protegido por índice único
+parcial. Una revocación nunca se deshace: conserva ID público, PDF/hash, snapshot,
+fecha, motivo, actor y auditoría. ADMIN puede solicitar «Emitir nuevo» después de
+revocar; crea otro registro e ID público desde el último cierre oficial vigente
+y sus destinatarios elegibles, mediante la generación/firmado normales, nunca
+reactivando ni autofirmando el anterior. Los registros revocados se conservan y
+se consultan mediante tarjetas históricas y sus detalles privados. Sus IDs
+públicos siguen devolviendo revocado/no válido, incluso tras emitir otro.
+
+La generación mantiene el lock compartido de operaciones académicas/certificados,
+la revalidación del actor y cierre y los receipts actor/requestKey. Doble envío
+o solicitudes concurrentes recuperan el mismo vigente; replay de una solicitud
+anterior conserva su resultado, aunque luego se revoque. 0030 cambia solo la
+unicidad y conserva los guards que impiden UPDATE/DELETE de revocados; no transforma ni borra
+datos ni artefactos históricos. Su metadata encadena 0029 (PR 400), con journal
+idx 30 y snapshot derivado del schema real. No aplica migraciones a canónico/cloud.
 
 La migración forward `0025_certificate_current_flow.sql` no modifica 0023 ni
 convierte credenciales históricas. Bloquea `certificates` en modo

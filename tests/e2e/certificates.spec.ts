@@ -467,7 +467,10 @@ async function uploadReviewIssue(
       "true",
     );
     await expect(
-      page.getByRole("button", { name: "Guardando PDF firmado…", exact: true }),
+      page.getByRole("button", {
+        name: "Guardando PDF firmado…",
+        exact: true,
+      }),
     ).toBeDisabled();
     await page.screenshot({
       path: shot("upload-loading.png"),
@@ -498,7 +501,9 @@ async function uploadReviewIssue(
     page.getByRole("link", { name: "Consultar estado público" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Datos para compartir o añadir a LinkedIn", { exact: true }),
+    page.getByText("Datos para compartir o añadir a LinkedIn", {
+      exact: true,
+    }),
   ).toHaveCount(0);
   await expect(
     page.getByRole("button", {
@@ -1134,6 +1139,101 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     await expect(
       page.getByRole("button", { name: "Regenerar PDF", exact: true }),
     ).toHaveCount(0);
+    const reissue = page.getByRole("button", {
+      name: "Emitir nuevo",
+      exact: true,
+    });
+    await expect(reissue).toBeVisible();
+    await reissue.focus();
+    await page.keyboard.press("Enter");
+    await expect(page).not.toHaveURL(
+      new RegExp(`/app/certificados/${record.id}$`),
+    );
+    await expect(page).toHaveURL(/\/app\/certificados\/[0-9a-f-]{36}$/u);
+    const newId = new URL(page.url()).pathname.split("/").at(-1)!;
+    expect(newId).not.toBe(record.id);
+    const reissued = (
+      (await (
+        await page.request.get(`/app/certificados/${newId}`, { headers })
+      ).json()) as { data: CertificateDto }
+    ).data;
+    expect(reissued.state).toBe("generated");
+    expect(reissued.publicCredentialId).not.toBe(record.publicCredentialId);
+    const history = page.getByRole("region", {
+      name: "Certificados revocados",
+    });
+    const historicalCard = history.getByRole("link");
+    await expect(historicalCard).toContainText("Corrección sintética QA");
+    await expect(historicalCard).toHaveAttribute(
+      "href",
+      `/app/certificados/${record.id}`,
+    );
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: testInfo.outputPath(`reissued-history-${width}.png`),
+        fullPage: true,
+      });
+    }
+    await historicalCard.click();
+    await expect(page.getByText("Revocado", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Emitir nuevo", exact: true }),
+    ).toHaveCount(0);
+    await page.goto(`/app/certificados/${newId}`);
+    await uploadReviewIssue(
+      page,
+      reissued,
+      await signedFixture("SYNTHETIC QA: reissued signed PDF"),
+    );
+    await publicPage.goto(`/certificados/${reissued.publicCredentialId}`);
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado vigente",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await publicPage.goto(`/certificados/${record.publicCredentialId}`);
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado revocado",
+        exact: true,
+      }),
+    ).toBeVisible();
+    const signedReissue = (
+      (await (
+        await page.request.get(`/app/certificados/${newId}`, { headers })
+      ).json()) as { data: CertificateDto }
+    ).data;
+    const secondRevocation = await page.request.post(
+      `/app/certificados/${newId}?operation=revoke`,
+      {
+        headers,
+        form: {
+          revision: String(signedReissue.revision),
+          requestKey: crypto.randomUUID(),
+          reason: "Segunda revocación sintética QA",
+        },
+      },
+    );
+    expect(secondRevocation.status()).toBe(200);
+    await page.reload();
+    await page
+      .getByRole("button", { name: "Emitir nuevo", exact: true })
+      .click();
+    await expect(page).not.toHaveURL(new RegExp(`/app/certificados/${newId}$`));
+    await expect(history.getByRole("link")).toHaveCount(2);
+    await expect(history).toContainText("Corrección sintética QA");
+    await expect(history).toContainText("Segunda revocación sintética QA");
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: testInfo.outputPath(`history-cards-${width}.png`),
+        fullPage: true,
+      });
+    }
   } finally {
     try {
       await anonymous?.close();

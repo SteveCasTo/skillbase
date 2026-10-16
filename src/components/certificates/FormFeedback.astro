@@ -109,7 +109,9 @@ const { feedback } = Astro.props;
                   id: requestKey,
                   title: form.dataset.successLabel ?? "Operación confirmada.",
                 });
-                await navigate(location.pathname, { history: "replace" });
+                await navigate(form.dataset.successHref ?? location.pathname, {
+                  history: "replace",
+                });
                 return;
               }
               const text =

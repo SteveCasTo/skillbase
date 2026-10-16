@@ -22,7 +22,11 @@ export class ManageCertificates {
     );
     const result = [];
     for (const row of rows) {
-      if (row.hasUnsignedPdf) {
+      if (
+        row.hasUnsignedPdf ||
+        row.state === "issued" ||
+        row.state === "revoked"
+      ) {
         result.push(row);
         continue;
       }

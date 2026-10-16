@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { and, asc, eq, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ne, lt, sql } from "drizzle-orm";
 import * as s from "@/server/db/schema";
 import type {
   CertificateRepository,
@@ -485,6 +485,7 @@ export class DrizzleCertificateRepository implements CertificateRepository {
               eq(s.certificates.type, input.type),
               eq(s.certificates.recipientId, recipient.id),
               eq(s.certificates.groupId, input.groupId),
+              ne(s.certificates.state, "revoked"),
             ),
           )
           .for("update");
@@ -592,14 +593,31 @@ export class DrizzleCertificateRepository implements CertificateRepository {
             );
         }
         if (!row) throw new Error("Certificate insertion failed");
+        const [revoked] = !existing
+          ? await tx
+              .select({ id: s.certificates.id })
+              .from(s.certificates)
+              .where(
+                and(
+                  eq(s.certificates.groupId, input.groupId),
+                  eq(s.certificates.type, input.type),
+                  eq(s.certificates.recipientId, recipient.id),
+                  eq(s.certificates.state, "revoked"),
+                ),
+              )
+              .orderBy(desc(s.certificates.revokedAt), desc(s.certificates.id))
+              .limit(1)
+          : [];
         await event(
           tx,
           actor,
           row,
-          existing ? "REGENERATED" : "PREPARED",
+          existing ? "REGENERATED" : revoked ? "REISSUED" : "PREPARED",
           existing
             ? `Invalidated credential ${existing.publicCredentialId}`
-            : undefined,
+            : revoked
+              ? `Revoked certificate ${revoked.id}`
+              : undefined,
         );
         result.push(row);
       }

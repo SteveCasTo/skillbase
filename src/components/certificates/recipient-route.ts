@@ -63,7 +63,10 @@ export async function prepareCertificateRecipient(
     if (!recipient)
       throw new CertificateError("NOT_FOUND", "Destinatario no disponible.");
     const record = records.data.find(
-      (r) => r.type === type && r.recipientId === recipientId,
+      (r) =>
+        r.type === type &&
+        r.recipientId === recipientId &&
+        r.state !== "revoked",
     );
     if (astro.request.method === "GET" && record)
       return astro.redirect(
