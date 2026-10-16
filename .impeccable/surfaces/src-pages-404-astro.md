@@ -13,7 +13,7 @@ Modo Operate: identificar la ruta ausente y volver al inicio, sin explicaciones 
 
 **THESIS:** La ilustración de linterna/roca 404 aportada por el usuario es el único gesto visual. No añade navegación, badges ni paneles redundantes.
 
-**OWN-WORLD:** Extensión del sistema existente: Montserrat, colores semánticos globales light/dark y acción secundaria del design system. Se preservan transparencia, luz, composición y color del archivo original.
+**OWN-WORLD:** Extensión del sistema existente: Montserrat, colores semánticos globales light/dark y acción delineada del design system. Se preservan transparencia, luz, composición y color del archivo original. La variante delineada mantiene el contraste del texto de primer plano sin alterar los tokens globales.
 
 **STORY:** El visitante reconoce la ausencia mediante la imagen y el título «Página no encontrada»; «Volver al inicio» es la única acción.
 
