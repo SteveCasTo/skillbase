@@ -513,11 +513,9 @@ export function initializeAttendanceForms() {
             const error = document.querySelector<HTMLElement>(
               "[data-attendance-page-error]",
             );
-            if (error) error.textContent = "";
-            notifications.warning({
-              title:
-                "Operación guardada. Recarga la sesión para ver los cambios.",
-            });
+            if (error)
+              error.textContent =
+                "Operación guardada. Recarga la sesión para ver los cambios.";
             document
               .querySelector<HTMLElement>("[data-attendance-refresh]")
               ?.removeAttribute("hidden");

@@ -506,15 +506,32 @@ function bindExports() {
       if (link.dataset.httpBound) return;
       link.dataset.httpBound = "true";
       link.addEventListener("click", async (event) => {
+        if (
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        )
+          return;
         event.preventDefault();
         if (link.dataset.pending) return;
         link.dataset.pending = "true";
         link.setAttribute("aria-disabled", "true");
         link.setAttribute("aria-busy", "true");
         const id = `registration-export-${crypto.randomUUID()}`;
+        const controller = new AbortController();
+        const abort = () => {
+          controller.abort();
+          notifications.dismiss(id);
+        };
+        document.addEventListener("astro:before-swap", abort, { once: true });
         notifications.loading({ id, title: "Preparando exportación…" });
         try {
-          const response = await fetch(link.href);
+          const response = await fetch(link.href, {
+            signal: controller.signal,
+          });
+          if (response.redirected) throw new Error("Unexpected redirect");
           if (!response.ok) {
             const error = (await response.json()) as {
               message?: string;
@@ -522,10 +539,7 @@ function bindExports() {
             };
             const message =
               error.message ?? "No se pudo exportar. Reintenta o utiliza CSV.";
-            const inline = document.querySelector<HTMLElement>(
-              "[data-registration-page-error]",
-            );
-            if (inline) inline.textContent = "";
+            controller.signal.throwIfAborted();
             notifications.warning({
               id,
               title: "Exportación no disponible",
@@ -535,9 +549,37 @@ function bindExports() {
           }
           const filename = response.headers
             .get("content-disposition")
-            ?.match(/filename="([a-z0-9.-]+)"/iu)?.[1];
+            ?.match(/filename="(preinscripciones-[\d-]+\.(?:csv|pdf))"/iu)?.[1];
           if (!filename) throw new Error("Missing filename");
-          const url = URL.createObjectURL(await response.blob());
+          const format = new URL(link.href).searchParams.get("format");
+          const mediaType = response.headers.get("content-type") ?? "";
+          const blob = await response.blob();
+          let valid = false;
+          if (format === "CSV") {
+            const prefix = new Uint8Array(await blob.slice(0, 3).arrayBuffer());
+            valid =
+              /^text\/csv(?:;|$)/iu.test(mediaType) &&
+              prefix[0] === 239 &&
+              prefix[1] === 187 &&
+              prefix[2] === 191;
+          } else if (format === "PDF") {
+            const header = await blob.slice(0, 8).text();
+            const trailer = await blob
+              .slice(Math.max(0, blob.size - 1024))
+              .text();
+            valid =
+              /^application\/pdf(?:;|$)/iu.test(mediaType) &&
+              /^%PDF-(?:1\.[0-9]|2\.0)/u.test(header) &&
+              /%%EOF\s*$/u.test(trailer);
+          }
+          if (
+            !valid ||
+            blob.size < 20 ||
+            !filename.endsWith(`.${format?.toLowerCase()}`)
+          )
+            throw new Error("Invalid export document");
+          controller.signal.throwIfAborted();
+          const url = URL.createObjectURL(blob);
           const download = document.createElement("a");
           download.href = url;
           download.download = filename;
@@ -545,18 +587,16 @@ function bindExports() {
           window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
           notifications.success({ id, title: "Exportación descargada" });
         } catch {
+          if (controller.signal.aborted) return;
           const message =
             "No se pudo descargar la exportación. Conserva los filtros y reintenta.";
-          const inline = document.querySelector<HTMLElement>(
-            "[data-registration-page-error]",
-          );
-          if (inline) inline.textContent = "";
           notifications.error({
             id,
             title: "Sin descarga",
             description: message,
           });
         } finally {
+          document.removeEventListener("astro:before-swap", abort);
           delete link.dataset.pending;
           link.removeAttribute("aria-disabled");
           link.removeAttribute("aria-busy");

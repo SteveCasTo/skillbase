@@ -183,7 +183,7 @@ describe("notification operation identity", () => {
     ]);
   });
 
-  test("a synchronous factory throw remains synchronous, matching the vendor", () => {
+  test("a synchronous factory throw settles loading and remains synchronous", () => {
     const failure = new Error("Factory failure");
     expect(() =>
       notifications.promise(
@@ -197,7 +197,8 @@ describe("notification operation identity", () => {
         },
       ),
     ).toThrow(failure);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.state).toBe("loading");
+    expect(calls.map((call) => call.state)).toEqual(["loading", "error"]);
+    expect(calls[1]!.id).toBe(calls[0]!.id);
+    expect(calls[1]!.options.title).toBe("Failed");
   });
 });

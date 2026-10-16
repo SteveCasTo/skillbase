@@ -370,6 +370,112 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     await expect(
       page.getByRole("link", { name: "Descargar PDF" }),
     ).toHaveAttribute("href", `${path}/1/informe.pdf`);
+    const invalidDownloads: string[] = [];
+    const recordInvalid = (download: import("@playwright/test").Download) =>
+      invalidDownloads.push(download.suggestedFilename());
+    page.on("download", recordInvalid);
+    for (const [artifact, label] of documents) {
+      const before = await page
+        .locator("[data-sileo-id]")
+        .evaluateAll((nodes) =>
+          nodes.map((node) => node.getAttribute("data-sileo-id")!),
+        );
+      await page.route(
+        `${e2eSiteUrl()}${path}/1/${artifact}`,
+        async (request) => {
+          await request.fulfill({
+            status: 200,
+            headers: {
+              "content-type": artifact.endsWith(".pdf")
+                ? "application/pdf"
+                : "text/csv",
+              "content-disposition": `attachment; filename="cierre-v1-${artifact}"`,
+            },
+            body: artifact.endsWith(".pdf")
+              ? "%PDF-1.7\ntruncated document"
+              : "",
+          });
+        },
+        { times: 1 },
+      );
+      await page.getByRole("link", { name: label, exact: true }).click();
+      const failure = page.locator(
+        '[data-sileo-toast][data-state="error"][data-exiting="false"]' +
+          before.map((id) => `:not([data-sileo-id="${id}"])`).join(""),
+      );
+      await expect(failure).toBeVisible();
+      await expect(failure).toContainText(/Reintenta la descarga/u);
+      await expect(
+        page.getByRole("link", { name: label, exact: true }),
+      ).not.toHaveAttribute("aria-busy");
+      expect(invalidDownloads).toEqual([]);
+    }
+    page.off("download", recordInvalid);
+    const currentClosureUrl = page.url();
+    let releaseDownload!: () => void;
+    const heldDownload = new Promise<void>((resolve) => {
+      releaseDownload = resolve;
+    });
+    const downloadRoute = `${e2eSiteUrl()}${path}/1/informe.pdf`;
+    await page.route(
+      downloadRoute,
+      async (request) => {
+        await heldDownload;
+        await request.abort().catch(() => {});
+      },
+      { times: 1 },
+    );
+    const independentId = await page.evaluate(async () => {
+      const moduleUrl = performance
+        .getEntriesByType("resource")
+        .find((entry) =>
+          /\/src\/lib\/notifications\.ts(?:\?|$)/u.test(entry.name),
+        )?.name;
+      // ClientRouter may retain the loaded ESM while resource timing entries
+      // belong to the new page. Fall back to its canonical test-server URL.
+      const { notifications }: typeof import("../../src/lib/notifications") =
+        await import(
+          moduleUrl ??
+            new URL("/src/lib/notifications.ts", location.origin).href
+        );
+      return notifications.info({
+        title: "Aviso independiente",
+        duration: 60000,
+      });
+    });
+    await page
+      .getByRole("link", { name: "Descargar PDF", exact: true })
+      .click();
+    const pendingDownload = page.locator(
+      '[data-sileo-id^="document-download-"][data-state="loading"][data-exiting="false"]',
+    );
+    await expect(pendingDownload).toHaveCount(1);
+    const pendingId = await pendingDownload.getAttribute("data-sileo-id");
+    try {
+      await page
+        .getByRole("navigation", { name: "Ruta de navegación" })
+        .getByRole("link", { name: "Cursos", exact: true })
+        .click();
+      await expect(page).toHaveURL(/\/app\/cursos$/u);
+    } finally {
+      releaseDownload();
+    }
+    await expect(page.locator(`[data-sileo-id="${pendingId}"]`)).toHaveCount(0);
+    await expect(
+      page.locator(`[data-sileo-id="${independentId}"][data-exiting="false"]`),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator("[data-sileo-toast]")
+        .filter({ hasText: "Descarga cancelada." }),
+    ).toHaveCount(0);
+    // Resume the document's existing assertions through its authoritative GET;
+    // history/list-filter URL normalization is outside this download scenario.
+    await page.goto(currentClosureUrl);
+    await expect(page).toHaveURL(currentClosureUrl);
+    await expect(
+      page.getByRole("link", { name: "Descargar PDF", exact: true }),
+    ).toBeVisible();
     const originalCsv = await downloadOfficialDocuments(
       page,
       path,
