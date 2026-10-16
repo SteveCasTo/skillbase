@@ -23,6 +23,8 @@ import type {
   AttendanceTransaction,
 } from "./attendance-calendar";
 import { lockInstructorSchedules } from "./instructor-schedule";
+import { ensureGroupSessions } from "./attendance-calendar";
+import { persistAttendanceGrades } from "./attendance-grade";
 import {
   buildClosureReport,
   closureVersionDto,
@@ -164,7 +166,7 @@ export class DrizzleClosureRepository
         throw new Error("Closure version unavailable");
       const report = ctx.state.closed
         ? null
-        : await buildClosureReport(tx, ctx.course, ctx.group, ctx.now, actorId);
+        : await buildClosureReport(tx, ctx.course, ctx.group, ctx.now);
       const blockers = report ? closureBlockers(report, ctx.now) : [];
       return {
         courseId,
@@ -297,12 +299,12 @@ export class DrizzleClosureRepository
       if (operation === "CLOSE") {
         if (ctx.state.closed)
           throw new ClosureError("GROUP_CLOSED", "El grupo ya está cerrado.");
-        const report = await buildClosureReport(
+        await ensureGroupSessions(tx, ctx.group, ctx.now, actorId);
+        let report = await buildClosureReport(
           tx,
           ctx.course,
           ctx.group,
           ctx.now,
-          actorId,
         );
         const blockers = closureBlockers(report, ctx.now);
         if (blockers.length)
@@ -311,6 +313,14 @@ export class DrizzleClosureRepository
             "Completa sesiones, notas y asistencia antes de cerrar.",
             Object.fromEntries(blockers.map((blocker) => [blocker, blocker])),
           );
+        await persistAttendanceGrades(
+          tx,
+          input.courseId,
+          report.participants,
+          actorId,
+          ctx.now,
+        );
+        report = await buildClosureReport(tx, ctx.course, ctx.group, ctx.now);
         const [row] = await tx
           .insert(s.academicClosureVersions)
           .values({

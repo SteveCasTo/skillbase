@@ -1,6 +1,6 @@
 import type { MembershipStatus } from "@/domain/pre-registrations/types";
 
-export type EvaluationType = "THEORY" | "PRACTICAL";
+export type EvaluationType = "THEORY" | "PRACTICAL" | "ATTENDANCE";
 export interface EvaluationComponentInput {
   id: string;
   name: string;
@@ -19,6 +19,8 @@ export interface EvaluationSchemeDto {
   canEdit: boolean;
 }
 export interface EvaluationGradeDto {
+  origin?: "AUTO" | "MANUAL";
+  canEdit?: boolean;
   componentId: string;
   score: string | null;
   revision: number;
@@ -47,6 +49,7 @@ export interface EvaluationParticipantDto {
   result: EvaluationResultDto;
 }
 export interface CourseEvaluationsDto {
+  hasAttendanceOverrides?: boolean;
   courseId: string;
   courseName: string;
   startsAt: string;
@@ -99,6 +102,7 @@ export interface SaveEvaluationRowInput extends EvaluationCommand {
   }[];
 }
 export type EvaluationCommandResult =
+  | { kind: "reset"; schemeRevision: number }
   | {
       kind: "row";
       schemeRevision: number;

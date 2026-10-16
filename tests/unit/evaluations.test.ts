@@ -12,8 +12,26 @@ import { getPrivateRoutePolicy } from "@/server/auth/route-policy";
 import type { EvaluationRepository } from "@/application/evaluations/evaluation-repository";
 import type { InternalUser } from "@/domain/auth/types";
 import { validateSaveRow } from "@/application/evaluations/manage-evaluations";
+import { attendanceGradeHundredths } from "@/domain/evaluations/attendance-grade";
 
 test("evaluations parse decimal hundredths exactly and validate exact weights without tolerance", () => {
+  expect(() =>
+    validateEvaluationComponents(
+      ["ATTENDANCE", "ATTENDANCE"].map((type) => ({
+        id: crypto.randomUUID(),
+        name: "Asistencia",
+        type: type as "ATTENDANCE",
+        weight: "50",
+      })),
+    ),
+  ).not.toThrow();
+  expect(attendanceGradeHundredths([])).toBeNull();
+  expect(attendanceGradeHundredths(["PENDING"])).toBeNull();
+  expect(
+    attendanceGradeHundredths(["PRESENT", "EXCUSED", "ABSENT", "PENDING"]),
+  ).toBe(6667);
+  expect(attendanceGradeHundredths(["ABSENT"])).toBe(0);
+  expect(attendanceGradeHundredths(["PRESENT", "EXCUSED"])).toBe(10000);
   for (const [text, expected] of [
     ["0", 0],
     ["100.00", 10000],
@@ -136,6 +154,12 @@ test("evaluation HTTP binds private course/group IDs and rejects unexpected fiel
     throw new Error("Unexpected operation");
   };
   const repository: EvaluationRepository = {
+    resetAttendance: async (id, command) => {
+      expect(id).toBe(actor.id);
+      expect(command).toMatchObject({ courseId, groupId });
+      calls++;
+      return { kind: "reset", schemeRevision: command.schemeRevision };
+    },
     getCourse: unused,
     saveScheme: unused,
     saveRow: unused,
@@ -175,6 +199,28 @@ test("evaluation HTTP binds private course/group IDs and rejects unexpected fiel
     expect(response.status).toBe(expected);
   }
   expect(calls).toBe(0);
+  const reset = await handleEvaluationPost({
+    request: new Request(siteUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: siteUrl.origin },
+      body: JSON.stringify({
+        requestKey: crypto.randomUUID(),
+        schemeRevision: 1,
+        action: "reset-attendance",
+      }),
+    }),
+    actor,
+    repository,
+    siteUrl,
+    operation: "grade",
+    courseId,
+    groupId,
+  });
+  expect(reset).toMatchObject({
+    status: 200,
+    payload: { ok: true, value: { kind: "reset" } },
+  });
+  expect(calls).toBe(1);
   expect(evaluationFailure(new Error("database secret"))).toMatchObject({
     status: 503,
     payload: { code: "SERVICE_UNAVAILABLE" },
@@ -215,6 +261,9 @@ test("evaluation row HTTP validates all changed grades and binds actor from serv
   };
   let calls = 0;
   const repository: EvaluationRepository = {
+    resetAttendance: async () => {
+      throw new Error("Unused");
+    },
     getCourse: unused,
     saveScheme: unused,
     saveGrade: unused,

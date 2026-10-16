@@ -74,6 +74,7 @@ export function closureBlockers(
   if (report.participants.some((person) => person.result.status !== "COMPLETE"))
     blockers.push("GRADES_PENDING");
   if (
+    report.sessions.length === 0 ||
     active.some(
       (session) =>
         session.administrativeReviewRequired ||

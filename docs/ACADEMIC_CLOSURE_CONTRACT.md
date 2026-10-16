@@ -1,5 +1,19 @@
 # Contrato de cierre académico por grupo y exports (Fase 8)
 
+## Asistencia como evaluación opcional (2026-10-15)
+
+El reporte abierto deriva notas ATTENDANCE en servidor sin escribir notas/roster.
+El cierre valida sesiones terminadas, asistencia/revisión resueltas y notas
+completas usando esa derivación; sin sesiones materializadas la lectura no
+declara resuelta la asistencia. La mutación puede materializar un calendario
+legado bajo sus guards existentes; una revisión histórica pendiente sigue
+bloqueando. Solo después de superar blockers persiste las notas AUTO de asistencia
+y reconstruye el snapshot con freeze/revisiones reales, todo bajo la misma
+barrera de horarios y locks de curso/grupo que notas/asistencia/cierre. MANUAL
+prevalece siempre. Un fallo no deja notas ni freeze parciales. No se modifican
+versiones anteriores ni certificados firmados. Reabrir habilita nuevas
+correcciones y una futura versión normal, sin descongelar el esquema.
+
 ## Estado y límite de release
 
 Fase 8 se liberó a producción mediante PR 286 como `master` `68c918119f2ec094ba7cc63b217efd2448480505`; PRs 280–285 integraron core, exports, UI/policy, backend ADMIN y UI ADMIN. PR 287 solo cambió aislamiento de fixtures E2E. El pipeline de release aplicó 0021/0022 a canónico local y cloud (ledger 21→23) y la comparación completa confirmó preservación. El gate combinado final pasó en run `37727200394`; detalles en [`TESTING.md`](TESTING.md) y [`DEPLOYMENT.md`](DEPLOYMENT.md).
