@@ -198,6 +198,13 @@ Cada página debe tener un `h1` coherente.
 
 Objetivo: WCAG 2.2 AA cuando sea razonable.
 
+El menú privado móvil aísla el fondo y la isla externa de notificaciones con
+`inert` mientras está abierto. El panel utiliza la convención existente
+`data-slot="dialog-content"` / `data-state` para recibir el portal de Sileo;
+el ciclo de Tab incluye sus grupos enfocables y acciones. Escape, resize y
+descarte de navegación restauran los valores previos de `inert`, sin añadir
+instrucciones ni cambiar el diseño.
+
 Requisitos mínimos:
 
 - navegación por teclado;
@@ -216,6 +223,19 @@ Requisitos mínimos:
 - iconos funcionales con nombre accesible.
 
 No usar placeholder como sustituto de label.
+
+### Metadatos e indexación
+
+- El layout común excluye de indexación las rutas privadas, Auth, login,
+  recuperación, acceso denegado, errores HTTP y respuestas que no son GET/HEAD.
+  Las verificaciones individuales de certificados y los previews conservan su
+  `noindex,nofollow` explícito; no se publican datos del titular en metadatos sociales.
+- Solo las páginas indexables generan canonical y metadatos sociales a partir
+  de su título/descripción existentes. El origen proviene de `PUBLIC_SITE_URL`,
+  no del Host de la solicitud; se omiten query/hash y la barra final redundante.
+- No se inventan valoraciones, ofertas, imágenes ni datos estructurados. No hay
+  sitemap/robots propio en el árbol actual; esta corrección no introduce uno ni
+  convierte rutas privadas en públicas para mejorar puntuaciones automáticas.
 
 ## COMPONENTES NATIVOS
 

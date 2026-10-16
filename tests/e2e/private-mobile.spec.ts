@@ -42,6 +42,21 @@ test("mobile drawer closes with Escape and restores keyboard focus", async ({
   await signInFixture(context, AUTH_FIXTURES.instructor.email);
   await page.goto("/app");
   const trigger = page.getByRole("button", { name: "Abrir menú" });
+  await page.evaluate(async () => {
+    const moduleUrl = performance
+      .getEntriesByType("resource")
+      .find((entry) =>
+        /\/src\/lib\/notifications\.ts(?:\?|$)/.test(entry.name),
+      )?.name;
+    if (!moduleUrl) throw new Error("Page notifications facade was not loaded");
+    const { notifications }: typeof import("../../src/lib/notifications") =
+      await import(moduleUrl);
+    notifications.info({
+      title: "Aviso de navegación",
+      duration: 60000,
+      button: { title: "Revisar aviso", onClick: () => {} },
+    });
+  });
   await trigger.click();
   const navigation = page.getByRole("navigation", { name: "Navegación móvil" });
   await expect(
@@ -56,10 +71,37 @@ test("mobile drawer closes with Escape and restores keyboard focus", async ({
   await expect(
     navigation.getByRole("link", { name: "Mis cursos", exact: true }),
   ).toBeVisible();
+  await expect(page.locator(".private-main-scroll")).toHaveAttribute(
+    "inert",
+    "",
+  );
+  await trigger.evaluate((element) => element.focus());
+  await expect(page.getByRole("button", { name: "Cerrar menú" })).toBeFocused();
+  const notice = page.getByRole("dialog").locator("[data-sileo-toast]");
+  await expect(notice).toBeVisible();
+  await notice.focus();
+  await expect(
+    notice.getByRole("button", { name: "Revisar aviso" }),
+  ).toBeVisible();
+  await notice.getByRole("button", { name: "Revisar aviso" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Cerrar menú" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    page
+      .getByRole("dialog")
+      .locator("[data-sileo-toast]:focus, [data-sileo-toast] :focus"),
+  ).toHaveCount(1);
+  await notice.getByRole("button", { name: "Revisar aviso" }).focus();
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
   await expect(page.locator("[data-mobile-drawer]")).toBeHidden();
+  await expect(page.locator(".private-main-scroll")).not.toHaveAttribute(
+    "inert",
+    "",
+  );
+  await expect(page.getByRole("main")).toBeVisible();
 });
 
 test("mobile menu slides in and out, with theme on the left and logout on the right", async ({
