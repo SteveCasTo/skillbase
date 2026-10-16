@@ -22,6 +22,13 @@ const groupPath = record
   : "/app/certificados";
 const signed = record?.hasSignedPdf;
 const editable = record && record.state !== "revoked" && !record.obsolete;
+const showUpload =
+  !instructorRoute && editable && (signed || record?.hasUnsignedPdf);
+const showPrepared =
+  Astro.url.searchParams.get("prepared") === "updated" && !signed;
+const showSaved = Astro.url.searchParams.get("signed") === "saved" && signed;
+const showDocument =
+  showUpload || showPrepared || showSaved || Boolean(feedback.message);
 ---
 
 <PrivateLayout {title}>
@@ -92,7 +99,7 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
           ))
         )}
       </header>
-      <dl class="grid gap-x-8 gap-y-5 border-b pb-6 sm:grid-cols-2 xl:grid-cols-4">
+      <dl class="grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-4">
         <div>
           <dt class="text-sm text-muted-foreground">Fechas nominales</dt>
           <dd class="mt-1 text-sm">
@@ -123,28 +130,33 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
           vigente. Si el grupo está abierto, ciérralo antes de continuar.
         </p>
       )}
-      <section aria-label="Documento" class="flex min-w-0 flex-col gap-5">
-        {Astro.url.searchParams.get("prepared") === "updated" && !signed && (
-          <p role="status" class="text-sm leading-6">
-            El PDF se actualizó con los datos vigentes. Tramita las firmas sobre
-            esta nueva descarga antes de guardarlo.
-          </p>
-        )}
-        {Astro.url.searchParams.get("signed") === "saved" && signed && (
-          <p role="status" class="text-sm">
-            PDF firmado guardado.
-          </p>
-        )}
-        <FormFeedback {feedback} />
-        {!instructorRoute && editable && (signed || record.hasUnsignedPdf) && (
-          <SignedPdfUpload
-            {path}
-            revision={record.revision}
-            {requestKey}
-            signed={Boolean(signed)}
-          />
-        )}
-      </section>
+      {showDocument && (
+        <section
+          aria-label="Documento"
+          class="flex min-w-0 flex-col gap-5 border-t pt-6"
+        >
+          {showPrepared && (
+            <p role="status" class="text-sm leading-6">
+              El PDF se actualizó con los datos vigentes. Tramita las firmas
+              sobre esta nueva descarga antes de guardarlo.
+            </p>
+          )}
+          {showSaved && (
+            <p role="status" class="text-sm">
+              PDF firmado guardado.
+            </p>
+          )}
+          <FormFeedback {feedback} />
+          {showUpload && (
+            <SignedPdfUpload
+              {path}
+              revision={record.revision}
+              {requestKey}
+              signed={Boolean(signed)}
+            />
+          )}
+        </section>
+      )}
       {signed && (
         <section
           aria-label="Credencial pública"
@@ -159,15 +171,27 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
             </dd>
           </dl>
           {(!instructorRoute || record.state !== "issued") && (
-            <a
-              href={`/certificados/${record.publicCredentialId}`}
-              class={buttonVariants({
-                variant: "outline",
-                className: "min-h-11 self-start",
-              })}
-            >
-              Consultar estado público
-            </a>
+            <div class="flex flex-wrap items-center gap-3">
+              <a
+                href={`/certificados/${record.publicCredentialId}`}
+                class={buttonVariants({
+                  variant: "outline",
+                  className: "min-h-11 self-start",
+                })}
+              >
+                Consultar estado público
+              </a>
+              {!instructorRoute && record.state === "issued" && (
+                <RevokeCertificate
+                  client:load
+                  {path}
+                  requestKey={crypto.randomUUID()}
+                  revision={record.revision}
+                  initialReason={feedback.values.reason}
+                  initialError={feedback.success ? "" : feedback.message}
+                />
+              )}
+            </div>
           )}
           {instructorRoute && record.state === "issued" && (
             <>
@@ -208,18 +232,6 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
               ></p>
             </>
           )}
-        </section>
-      )}
-      {!instructorRoute && record.state === "issued" && (
-        <section aria-label="Gestión de vigencia" class="border-t pt-6">
-          <RevokeCertificate
-            client:load
-            {path}
-            requestKey={crypto.randomUUID()}
-            revision={record.revision}
-            initialReason={feedback.values.reason}
-            initialError={feedback.success ? "" : feedback.message}
-          />
         </section>
       )}
     </article>
