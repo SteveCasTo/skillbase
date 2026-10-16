@@ -2174,7 +2174,7 @@ html.dark:has(.landing.warm-preview) {
     }
 
     .featured-course-link .course-artwork {
-      aspect-ratio: 4 / 3;
+      aspect-ratio: 2 / 1;
     }
 
     .course-artwork.is-featured-artwork img {
@@ -2182,29 +2182,27 @@ html.dark:has(.landing.warm-preview) {
     }
 
     .featured-course-copy {
-      padding: 1.5rem 1.25rem 1.35rem;
+      padding: 1.25rem;
     }
 
     .featured-course-copy h3 {
       max-width: none;
-      margin-top: 1.1rem;
-      font-size: clamp(2.35rem, 11vw, 3.25rem);
-      line-height: 0.96;
+      margin-top: 0.75rem;
+      font-size: clamp(2rem, 8vw, 2.75rem);
+      line-height: 1.02;
     }
 
-    .featured-course-copy .course-description {
-      display: -webkit-box;
-      margin-top: 1rem;
-    }
-
-    .editorial-rule {
-      margin-block: 1.5rem 1.1rem;
-    }
-
+    .featured-course-copy .course-description,
+    .poster-description,
+    .editorial-rule,
     .course-summary,
     .poster-facts {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 0.75rem;
+      display: none;
+    }
+
+    .featured-course-copy .course-link-label,
+    .course-poster-copy .course-link-label {
+      margin-top: 1rem;
     }
 
     .more-courses {
@@ -2212,7 +2210,7 @@ html.dark:has(.landing.warm-preview) {
     }
 
     .poster-rows {
-      gap: 2.5rem;
+      gap: 1.5rem;
       margin-top: 2.25rem;
     }
 
@@ -2222,7 +2220,7 @@ html.dark:has(.landing.warm-preview) {
     .poster-row-trio.poster-row-variant-3 .poster-row-list,
     .poster-row-pair[data-pair-emphasis] .poster-row-list {
       grid-template-columns: minmax(0, 1fr);
-      gap: 2.5rem;
+      gap: 1.5rem;
     }
 
     .poster-row-trio .course-poster:last-child {
@@ -2238,7 +2236,7 @@ html.dark:has(.landing.warm-preview) {
     }
 
     .course-poster .course-artwork {
-      aspect-ratio: 4 / 3;
+      aspect-ratio: 2 / 1;
       min-height: 0;
     }
 
@@ -2255,11 +2253,13 @@ html.dark:has(.landing.warm-preview) {
     }
 
     .course-poster-copy {
-      min-height: 20rem;
-      padding: 1.25rem 1rem;
+      min-height: 0;
+      padding: 1.25rem;
     }
 
     .course-poster-copy h3 {
+      display: block;
+      margin-top: 0.75rem;
       font-size: clamp(1.8rem, 8vw, 2.35rem);
     }
 

@@ -50,6 +50,10 @@ La oferta adopta la composición **Cartelera editorial**, seleccionada el 2026-0
 
 Dark y warm-dark conservan el copy de hero y footer vinculado a las placas luminosas existentes; no introducen placas oscuras alternativas. El bloque de certificados pasa al footer con un fade superior sutil.
 
+## Responsive refinement — 2026-10-16
+
+Dirección explícita del usuario: conservar la cartelera de escritorio. Solo en mobile (<640 px), el artwork pasa de 4:3 a 2:1 y se ocultan descripción/nivel/duración, disponibles sin cambios en el detalle. Disponibilidad, nombre y CTA visual permanecen, con un único enlace de tarjeta completa, teclado y foco visibles. Se elimina la altura mínima del cuerpo para reducir el recorrido sin reducir el texto esencial. La verificación mantiene label/validación/lookup y omite únicamente la ayuda redundante del QR en landing.
+
 ## Open Decisions
 
 - Completar el modelo de Tipos de curso y revisiones inmutables antes de cerrar Fase 2B.

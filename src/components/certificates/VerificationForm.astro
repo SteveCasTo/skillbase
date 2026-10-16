@@ -29,12 +29,18 @@ const id = landing ? "landing-credential-code" : "credential-code";
     autocomplete="off"
     spellcheck="false"
     aria-invalid={Boolean(error)}
-    aria-describedby={`${id}-help${error ? ` ${id}-error` : ""}`}
+    aria-describedby={
+      [!landing && `${id}-help`, error && `${id}-error`]
+        .filter(Boolean)
+        .join(" ") || undefined
+    }
     class="min-h-11 w-full min-w-0 rounded-lg border bg-background px-3 font-mono text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring"
   />
-  <p id={`${id}-help`} class="text-sm text-muted-foreground">
-    Introduce el código de 32 caracteres impreso junto al QR.
-  </p>
+  {!landing && (
+    <p id={`${id}-help`} class="text-sm text-muted-foreground">
+      Introduce el código de 32 caracteres impreso junto al QR.
+    </p>
+  )}
   {error && (
     <p id={`${id}-error`} role="alert" class="text-sm text-destructive">
       {error}
