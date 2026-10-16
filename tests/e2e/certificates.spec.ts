@@ -1035,9 +1035,25 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       fullPage: true,
     });
     await page.goto(`/app/certificados/${record.id}`);
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      const publicAction = await page
+        .getByRole("link", { name: "Consultar estado público" })
+        .boundingBox();
+      const revokeAction = await page
+        .getByRole("button", { name: "Revocar certificado", exact: true })
+        .boundingBox();
+      if (width >= 768) expect(revokeAction!.y).toBe(publicAction!.y);
+      await page.screenshot({
+        path: testInfo.outputPath(`issued-actions-${width}.png`),
+        fullPage: true,
+      });
+    }
     await page
       .getByRole("button", { name: "Revocar certificado", exact: true })
-      .click();
+      .focus();
+    await page.keyboard.press("Enter");
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(
@@ -1056,6 +1072,31 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     );
     await page.getByRole("button", { name: "Revocar", exact: true }).click();
     expect((await revoked).status()).toBe(200);
+    await expect(page.getByText("Revocado", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Documento", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Revocar certificado", exact: true }),
+    ).toHaveCount(0);
+    await expect(page.locator("[data-signed-pdf-form]")).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Descargar firmado", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Consultar estado público" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(substituted.signedSha256!, { exact: true }),
+    ).toBeVisible();
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: testInfo.outputPath(`revoked-detail-${width}.png`),
+        fullPage: true,
+      });
+    }
     await publicPage.reload();
     await expect(
       publicPage.getByRole("heading", {
