@@ -161,6 +161,15 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
       .click();
     await saving;
     await expect(page.locator("[data-attendance-page-error]")).toBeEmpty();
+    // Recovery preserves the open editor/draft; close it explicitly before the
+    // next independent edit, rather than expecting refresh to discard it.
+    await person
+      .getByRole("button", {
+        name: "Cancelar edición de asistencia de Enrolled Attendance Quispe",
+        exact: true,
+      })
+      .click();
+    await expect(pencil).toBeVisible();
     const corrected = (await detail(page, path)).participants.find(
       (person) => person.registrationId === fixture.paid.id,
     )!;
