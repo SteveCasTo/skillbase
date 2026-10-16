@@ -30,7 +30,9 @@ for (const [name, widths] of Object.entries(plates)) {
         .resize({ width, height, withoutEnlargement: true })
         .toFormat(format, {
           quality: format === "webp" ? 82 : 52,
-          effort: 6,
+          // AVIF's effort also changes its lossy alpha plane. Preserve the
+          // established transparent artwork encoding, not just alpha presence.
+          effort: format === "avif" && metadata.hasAlpha ? 4 : 6,
         })
         .toFile(resolve(directory, `${name}-${width}.${format}`));
     }
