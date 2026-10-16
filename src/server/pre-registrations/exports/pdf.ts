@@ -1,5 +1,5 @@
 import fontkit from "@pdf-lib/fontkit";
-import { PDFDocument, type PDFFont, type PDFPage, rgb } from "pdf-lib";
+import { PDFDocument, type PDFPage, rgb } from "pdf-lib";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 import type { RegistrationFilter } from "@/domain/pre-registrations/types";
 import type { RegistrationExportRow } from "@/application/pre-registrations/export-finance";
@@ -28,67 +28,14 @@ const MUTED = rgb(0.35, 0.37, 0.4);
 const RULE = rgb(0.8, 0.82, 0.84);
 const ACCENT = rgb(0.73, 0.3, 0.19);
 const WASH = rgb(0.97, 0.96, 0.95);
-const segmenter = new Intl.Segmenter("es", { granularity: "grapheme" });
-
-export class RegistrationPdfTextError extends Error {
-  readonly code = "PDF_UNSUPPORTED_TEXT";
-  constructor() {
-    super(
-      "La fuente del PDF no admite algunos caracteres. Exporta CSV para conservar el texto completo.",
-    );
-    this.name = "RegistrationPdfTextError";
-  }
-}
-
-/** Never truncate names/CI or silently replace missing glyphs. The bundled Noto
- * font supports Latin, Greek and Cyrillic; other scripts may require CSV.
- */
-export function wrapPdfText(
-  text: string,
-  font: PDFFont,
-  width: number,
-  supported: ReadonlySet<number> = new Set(font.getCharacterSet()),
-  size = FONT_SIZE,
-): string[] {
-  for (const character of text) {
-    if (character !== "\n" && !supported.has(character.codePointAt(0) ?? -1))
-      throw new RegistrationPdfTextError();
-  }
-  const lines: string[] = [];
-  for (const paragraph of text.split("\n")) {
-    const graphemes = [...segmenter.segment(paragraph)].map(
-      ({ segment }) => segment,
-    );
-    if (!graphemes.length) lines.push("");
-    let offset = 0;
-    while (offset < graphemes.length) {
-      let low = 1;
-      let high = graphemes.length - offset;
-      let length = 0;
-      // Measure shaped strings, not guessed character widths, with logarithmic
-      // probes instead of reshaping every growing prefix on every PDF page.
-      while (low <= high) {
-        const middle = Math.floor((low + high) / 2);
-        const candidate = graphemes.slice(offset, offset + middle).join("");
-        if (font.widthOfTextAtSize(candidate, size) <= width) {
-          length = middle;
-          low = middle + 1;
-        } else high = middle - 1;
-      }
-      if (!length) throw new RegistrationPdfTextError();
-      // Prefer whole words while retaining every space and grapheme verbatim.
-      if (offset + length < graphemes.length) {
-        const boundary = graphemes
-          .slice(offset, offset + length)
-          .lastIndexOf(" ");
-        if (boundary > 0) length = boundary + 1;
-      }
-      lines.push(graphemes.slice(offset, offset + length).join(""));
-      offset += length;
-    }
-  }
-  return lines;
-}
+import {
+  PdfTextError as RegistrationPdfTextError,
+  wrapPdfText,
+} from "@/server/exports/pdf-text";
+export {
+  PdfTextError as RegistrationPdfTextError,
+  wrapPdfText,
+} from "@/server/exports/pdf-text";
 
 export async function renderRegistrationsPdf(
   rows: readonly RegistrationExportRow[],

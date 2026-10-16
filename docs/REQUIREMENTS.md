@@ -585,7 +585,10 @@ Protección de datos personales.
   implementar: listas de participantes por grupo (solicitadas como necesarias,
   pero con contenido y comportamiento por precisar); resumen por curso
   (tentativo); vista general de pagos pendientes en laboratorio (tentativa); y
-  consulta de certificados por curso/grupo, con filtros por concretar. No se ha
+  consulta de certificados por curso/grupo, con filtros por concretar. El resumen
+  de cursos PDF/CSV fue aprobado posteriormente con filtros editoriales/búsqueda,
+  métricas solo de inscritos actuales y resultados oficiales vigentes;
+  contrato acotado en [`COURSE_REPORTS.md`](COURSE_REPORTS.md). Para las demás propuestas no se ha
   aprobado formato de reporte/exportación, usuarios/roles adicionales ni un
   módulo nuevo. Antes de implementar, aclarar objetivo, audiencia, datos, campos,
   filtros y presentación; preferir reutilizar pantallas existentes cuando

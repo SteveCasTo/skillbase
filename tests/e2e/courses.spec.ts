@@ -720,6 +720,72 @@ test("admin creates, validates, edits, publishes, withdraws and archives a cours
   });
   await expect(savedCourseCard).toHaveCount(1);
   await expect(savedCourseCard).toBeVisible();
+  const filteredReport = await page.request.get(
+    `/app/cursos/exportar?format=CSV&status=DRAFT&search=${encodeURIComponent(courseName)}&page=999`,
+  );
+  expect(filteredReport.status()).toBe(200);
+  expect(filteredReport.headers()["cache-control"]).toBe("private, no-store");
+  expect(filteredReport.headers()["x-content-type-options"]).toBe("nosniff");
+  expect(filteredReport.headers()["x-course-count"]).toBe("1");
+  expect(await filteredReport.text()).toContain(courseName);
+  await page
+    .getByRole("searchbox", { name: "Buscar por nombre de curso" })
+    .fill(courseName);
+  const pdfAction = page.getByRole("link", {
+    name: "Descargar informe de cursos PDF",
+  });
+  let releaseExport!: () => void;
+  const exportGate = new Promise<void>((resolve) => {
+    releaseExport = resolve;
+  });
+  await page.route("**/app/cursos/exportar?**", async (route) => {
+    await exportGate;
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "Fallo sintético recuperable" }),
+    });
+  });
+  await pdfAction.click();
+  await expect(pdfAction).toHaveAttribute("aria-busy", "true");
+  await expect(
+    page.locator("[data-sileo-toast]").filter({ hasText: "Preparando PDF" }),
+  ).toBeVisible();
+  releaseExport();
+  await expect(
+    page
+      .locator("[data-sileo-toast]")
+      .filter({ hasText: "Fallo sintético recuperable" }),
+  ).toBeVisible();
+  await expect(pdfAction).not.toHaveAttribute("aria-disabled", "true");
+  await page.unroute("**/app/cursos/exportar?**");
+  const pdfDownloadEvent = page.waitForEvent("download");
+  await pdfAction.click();
+  const pdfDownload = await pdfDownloadEvent;
+  expect(pdfDownload.suggestedFilename()).toMatch(
+    /^cursos-\d{4}-\d{2}-\d{2}\.pdf$/,
+  );
+  if (process.env.E2E_EVIDENCE_DIR)
+    await pdfDownload.saveAs(
+      `${process.env.E2E_EVIDENCE_DIR}/downloaded-draft.pdf`,
+    );
+  await expect(pdfAction).not.toHaveAttribute("aria-busy", "true");
+  await expect(page).toHaveURL(new RegExp(`status=DRAFT.*search=`));
+  await page
+    .getByRole("searchbox", { name: "Buscar por nombre de curso" })
+    .clear();
+  expect(
+    (
+      await page.request.get("/app/cursos/exportar?format=CSV&status=INVALID")
+    ).status(),
+  ).toBe(422);
+  expect(
+    (
+      await page.request.get(
+        "/app/cursos/exportar?format=CSV&status=ALL&search=no-course-can-match-this-query-20261015",
+      )
+    ).status(),
+  ).toBe(409);
   await expect(savedCourseCard.getByRole("link")).toHaveAttribute(
     "href",
     `/app/cursos/${createdIds[0]}/editar`,
@@ -1240,6 +1306,14 @@ test("instructor is denied and mutation without expected origin is rejected", as
   context,
 }) => {
   await signInFixture(context, AUTH_FIXTURES.instructor.email);
+  const forbiddenReport = await page.request.get(
+    "/app/cursos/exportar?format=PDF",
+    { maxRedirects: 0 },
+  );
+  expect(forbiddenReport.status()).toBe(303);
+  expect(forbiddenReport.headers().location).toContain(
+    "/unauthorized?reason=forbidden",
+  );
   await page.goto("/app/cursos/nuevo");
   await expect(page).toHaveURL(/\/unauthorized\?reason=forbidden$/);
   await page.goto("/app/formatos");
@@ -1262,6 +1336,12 @@ test("instructor is denied and mutation without expected origin is rejected", as
   );
 
   await context.clearCookies();
+  const anonymousReport = await page.request.get(
+    "/app/cursos/exportar?format=CSV",
+    { maxRedirects: 0 },
+  );
+  expect(anonymousReport.status()).toBe(303);
+  expect(anonymousReport.headers().location).toContain("/login");
   await signInFixture(context, AUTH_FIXTURES.originAdmin.email);
   const response = await page.request.post("/app/cursos/nuevo", {
     form: { name: "Blocked origin" },
@@ -1320,6 +1400,28 @@ test("course administration remains keyboard reachable and responsive", async ({
   await page.keyboard.press("Tab");
   await expect(page.locator(":focus")).toBeVisible();
   await expect(page.getByRole("link", { name: "Nuevo curso" })).toBeVisible();
+  for (const width of [375, 768, 1440]) {
+    await page.setViewportSize({ width, height: 960 });
+    await expectNoHorizontalOverflow();
+    const create = await page
+      .getByRole("link", { name: "Nuevo curso" })
+      .boundingBox();
+    for (const format of ["PDF", "CSV"]) {
+      const action = page.getByRole("link", {
+        name: `Descargar informe de cursos ${format}`,
+      });
+      await expect(action).toBeVisible();
+      const box = await action.boundingBox();
+      expect(box!.height).toBeCloseTo(create!.height, 0);
+      expect(box!.y).toBeCloseTo(create!.y, 0);
+    }
+    if (process.env.E2E_EVIDENCE_DIR)
+      await page.screenshot({
+        path: `${process.env.E2E_EVIDENCE_DIR}/course-report-actions-${width}.png`,
+        animations: "disabled",
+        fullPage: true,
+      });
+  }
   await page.goto("/app/cursos/nuevo");
   await expect(
     page.getByRole("toolbar", { name: "Formato Markdown" }),

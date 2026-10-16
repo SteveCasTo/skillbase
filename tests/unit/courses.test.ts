@@ -25,6 +25,21 @@ import {
 } from "@/server/courses/errors";
 import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
 import { courseInputFromFormData } from "@/server/courses/form";
+import {
+  buildCourseReport,
+  loadCourseReport,
+  parseCourseReportFilter,
+} from "@/application/courses/course-report";
+import { matchesCourseSearch } from "@/domain/courses/report-filters";
+import { renderCoursesCsv } from "@/server/courses/exports/csv";
+import { renderCoursesPdf } from "@/server/courses/exports/pdf";
+import { groupSchedule } from "@/server/courses/exports/columns";
+import { PDFDocument, PDFPage } from "pdf-lib";
+import {
+  courseReportNow,
+  courseReportSource,
+} from "../fixtures/course-reports";
+import { exportActor } from "./registration-export-fixture";
 
 const validInput = {
   courseTypeId: "00000000-0000-4000-8000-000000000001",
@@ -227,7 +242,7 @@ describe("course domain", () => {
     expect(() => assertTransition("DRAFT", "DRAFT")).toThrow();
   });
 
-  test("derives registration availability and academic phase without persisting them", () => {
+  test("derives registration availability and academic phase without persisting them", async () => {
     const now = new Date("2027-01-05T12:00:00Z");
     expect(registrationAvailability(null, null, now)).toBe("UNAVAILABLE");
     expect(
@@ -269,6 +284,179 @@ describe("course domain", () => {
     expect(
       courseAcademicPhase([{ ...closed, academicallyClosed: false }], now),
     ).toBe("IN_PROGRESS");
+    const filter = parseCourseReportFilter({
+      status: "ALL",
+      search: "  DISEÑO  Ágil ",
+    });
+    expect(filter.search).toBe("diseno agil");
+    expect(parseCourseReportFilter({}).status).toBe("PUBLISHED");
+    expect(() => parseCourseReportFilter({ status: "CANCELLED" })).toThrow();
+    expect(() =>
+      parseCourseReportFilter({ search: "x".repeat(501) }),
+    ).toThrow();
+    expect(
+      matchesCourseSearch({ name: "Diseño Ágil", slug: "otro" }, filter.search),
+    ).toBe(true);
+    expect(
+      matchesCourseSearch({ name: "Otro", slug: "diseno-agil" }, "diseno-agil"),
+    ).toBe(true);
+    const source = courseReportSource();
+    const report = buildCourseReport(
+      source,
+      { search: "", status: "ALL" },
+      courseReportNow,
+    );
+    expect(report).toMatchObject({
+      uniqueEnrolled: 2,
+      netCents: "22000",
+      groupCount: 4,
+    });
+    expect(report.courses[0]).toMatchObject({
+      enrolled: 2,
+      netCents: "19000",
+      instructorName: "María José Álvarez Quiñónez",
+      groups: [
+        { enrolled: 1, netCents: "9000", passed: 0, notPassed: 1 },
+        { enrolled: 2, netCents: "10000", passed: null, notPassed: null },
+      ],
+    });
+    expect(report.courses[0]!.groups[0]!.endsAt.toISOString()).toBe(
+      "2026-01-24T15:30:00.000Z",
+    );
+    expect(report.courses[2]).toMatchObject({
+      enrolled: 0,
+      netCents: "0",
+      instructorName: "Sin asignar",
+      groups: [],
+    });
+    expect(report.courses[3]!.groups[0]).toMatchObject({
+      enrolled: 0,
+      netCents: "0",
+      passed: null,
+    });
+    const legacyGroup = {
+      ...report.courses[0]!.groups[1]!,
+      weekdaysMask: null,
+    };
+    expect(groupSchedule(legacyGroup)).toBe("10:00–11:30");
+    expect(groupSchedule(report.courses[0]!.groups[1]!)).toContain(
+      "Lun, Mar, Mié, Jue, Vie",
+    );
+    const csv = renderCoursesCsv(report);
+    expect([...csv.slice(0, 3)]).toEqual([239, 187, 191]);
+    const content = new TextDecoder().decode(csv);
+    expect(content).toContain(
+      '"María José Álvarez Quiñónez",100.00,150.00,50.00',
+    );
+    expect(content).toContain('"Borrador sin grupos"');
+    expect(content).toContain("90.00,0,1");
+    expect(content).not.toMatch(
+      /person-a|registration-a|CANCELADO|SALDOVENCIDO|PREINSCRITO|Estado financiero|Saldo|CI,/u,
+    );
+    source.courses[0]!.name = "=SUM(A1:A3)";
+    expect(
+      new TextDecoder().decode(
+        renderCoursesCsv(buildCourseReport(source, filter, courseReportNow)),
+      ),
+    ).toContain('"\'=SUM(A1:A3)"');
+    source.groups[0]!.officialVersion = 1;
+    expect(() => buildCourseReport(source, filter, courseReportNow)).toThrow(
+      "conciliar",
+    );
+    source.groups[0]!.officialVersion = 2;
+    source.groups[0]!.officialParticipants = [];
+    expect(() => buildCourseReport(source, filter, courseReportNow)).toThrow(
+      "conciliar",
+    );
+    source.groups[0]!.closed = false;
+    expect(
+      buildCourseReport(source, filter, courseReportNow).courses[0]!.groups[0]!
+        .passed,
+    ).toBeNull();
+    expect(() =>
+      buildCourseReport({ ...source, courses: [] }, filter, courseReportNow),
+    ).toThrow("No hay cursos");
+    expect(() =>
+      buildCourseReport(
+        {
+          ...source,
+          groups: Array.from({ length: 1001 }, () => source.groups[0]!),
+        },
+        filter,
+        courseReportNow,
+      ),
+    ).toThrow("1000");
+    const pdf = await renderCoursesPdf(report);
+    expect(new TextDecoder().decode(pdf.slice(0, 5))).toBe("%PDF-");
+    expect((await PDFDocument.load(pdf)).getPageCount()).toBeGreaterThan(0);
+    const tallSource = courseReportSource();
+    const longName =
+      "Especialización en programación y análisis de sistemas de información para la gestión académica e institucional avanzada y el desarrollo de soluciones de interoperabilidad y automatización de procesos universitarios con gobernanza y planificación de infraestructuras tecnológicas";
+    tallSource.courses = [{ ...tallSource.courses[0]!, name: longName }];
+    tallSource.groups = [tallSource.groups[0]!];
+    tallSource.registrations = [tallSource.registrations[0]!];
+    tallSource.sessions = Array.from({ length: 44 }, (_, index) => ({
+      groupId: tallSource.groups[0]!.id,
+      startsAt: new Date(Date.UTC(2026, 0, 5 + index, 12, index)),
+      endsAt: new Date(Date.UTC(2026, 0, 5 + index, 13, index + 30)),
+    }));
+    const draws: { page: PDFPage; text: string; y: number }[] = [];
+    const originalDraw = PDFPage.prototype.drawText;
+    const draw = spyOn(PDFPage.prototype, "drawText").mockImplementation(
+      function (this: PDFPage, value, options) {
+        draws.push({ page: this, text: value, y: options?.y ?? 0 });
+        return originalDraw.call(this, value, options);
+      },
+    );
+    try {
+      const tallPdf = await renderCoursesPdf(
+        buildCourseReport(tallSource, filter, courseReportNow),
+      );
+      expect((await PDFDocument.load(tallPdf)).getPageCount()).toBeGreaterThan(
+        1,
+      );
+      const body = draws.filter(
+        ({ text }) =>
+          text !== "Informe de cursos" && !/^\d+ \/ \d+$/u.test(text),
+      );
+      expect(body.every(({ y }) => y >= 48)).toBe(true);
+      const allText = draws.map(({ text }) => text).join(" ");
+      expect(allText.replace(/\s/gu, "")).toContain(
+        longName.replace(/\s/gu, ""),
+      );
+      for (let minute = 0; minute < 44; minute++) {
+        const time = `08:${minute.toString().padStart(2, "0")}–`;
+        expect(allText.split(time)).toHaveLength(2);
+      }
+      for (const page of new Set(draws.map((row) => row.page))) {
+        const content = draws
+          .filter((row) => row.page === page)
+          .map((row) => row.text);
+        if (content.includes("Grupo / horario"))
+          expect(content.some((value) => /^Grupo 1/u.test(value))).toBe(true);
+      }
+    } finally {
+      draw.mockRestore();
+    }
+    const badText = structuredClone(report);
+    badText.courses[0]!.name = "漢字";
+    await expect(renderCoursesPdf(badText)).rejects.toMatchObject({
+      code: "PDF_UNSUPPORTED_TEXT",
+    });
+    let reads = 0;
+    await expect(
+      loadCourseReport(
+        {
+          read: async () => {
+            reads++;
+            return source;
+          },
+        },
+        { ...exportActor, roles: ["INSTRUCTOR"] },
+        {},
+      ),
+    ).rejects.toThrow();
+    expect(reads).toBe(0);
   });
 
   test("course use cases reject invited and disabled admins before persistence", async () => {

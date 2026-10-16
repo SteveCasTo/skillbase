@@ -482,6 +482,13 @@ Ejemplos:
 
 ## MÓDULO COURSES EN FASE 2
 
+El informe administrativo de cursos añade un port y caso de uso independiente
+en `src/application/courses/course-report.ts`, una consulta por lotes en
+`course-report-repository.ts` y renderers propios en `src/server/courses/exports`.
+No reutiliza el renderer financiero ni modifica el cierre histórico. Contrato
+de filtros, inscritos, netos, resultados oficiales y CSV en
+[`COURSE_REPORTS.md`](COURSE_REPORTS.md).
+
 El flujo implementado conserva los límites del monolito modular:
 
 ```text

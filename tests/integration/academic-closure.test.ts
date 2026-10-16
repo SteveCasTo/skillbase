@@ -15,6 +15,8 @@ import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { createClosureFixture } from "../fixtures/academic-closure";
 import { evaluationFixtureTables } from "../fixtures/evaluation-cleanup";
 import type { InternalUser } from "@/domain/auth/types";
+import { DrizzleCourseReportRepository } from "@/server/db/repositories/course-report-repository";
+import { buildCourseReport } from "@/application/courses/course-report";
 
 const connection = createDatabase(getTestSupabaseEnvironment().databaseUrl, {
   max: 8,
@@ -134,6 +136,18 @@ test("academic closure lifecycle validates blockers, permissions and immutable h
   });
   expect(await db.select().from(s.participantAttendance)).toHaveLength(0);
   const first = await repo.close(f.instructor.id, f.command);
+  const courseReports = new DrizzleCourseReportRepository(db);
+  const reportFilter = { search: f.course.slug, status: "ALL" as const };
+  const closedReport = buildCourseReport(
+    await courseReports.read(f.admin.id, reportFilter, now),
+    reportFilter,
+    now,
+  );
+  expect(closedReport.courses[0]!.groups[0]).toMatchObject({
+    enrolled: 1,
+    passed: 0,
+    notPassed: 1,
+  });
   expect(first).toMatchObject({ status: "CLOSED", revision: 1, version: 1 });
   expect(await repo.close(f.instructor.id, f.command)).toEqual(first);
   await expect(
@@ -261,6 +275,16 @@ test("academic closure lifecycle validates blockers, permissions and immutable h
   expect(closedAttendance.reviewCandidates).toEqual([]);
   const reopened = await repo.reopen(f.admin2.id, reopen);
   expect(reopened).toMatchObject({ status: "OPEN", revision: 2, version: 1 });
+  const reopenedReport = buildCourseReport(
+    await courseReports.read(f.admin.id, reportFilter, now),
+    reportFilter,
+    now,
+  );
+  expect(reopenedReport.courses[0]!.groups[0]).toMatchObject({
+    enrolled: 1,
+    passed: null,
+    notPassed: null,
+  });
   expect(await repo.reopen(f.admin2.id, reopen)).toEqual(reopened);
   state = await repo.getGroup(f.admin.id, f.course.id, f.groupId);
   expect(state.official).toBeNull();
@@ -290,6 +314,16 @@ test("academic closure lifecycle validates blockers, permissions and immutable h
   const next = await repo.close(f.admin2.id, nextCommand);
   expect(next).toMatchObject({ version: 2, revision: 3, status: "CLOSED" });
   const official = await repo.getVersion(f.admin.id, f.course.id, f.groupId, 2);
+  const currentReport = buildCourseReport(
+    await courseReports.read(f.admin.id, reportFilter, now),
+    reportFilter,
+    now,
+  );
+  expect(currentReport.courses[0]!.groups[0]).toMatchObject({
+    enrolled: 1,
+    passed: 1,
+    notPassed: 0,
+  });
   await expect(
     repo.getVersion(f.instructor.id, f.course.id, f.groupId, 1),
   ).rejects.toMatchObject({ code: "FORBIDDEN" });

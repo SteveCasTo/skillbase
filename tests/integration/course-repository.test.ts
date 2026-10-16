@@ -12,6 +12,7 @@ import {
   courses,
   users,
   userRoles,
+  instructorProfiles,
 } from "@/server/db/schema";
 import { validateCourseData } from "@/domain/courses/validation";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
@@ -25,6 +26,8 @@ import { COURSE_FIXTURES } from "../fixtures/courses";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { createInstructorFixture } from "../fixtures/instructors";
 import { evaluationFixtureTables } from "../fixtures/evaluation-cleanup";
+import { DrizzleCourseReportRepository } from "@/server/db/repositories/course-report-repository";
+import { buildCourseReport } from "@/application/courses/course-report";
 
 const connection = getTestSupabaseEnvironment().databaseUrl;
 const database = createDatabase(connection);
@@ -863,6 +866,52 @@ describe("course format persistence", () => {
       courseAuditEvents.find((row) => row.action === "COURSE_PUBLISHED")
         ?.metadata,
     ).toEqual({ from: "DRAFT", to: "PUBLISHED" });
+    const reports = new DrizzleCourseReportRepository(database.db);
+    await database.db
+      .update(instructorProfiles)
+      .set({ firstName: "María José", lastName: "Álvarez" })
+      .where(eq(instructorProfiles.id, instructorId));
+    const time = new Date("2028-01-01T12:00:00Z");
+    const filter = { search: first.slug, status: "ALL" as const };
+    const report = buildCourseReport(
+      await reports.read(actorId, filter, time),
+      filter,
+      time,
+    );
+    expect(report.courses).toHaveLength(2); // slug-prefix search also matches the second draft.
+    expect(
+      report.courses.find((course) => course.status === "PUBLISHED"),
+    ).toMatchObject({
+      enrolled: 0,
+      netCents: "0",
+      instructorName: "María José Álvarez",
+      studentCents: "12000",
+      externalCents: "15000",
+      auxiliaryCents: "6000",
+      groups: [{ enrolled: 0, passed: null, notPassed: null }],
+    });
+    expect(
+      report.courses.find((course) => course.status === "DRAFT")!.groups,
+    ).toEqual([]);
+    const publicOnly = await reports.read(
+      actorId,
+      { ...filter, status: "PUBLISHED" },
+      time,
+    );
+    expect(publicOnly.courses).toHaveLength(1);
+    const unmatched = await reports.read(
+      actorId,
+      { ...filter, search: "does-not-exist" },
+      time,
+    );
+    expect(unmatched.courses).toEqual([]);
+    await database.db
+      .update(users)
+      .set({ status: "DISABLED" })
+      .where(eq(users.id, actorId));
+    await expect(reports.read(actorId, filter, time)).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
   });
 
   test("DB checks, RLS and grants protect format and featured tables", async () => {
