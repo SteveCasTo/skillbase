@@ -7,10 +7,10 @@ Precondición comprobada antes de implementar: PR 406 MERGED, master
 `f58feaf4e6916b6a8df8c1b314cd41d181aad67a`, CI `38855227139` SUCCESS y
 deployment de producción SUCCESS. Esta rama no despliega ni modifica producción.
 
-Tras integrarse PR 425, la rama se rebaseó sobre
-`86d1ccd64387bf0c36813c7739ce5c0864f788d5`. La comparación aislada de abajo conserva
+Tras integrarse PR 423/424/425/426, la rama se rebaseó sobre
+`7b397124a336c4704df75fb202e3d840697c9b39`. La comparación aislada de abajo conserva
 su procedencia histórica; no se presenta la versión anterior de cards como el
-estado actual. La matriz final usa el build combinado con PR 425 más esta rama,
+estado actual. La matriz final usa el build combinado con esos PRs más esta rama,
 separando ese efecto de los bytes deterministas de las placas.
 
 Cambio exclusivamente offline: regenerar las variantes existentes de placas
@@ -154,6 +154,44 @@ No se introducen aquí cambios globales de SEO/a11y ni modificaciones de sus own
 
 ## Validación
 
+### Combinado final vigente
+
+[Matriz final completa](PERFORMANCE_20261016_MATRIX.md): 72 pares baseline→final
+con las 36 páginas y ambos dispositivos. Build medido de implementación
+`3a2a7b24a6b3ce912d5a70e19c8374be6747fcd0`, sobre development `7b397124`; los cambios
+posteriores a ese SHA son solo esta documentación/matriz. Cada una de las cinco
+etapas conservadas en evidencia tiene 72 informes únicos: baseline, after aislado,
+combined (PR425), current (PR424+425) y final (PR423–426). No se sustituyeron muestras
+para mejorar scores; las etapas adicionales responden a integraciones coordinadas.
+`EVIDENCE-VALIDATION.json` comprueba 360 informes, 310 autenticados, URL final exacta,
+HTTP 200, h1 y cookie ADMIN. Las rutas ya completadas no se repitieron al reanudar
+procesos interrumpidos por el entorno.
+
+| Superficie   | Performance final mobile / desktop | LCP mobile / desktop (ms) | CLS mobile / desktop |
+| ------------ | ---------------------------------- | ------------------------- | -------------------- |
+| Landing      | 92 / 100                           | 2859 / 687                | 0,0013 / 0,0010      |
+| Catálogo     | 96 / 100                           | 2331 / 546                | 0,0007 / 0,0008      |
+| Curso        | 97 / 100                           | 2108 / 730                | 0,0023 / 0,0020      |
+| Login        | 80 / 100                           | 4206 / 646                | 0,0005 / 0,0259      |
+| Verificación | 79 / 100                           | 4205 / 528                | 0,0381 / 0,0045      |
+
+TBT final público: 0 ms en las diez muestras. FCP/SI y transferencia/JS completos
+figuran por ruta en la matriz, incluidos los 31 ADMIN. ADMIN final performance
+59–98 mobile y 87–99 desktop; no se ocultan mínimos ni se persigue SEO100.
+PR423 introduce noindex correcto en login/ADMIN (SEO60), PR424 modifica verificación
+y PR426 feedback. Por tanto, el cambio final de bytes/JS/CLS/score en esas rutas
+**no se atribuye a esta optimización de placas**. Verificación pasa de 219797 a
+598502 bytes en el combinado, incorporando interacción del otro owner.
+
+Landing final: 352236→351670 bytes mobile y 465831→465290 desktop; el ahorro neto
+combinado (566/541 bytes) incluye overhead de los otros PRs y no sustituye el ahorro
+aislado de 1088/1063 bytes ni el ahorro determinista de archivos de 144973 bytes.
+Landing mobile SEO92 reporta `robots-txt` en el preview local; no se añade un robots
+global ni se afirma un problema productivo a partir de esa medición local aislada.
+Los hallazgos de contraste/nombre accesible que quedan se entregan a sus owners.
+
+### Gates
+
 - Local: lint, formatter, Astro check (0 errores, 0 warnings; 383 hints), 464 unit
   (0 fallos), build de producción final y `git diff --check`.
 - CI del primer candidato `38908521760`: quality, integración 177, demos aisladas
@@ -163,6 +201,10 @@ No se introducen aquí cambios globales de SEO/a11y ni modificaciones de sus own
 - Inventario de 68 imágenes y comparación de dimensiones/formato/alpha; revisión
   visual de las cinco placas en contact sheet y detalle hero/kantuta. La captura
   no reemplaza la auditoría de rutas ni una prueba institucional de los logos.
+
+La instalación local de Astro carecía de un módulo de runtime al reconstruir tras
+el rebase; `bun install --frozen-lockfile --force` reparó exclusivamente dependencias
+locales. El build integrado posterior pasó sin editar source, versiones o lockfile.
 
 ## Límites y coordinación
 
