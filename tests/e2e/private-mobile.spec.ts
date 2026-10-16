@@ -56,10 +56,20 @@ test("mobile drawer closes with Escape and restores keyboard focus", async ({
   await expect(
     navigation.getByRole("link", { name: "Mis cursos", exact: true }),
   ).toBeVisible();
+  await expect(page.locator(".private-main-scroll")).toHaveAttribute(
+    "inert",
+    "",
+  );
+  await expect(page.getByRole("main")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
   await expect(page.locator("[data-mobile-drawer]")).toBeHidden();
+  await expect(page.locator(".private-main-scroll")).not.toHaveAttribute(
+    "inert",
+    "",
+  );
+  await expect(page.getByRole("main")).toBeVisible();
 });
 
 test("mobile menu slides in and out, with theme on the left and logout on the right", async ({

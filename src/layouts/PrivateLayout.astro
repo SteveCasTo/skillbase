@@ -31,7 +31,7 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
 );
 ---
 
-<BaseLayout title={`${title} | SkillBase`} clientRouter>
+<BaseLayout title={`${title} | SkillBase`} noindex clientRouter>
   <OAuthLoginNotice visible={oauthLoginNotice} />
   <div class="private-shell" data-private-shell>
     <aside class="private-sidebar" aria-label="Barra lateral">
@@ -213,6 +213,9 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
         const mobilePanel = drawer?.querySelector<HTMLElement>(
           ".private-mobile-panel",
         );
+        const background = shell.querySelectorAll<HTMLElement>(
+          ".private-sidebar, .private-mobile-header, .private-main-scroll",
+        );
         let keyboardFocus = false;
         let returnFocus: HTMLElement | null = null;
 
@@ -295,6 +298,7 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
             return;
           drawer.dataset.state = "closed";
           drawer.inert = true;
+          background.forEach((element) => (element.inert = false));
           openButton?.setAttribute("aria-expanded", "false");
           document.body.classList.remove("private-drawer-open");
           if (restoreFocus) returnFocus?.focus();
@@ -341,6 +345,7 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
           returnFocus = openButton;
           drawer.hidden = false;
           drawer.inert = false;
+          background.forEach((element) => (element.inert = true));
           mobilePanel?.getBoundingClientRect();
           drawer.dataset.state = "open";
           openButton.setAttribute("aria-expanded", "true");
