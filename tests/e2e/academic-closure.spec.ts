@@ -370,6 +370,47 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
     await expect(
       page.getByRole("link", { name: "Descargar PDF" }),
     ).toHaveAttribute("href", `${path}/1/informe.pdf`);
+    const invalidDownloads: string[] = [];
+    const recordInvalid = (download: import("@playwright/test").Download) =>
+      invalidDownloads.push(download.suggestedFilename());
+    page.on("download", recordInvalid);
+    for (const [artifact, label] of documents) {
+      const before = await page
+        .locator("[data-sileo-id]")
+        .evaluateAll((nodes) =>
+          nodes.map((node) => node.getAttribute("data-sileo-id")!),
+        );
+      await page.route(
+        `${e2eSiteUrl()}${path}/1/${artifact}`,
+        async (request) => {
+          await request.fulfill({
+            status: 200,
+            headers: {
+              "content-type": artifact.endsWith(".pdf")
+                ? "application/pdf"
+                : "text/csv",
+              "content-disposition": `attachment; filename="cierre-v1-${artifact}"`,
+            },
+            body: artifact.endsWith(".pdf")
+              ? "%PDF-1.7\ntruncated document"
+              : "",
+          });
+        },
+        { times: 1 },
+      );
+      await page.getByRole("link", { name: label, exact: true }).click();
+      const failure = page.locator(
+        '[data-sileo-toast][data-state="error"][data-exiting="false"]' +
+          before.map((id) => `:not([data-sileo-id="${id}"])`).join(""),
+      );
+      await expect(failure).toBeVisible();
+      await expect(failure).toContainText(/Reintenta la descarga/u);
+      await expect(
+        page.getByRole("link", { name: label, exact: true }),
+      ).not.toHaveAttribute("aria-busy");
+      expect(invalidDownloads).toEqual([]);
+    }
+    page.off("download", recordInvalid);
     const originalCsv = await downloadOfficialDocuments(
       page,
       path,

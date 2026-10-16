@@ -118,6 +118,13 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
       },
       { times: 1 },
     );
+    await page.route(
+      `${e2eSiteUrl()}${path}`,
+      async (request) => {
+        await request.fulfill({ status: 503, body: "Fragment unavailable" });
+      },
+      { times: 1 },
+    );
     const saving = chooseState(page, person, "Justificada");
     await expect(person).toHaveAttribute("aria-busy", "true");
     await expect(
@@ -132,8 +139,28 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
         exact: true,
       }),
     ).toBeDisabled();
+    const loading = page.locator(
+      '[data-sileo-toast][data-state="loading"][data-exiting="false"]',
+    );
+    await expect(loading).toBeVisible();
+    const noticeId = await loading.getAttribute("data-sileo-id");
     release();
+    await expect(page.locator("[data-attendance-page-error]")).toHaveText(
+      "Operación guardada. Recarga la sesión para ver los cambios.",
+    );
+    await expect(
+      page.locator(`[data-sileo-id="${noticeId}"][data-exiting="false"]`),
+    ).toHaveAttribute("data-state", "success");
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="warning"][data-exiting="false"]',
+      ),
+    ).toHaveCount(0);
+    await page
+      .getByRole("link", { name: "Reintentar actualización", exact: true })
+      .click();
     await saving;
+    await expect(page.locator("[data-attendance-page-error]")).toBeEmpty();
     const corrected = (await detail(page, path)).participants.find(
       (person) => person.registrationId === fixture.paid.id,
     )!;

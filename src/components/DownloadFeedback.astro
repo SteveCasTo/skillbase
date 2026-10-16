@@ -26,18 +26,20 @@
           const certificate = link.hasAttribute("data-certificate-download");
           const controller = new AbortController();
           const abort = () => controller.abort();
-          if (certificate)
-            document.addEventListener("astro:before-swap", abort, {
-              once: true,
-            });
+          document.addEventListener("astro:before-swap", abort, {
+            once: true,
+          });
           try {
             await notifications.promise(
               async () => {
                 const response = await fetch(link.href, {
                   credentials: "same-origin",
-                  ...(certificate ? { signal: controller.signal } : {}),
+                  signal: controller.signal,
                 });
-                if (certificate) {
+                if (
+                  certificate ||
+                  new URL(link.href).pathname.endsWith(".pdf")
+                ) {
                   await downloadCertificatePdf(response, controller.signal);
                   return;
                 }
@@ -49,11 +51,28 @@
                 const filename = response.headers
                   .get("content-disposition")
                   ?.match(/filename="([^"\\/]+)"/u)?.[1];
-                if (!filename || !/^(application\/pdf|text\/csv)/u.test(type))
+                if (
+                  !filename?.endsWith(".csv") ||
+                  !/^text\/csv(?:;|$)/iu.test(type)
+                )
                   throw new Error(
                     "No se pudo confirmar el documento. Reintenta la descarga.",
                   );
-                const url = URL.createObjectURL(await response.blob());
+                const blob = await response.blob();
+                const prefix = new Uint8Array(
+                  await blob.slice(0, 3).arrayBuffer(),
+                );
+                if (
+                  blob.size < 20 ||
+                  prefix[0] !== 239 ||
+                  prefix[1] !== 187 ||
+                  prefix[2] !== 191
+                )
+                  throw new Error(
+                    "No se pudo confirmar el documento. Reintenta la descarga.",
+                  );
+                controller.signal.throwIfAborted();
+                const url = URL.createObjectURL(blob);
                 const download = document.createElement("a");
                 download.href = url;
                 download.download = filename;

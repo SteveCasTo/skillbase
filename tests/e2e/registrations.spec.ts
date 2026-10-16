@@ -635,11 +635,81 @@ registrationTest.describe(() => {
               .registrationMarker,
         ),
       ).toBe("list-kept");
-      const downloaded = page.waitForEvent("download");
-      await page.getByRole("link", { name: "CSV", exact: true }).click();
-      expect((await downloaded).suggestedFilename()).toMatch(
-        /^preinscripciones-[\d-]+\.csv$/u,
-      );
+      const exportRoute = "**/app/preinscripciones/exportar?**";
+      const unexpectedDownloads: string[] = [];
+      const recordDownload = (download: import("@playwright/test").Download) =>
+        unexpectedDownloads.push(download.suggestedFilename());
+      page.on("download", recordDownload);
+      for (const invalid of [
+        { format: "CSV", mediaType: "text/csv", body: "" },
+        {
+          format: "CSV",
+          mediaType: "text/csv",
+          body: "<html>Not an export</html>",
+        },
+        {
+          format: "PDF",
+          mediaType: "application/pdf",
+          body: "%PDF-1.7\ntruncated document",
+        },
+      ]) {
+        let release!: () => void;
+        const held = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        await page.route(exportRoute, async (route) => {
+          await held;
+          await route.fulfill({
+            status: 200,
+            headers: {
+              "content-type": invalid.mediaType,
+              "content-disposition": `attachment; filename="preinscripciones-2027-05-03.${invalid.format.toLowerCase()}"`,
+            },
+            body: invalid.body,
+          });
+        });
+        const link = page.getByRole("link", {
+          name: invalid.format,
+          exact: true,
+        });
+        await link.click();
+        const loading = page.locator(
+          '[data-sileo-toast][data-state="loading"][data-exiting="false"]',
+        );
+        await expect(loading).toBeVisible();
+        const id = await loading.getAttribute("data-sileo-id");
+        expect(id).toMatch(/^registration-export-/u);
+        await expect(link).toHaveAttribute("aria-busy", "true");
+        expect(unexpectedDownloads).toEqual([]);
+        release();
+        const outcome = page.locator(
+          `[data-sileo-id="${id}"][data-exiting="false"]`,
+        );
+        await expect(outcome).toHaveAttribute("data-state", "error");
+        await expect(outcome).toContainText("Sin descarga");
+        await expect(link).not.toHaveAttribute("aria-busy");
+        await expect(loading).toHaveCount(0);
+        expect(unexpectedDownloads).toEqual([]);
+        await page.unroute(exportRoute);
+      }
+      page.off("download", recordDownload);
+      for (const format of ["CSV", "PDF"]) {
+        const downloaded = page.waitForEvent("download");
+        await page.getByRole("link", { name: format, exact: true }).click();
+        expect((await downloaded).suggestedFilename()).toMatch(
+          new RegExp(
+            `^preinscripciones-[\\d-]+\\.${format.toLowerCase()}$`,
+            "u",
+          ),
+        );
+        await expect(
+          page
+            .locator(
+              '[data-sileo-id^="registration-export-"][data-state="success"][data-exiting="false"]',
+            )
+            .last(),
+        ).toContainText("Exportación descargada");
+      }
     },
   );
 });
