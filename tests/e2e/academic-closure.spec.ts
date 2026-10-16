@@ -411,6 +411,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
       expect(invalidDownloads).toEqual([]);
     }
     page.off("download", recordInvalid);
+    const currentClosureUrl = page.url();
     let releaseDownload!: () => void;
     const heldDownload = new Promise<void>((resolve) => {
       releaseDownload = resolve;
@@ -430,9 +431,13 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
         .find((entry) =>
           /\/src\/lib\/notifications\.ts(?:\?|$)/u.test(entry.name),
         )?.name;
-      if (!moduleUrl) throw new Error("Real notification facade missing");
+      // ClientRouter may retain the loaded ESM while resource timing entries
+      // belong to the new page. Fall back to its canonical test-server URL.
       const { notifications }: typeof import("../../src/lib/notifications") =
-        await import(moduleUrl);
+        await import(
+          moduleUrl ??
+            new URL("/src/lib/notifications.ts", location.origin).href
+        );
       return notifications.info({
         title: "Aviso independiente",
         duration: 60000,
@@ -465,7 +470,7 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
         .filter({ hasText: "Descarga cancelada." }),
     ).toHaveCount(0);
     await page.goBack();
-    await expect(page).toHaveURL(new RegExp(`${path}$`, "u"));
+    await expect(page).toHaveURL(currentClosureUrl);
     await expect(
       page.getByRole("link", { name: "Descargar PDF", exact: true }),
     ).toBeVisible();
