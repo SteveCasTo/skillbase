@@ -503,6 +503,27 @@ async function uploadReviewIssue(
       fullPage: true,
     });
     await page.unroute(`**${path}/cargar`);
+    await page.route(`**${path}/cargar`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          value: { id: record.id, state: "issued" },
+        }),
+      }),
+    );
+    await save.click();
+    await expect(page.locator("[data-upload-error]")).toContainText(
+      "No se pudo confirmar",
+    );
+    await expect(save).toBeEnabled();
+    await expect(details).toBeVisible();
+    await expect(zone).toBeHidden();
+    await expect(
+      page.getByRole("link", { name: "Descargar firmado", exact: true }),
+    ).toHaveCount(record.hasSignedPdf ? 1 : 0);
+    await page.unroute(`**${path}/cargar`);
   }
   const uploaded = page.waitForResponse(
     (response) =>
@@ -578,6 +599,22 @@ async function assertNoOverflow(page: Page) {
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+}
+async function captureDark(page: Page, info: TestInfo, name: string) {
+  await page.evaluate(() => {
+    document.documentElement.classList.add("dark");
+    document.documentElement.dataset.theme = "dark";
+  });
+  await assertNoOverflow(page);
+  await page.screenshot({
+    path: info.outputPath(name),
+    fullPage: true,
+    animations: "disabled",
+  });
+  await page.evaluate(() => {
+    document.documentElement.classList.remove("dark");
+    document.documentElement.dataset.theme = "light";
+  });
 }
 
 test("ADMIN configures a single recipient certificate, regenerates drafts, saves and substitutes signed PDF; anonymous file comparison stays local", async ({
@@ -894,6 +931,20 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         path: testInfo.outputPath(`public-selected-${width}.png`),
         fullPage: true,
       });
+      if (width >= 1024) {
+        const compact = await publicPage
+          .locator("[data-local-selection]")
+          .boundingBox();
+        const information = await publicPage
+          .getByRole("region", { name: "Datos públicos del certificado" })
+          .boundingBox();
+        expect(compact!.height).toBeLessThan(information!.height);
+      }
+      await captureDark(
+        publicPage,
+        testInfo,
+        `public-selected-dark-${width}.png`,
+      );
     }
     await publicPage
       .getByRole("button", { name: "Quitar archivo", exact: true })
@@ -939,6 +990,11 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         path: testInfo.outputPath(`public-mismatch-${width}.png`),
         fullPage: true,
       });
+      await captureDark(
+        publicPage,
+        testInfo,
+        `public-mismatch-dark-${width}.png`,
+      );
     }
     // Delay a genuine File read, not the digest or registry response. The older
     // calculation must not overwrite the newer selection or a reset.
@@ -1061,6 +1117,30 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     await expect(publicPage.getByLabel("Seleccionar PDF firmado")).toHaveValue(
       "",
     );
+    for (const rejected of [
+      { name: "wrong.txt", mimeType: "text/plain", buffer: signed },
+      { name: "wrong.pdf", mimeType: "text/plain", buffer: signed },
+      {
+        name: "empty.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.alloc(0),
+      },
+      {
+        name: "large.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
+      },
+    ]) {
+      await publicPicker.setInputFiles(rejected);
+      await expect(localResult).toHaveAttribute("data-tone", "error");
+      await expect(publicPicker).toHaveAttribute("aria-invalid", "true");
+      await expect(hashLoading).toHaveCount(0);
+      await publicPage
+        .getByRole("button", { name: "Quitar archivo", exact: true })
+        .click();
+      await expect(localResult).toHaveText("");
+      await expect(publicPicker).toBeFocused();
+    }
     expect(transmitted).toBe(0);
     const anonymousFile = await publicPage.request.get(
       `/app/certificados/${record.id}/firmado.pdf`,
@@ -1087,6 +1167,7 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         path: testInfo.outputPath(`public-${width}.png`),
         fullPage: true,
       });
+      await captureDark(publicPage, testInfo, `public-empty-dark-${width}.png`);
     }
     const replacementBytes = await signedFixture(
       "SYNTHETIC QA: replacement file, no institutional signature",
@@ -1240,6 +1321,11 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         path: testInfo.outputPath(`public-revoked-${width}.png`),
         fullPage: true,
       });
+      await captureDark(
+        publicPage,
+        testInfo,
+        `public-revoked-dark-${width}.png`,
+      );
     }
     await expect(
       page.getByRole("link", { name: "Preparar reemplazo" }),
@@ -1341,6 +1427,7 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         path: testInfo.outputPath(`history-cards-${width}.png`),
         fullPage: true,
       });
+      await captureDark(page, testInfo, `history-cards-dark-${width}.png`);
     }
   } finally {
     try {
