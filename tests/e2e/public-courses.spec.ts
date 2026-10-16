@@ -414,6 +414,23 @@ test("unknown slug uses the same public 404 without exposing private data", asyn
     "content",
     "noindex,nofollow",
   );
+
+  for (const path of ["/pagina-inexistente-e2e", "/404"]) {
+    const notFoundResponse = await page.goto(path);
+    expect(notFoundResponse?.status()).toBe(404);
+    expect(new URL(page.url()).pathname).toBe(path);
+    await expect(page).toHaveTitle("Página no encontrada | Formación continua");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Página no encontrada" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Volver al inicio" }),
+    ).toHaveAttribute("href", "/");
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      "noindex,nofollow",
+    );
+  }
 });
 
 test("catalog navigation, keyboard focus, and responsive layout", async ({

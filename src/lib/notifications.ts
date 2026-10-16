@@ -120,47 +120,55 @@ export const notifications = {
     // The vendor captures loading.id and reuses it for success/error/action.
     // Return its actual promise unchanged: value, identity and rejection remain intact.
     // The vendor overwrites loading.position with the promise-level position.
-    return sileo.promise(operation, {
-      ...rest,
-      position: rest.position ?? loading.position,
-      loading,
-      ...(rest.action
-        ? {
-            action: (value: T) =>
-              withId(
-                {
-                  position: rest.position ?? loading.position,
-                  ...(typeof rest.action === "function"
-                    ? rest.action(value)
-                    : rest.action),
-                  id: loading.id,
-                },
-                "action",
-              ),
-          }
-        : {}),
-      success: (value: T) =>
-        withId(
-          {
-            position: rest.position ?? loading.position,
-            ...(typeof rest.success === "function"
-              ? rest.success(value)
-              : rest.success),
-            id: loading.id,
-          },
-          "success",
-        ),
-      error: (error: unknown) =>
-        withId(
-          {
-            position: rest.position ?? loading.position,
-            ...(typeof rest.error === "function"
-              ? rest.error(error)
-              : rest.error),
-            id: loading.id,
-          },
-          "error",
-        ),
-    });
+    const errorOptions = (error: unknown) =>
+      withId(
+        {
+          position: rest.position ?? loading.position,
+          ...(typeof rest.error === "function"
+            ? rest.error(error)
+            : rest.error),
+          id: loading.id,
+        },
+        "error",
+      );
+    try {
+      return sileo.promise(operation, {
+        ...rest,
+        position: rest.position ?? loading.position,
+        loading,
+        ...(rest.action
+          ? {
+              action: (value: T) =>
+                withId(
+                  {
+                    position: rest.position ?? loading.position,
+                    ...(typeof rest.action === "function"
+                      ? rest.action(value)
+                      : rest.action),
+                    id: loading.id,
+                  },
+                  "action",
+                ),
+            }
+          : {}),
+        success: (value: T) =>
+          withId(
+            {
+              position: rest.position ?? loading.position,
+              ...(typeof rest.success === "function"
+                ? rest.success(value)
+                : rest.success),
+              id: loading.id,
+            },
+            "success",
+          ),
+        error: errorOptions,
+      });
+    } catch (failure) {
+      // 0.1.5 creates loading before calling the factory, but never handles a
+      // synchronous throw. Settle that same notice without changing the throw.
+      sileo.error(errorOptions(failure));
+      throw failure;
+    }
   },
 };

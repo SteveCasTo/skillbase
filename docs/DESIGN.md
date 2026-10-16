@@ -198,6 +198,13 @@ Cada página debe tener un `h1` coherente.
 
 Objetivo: WCAG 2.2 AA cuando sea razonable.
 
+El menú privado móvil aísla el fondo y la isla externa de notificaciones con
+`inert` mientras está abierto. El panel utiliza la convención existente
+`data-slot="dialog-content"` / `data-state` para recibir el portal de Sileo;
+el ciclo de Tab incluye sus grupos enfocables y acciones. Escape, resize y
+descarte de navegación restauran los valores previos de `inert`, sin añadir
+instrucciones ni cambiar el diseño.
+
 Requisitos mínimos:
 
 - navegación por teclado;
@@ -216,6 +223,19 @@ Requisitos mínimos:
 - iconos funcionales con nombre accesible.
 
 No usar placeholder como sustituto de label.
+
+### Metadatos e indexación
+
+- El layout común excluye de indexación las rutas privadas, Auth, login,
+  recuperación, acceso denegado, errores HTTP y respuestas que no son GET/HEAD.
+  Las verificaciones individuales de certificados y los previews conservan su
+  `noindex,nofollow` explícito; no se publican datos del titular en metadatos sociales.
+- Solo las páginas indexables generan canonical y metadatos sociales a partir
+  de su título/descripción existentes. El origen proviene de `PUBLIC_SITE_URL`,
+  no del Host de la solicitud; se omiten query/hash y la barra final redundante.
+- No se inventan valoraciones, ofertas, imágenes ni datos estructurados. No hay
+  sitemap/robots propio en el árbol actual; esta corrección no introduce uno ni
+  convierte rutas privadas en públicas para mejorar puntuaciones automáticas.
 
 ## COMPONENTES NATIVOS
 
@@ -597,10 +617,13 @@ Antes de crear un componente:
 ### Jerarquía de información de cursos
 
 - Las tarjetas de landing y del catálogo público no muestran rangos de fechas; conservan el nivel y la duración total del formato.
+- Excepción responsive de la landing: por debajo de 640 px, el destacado y los afiches ocultan descripción, nivel/duración y el separador asociado. Conservan disponibilidad, nombre completo y CTA visual accesible dentro del único enlace de tarjeta completa, sin controles anidados. El artwork se encuadra a 2:1 y se elimina la altura mínima del cuerpo para compactar la oferta. Desktop, catálogo y detalle conservan su información y composición actuales.
 - Las tarjetas no muestran los dos precios detallados ni el horario detallado.
 - El detalle `/cursos/[slug]` muestra inicio, fin y ventana de preinscripción como fechas civiles de Bolivia, sin horas; también muestra condiciones, precios diferenciados y contenido autorizado del curso. No presenta el horario informativo legado.
 - En escritorio, el cuerpo del detalle reparte el espacio en dos columnas equivalentes para contenido y ficha informativa. La ficha agrupa los datos breves y precios en pares cuando hay anchura suficiente, dejando las fechas de preinscripción en una fila amplia; en móvil las columnas se apilan sin reducir la anchura de lectura.
 - La landing y el catálogo muestran disponibilidad, título, descripción breve, nivel y duración total en horas, sin rangos de fechas, precios diferenciados ni horario detallado. Los términos comerciales y duración proceden de la revisión de formato enlazada al curso.
+- La verificación de la landing mantiene el label y las restricciones del código de 32 caracteres, sin la ayuda redundante sobre el QR; la ayuda de la página de verificación permanece.
+- La página global `404.astro` usa la ilustración transparente aportada por el usuario, sin recorte, en WebP responsive de 640/1280 px. Solo presenta «Página no encontrada» y «Volver al inicio», con tokens globales light/dark, layout base existente y `noindex,nofollow`. Las rutas desconocidas públicas responden HTTP 404 sin redirect. No reemplaza estados de dominio específicos ni respuestas de autorización: las rutas privadas desconocidas conservan los guards fail-closed y sus redirects existentes.
 - La capa visual conserva artwork local de preview para muestras sintéticas y fallback gráfico de Cota Activa cuando falta imagen propia. El formulario administrativo permite seleccionar, recortar, previsualizar y subir artwork autorizado; no presentar el asset sintético de preview como fotografía de curso real.
 - La landing, el catálogo y el detalle comparten el mismo fallback gráfico para cursos sin imagen; las fotos sintéticas de preview siguen limitadas a la landing de desarrollo. El catálogo encuadra las fotos guardadas con el mismo tratamiento de imagen de las tarjetas de landing y revela sus tarjetas individualmente al entrar en pantalla, respetando movimiento reducido y la lectura sin JavaScript.
 - El encabezado del catálogo permite al título y a la descripción ocupar el ancho disponible en lugar de imponerles una columna estrecha. Los enlaces de regreso redundantes se omiten en catálogo y detalle; la navegación principal y del pie siguen ofreciendo acceso a Inicio y Cursos.

@@ -1,5 +1,5 @@
 ---
-import { FileText, FileUp, LoaderCircle, X } from "lucide-react";
+import { FileText, FileUp, X } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 interface Props {
   path: string;
@@ -22,7 +22,7 @@ const { path, revision, requestKey, signed } = Astro.props;
   <input type="hidden" name="purpose" value="SIGNED" />
   <div
     data-dropzone
-    class="group relative flex min-h-60 min-w-0 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-muted-foreground/40 bg-card px-5 py-8 text-center transition-colors hover:border-primary hover:bg-secondary/50 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring motion-reduce:transition-none data-[dragging=true]:border-primary data-[dragging=true]:bg-secondary data-[invalid=true]:border-destructive sm:px-8"
+    class="group relative flex min-h-50 min-w-0 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-muted-foreground/40 bg-card px-5 py-8 text-center transition-colors hover:border-primary hover:bg-secondary/50 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring motion-reduce:transition-none data-[dragging=true]:border-primary data-[dragging=true]:bg-secondary data-[invalid=true]:border-destructive sm:px-8"
   >
     <span
       class="flex size-14 items-center justify-center rounded-xl bg-secondary text-foreground"
@@ -87,15 +87,7 @@ const { path, revision, requestKey, signed } = Astro.props;
         className: "min-h-11 max-w-full whitespace-normal text-center",
       })}
     >
-      <LoaderCircle
-        data-upload-spinner
-        size={18}
-        className="hidden motion-safe:animate-spin"
-        aria-hidden="true"
-      />
-      <span data-upload-label>
-        {signed ? "Sustituir PDF firmado" : "Guardar PDF firmado"}
-      </span>
+      {signed ? "Sustituir PDF firmado" : "Guardar PDF firmado"}
     </button>
   </div>
   <p
@@ -153,6 +145,7 @@ const { path, revision, requestKey, signed } = Astro.props;
 
 <script>
   import { navigate } from "astro:transitions/client";
+  import { notifications } from "@/lib/notifications";
   import { localPdfError } from "./local-hash";
   let controller: AbortController | undefined;
   function enhanceSignedUploads() {
@@ -174,8 +167,6 @@ const { path, revision, requestKey, signed } = Astro.props;
         const fileError = form.querySelector<HTMLElement>("[data-file-error]")!;
         const error = form.querySelector<HTMLElement>("[data-upload-error]")!;
         const status = form.querySelector<HTMLElement>("[data-upload-status]")!;
-        const label = form.querySelector<HTMLElement>("[data-upload-label]")!;
-        const idleLabel = label.textContent!;
         let generation = 0;
         let pending = false;
         let dragDepth = 0;
@@ -318,50 +309,99 @@ const { path, revision, requestKey, signed } = Astro.props;
             remove.disabled = true;
             file.disabled = true;
             form.setAttribute("aria-busy", "true");
-            form
-              .querySelector<HTMLElement>("[data-upload-spinner]")!
-              .classList.remove("hidden");
-            label.textContent = "Guardando PDF firmado…";
-            status.textContent = "Guardando y publicando el documento…";
+            submit.setAttribute("aria-busy", "true");
+            status.textContent = "";
             error.textContent = "";
             try {
-              const response = await fetch(form.action, {
-                method: "POST",
-                credentials: "same-origin",
-                headers: { Accept: "application/json" },
-                body,
-              });
-              const result: unknown = await response.json();
-              if (
-                response.ok &&
-                result &&
-                typeof result === "object" &&
-                "ok" in result &&
-                result.ok === true
-              ) {
-                status.textContent = "PDF firmado guardado.";
+              await notifications.promise(
+                async () => {
+                  const response = await fetch(form.action, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: { Accept: "application/json" },
+                    body,
+                  });
+                  const result: unknown = await response.json();
+                  if (response.status === 409) {
+                    form.querySelector<HTMLInputElement>(
+                      '[name="requestKey"]',
+                    )!.value = crypto.randomUUID();
+                  }
+                  if (
+                    !response.ok ||
+                    response.redirected ||
+                    !result ||
+                    typeof result !== "object" ||
+                    !("ok" in result) ||
+                    result.ok !== true
+                  ) {
+                    throw new Error(
+                      result &&
+                        typeof result === "object" &&
+                        "message" in result &&
+                        typeof result.message === "string"
+                        ? result.message
+                        : "No se pudo guardar el documento. Reintenta.",
+                    );
+                  }
+                  // Only the committed server record can confirm publication.
+                  const value = "value" in result ? result.value : null;
+                  if (
+                    !value ||
+                    typeof value !== "object" ||
+                    !("id" in value) ||
+                    value.id !==
+                      new URL(form.action).pathname.split("/").at(-2) ||
+                    !("state" in value) ||
+                    value.state !== "issued" ||
+                    !("hasSignedPdf" in value) ||
+                    value.hasSignedPdf !== true ||
+                    !("signedSha256" in value) ||
+                    typeof value.signedSha256 !== "string" ||
+                    !/^[a-f0-9]{64}$/iu.test(value.signedSha256) ||
+                    !("revision" in value) ||
+                    typeof value.revision !== "number" ||
+                    !Number.isInteger(value.revision) ||
+                    value.revision <= Number(body.get("revision")) ||
+                    !("issuedAt" in value) ||
+                    typeof value.issuedAt !== "string" ||
+                    !Number.isFinite(Date.parse(value.issuedAt))
+                  ) {
+                    throw new Error(
+                      "No se pudo confirmar el documento guardado. Reintenta la misma solicitud.",
+                    );
+                  }
+                },
+                {
+                  loading: { title: "Guardando PDF firmado…" },
+                  success: { title: "PDF firmado guardado." },
+                  error: (failure: unknown) => ({
+                    title:
+                      failure instanceof Error &&
+                      !(failure instanceof TypeError) &&
+                      !(failure instanceof SyntaxError)
+                        ? failure.message
+                        : "No se pudo guardar el documento. Conservamos el archivo; reintenta la misma solicitud.",
+                  }),
+                },
+              );
+              if (signal.aborted || !form.isConnected) return;
+              try {
                 await navigate(`${location.pathname}?signed=saved`, {
                   history: "replace",
                 });
-                return;
+              } catch {
+                error.textContent =
+                  "El PDF se guardó, pero no se pudo actualizar la vista. Recarga el detalle.";
+                error.focus();
               }
+            } catch (failure) {
               error.textContent =
-                result &&
-                typeof result === "object" &&
-                "message" in result &&
-                typeof result.message === "string"
-                  ? result.message
-                  : "No se pudo guardar el documento. Reintenta.";
-              if (response.status === 409) {
-                const key = form.querySelector<HTMLInputElement>(
-                  '[name="requestKey"]',
-                )!;
-                key.value = crypto.randomUUID();
-              }
-              error.focus();
-            } catch {
-              error.textContent =
-                "No se pudo guardar el documento. Conservamos el archivo; reintenta la misma solicitud.";
+                failure instanceof Error &&
+                !(failure instanceof TypeError) &&
+                !(failure instanceof SyntaxError)
+                  ? failure.message
+                  : "No se pudo guardar el documento. Conservamos el archivo; reintenta la misma solicitud.";
               error.focus();
             } finally {
               pending = false;
@@ -369,11 +409,7 @@ const { path, revision, requestKey, signed } = Astro.props;
               remove.disabled = false;
               file.disabled = false;
               form.removeAttribute("aria-busy");
-              form
-                .querySelector<HTMLElement>("[data-upload-spinner]")!
-                .classList.add("hidden");
-              label.textContent = idleLabel;
-              if (error.textContent) status.textContent = "";
+              submit.removeAttribute("aria-busy");
             }
           },
           { signal },

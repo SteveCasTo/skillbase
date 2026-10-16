@@ -377,6 +377,29 @@ test("course billboards are single whole-card links with complete metadata", asy
   for (const poster of await posters.all()) {
     await expect(poster.getByRole("link")).toHaveCount(1);
   }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const card of [featured, ...(await posters.all())]) {
+    await expect(card.getByRole("link")).toHaveCount(1);
+    await expect(card.locator("button, a a")).toHaveCount(0);
+    await expect(card.locator(".course-link-label")).toBeVisible();
+    await expect(
+      card.locator(".course-description, .poster-description"),
+    ).toBeHidden();
+    await expect(card.locator(".course-summary, .poster-facts")).toBeHidden();
+  }
+  const featuredLink = featured.getByRole("link");
+  await featuredLink.focus();
+  await expect(featuredLink).toBeFocused();
+  await expect(featuredLink).toHaveCSS("outline-style", "solid");
+  await expect(page.locator("#landing-credential-code")).not.toHaveAttribute(
+    "aria-describedby",
+  );
+  await expect(page.locator("#landing-credential-code")).toHaveAttribute(
+    "pattern",
+    "[A-Za-z0-9_-]{32}",
+  );
+  await expect(page.locator("#landing-credential-code-help")).toHaveCount(0);
 });
 
 test("editorial rows stay complete and preserve course order across breakpoints", async ({
