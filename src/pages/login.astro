@@ -20,7 +20,7 @@ const recoverySent = Astro.url.searchParams.get("status") === "recovery_sent";
       class="w-full max-w-md rounded-2xl border bg-card p-7 shadow-lg sm:p-9"
       aria-labelledby="login-title"
     >
-      <a class="text-sm font-semibold text-primary" href="/">
+      <a class="text-sm font-semibold text-foreground" href="/">
         SkillBase
       </a>
       <h1 id="login-title" class="mt-6 text-3xl font-semibold tracking-tight">
@@ -118,7 +118,7 @@ const recoverySent = Astro.url.searchParams.get("status") === "recovery_sent";
         </button>
       </form>
       <a
-        class="mt-6 block text-center text-sm font-medium text-primary underline-offset-4 hover:underline"
+        class="mt-6 block text-center text-sm font-medium text-foreground underline-offset-4 hover:underline"
         href="/recuperar-contrasena"
       >
         ¿Olvidaste tu contraseña?
