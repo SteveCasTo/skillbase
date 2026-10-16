@@ -615,6 +615,17 @@ async function captureDark(page: Page, info: TestInfo, name: string) {
     document.documentElement.classList.remove("dark");
     document.documentElement.dataset.theme = "light";
   });
+  // Finish real theme transitions before the next light capture. Otherwise a
+  // dark surface can be photographed halfway through its return to light.
+  await page.evaluate(async () => {
+    document.documentElement.getBoundingClientRect();
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation instanceof CSSTransition)
+        .map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });
 }
 
 test("ADMIN configures a single recipient certificate, regenerates drafts, saves and substitutes signed PDF; anonymous file comparison stays local", async ({
