@@ -385,6 +385,7 @@ const { path, revision, requestKey, signed } = Astro.props;
                   }),
                 },
               );
+              if (signal.aborted || !form.isConnected) return;
               try {
                 await navigate(`${location.pathname}?signed=saved`, {
                   history: "replace",

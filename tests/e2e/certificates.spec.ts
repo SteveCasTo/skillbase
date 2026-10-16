@@ -877,12 +877,14 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       if (request.method() !== "GET") transmitted += 1;
     });
     const publicPicker = publicPage.getByLabel("Seleccionar PDF firmado");
-    await expect(
-      publicPage.getByRole("heading", {
-        name: "Comprobar tu archivo",
-        exact: true,
-      }),
-    ).toBeHidden();
+    const accessibleFileHeading = publicPage.getByRole("heading", {
+      name: "Comprobar tu archivo",
+      exact: true,
+    });
+    // sr-only remains in the accessibility tree, not display:none.
+    const hiddenHeadingBounds = await accessibleFileHeading.boundingBox();
+    expect(hiddenHeadingBounds!.width).toBe(1);
+    expect(hiddenHeadingBounds!.height).toBe(1);
     await publicPicker.focus();
     await expect(publicPicker).toBeFocused();
     const publicChooser = publicPage.waitForEvent("filechooser");
