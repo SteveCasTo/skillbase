@@ -7,6 +7,7 @@ import PasswordField from "@/components/auth/PasswordField";
 import AuthFormPending from "@/components/auth/AuthFormPending.astro";
 import { Input } from "@/components/ui/input";
 import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const next = safeRelativeRedirect(Astro.url.searchParams.get("next"));
 const error = Astro.url.searchParams.get("error");
@@ -89,7 +90,10 @@ const recoverySent = Astro.url.searchParams.get("status") === "recovery_sent";
           client:load
         />
         <button
-          class={buttonVariants({ className: "min-h-11 w-full" })}
+          class={cn(
+            buttonVariants({ className: "min-h-11 w-full" }),
+            "text-accent-foreground",
+          )}
           type="submit"
           data-label="Iniciar sesión"
         >
