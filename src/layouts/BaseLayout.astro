@@ -28,6 +28,21 @@ const {
   allowSystemTheme = true,
   clientRouter = false,
 } = Astro.props;
+const pathname = Astro.url.pathname.replace(/\/+$/, "") || "/";
+const privatePage =
+  pathname === "/app" ||
+  pathname.startsWith("/app/") ||
+  pathname.startsWith("/auth/") ||
+  ["/login", "/recuperar-contrasena", "/unauthorized"].includes(pathname);
+const preventIndexing =
+  noindex ||
+  privatePage ||
+  (Astro.response.status ?? 200) >= 400 ||
+  !["GET", "HEAD"].includes(Astro.request.method);
+const siteUrl = import.meta.env.PUBLIC_SITE_URL?.trim();
+const canonicalUrl =
+  !preventIndexing && siteUrl ? new URL(new URL(siteUrl).origin) : undefined;
+if (canonicalUrl) canonicalUrl.pathname = pathname;
 ---
 
 <!doctype html>
@@ -41,7 +56,20 @@ const {
     <meta name="viewport" content="width=device-width" />
     <meta name="description" content={description} />
     <meta name="generator" content={Astro.generator} />
-    {noindex && <meta name="robots" content="noindex,nofollow" />}
+    {preventIndexing && <meta name="robots" content="noindex,nofollow" />}
+    {canonicalUrl && (
+      <>
+        <link rel="canonical" href={canonicalUrl.href} />
+        <meta property="og:type" content="website" />
+        <meta property="og:locale" content="es_BO" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:url" content={canonicalUrl.href} />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={description} />
+      </>
+    )}
     <meta
       name="theme-color"
       content="#ffffff"
