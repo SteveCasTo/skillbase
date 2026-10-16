@@ -329,7 +329,8 @@ la revalidación del actor y cierre y los receipts actor/requestKey. Doble enví
 o solicitudes concurrentes recuperan el mismo vigente; replay de una solicitud
 anterior conserva su resultado, aunque luego se revoque. 0030 cambia solo la
 unicidad y conserva los guards que impiden UPDATE/DELETE de revocados; no transforma ni borra
-datos ni artefactos históricos. Su metadata depende de 0029 (PR 400).
+datos ni artefactos históricos. Su metadata encadena 0029 (PR 400), con journal
+idx 30 y snapshot derivado del schema real. No aplica migraciones a canónico/cloud.
 
 La migración forward `0025_certificate_current_flow.sql` no modifica 0023 ni
 convierte credenciales históricas. Bloquea `certificates` en modo
