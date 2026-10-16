@@ -1,0 +1,64 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { buttonVariants } from "@/components/ui/button";
+import smallArtwork from "../../assets/plates/not-found-640.webp";
+import artwork from "../../assets/plates/not-found-1280.webp";
+
+Astro.response.status = 404;
+---
+
+<BaseLayout
+  title="Página no encontrada | Formación continua"
+  description="Página no encontrada"
+  noindex
+  showToasts={false}
+>
+  <main class="not-found" aria-labelledby="not-found-title">
+    <img
+      src={artwork.src}
+      srcset={`${smallArtwork.src} 640w, ${artwork.src} 1280w`}
+      sizes="(max-width: 864px) calc(100vw - 32px), 832px"
+      width="1280"
+      height="853"
+      alt=""
+      fetchpriority="high"
+      decoding="async"
+    />
+    <h1 id="not-found-title">Página no encontrada</h1>
+    <a
+      href="/"
+      class={buttonVariants({
+        variant: "outline",
+        size: "lg",
+        className: "min-h-11",
+      })}
+    >
+      Volver al inicio
+    </a>
+  </main>
+</BaseLayout>
+
+<style>
+  .not-found {
+    display: flex;
+    min-height: 100svh;
+    padding: 2rem 1rem;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  img {
+    width: min(100%, 52rem);
+    height: auto;
+  }
+
+  h1 {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    text-wrap: balance;
+  }
+</style>
