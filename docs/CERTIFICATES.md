@@ -78,8 +78,11 @@ Mostrar únicamente:
 - fecha;
 - credential ID.
 
-La página pública incluye estado, titular, curso, horas nominales, fecha final,
-ID/URL y el hash oficial para comparación local de bytes. La allowlist concreta
+La página pública incluye estado, titular, curso, horas nominales y fecha final;
+omite las filas del código de credencial y del SHA-256 oficial. El identificador
+público permanece en la URL, el QR, el PDF y la búsqueda manual; no se oculta ni
+se sustituye por el hash. El hash oficial sigue en los metadatos de comparación
+del navegador y en el contrato público, no como texto visible. La allowlist concreta
 para Fase 9, que no incluye nivel no impreso en la plantilla, está en
 [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md).
 
@@ -108,6 +111,13 @@ El selector público admite teclado y arrastre, muestra el nombre del archivo
 y ofrece «Quitar archivo» solo tras seleccionarlo. La zona de arrastre y el
 archivo seleccionado son mutuamente excluyentes; quitarlo limpia también el
 resultado y devuelve el foco al selector.
+El resultado público presenta únicamente el mensaje de comparación con un icono
+de estado, sin mostrar ni anunciar el hash calculado. Coincidencia vigente,
+coincidencia con credencial revocada/reemplazada y archivo distinto se distinguen
+por mensaje e icono; una coincidencia inválida nunca se presenta como éxito.
+La selección nueva o «Quitar archivo» limpia el resultado anterior y conserva
+la protección contra lecturas locales fuera de orden. Los hashes visibles de
+ADMIN no cambian.
 La comprobación conserva MIME/extensión PDF, límite de 10 MiB y SHA-256 de todos
 los bytes en el navegador: no transmite ni persiste el archivo ni habilita una
 descarga pública. Una coincidencia no cambia el estado oficial de la credencial.
