@@ -364,7 +364,12 @@ const { officialHash, state } = Astro.props;
     display: flex;
   }
   .local-result:not([data-tone]) {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
   @media (min-width: 1024px) {
     .local-verification:has(.local-dropzone:not([hidden]))
