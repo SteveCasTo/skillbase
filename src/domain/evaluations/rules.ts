@@ -112,11 +112,15 @@ export function validateEvaluationComponents(
             "Introduce un nombre de 1 a 100 caracteres.",
         },
       );
-    if (component.type !== "THEORY" && component.type !== "PRACTICAL")
+    if (
+      component.type !== "THEORY" &&
+      component.type !== "PRACTICAL" &&
+      component.type !== "ATTENDANCE"
+    )
       throw new EvaluationError(
         "VALIDATION_FAILED",
         "Tipo de componente no válido.",
-        { [`components.${index}.type`]: "Selecciona teoría o práctica." },
+        { [`components.${index}.type`]: "Selecciona un tipo de componente." },
       );
     total += evaluationHundredths(
       component.weight,

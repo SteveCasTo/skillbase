@@ -45,6 +45,28 @@ function repository(): ClosureRepository {
 }
 test("official CSV preserves frozen metadata, two decimals, BOM, leading-zero CI and role allowlist", () => {
   const v = closureExportFixture();
+  for (const [type, label] of [
+    ["THEORY", "Teoría"],
+    ["PRACTICAL", "Práctica"],
+    ["ATTENDANCE", "Asistencia"],
+  ] as const) {
+    const variant = closureExportFixture();
+    if (variant.report.access !== "ADMIN")
+      throw new Error("Expected ADMIN fixture");
+    variant.report.scheme.components[0]!.type = type;
+    variant.report.scheme.components[0]!.name = "Asistencia";
+    variant.report.scheme.modality = type;
+    for (const admin of [true, false]) {
+      const report = privateClosureReport(variant.report, admin);
+      const rendered = new TextDecoder().decode(
+        renderClosureCsv({ ...variant, report }),
+      );
+      expect(rendered).toContain(`"Asistencia (${label}; peso 100.00 %)"`);
+      if (type === "ATTENDANCE")
+        expect(rendered).not.toContain("Asistencia (Práctica;");
+      if (!admin) expect(rendered).not.toContain("001234QA");
+    }
+  }
   const csv = new TextDecoder().decode(renderClosureCsv(v));
   expect(renderClosureCsv(v).slice(0, 3)).toEqual(
     new Uint8Array([239, 187, 191]),
@@ -164,10 +186,11 @@ test("PDF paginates a single participant with 100 components without losing the 
   v.report.scheme.components = Array.from({ length: 100 }, (_, order) => ({
     id: String(order),
     name: `Componente sintético ${order + 1}`,
-    type: "THEORY" as const,
+    type: (["THEORY", "PRACTICAL", "ATTENDANCE"] as const)[order % 3]!,
     weight: "1",
     order,
   }));
+  v.report.scheme.modality = "MIXED";
   v.report.participants[0]!.grades = v.report.scheme.components.map((c) => ({
     componentId: c.id,
     score: "0",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type {
   CourseEvaluationsDto,
   EvaluationComponentInput,
@@ -30,6 +30,7 @@ export function EvaluationWorkspace({
   message,
 }: Props) {
   const [data, setData] = useState(initialData);
+  const resetKey = useRef<string | null>(null);
   return (
     <div className="flex min-w-0 flex-col gap-8">
       {data.groupId ? (
@@ -37,6 +38,22 @@ export function EvaluationWorkspace({
           <GradeRoster
             data={data}
             save={(input) => saveEvaluation(path, input, data)}
+            reset={async () => {
+              resetKey.current ??= crypto.randomUUID();
+              const result = await saveEvaluation(
+                path,
+                {
+                  action: "reset-attendance",
+                  courseId: data.courseId,
+                  groupId: data.groupId!,
+                  schemeRevision: data.scheme.revision,
+                  requestKey: resetKey.current,
+                },
+                data,
+              );
+              if (result.ok) resetKey.current = null;
+              return result;
+            }}
             onSaved={setData}
             unavailableReason={data.unavailableReason ?? undefined}
             attemptedGrade={attemptedGrade}

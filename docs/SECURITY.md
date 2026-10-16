@@ -21,6 +21,16 @@ Toda operación sensible debe validarse en servidor.
 
 ## AUTHORIZATION
 
+La ampliación ATTENDANCE (0029) mantiene revalidación transaccional de usuario
+ACTIVE, ADMIN o instructor propietario y ventana vigente. Sobrescribir la nota
+requiere además grupo abierto y sesiones/asistencia resueltas. Reset por POST
+con Origin/allowlist/revisión/receipt solo cambia overrides ATTENDANCE de
+inscripciones del grupo de ruta; no acepta actor ni origen del cliente ni toca
+otros grupos/componentes. Comparte barrera/locks de notas, asistencia y cierre;
+guard cerrado y triggers siguen vigentes. Auditoría conserva actor, origen
+anterior/nuevo, score, inscripción, componente y revisión. No se exponen nuevos
+datos personales ni se conceden grants/RPC públicos.
+
 Roles iniciales:
 
 - ADMIN.

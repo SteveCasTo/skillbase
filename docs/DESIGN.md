@@ -2,6 +2,13 @@
 
 ## OBJETIVO
 
+Evaluaciones (2026-10-15): tipo Asistencia en el selector existente, nota en la
+celda actual y campo deshabilitado sin explicación/tooltip hasta resolución.
+Reset se muestra únicamente con overrides de asistencia, a la derecha del título
+«Notas de participantes» con wrap móvil. «Buscar participante» permanece como
+label sr-only; input y nombre accesible se conservan. No se agregan badges,
+leyendas ni prosa de cálculo.
+
 Definir las reglas visuales y de experiencia de usuario para mantener una interfaz coherente, accesible, responsive y mantenible.
 
 El diseño debe priorizar claridad operativa sobre ornamentación.

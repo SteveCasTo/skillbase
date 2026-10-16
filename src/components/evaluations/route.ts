@@ -135,6 +135,12 @@ export async function prepareEvaluationRoute(
           schemeRevision: value("schemeRevision"),
           components: state.attemptedComponents,
         });
+      } else if (value("action") === "reset-attendance") {
+        request = adaptedRequest(astro.request, {
+          action: "reset-attendance",
+          requestKey: state.requestKey,
+          schemeRevision: value("schemeRevision"),
+        });
       } else {
         state.attemptedGrade = {
           registrationId: value("registrationId"),

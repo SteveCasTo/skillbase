@@ -328,6 +328,17 @@ Estado: Fase 6 se liberó mediante PR 211 y las correcciones posteriores (PRs 21
 
 ## Evaluación y notas (Fase 7; implementada y liberada en producción)
 
+Ampliación aprobada 2026-10-15: componente opcional `ATTENDANCE`, pesos editables
+con suma exacta 100 % sin redistribución. Nota progresiva según roster legítimo:
+`100 × (PRESENT + EXCUSED) / (PRESENT + EXCUSED + ABSENT)`; excluye futuras,
+canceladas/originales reemplazadas y pendientes; denominador vacío da `null`.
+No cambia componentes existentes por su nombre ni grupos cerrados. Edición manual
+solo al terminar/resolver toda la asistencia del grupo abierto, con permisos
+actuales y override auditado que AUTO no sobrescribe. Reset contextual/idempotente
+restablece únicamente overrides ATTENDANCE del grupo. Persistencia AUTO en cierre
+atómico bajo locks compartidos, nunca por GET ni cron. No cambia rachas ni añade
+elegibilidad porcentual. Detalle en `EVALUATIONS_CONTRACT.md`.
+
 La definición de Fase 7 se aprobó antes de su implementación. Cada curso tiene un esquema de componentes con pesos decimales exactos cuya suma debe ser exactamente 100 %; nombres de componentes son libres y la modalidad se deriva como `THEORY`, `PRACTICAL` o mixta. Las notas admiten dos decimales dentro de 0–100. La nota final usa la precisión decimal persistida, redondea solo el resultado final a dos decimales y compara ese mismo valor mostrado con la `minimum_grade` vigente del curso (70 por defecto provisional).
 
 Una persona sin todas las notas requeridas tiene resultado incompleto/pendiente, no una exención; el cálculo incompleto se trata como 0 de forma explícita para la decisión académica, sin presentar silenciosamente una nota final aprobatoria. Al persistir la primera nota, incluso 0, quedan congelados los componentes y sus pesos; correcciones de notas son auditables. No se aprueba todavía editar componentes/pesos después de ese punto.
