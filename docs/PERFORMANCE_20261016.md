@@ -7,6 +7,12 @@ Precondición comprobada antes de implementar: PR 406 MERGED, master
 `f58feaf4e6916b6a8df8c1b314cd41d181aad67a`, CI `38855227139` SUCCESS y
 deployment de producción SUCCESS. Esta rama no despliega ni modifica producción.
 
+Tras integrarse PR 425, la rama se rebaseó sobre
+`86d1ccd64387bf0c36813c7739ce5c0864f788d5`. La comparación aislada de abajo conserva
+su procedencia histórica; no se presenta la versión anterior de cards como el
+estado actual. La matriz final usa el build combinado con PR 425 más esta rama,
+separando ese efecto de los bytes deterministas de las placas.
+
 Cambio exclusivamente offline: regenerar las variantes existentes de placas
 desde sus cinco PNG originales, aumentando el esfuerzo de WebP/AVIF opaco a 6. Se
 conservan calidad (WebP 82, AVIF 52), dimensiones, formato, alpha y paths. No se
@@ -15,7 +21,7 @@ No hay cambios de presentación, carga, Auth, datos, schema o dependencias.
 
 ## Imágenes
 
-Inventario local: 68 imágenes raster/vector versionadas, incluyendo originales,
+Inventario local inicial: 68 imágenes raster/vector versionadas, incluyendo originales,
 variantes, favicon y logos de documentos. Las 50 variantes pasan de **6 151 822 a
 6 006 849 bytes** (−144 973; −2,36 % en el conjunto, no por navegación).
 44 variantes cambian; seis AVIF transparentes y las otras 18 imágenes se conservan
@@ -36,6 +42,21 @@ Comparaciones visuales lado a lado
 de hero mobile y kantuta a 640 px no muestran degradación visible. No se afirma
 identidad pixel a pixel de imágenes lossy.
 
+Auditoría de entrega existente (sin cambiar archivos de otros owners):
+
+| Familia                    | Formato/responsive                                                                 | Carga y límites                                                 |
+| -------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Hero                       | Picture AVIF/WebP, media mobile/desktop, srcset de variantes y sizes 100vw         | Eager/high; no lazy en LCP                                      |
+| Footer                     | Picture AVIF/WebP, srcset separado mobile/desktop, sizes 100vw                     | Lazy; dimensiones explícitas                                    |
+| Kantuta                    | AVIF/WebP, seis anchos, sizes según composición                                    | Lazy; alpha preservado                                          |
+| Preview sintético de curso | JPG fuente procesado por Astro Image a WebP con widths/sizes                       | No sustituye artwork real; prioridad según destacado            |
+| Upload de curso            | WebP 1200×750; dimensiones en consumidores, destacado eager/high, secundarios lazy | Sin variantes remotas existentes: no inventar srcset de Storage |
+| Logos/favicons             | PNG de documentos y SVG vectorial                                                  | Conservados; no convertir SVG ni recomprimir PDFs               |
+
+Los PNG fuente de placas se conservan como originales; no se sirven en lugar de
+las variantes ya optimizadas. No añadir conversiones duplicadas sin consumidor.
+El nuevo asset 404 de PR 425 queda expresamente fuera de esta optimización.
+
 ## Medición reproducible
 
 - Build Astro/Vercel de producción, Node 24.14.0, Bun 1.4.3, Windows, loopback.
@@ -44,11 +65,15 @@ identidad pixel a pixel de imágenes lossy.
   adapter para permitir `Astro.clientAddress` en verificación pública.
 - Lighthouse 13.0.3, Chromium Playwright 1243, navegación, cuatro categorías:
   performance/accessibility/best-practices/SEO. Configuración mobile por defecto y
-  desktop oficial; throttling simulado de cada preset, caché HTTP fría.
+  desktop oficial; throttling simulado de cada preset. Públicas usan reset de
+  storage de Lighthouse; ADMIN conserva storage/cookies con
+  `disableStorageReset=true` para mantener la sesión. No se declara ADMIN como
+  una purga completa de caché: el wrapper no publica cache headers/ETags y las
+  trazas muestran assets transferidos con HTTP 200. Misma política antes/después.
 - El wrapper local no habilita compresión HTTP; transferencias/JS se comparan
   bajo esa misma condición, no representan bytes gzip de Vercel/CDN.
 - Una muestra por ruta/dispositivo; no es una estimación estadística ni garantía
-  de score. Las diferencias pequeñas de tiempos son ruido. Hubo trabajo local
+  de score. Las diferencias pequeñas de tiempos pueden ser ruido. Hubo trabajo local
   concurrente durante parte del baseline público; no atribuir variaciones de CPU
   a los assets. Bytes de archivo son una comparación determinista independiente.
 - Antes de puntuar: HTTP 200, pathname final exacto y `h1` real. En ADMIN además
@@ -92,10 +117,10 @@ de Storage. No se cambia ese contrato ni se migran objetos reales. El detalle
 público y tarjetas que consumen futuros uploads pertenecen a otros owners; no se
 introduce aquí un proxy/transformación remota ni `srcset` con variantes inexistentes.
 
-## Resultado antes/después
+## Resultado aislado antes/después (base anterior a PR 425)
 
 Comparación completa: **144 informes = 36 páginas × 2 dispositivos × 2 builds**.
-[Matriz legible por ruta y dispositivo](PERFORMANCE_20261016_MATRIX.md), con las
+Evidencia histórica `baseline-matrix.json`/`after-matrix.json`, con las
 cuatro puntuaciones, LCP/CLS/TBT/FCP/SI, transferencia total y JavaScript. Los JSON
 incluyen el desglose de imágenes, fuentes, CSS y otros recursos; los HTML permiten
 inspeccionar nodos y oportunidades. No se reemplaza una muestra desfavorable por
