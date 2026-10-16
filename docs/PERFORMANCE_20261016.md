@@ -57,6 +57,14 @@ Los PNG fuente de placas se conservan como originales; no se sirven en lugar de
 las variantes ya optimizadas. No añadir conversiones duplicadas sin consumidor.
 El nuevo asset 404 de PR 425 queda expresamente fuera de esta optimización.
 
+Inventario final reconciliado: **70 imágenes versionadas**, 44 modificadas y 26
+intactas. `all-images-final-inventory.json` incluye dimensiones, formato decodificado,
+alpha, tamaño y SHA-256 antes/después de todas ellas frente a development7b397124.
+Incluye los dos WebP 404 de PR425, sin optimizarlos ni atribuir su ahorro:
+`not-found-640.webp` (640×427, 47196 bytes) y `not-found-1280.webp` (1280×853,
+136552 bytes). Ambos conservan exactamente los hashes de development. No se
+convierte el SVG ni se fuerzan nuevos WebP donde ya existe AVIF apropiado.
+
 ## Medición reproducible
 
 - Build Astro/Vercel de producción, Node 24.14.0, Bun 1.4.3, Windows, loopback.
@@ -109,6 +117,18 @@ páginas distintas. Informes PDF/CSV se ofrecen desde Cursos y Preinscripciones;
 son descargas, no páginas HTML puntuables por Lighthouse. Pagos vive dentro de la
 ficha de preinscripción, no hay una página adicional de caja en la navegación.
 
+Reconciliación del template administrativo adicional
+`/app/cursos/[id]/grupos/[groupId]/certificados/[type]/[recipientId]`:
+se solicitó con curso/grupo/destinatario reales existentes, sesión ADMIN y sin
+seguir redirects inicialmente. Devuelve **302** al detalle de su certificado
+vigente; el destino final muestra «Certificado de aprobación», noindex y cookie
+válida, nunca login. Ese detalle ya tiene sus dos informes. Evidencia:
+`recipient-route-reconciliation.json`; comportamiento en `recipient-route.ts:71`.
+Por tanto: 31 templates ADMIN puntuados + 2 aliases settings + 1 template de
+destinatario reconciliado por redirect legítimo. La rama HTML200 de destinatario
+sin certificado no se ejercita: no se crean fixtures ni se revocan certificados
+canónicos para forzarla, y no se inventa una puntuación para ese estado.
+
 La DB local contiene cero keys de artwork: las páginas medidas usan el fallback
 gráfico real. No se atribuye ahorro a uploads que no existen en esta muestra.
 El pipeline existente ya exporta WebP 1200 × 750 desde canvas y valida en servidor
@@ -116,6 +136,15 @@ origen, actor ADMIN activo, MIME/extensión/tamaño, contenedor y dimensiones an
 de Storage. No se cambia ese contrato ni se migran objetos reales. El detalle
 público y tarjetas que consumen futuros uploads pertenecen a otros owners; no se
 introduce aquí un proxy/transformación remota ni `srcset` con variantes inexistentes.
+
+`dynamic-images-audit-final.json` cierra el inventario dinámico por lectura local:
+0 keys de artwork y 0 objetos del bucket course-artwork. Los únicos objetos Storage
+son 11 documentos de certificados (15103939 bytes por metadata); se excluyen por
+finalidad y no se descargan ni recomprimen. El JSON inicial vacío queda como muestra
+de los consumidores renderizados, no como afirmación de inventario completo.
+**Cloud no se inventarió**: no hay cobertura de objetos reales cloud ni afirmación
+de que todos sus uploads cumplan dimensiones/bytes. No se accede a sus bytes ni se
+mutan objetos; el contrato futuro permanece en el pipeline autorizado existente.
 
 ## Resultado aislado antes/después (base anterior a PR 425)
 
@@ -166,6 +195,13 @@ para mejorar scores; las etapas adicionales responden a integraciones coordinada
 `EVIDENCE-VALIDATION.json` comprueba 360 informes, 310 autenticados, URL final exacta,
 HTTP 200, h1 y cookie ADMIN. Las rutas ya completadas no se repitieron al reanudar
 procesos interrumpidos por el entorno.
+
+`FINAL-PROVENANCE.json` vincula los SHA/árboles del baseline y del build final con
+sus matrices de 72 muestras. El árbol fuera de `docs/` del SHA publicado coincide
+exactamente con el build medido; la documentación posterior no cambia runtime ni
+assets. Los JSON individuales guardan presets, categorías y finalDisplayedUrl;
+sus pares HTML conservan los informes inspeccionables. Los archivos `*-content.json`
+aportan HTTP200, h1, robots y presencia de cookie sin publicar valores de cookies.
 
 | Superficie   | Performance final mobile / desktop | LCP mobile / desktop (ms) | CLS mobile / desktop |
 | ------------ | ---------------------------------- | ------------------------- | -------------------- |
