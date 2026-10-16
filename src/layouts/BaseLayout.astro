@@ -37,7 +37,7 @@ const privatePage =
 const preventIndexing =
   noindex ||
   privatePage ||
-  Astro.response.status >= 400 ||
+  (Astro.response.status ?? 200) >= 400 ||
   !["GET", "HEAD"].includes(Astro.request.method);
 const siteUrl = import.meta.env.PUBLIC_SITE_URL?.trim();
 const canonicalUrl =
