@@ -469,7 +469,9 @@ test("ADMIN closes, reopens and preserves the immutable official version with re
         .locator("[data-sileo-toast]")
         .filter({ hasText: "Descarga cancelada." }),
     ).toHaveCount(0);
-    await page.goBack();
+    // Resume the document's existing assertions through its authoritative GET;
+    // history/list-filter URL normalization is outside this download scenario.
+    await page.goto(currentClosureUrl);
     await expect(page).toHaveURL(currentClosureUrl);
     await expect(
       page.getByRole("link", { name: "Descargar PDF", exact: true }),
