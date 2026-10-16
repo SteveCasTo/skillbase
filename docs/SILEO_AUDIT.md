@@ -71,6 +71,12 @@ que abre la confirmación del sistema, no la API nativa.
    La escritura mantiene su único éxito; la necesidad de recuperar la vista
    permanece en el error de página existente con su enlace de reintento.
    Un fallo de lectura ya no genera además un warning independiente que compita.
+5. **Destino modal stale bajo hidden/inert.** `SileoHost.tsx` mantiene el
+   marcador compartido `data-slot="dialog-content"` + `data-state="open"`,
+   excluye candidatos bajo `hidden`/`inert` y observa esas transiciones. El
+   panel móvil del PR423 adopta ese contrato y amplía su trap para incluir
+   los grupos enfocables de Sileo. No se modifica `PrivateLayout.astro` aquí:
+   integrar primero PR423; verificar ambos juntos con Auth y renderer reales.
 
 La confirmación de descarga significa bytes comprobados y entregados al
 navegador, no que el usuario haya guardado el archivo en disco. La comprobación
@@ -92,6 +98,10 @@ Se actualizan únicamente casos existentes, sin añadir specs, suites ni casos:
 - `tests/e2e/attendance.spec.ts`: POST real y GET de fragmento fallido muestran
   un éxito de la operación y recuperación persistente, sin warning duplicado;
   el reintento real recupera revisión/estado y limpia el mensaje de página.
+- `tests/e2e/toast-theme.spec.ts`: el caso de colocación existente también
+  verifica que un destino hidden/inert no capture el único renderer; al activar,
+  inertizar y retirar el destino se conserva el aviso del store real. Es evidencia
+  de contrato del host, no sustituye la aceptación móvil autenticada con PR423.
 
 Los resultados ejecutados, SHA y CI se registran en el PR correspondiente;
 la existencia de estas assertions no equivale por sí sola a PASS. La auditoría

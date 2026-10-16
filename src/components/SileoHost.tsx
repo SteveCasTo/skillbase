@@ -38,12 +38,14 @@ export function SileoHost() {
           ...document.querySelectorAll<HTMLElement>(
             'dialog:modal, [data-slot="dialog-content"][data-state="open"]',
           ),
-        ].at(-1) ?? null,
+        ]
+          .filter((element) => !element.closest("[hidden], [inert]"))
+          .at(-1) ?? null,
       );
     const observer = new MutationObserver(syncModal);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["open", "data-state"],
+      attributeFilter: ["open", "data-state", "hidden", "inert"],
       childList: true,
       subtree: true,
     });

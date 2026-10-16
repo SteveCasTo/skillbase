@@ -181,6 +181,35 @@ test("private toast placement leaves top-right page actions clickable", async ({
       .locator("[data-sileo-toast]")
       .filter({ hasText: "Aviso persistente de prueba" }),
   ).toBeVisible();
+  // Shared dialog contract: a stale open marker under hidden/inert must never
+  // capture the single renderer or swallow notices while the modal is inactive.
+  await page.evaluate(() => {
+    const inactive = document.createElement("section");
+    inactive.id = "inactive-notice-modal";
+    inactive.hidden = true;
+    inactive.innerHTML =
+      '<div data-slot="dialog-content" data-state="open"></div>';
+    document.body.append(inactive);
+  });
+  const inactive = page.locator("#inactive-notice-modal");
+  await expect(inactive.locator("[data-sileo-viewport]")).toHaveCount(0);
+  await inactive.evaluate((element) => {
+    element.inert = true;
+    element.hidden = false;
+  });
+  await expect(inactive.locator("[data-sileo-viewport]")).toHaveCount(0);
+  await inactive.evaluate((element) => (element.inert = false));
+  await expect(inactive.locator("[data-sileo-viewport]")).toHaveCount(1);
+  await expect(page.locator("[data-sileo-viewport]")).toHaveCount(1);
+  await inactive.evaluate((element) => (element.inert = true));
+  await expect(inactive.locator("[data-sileo-viewport]")).toHaveCount(0);
+  await expect(page.locator("[data-sileo-viewport]")).toHaveCount(1);
+  await expect(
+    page
+      .locator("[data-sileo-toast]")
+      .filter({ hasText: "Aviso persistente de prueba" }),
+  ).toBeVisible();
+  await inactive.evaluate((element) => element.remove());
 });
 
 test("independent early notifications survive delayed hydration, concurrent loading updates and theme toggles", async ({
