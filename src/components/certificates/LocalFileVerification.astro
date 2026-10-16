@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { SileoHost } from "@/components/SileoHost";
 interface Props {
   officialHash: string;
   state: "issued" | "revoked" | "replaced";
@@ -22,7 +23,7 @@ const { officialHash, state } = Astro.props;
   data-official-hash={officialHash}
   data-certificate-state={state}
 >
-  <h2 id="local-file-title" class="text-xl font-semibold">
+  <h2 id="local-file-title" class="sr-only">
     Comprobar tu archivo
   </h2>
   <div data-local-controls hidden>
@@ -31,7 +32,7 @@ const { officialHash, state } = Astro.props;
       type="file"
       accept="application/pdf,.pdf"
       aria-labelledby="local-pdf-label"
-      aria-describedby="local-pdf-help local-result"
+      aria-describedby="local-file-title local-result"
       class="sr-only"
     />
     <label for="local-pdf" data-local-dropzone class="local-dropzone">
@@ -112,7 +113,9 @@ const { officialHash, state } = Astro.props;
     </p>
   </noscript>
 </section>
+<SileoHost client:load />
 <script>
+  import { notifications } from "@/lib/notifications";
   import { hashComparison, localPdfSha256, localPdfError } from "./local-hash";
   const root = document.querySelector<HTMLElement>("[data-local-verification]");
   const input = root?.querySelector<HTMLInputElement>("#local-pdf");
@@ -133,6 +136,15 @@ const { officialHash, state } = Astro.props;
     filename
   ) {
     let latest = 0;
+    let calculation: AbortController | undefined;
+    let activeNotice: string | undefined;
+    const cancelCalculation = () => {
+      calculation?.abort();
+      calculation = undefined;
+      if (activeNotice) notifications.dismiss(activeNotice);
+      activeNotice = undefined;
+    };
+    window.addEventListener("pagehide", cancelCalculation, { once: true });
     const showResult = (text: string, tone?: "valid" | "invalid" | "error") => {
       message.textContent = text;
       if (tone) result.dataset.tone = tone;
@@ -151,6 +163,7 @@ const { officialHash, state } = Astro.props;
       );
     const clear = () => {
       latest += 1;
+      cancelCalculation();
       input.value = "";
       filename.textContent = "";
       selection.hidden = true;
@@ -188,7 +201,13 @@ const { officialHash, state } = Astro.props;
       resetDrag();
       const files = event.dataTransfer?.files;
       if (!files?.length) return;
-      // Select exactly one file, as with the native single-file picker.
+      if (files.length !== 1) {
+        clear();
+        showResult("Selecciona un archivo PDF.", "error");
+        input.setAttribute("aria-invalid", "true");
+        dropzone.setAttribute("data-invalid", "");
+        return;
+      }
       const transfer = new DataTransfer();
       transfer.items.add(files[0]!);
       input.files = transfer.files;
@@ -196,6 +215,7 @@ const { officialHash, state } = Astro.props;
     });
     input.addEventListener("change", async () => {
       const token = ++latest;
+      cancelCalculation();
       const file = input.files?.[0];
       filename.textContent = file?.name ?? "";
       selection.hidden = !file;
@@ -219,28 +239,85 @@ const { officialHash, state } = Astro.props;
         return;
       }
       root.setAttribute("aria-busy", "true");
-      showResult("Comprobando tu archivo…");
+      const current = new AbortController();
+      calculation = current;
+      const notificationId = `local-pdf-${crypto.randomUUID()}`;
+      activeNotice = notificationId;
+      let failureTone: "invalid" | "error" = "error";
+      // File reads and WebCrypto cannot be aborted. Settle their notification
+      // immediately on reset/reselection while ignoring the superseded digest.
+      let abortRead: (() => void) | undefined;
       try {
-        const hash = await localPdfSha256(file);
-        if (token !== latest) return;
-        const official = root.dataset.officialHash ?? "";
-        const state = root.dataset.certificateState ?? "";
-        const matches = hash.toLowerCase() === official.toLowerCase();
-        showResult(
-          hashComparison(hash, official, state),
-          matches ? (state === "issued" ? "valid" : "invalid") : "error",
+        const comparison = await notifications.promise(
+          async () => {
+            const hash = await Promise.race([
+              localPdfSha256(file),
+              new Promise<never>((_, reject) => {
+                abortRead = () =>
+                  reject(
+                    new DOMException("Comprobación cancelada.", "AbortError"),
+                  );
+                current.signal.addEventListener("abort", abortRead, {
+                  once: true,
+                });
+              }),
+            ]);
+            current.signal.throwIfAborted();
+            const official = root.dataset.officialHash ?? "";
+            const state = root.dataset.certificateState ?? "";
+            const text = hashComparison(hash, official, state);
+            if (
+              hash.toLowerCase() === official.toLowerCase() &&
+              state !== "issued"
+            )
+              failureTone = "invalid";
+            if (
+              !/^[a-f0-9]{64}$/iu.test(official) ||
+              hash.toLowerCase() !== official.toLowerCase() ||
+              state !== "issued"
+            )
+              throw new Error(text);
+            return text;
+          },
+          {
+            id: notificationId,
+            loading: { title: "Comprobando tu archivo…" },
+            success: {
+              title: "El archivo coincide.",
+              description: "El certificado está vigente.",
+            },
+            error: (failure: unknown) => {
+              if (current.signal.aborted) {
+                // The vendor updates after this callback; dismiss that same ID
+                // next, so cancellation cannot revive an old loading notification.
+                queueMicrotask(() => notifications.dismiss(notificationId));
+              }
+              return {
+                title: current.signal.aborted
+                  ? "Comprobación cancelada."
+                  : failureTone === "invalid"
+                    ? "Certificado no válido."
+                    : "Certificado no verificado.",
+                description:
+                  failure instanceof Error
+                    ? failure.message
+                    : "No se pudo leer el archivo. Selecciónalo de nuevo.",
+              };
+            },
+          },
         );
-      } catch (error) {
         if (token !== latest) return;
+        showResult(comparison, "valid");
+      } catch (error) {
+        if (token !== latest || current.signal.aborted) return;
         showResult(
           error instanceof Error
             ? error.message
             : "No se pudo leer el archivo. Selecciónalo de nuevo.",
-          "error",
+          failureTone,
         );
-        dropzone.setAttribute("data-invalid", "");
-        input.setAttribute("aria-invalid", "true");
       } finally {
+        if (abortRead) current.signal.removeEventListener("abort", abortRead);
         if (token === latest) root.removeAttribute("aria-busy");
       }
     });
@@ -253,6 +330,7 @@ const { officialHash, state } = Astro.props;
     cursor: pointer;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 1.5rem;
     border: 1px dashed var(--border);
     border-radius: var(--radius-xl);
@@ -284,6 +362,24 @@ const { officialHash, state } = Astro.props;
   .local-selection,
   .local-result {
     display: flex;
+  }
+  .local-result:not([data-tone]) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  @media (min-width: 1024px) {
+    .local-verification:has(.local-dropzone:not([hidden]))
+      [data-local-controls] {
+      display: flex;
+      flex: 1;
+    }
+    .local-dropzone {
+      flex: 1;
+    }
   }
   .local-result {
     align-items: flex-start;
