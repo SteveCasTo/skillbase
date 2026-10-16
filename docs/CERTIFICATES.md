@@ -113,6 +113,9 @@ atención en su estado y comprobación local, también cuando aún no está emit
 La búsqueda inicial sigue disponible en `/certificados`; el desplegable de consulta
 se conserva únicamente como recuperación ante registro no encontrado o consulta
 no disponible. La navegación institucional y las URLs no cambian.
+El botón de consulta fuera de la landing conserva el fondo primario y usa el
+token `deep` del shell público para el texto, en lugar de blanco sobre coral,
+para mantener contraste AA sin cambiar tokens globales ni la variante landing.
 El selector público admite teclado y arrastre, muestra el nombre del archivo
 y ofrece «Quitar archivo» solo tras seleccionarlo. La zona de arrastre y el
 archivo seleccionado son mutuamente excluyentes; quitarlo limpia también el

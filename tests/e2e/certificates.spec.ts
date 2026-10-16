@@ -1041,6 +1041,7 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     await publicPage.screenshot({
       path: testInfo.outputPath("public-hash-loading.png"),
       fullPage: true,
+      animations: "disabled",
     });
     await publicPage.getByLabel("Seleccionar PDF firmado").setInputFiles({
       name: "newest.pdf",
