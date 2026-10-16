@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { PDFDocument } from "pdf-lib";
 import { createClient } from "@supabase/supabase-js";
@@ -310,6 +310,64 @@ test("signed save is atomic, idempotent and serializes concurrent substitution/r
   await expect(
     repository.history(f.instructor.id, issued.id),
   ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  const reissueInput = { ...f.input, requestKey: randomUUID() };
+  await expect(
+    f.service.generate(f.instructor.id, reissueInput),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  const [first, second] = await Promise.all([
+    repository.prepare(f.admin.id, reissueInput, "https://qa.invalid"),
+    repository.prepare(
+      f.admin.id,
+      {
+        ...reissueInput,
+        requestKey: randomUUID(),
+      },
+      "https://qa.invalid",
+    ),
+  ]);
+  expect(second[0]!.id).toBe(first[0]!.id);
+  const replacement = (await f.service.generate(f.admin.id, reissueInput))[0]!;
+  expect(replacement.id).not.toBe(revoked.id);
+  expect(replacement.publicCredentialId).not.toBe(revoked.publicCredentialId);
+  expect(replacement.state).toBe("generated");
+  const recipientRecords = (
+    await repository.list(f.admin.id, f.course.id, f.groupId)
+  ).filter(
+    (r) =>
+      r.type === replacement.type && r.recipientId === replacement.recipientId,
+  );
+  expect(recipientRecords).toHaveLength(2);
+  expect(recipientRecords.filter((r) => r.state !== "revoked")).toHaveLength(1);
+  expect((await f.service.generate(f.admin.id, reissueInput))[0]!.id).toBe(
+    replacement.id,
+  );
+  expect((await f.service.generate(f.admin.id, f.input))[0]!.id).toBe(
+    revoked.id,
+  );
+  expect(await repository.get(f.admin.id, revoked.id)).toEqual(revoked);
+  expect(await f.service.download(f.admin.id, revoked.id, "SIGNED")).toEqual(
+    unsigned,
+  );
+  expect((await repository.verify(replacement.publicCredentialId)).valid).toBe(
+    false,
+  );
+  const newSigned = await f.service.uploadSigned(
+    f.admin.id,
+    command(replacement),
+    signed,
+  );
+  expect(newSigned.state).toBe("issued");
+  expect((await repository.verify(newSigned.publicCredentialId)).valid).toBe(
+    true,
+  );
+  expect(await repository.verify(revoked.publicCredentialId)).toMatchObject({
+    state: "revoked",
+    valid: false,
+    signedSha256: revoked.signedSha256,
+  });
+  expect(
+    (await repository.history(f.admin.id, replacement.id))[0],
+  ).toMatchObject({ action: "REISSUED", actorId: f.admin.id });
   await expect(
     db.delete(s.certificates).where(eq(s.certificates.id, issued.id)).execute(),
   ).rejects.toThrow();
@@ -344,6 +402,17 @@ test("reopening retains issued validity but obsoletes drafts; new closure cannot
   await expect(
     f.service.uploadSigned(f.admin.id, command(draft!), signed),
   ).rejects.toMatchObject({ code: "STALE_CLOSURE" });
+  const historical = await repository.revoke(
+    f.admin.id,
+    command(issued),
+    "Synthetic revoked during reopening",
+  );
+  await expect(
+    f.service.generate(f.admin.id, {
+      ...f.input,
+      requestKey: crypto.randomUUID(),
+    }),
+  ).rejects.toMatchObject({ code: "STALE_CLOSURE" });
   const next = await closure.close(f.admin.id, {
     courseId: f.course.id,
     groupId: f.groupId,
@@ -374,6 +443,19 @@ test("reopening retains issued validity but obsoletes drafts; new closure cannot
   expect(recovered!.id).toBe(draft!.id);
   expect(recovered!.version).toBe(2);
   expect(recovered!.obsolete).toBe(false);
+  const [reissued] = await f.service.generate(f.admin.id, {
+    ...f.input,
+    versionId: next.versionId,
+    closureRevision: next.revision,
+    requestKey: crypto.randomUUID(),
+  });
+  expect(reissued!.id).not.toBe(historical.id);
+  expect(reissued!.version).toBe(2);
+  expect(await repository.get(f.admin.id, historical.id)).toMatchObject({
+    state: "revoked",
+    signedSha256: historical.signedSha256,
+    data: historical.data,
+  });
   expect(await repository.verify(draft!.publicCredentialId)).toEqual({
     state: "not_found",
     valid: false,

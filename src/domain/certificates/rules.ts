@@ -5,6 +5,7 @@ import type {
 import { participantFullName } from "@/domain/pre-registrations/participant-name";
 import type {
   CertificateConfiguration,
+  CertificateDto,
   CertificateState,
   CertificateTemplateData,
   CertificateType,
@@ -138,6 +139,35 @@ export function certificateRecipients(
       id: p.participantId,
       name: certificateText(participantFullName(p), "recipientName"),
     }));
+}
+/** Display capability only; prepare revalidates actor, eligibility and uniqueness under locks. */
+export function canReissueCertificate(
+  record: Pick<CertificateDto, "state" | "groupId" | "type" | "recipientId">,
+  records: readonly Pick<
+    CertificateDto,
+    "state" | "groupId" | "type" | "recipientId"
+  >[],
+  officialReport: ClosureReportDto | AuthorizedClosureReportDto,
+): boolean {
+  if (
+    record.state !== "revoked" ||
+    records.some(
+      (r) =>
+        r.groupId === record.groupId &&
+        r.type === record.type &&
+        r.recipientId === record.recipientId &&
+        r.state !== "revoked",
+    )
+  )
+    return false;
+  try {
+    return certificateRecipients(officialReport, record.type).some(
+      (r) => r.id === record.recipientId,
+    );
+  } catch (error) {
+    if (error instanceof CertificateError) return false;
+    throw error;
+  }
 }
 export function requireCurrentClosure(
   closed: boolean,

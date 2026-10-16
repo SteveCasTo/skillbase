@@ -562,6 +562,10 @@ El contrato funcional/técnico aprobado está en [`docs/EVALUATIONS_CONTRACT.md`
 - Documento solo ocupa una sección cuando hay carga o feedback real; un firmado
   revocado conserva snapshot, hash, consulta pública y descarga privada histórica
   sin una sección vacía ni acciones de carga.
+- Tras revocar, ADMIN puede «Emitir nuevo» en la misma fila si el último cierre
+  oficial permite al destinatario y no existe otro vigente. El nuevo documento
+  sigue el flujo para firmar; tarjetas responsive permiten abrir los revocados
+  y muestran fecha y motivo sin números técnicos de versión.
 
 Antes de crear un componente:
 
