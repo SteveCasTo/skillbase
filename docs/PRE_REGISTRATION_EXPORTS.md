@@ -45,9 +45,17 @@ de métodos integrado mediante PR388.
 - PDF A4 horizontal con Noto Sans embebida existente, encabezado institucional
   textual, fecha/hora civil Bolivia, filtros y resumen global de los registros
   exportados. Usa grupos contiguos por curso/grupo, cabeceras repetidas y páginas
-  numeradas. Las columnas principales muestran precio, netos y saldo; debajo de
-  cada participante aparecen pagado/devuelto/por devolver y responsable. Así se
-  conservan todos los datos sin comprimir nueve importes y nombres en una fila.
+  numeradas. Cabecera, filtros y totales ocupan un bloque compacto, sin tarjetas;
+  BOB se indica una vez en el alcance. La tabla conserva los nueve importes en
+  columnas alineadas a la derecha (precio, pagado, devuelto, por devolver,
+  efectivo/QR/sin método netos, recibido neto y saldo), con cuerpo de 8.5 pt.
+  El ancho de cada importe se mide con la fuente real, sin reducir su tamaño;
+  el espacio restante se destina a identidad. Nombres y ambos apellidos forman
+  un solo texto, sin saltos impuestos. CI/categoría y responsable humano aparecen
+  como líneas secundarias de 7.5 pt en esa misma celda, no en un renglón financiero
+  adicional. Los grupos siguientes aprovechan la página disponible; sus cabeceras
+  se mantienen junto a la primera fila completa. El pie se limita al estado vivo,
+  uso exclusivo ADMIN y número de página.
 - Nombres y etiquetas envuelven sin elipsis; montos se alinean a la derecha sin
   cortar dígitos. Texto no soportado por la fuente o que exceda la página falla
   explícitamente y conserva la alternativa CSV. No hay firmas ni sellos ficticios.

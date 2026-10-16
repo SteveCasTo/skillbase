@@ -7,10 +7,12 @@ import type { CourseEvaluationsDto } from "@/domain/evaluations/types";
 import { GradeRow } from "./GradeRow";
 import type { SaveRow } from "./mutation-types";
 import type { EvaluationRouteData } from "./route";
+import type { EvaluationSaveResult } from "./mutation-types";
 
 interface Props {
   data: CourseEvaluationsDto;
   save: SaveRow;
+  reset?: () => Promise<EvaluationSaveResult>;
   onSaved: (data: CourseEvaluationsDto) => void;
   unavailableReason?: string | undefined;
   attemptedGrade?: EvaluationRouteData["attemptedGrade"] | undefined;
@@ -21,6 +23,7 @@ interface Props {
 export function GradeRoster({
   data,
   save,
+  reset,
   onSaved,
   unavailableReason,
   attemptedGrade,
@@ -29,6 +32,7 @@ export function GradeRoster({
 }: Props) {
   const [pending, setPending] = useState(false);
   const [query, setQuery] = useState("");
+  const [resetError, setResetError] = useState("");
   const search = useRef<HTMLInputElement>(null);
   const busy = useRef(false);
   const normalized = query
@@ -61,11 +65,48 @@ export function GradeRoster({
       className="flex min-w-0 flex-col gap-4"
     >
       <header className="flex min-w-0 flex-col gap-3">
-        <h2 id="grade-roster-title" className="text-xl font-semibold">
-          Notas de participantes
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="grade-roster-title" className="text-xl font-semibold">
+            Notas de participantes
+          </h2>
+          {data.hasAttendanceOverrides &&
+            reset &&
+            !data.academicGroups?.some(
+              (g) => g.groupId === data.groupId && g.closed,
+            ) && (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11 max-w-full whitespace-normal"
+                disabled={pending}
+                onClick={async () => {
+                  if (busy.current) return;
+                  busy.current = true;
+                  setPending(true);
+                  setResetError("");
+                  try {
+                    const result = await reset();
+                    if (result.ok) onSaved(result.value);
+                    else {
+                      setResetError(result.message);
+                      if (result.currentData) onSaved(result.currentData);
+                    }
+                  } catch {
+                    setResetError(
+                      "No se pudo confirmar el guardado. Reintenta.",
+                    );
+                  } finally {
+                    busy.current = false;
+                    setPending(false);
+                  }
+                }}
+              >
+                Restablecer cálculo automático
+              </Button>
+            )}
+        </div>
         <div className="flex w-full min-w-0 flex-col gap-1">
-          <label htmlFor="evaluation-search" className="text-sm font-medium">
+          <label htmlFor="evaluation-search" className="sr-only">
             Buscar participante
           </label>
           <div className="flex items-center gap-1">
@@ -95,6 +136,11 @@ export function GradeRoster({
           </div>
         </div>
       </header>
+      {resetError && (
+        <p role="alert" className="text-destructive text-sm">
+          {resetError}
+        </p>
+      )}
       {unavailableReason && (
         <p className="text-muted-foreground text-sm">{unavailableReason}</p>
       )}

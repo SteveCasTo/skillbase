@@ -14,7 +14,8 @@ import FormFeedback from "./FormFeedback.astro";
 import SignedPdfUpload from "./SignedPdfUpload.astro";
 import RevokeCertificate from "./RevokeCertificate";
 type Props = CertificateDetailProps;
-const { load, feedback, instructorRoute, path, requestKey } = Astro.props;
+const { load, feedback, instructorRoute, path, requestKey, history, reissue } =
+  Astro.props;
 const record = load.available ? load.data : null;
 const title = record ? certificateTypeLabel[record.type] : "Certificado";
 const groupPath = record
@@ -22,6 +23,13 @@ const groupPath = record
   : "/app/certificados";
 const signed = record?.hasSignedPdf;
 const editable = record && record.state !== "revoked" && !record.obsolete;
+const showUpload =
+  !instructorRoute && editable && (signed || record?.hasUnsignedPdf);
+const showPrepared =
+  Astro.url.searchParams.get("prepared") === "updated" && !signed;
+const showSaved = Astro.url.searchParams.get("signed") === "saved" && signed;
+const showDocument =
+  showUpload || showPrepared || showSaved || Boolean(feedback.message);
 ---
 
 <PrivateLayout {title}>
@@ -52,6 +60,7 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
             data-astro-reload
             href={`${path}/firmado.pdf`}
             data-feedback-download
+            data-certificate-download
             class={buttonVariants({ className: "min-h-11 shrink-0" })}
           >
             Descargar firmado
@@ -63,6 +72,7 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
               data-astro-reload
               href={`${path}/generado.pdf`}
               data-feedback-download
+              data-certificate-download
               class={buttonVariants({ className: "min-h-11 shrink-0" })}
             >
               Descargar para firmar
@@ -86,22 +96,11 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
               >
                 Descargar para firmar
               </button>
-              <p
-                data-download-status
-                role="status"
-                class="mt-2 text-sm empty:hidden"
-              ></p>
-              <p
-                data-download-error
-                role="alert"
-                tabindex="-1"
-                class="mt-2 max-w-sm text-sm text-destructive empty:hidden"
-              ></p>
             </form>
           ))
         )}
       </header>
-      <dl class="grid gap-x-8 gap-y-5 border-b pb-6 sm:grid-cols-2 xl:grid-cols-4">
+      <dl class="grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-4">
         <div>
           <dt class="text-sm text-muted-foreground">Fechas nominales</dt>
           <dd class="mt-1 text-sm">
@@ -132,28 +131,33 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
           vigente. Si el grupo está abierto, ciérralo antes de continuar.
         </p>
       )}
-      <section aria-label="Documento" class="flex min-w-0 flex-col gap-5">
-        {Astro.url.searchParams.get("prepared") === "updated" && !signed && (
-          <p role="status" class="text-sm leading-6">
-            El PDF se actualizó con los datos vigentes. Tramita las firmas sobre
-            esta nueva descarga antes de guardarlo.
-          </p>
-        )}
-        {Astro.url.searchParams.get("signed") === "saved" && signed && (
-          <p role="status" class="text-sm">
-            PDF firmado guardado.
-          </p>
-        )}
-        <FormFeedback {feedback} />
-        {!instructorRoute && editable && (signed || record.hasUnsignedPdf) && (
-          <SignedPdfUpload
-            {path}
-            revision={record.revision}
-            {requestKey}
-            signed={Boolean(signed)}
-          />
-        )}
-      </section>
+      {showDocument && (
+        <section
+          aria-label="Documento"
+          class="flex min-w-0 flex-col gap-5 border-t pt-6"
+        >
+          {showPrepared && (
+            <p role="status" class="text-sm leading-6">
+              El PDF se actualizó con los datos vigentes. Tramita las firmas
+              sobre esta nueva descarga antes de guardarlo.
+            </p>
+          )}
+          {showSaved && (
+            <p role="status" class="text-sm">
+              PDF firmado guardado.
+            </p>
+          )}
+          <FormFeedback {feedback} />
+          {showUpload && (
+            <SignedPdfUpload
+              {path}
+              revision={record.revision}
+              {requestKey}
+              signed={Boolean(signed)}
+            />
+          )}
+        </section>
+      )}
       {signed && (
         <section
           aria-label="Credencial pública"
@@ -168,15 +172,67 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
             </dd>
           </dl>
           {(!instructorRoute || record.state !== "issued") && (
-            <a
-              href={`/certificados/${record.publicCredentialId}`}
-              class={buttonVariants({
-                variant: "outline",
-                className: "min-h-11 self-start",
-              })}
-            >
-              Consultar estado público
-            </a>
+            <div class="flex flex-wrap items-center gap-3">
+              <a
+                href={`/certificados/${record.publicCredentialId}`}
+                class={buttonVariants({
+                  variant: "outline",
+                  className: "min-h-11 self-start",
+                })}
+              >
+                Consultar estado público
+              </a>
+              {!instructorRoute && record.state === "issued" && (
+                <RevokeCertificate
+                  client:load
+                  {path}
+                  requestKey={crypto.randomUUID()}
+                  revision={record.revision}
+                  initialReason={feedback.values.reason}
+                  initialError={feedback.success ? "" : feedback.message}
+                />
+              )}
+              {reissue && (
+                <form
+                  method="post"
+                  action={reissue.path}
+                  data-success-href={reissue.path}
+                  data-certificate-form
+                  data-pending-label="Generando PDF…"
+                  data-success-label="PDF listo para firmar."
+                >
+                  <input type="hidden" name="type" value={record.type} />
+                  <input
+                    type="hidden"
+                    name="recipientId"
+                    value={record.recipientId}
+                  />
+                  <input
+                    type="hidden"
+                    name="versionId"
+                    value={reissue.versionId}
+                  />
+                  <input
+                    type="hidden"
+                    name="closureRevision"
+                    value={reissue.closureRevision}
+                  />
+                  <input
+                    type="hidden"
+                    name="configurationRevision"
+                    value={reissue.configurationRevision}
+                  />
+                  <input type="hidden" name="requestKey" value={requestKey} />
+                  <FormFeedback />
+                  <button
+                    type="submit"
+                    class={buttonVariants({ className: "min-h-11" })}
+                  >
+                    Emitir nuevo
+                  </button>
+                </form>
+              )}
+            </div>
           )}
           {instructorRoute && record.state === "issued" && (
             <>
@@ -219,16 +275,32 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
           )}
         </section>
       )}
-      {!instructorRoute && record.state === "issued" && (
-        <section aria-label="Gestión de vigencia" class="border-t pt-6">
-          <RevokeCertificate
-            client:load
-            {path}
-            requestKey={crypto.randomUUID()}
-            revision={record.revision}
-            initialReason={feedback.values.reason}
-            initialError={feedback.success ? "" : feedback.message}
-          />
+      {history.length > 0 && (
+        <section
+          aria-label="Certificados revocados"
+          class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          {history.map((previous) => (
+            <a
+              href={`${instructorRoute ? "/app/mis-certificados" : "/app/certificados"}/${previous.id}`}
+              class="flex min-w-0 flex-col gap-2 rounded-xl border p-4 focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              <span class="font-medium">Revocado</span>
+              {previous.revokedAt && (
+                <time datetime={previous.revokedAt} class="text-sm">
+                  {new Intl.DateTimeFormat("es-BO", {
+                    dateStyle: "medium",
+                    timeZone: "America/La_Paz",
+                  }).format(new Date(previous.revokedAt))}
+                </time>
+              )}
+              {previous.reason && (
+                <p class="break-words text-sm text-muted-foreground">
+                  {previous.reason}
+                </p>
+              )}
+            </a>
+          ))}
         </section>
       )}
     </article>
@@ -243,6 +315,8 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
 </PrivateLayout>
 <script>
   import { navigate } from "astro:transitions/client";
+  import { notifications } from "@/lib/notifications";
+  import { downloadCertificatePdf } from "./download-pdf";
   let downloadController: AbortController | undefined;
   function enablePreparedDownload() {
     downloadController?.abort();
@@ -261,76 +335,69 @@ const editable = record && record.state !== "revoked" && !record.obsolete;
             const button = form.querySelector<HTMLButtonElement>(
               'button[type="submit"]',
             )!;
-            const status = form.querySelector<HTMLElement>(
-              "[data-download-status]",
-            )!;
-            const error = form.querySelector<HTMLElement>(
-              "[data-download-error]",
-            )!;
+            const hadFocus = button === document.activeElement;
             button.disabled = true;
+            button.setAttribute("aria-busy", "true");
             form.setAttribute("aria-busy", "true");
-            status.textContent = "Preparando descarga…";
-            error.textContent = "";
             try {
-              const body = new URLSearchParams(
-                [...new FormData(form)].map(([name, value]) => [
-                  name,
-                  String(value),
-                ]),
+              await notifications.promise(
+                async () => {
+                  const body = new URLSearchParams(
+                    [...new FormData(form)].map(([name, value]) => [
+                      name,
+                      String(value),
+                    ]),
+                  );
+                  const response = await fetch(form.action, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    signal,
+                    body,
+                  });
+                  await downloadCertificatePdf(response, signal);
+                  const revision = response.headers.get(
+                    "X-Certificate-Revision",
+                  );
+                  if (
+                    revision !==
+                    form.querySelector<HTMLInputElement>('[name="revision"]')
+                      ?.value
+                  ) {
+                    await navigate(`${location.pathname}?prepared=updated`, {
+                      history: "replace",
+                    });
+                  } else {
+                    form.querySelector<HTMLInputElement>(
+                      '[name="requestKey"]',
+                    )!.value = crypto.randomUUID();
+                  }
+                },
+                {
+                  loading: { title: "Preparando descarga…" },
+                  success: { title: "PDF listo." },
+                  error: (failure: unknown) => ({
+                    title: signal.aborted
+                      ? "Descarga cancelada."
+                      : failure instanceof Error &&
+                          !(failure instanceof TypeError)
+                        ? failure.message
+                        : "No se pudo preparar la descarga. Reintenta.",
+                  }),
+                },
               );
-              const response = await fetch(form.action, {
-                method: "POST",
-                credentials: "same-origin",
-                body,
-              });
-              if (
-                !response.ok ||
-                !response.headers
-                  .get("Content-Type")
-                  ?.includes("application/pdf")
-              ) {
-                const result: unknown = await response.json();
-                error.textContent =
-                  result &&
-                  typeof result === "object" &&
-                  "message" in result &&
-                  typeof result.message === "string"
-                    ? result.message
-                    : "No se pudo preparar la descarga. Reintenta.";
-                error.focus();
-                return;
-              }
-              const url = URL.createObjectURL(await response.blob());
-              const link = document.createElement("a");
-              link.href = url;
-              link.download = "certificate-unsigned.pdf";
-              document.body.append(link);
-              link.click();
-              link.remove();
-              setTimeout(() => URL.revokeObjectURL(url), 1000);
-              const revision = response.headers.get("X-Certificate-Revision");
-              if (
-                revision !==
-                form.querySelector<HTMLInputElement>('[name="revision"]')?.value
-              ) {
-                await navigate(`${location.pathname}?prepared=updated`, {
-                  history: "replace",
-                });
-              } else {
-                status.textContent = "PDF preparado. Descarga iniciada.";
-                form.querySelector<HTMLInputElement>(
-                  '[name="requestKey"]',
-                )!.value = crypto.randomUUID();
-              }
             } catch {
-              error.textContent =
-                "No se pudo preparar la descarga. Reintenta; si los datos cambiaron, recarga la página.";
-              error.focus();
+              // The same promise toast reports the failure; preserve the form for retry.
             } finally {
               pending = false;
               button.disabled = false;
+              button.removeAttribute("aria-busy");
               form.removeAttribute("aria-busy");
-              if (error.textContent) status.textContent = "";
+              if (
+                hadFocus &&
+                button.isConnected &&
+                document.activeElement === document.body
+              )
+                button.focus({ preventScroll: true });
             }
           },
           { signal },

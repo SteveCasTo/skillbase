@@ -240,7 +240,22 @@ test("courses page has a single create-course action", async ({
   await expect(
     header.getByRole("link", { name: "Nuevo curso" }),
   ).toHaveAttribute("href", "/app/cursos/nuevo");
-  await expect(header.getByRole("link")).toHaveCount(1);
+  await expect(header.getByRole("link", { name: "Nuevo curso" })).toHaveCount(
+    1,
+  );
+  await expect(header.getByRole("link")).toHaveCount(3);
+  for (const format of ["PDF", "CSV"]) {
+    await expect(
+      header.getByRole("link", {
+        name: `Descargar informe de cursos ${format}`,
+      }),
+    ).toHaveAttribute(
+      "href",
+      new RegExp(
+        `^/app/cursos/exportar\\?format=${format}&search=&status=PUBLISHED$`,
+      ),
+    );
+  }
   await expect(
     header.getByRole("link", { name: "Gestionar formatos" }),
   ).toHaveCount(0);

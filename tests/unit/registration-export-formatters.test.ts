@@ -77,10 +77,10 @@ test("PDF is real paginated A4 landscape with repeated headings, full names and 
     expect(
       text.filter((value) => value === "Participante / CI / categoría"),
     ).toHaveLength(pdf.getPageCount());
-    expect(text.filter((value) => value === "Precio BOB")).toHaveLength(
+    expect(text.filter((value) => value === "Precio")).toHaveLength(
       pdf.getPageCount() + 1,
     );
-    expect(text).toContain("Ángela Ω Иван");
+    expect(text.join("")).toContain("Ángela Ω Иван");
     expect(
       text.filter((value) => value === "Curso: Diseño y programación"),
     ).toHaveLength(pdf.getPageCount());
@@ -94,7 +94,26 @@ test("PDF is real paginated A4 landscape with repeated headings, full names and 
     );
     expect(text).toContain("2400.30");
     expect(text).toContain("600.30");
-    expect(text).toContain("No registrado neto BOB");
+    expect(text).toContain("Sin método neto");
+    expect(
+      text.some((value) =>
+        value.includes("30 preinscripciones · Importes en BOB"),
+      ),
+    ).toBe(true);
+    expect(text.filter((value) => value.startsWith("CI: "))).toHaveLength(
+      rows.length,
+    );
+    expect(
+      text.filter((value) => value.startsWith("Responsable: ")),
+    ).toHaveLength(rows.length);
+    for (const [value, options] of draw.mock.calls) {
+      expect(options?.size).toBeGreaterThanOrEqual(7.5);
+      expect(options?.x).toBeGreaterThanOrEqual(28);
+      expect(
+        (options?.x ?? 0) +
+          (options?.font?.widthOfTextAtSize(value, options?.size ?? 8.5) ?? 0),
+      ).toBeLessThanOrEqual(841.89 - 28 + 0.01);
+    }
     expect(
       text.some((value) => value.includes("2099-03-01 22:03 (Bolivia UTC-04)")),
     ).toBe(true);
@@ -102,8 +121,9 @@ test("PDF is real paginated A4 landscape with repeated headings, full names and 
     expect(text.join("")).not.toContain("private-interest");
     expect(text.join("")).not.toContain("private-tariff");
     expect(text).toContain(
-      `Uso exclusivo ADMIN · Página ${pdf.getPageCount()} de ${pdf.getPageCount()}`,
+      `Página ${pdf.getPageCount()} de ${pdf.getPageCount()}`,
     );
+    expect(text).toContain("Estado vivo · Uso exclusivo ADMIN");
   } finally {
     draw.mockRestore();
   }
@@ -282,8 +302,8 @@ test("PDF wraps complete long course/group labels above rows and repeats them on
     );
     let headingY = 0;
     for (const [value, options] of draw.mock.calls) {
-      if (value === "Por devolver BOB") headingY = options?.y ?? 0;
-      if (value === row.participant.firstName)
+      if (value === "Participante / CI / categoría") headingY = options?.y ?? 0;
+      if (value.startsWith(row.participant.firstName))
         expect(options?.y).toBeLessThan(headingY);
     }
   } finally {

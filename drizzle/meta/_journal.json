@@ -204,6 +204,20 @@
       "when": 1792026165834,
       "tag": "0028_payment_methods",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792078737269,
+      "tag": "0029_attendance_grade",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792123894945,
+      "tag": "0030_certificate_reissuance",
+      "breakpoints": true
     }
   ]
 }

@@ -199,13 +199,17 @@ no afirmar preservación cloud completa. Evidencia y límites en
 - `evaluation_schemes`: una fila por curso, con revisión, `frozen_at`, actor y
   timestamp de actualización.
 - `evaluation_components`: componentes del curso con `name`, tipo enum
-  `THEORY`/`PRACTICAL`, `weight_hundredths` entero y `sort_order`; nombre/rango/
+  `THEORY`/`PRACTICAL` (0029 añade `ATTENDANCE` opcional), `weight_hundredths` entero y `sort_order`; nombre/rango/
   orden acotados, máximo 100 componentes y pesos con suma diferida exactamente
   10 000 (100 %).
 - `evaluation_grades`: una fila por curso/participante/componente; vincula la
   inscripción válida y conserva nota en centésimas enteras, revisión, actor y
   timestamp. Una FK compuesta asegura curso/componente; los triggers comprueban
   que la inscripción asociada corresponda al mismo curso y participante.
+  0029 añade origen `MANUAL`/`AUTO` (default MANUAL para legados), check y
+  auditoría de transiciones. AUTO se deriva live para grupos abiertos y se
+  finaliza transaccionalmente al cerrar; MANUAL es override protegido. No se
+  borra evidencia al restablecer origen AUTO ni se modifican snapshots previos.
 - `evaluation_results`: proyección por curso/participante. `final_hundredths`
   queda `NULL` mientras falte cualquier componente; al completar, persiste el
   resultado final en centésimas. La decisión explícita de incompleto=`0.00` es
@@ -418,7 +422,11 @@ eventos, receipts idempotentes y reservas/metadata de artefactos, todos con RLS.
 La tabla `certificates` conserva tipo/estado, destinatario, versión oficial F8,
 datos/procedencia congelados, actor y paths/hash de artefactos. La migración
 forward 0025 elimina las relaciones de reemplazo y garantiza un único registro
-por grupo/tipo/destinatario en todos los estados. Regeneración unsigned actualiza
+por grupo/tipo/destinatario en todos los estados. La candidata 0030 limita ese
+índice único a `state <> 'revoked'`: permite otro registro después de revocar,
+conservando todos los revocados inmutables y sus artefactos/eventos/receipts.
+No introduce pointer ni cadenas de reemplazo; el vigente se deriva del predicado
+parcial. No está aplicada a canónico/cloud. Regeneración unsigned actualiza
 ese registro con ID público nuevo; sustitución signed conserva ID/metadata y
 actualiza el artefacto con reserva exacta y revisión optimista. Detalle normativo en
 [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md). El estado de release y

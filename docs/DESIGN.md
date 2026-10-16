@@ -2,6 +2,13 @@
 
 ## OBJETIVO
 
+Evaluaciones (2026-10-15): tipo Asistencia en el selector existente, nota en la
+celda actual y campo deshabilitado sin explicación/tooltip hasta resolución.
+Reset se muestra únicamente con overrides de asistencia, a la derecha del título
+«Notas de participantes» con wrap móvil. «Buscar participante» permanece como
+label sr-only; input y nombre accesible se conservan. No se agregan badges,
+leyendas ni prosa de cálculo.
+
 Definir las reglas visuales y de experiencia de usuario para mantener una interfaz coherente, accesible, responsive y mantenible.
 
 El diseño debe priorizar claridad operativa sobre ornamentación.
@@ -547,6 +554,19 @@ El contrato funcional/técnico aprobado está en [`docs/EVALUATIONS_CONTRACT.md`
 
 ## CONSISTENCIA
 
+### Acciones del detalle de certificado
+
+- «Consultar estado público» y «Revocar certificado» comparten una fila flexible
+  junto al hash del firmado; en mobile pueden envolver. La confirmación conserva
+  motivo obligatorio, Escape y retorno del foco.
+- Documento solo ocupa una sección cuando hay carga o feedback real; un firmado
+  revocado conserva snapshot, hash, consulta pública y descarga privada histórica
+  sin una sección vacía ni acciones de carga.
+- Tras revocar, ADMIN puede «Emitir nuevo» en la misma fila si el último cierre
+  oficial permite al destinatario y no existe otro vigente. El nuevo documento
+  sigue el flujo para firmar; tarjetas responsive permiten abrir los revocados
+  y muestran fecha y motivo sin números técnicos de versión.
+
 Antes de crear un componente:
 
 1. Revisar si existe en `components/ui`.
@@ -609,6 +629,7 @@ Antes de crear un componente:
 - Antes de confirmar el recorte, el editor permite comprobar el WebP generado en encuadres representativos de la landing (destacado de escritorio, afiches de distinto ancho y tarjeta móvil) y del detalle público en escritorio y móvil. Las vistas se actualizan con el recorte y no alteran el archivo único ni las páginas públicas.
 - El formulario conserva contenido SSR funcional antes de hidratarse: la foto guardada/seleccionada tiene fallback visible y el contenido Markdown mantiene un control de texto utilizable mientras su editor React hidrata. La inicialización del sidebar privado aplica el estado guardado también en la carga inicial y evita registrar controladores duplicados en navegaciones del router.
 - El listado administrativo de cursos omite el rango de fechas para mantener compactas las filas; las fechas se consultan al abrir la edición. Las acciones editoriales se presentan de forma compacta y el feedback transitorio usa Sileo con el tema activo.
+- Cursos añade acciones delineadas PDF/CSV junto a Nuevo curso, de igual altura y sin perder la búsqueda/estado seleccionados. El PDF de cursos usa una composición institucional compacta, con cabeceras de curso, tabla continua de grupos, importes alineados y continuación con encabezados repetidos; contrato y alcances en [`COURSE_REPORTS.md`](COURSE_REPORTS.md).
 - El toolbar Markdown expone niveles de encabezado de contenido H2/H3, negrita, cursiva, código en línea y bloque, listas, citas, separadores y enlaces. El detalle público renderiza ese subconjunto con jerarquía semántica debajo del título del curso y sin HTML crudo; los enlaces pasan por una lista segura de destinos.
 - El contenido Markdown público restaura marcadores visibles de listas ordenadas y no ordenadas, incluidos estilos diferenciados para niveles anidados.
 - Las páginas de alta, edición y configuración de formatos muestran una ruta de navegación semántica hacia Inicio y Cursos, en lugar de depender de un único enlace «Volver». Las operaciones administrativas siguen renderizadas por servidor y las confirmaciones de éxito no sustituyen errores persistentes de formulario.

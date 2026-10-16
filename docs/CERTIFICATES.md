@@ -78,8 +78,11 @@ Mostrar únicamente:
 - fecha;
 - credential ID.
 
-La página pública incluye estado, titular, curso, horas nominales, fecha final,
-ID/URL y el hash oficial para comparación local de bytes. La allowlist concreta
+La página pública incluye estado, titular, curso, horas nominales y fecha final;
+omite las filas del código de credencial y del SHA-256 oficial. El identificador
+público permanece en la URL, el QR, el PDF y la búsqueda manual; no se oculta ni
+se sustituye por el hash. El hash oficial sigue en los metadatos de comparación
+del navegador y en el contrato público, no como texto visible. La allowlist concreta
 para Fase 9, que no incluye nivel no impreso en la plantilla, está en
 [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md).
 
@@ -99,9 +102,22 @@ compactos coinciden con la landing sin cambiar otras páginas públicas. El resu
 presenta el estado como título, los datos permitidos y «Comprobar tu archivo»;
 los errores de consulta y los resultados de comparación permanecen visibles
 inline, sin un toast duplicado.
+El detalle de una credencial omite «Consultar otro certificado» para centrar la
+atención en su estado y comprobación local, también cuando aún no está emitida.
+La búsqueda inicial sigue disponible en `/certificados`; el desplegable de consulta
+se conserva únicamente como recuperación ante registro no encontrado o consulta
+no disponible. La navegación institucional y las URLs no cambian.
 El selector público admite teclado y arrastre, muestra el nombre del archivo
-y ofrece «Quitar archivo» solo tras seleccionarlo; quitarlo limpia también el
-resultado y devuelve el foco al selector. No modifica el selector privado ADMIN.
+y ofrece «Quitar archivo» solo tras seleccionarlo. La zona de arrastre y el
+archivo seleccionado son mutuamente excluyentes; quitarlo limpia también el
+resultado y devuelve el foco al selector.
+El resultado público presenta únicamente el mensaje de comparación con un icono
+de estado, sin mostrar ni anunciar el hash calculado. Coincidencia vigente,
+coincidencia con credencial revocada/reemplazada y archivo distinto se distinguen
+por mensaje e icono; una coincidencia inválida nunca se presenta como éxito.
+La selección nueva o «Quitar archivo» limpia el resultado anterior y conserva
+la protección contra lecturas locales fuera de orden. Los hashes visibles de
+ADMIN no cambian.
 La comprobación conserva MIME/extensión PDF, límite de 10 MiB y SHA-256 de todos
 los bytes en el navegador: no transmite ni persiste el archivo ni habilita una
 descarga pública. Una coincidencia no cambia el estado oficial de la credencial.
@@ -162,8 +178,11 @@ Con JavaScript se actualiza el detalle tras una preparación que cambie revisió
 sin JavaScript la descarga conserva POST/attachment y, si se actualizó, se debe
 recargar el detalle antes de cargar el firmado (la revisión anterior se deniega).
 
-Seleccionar o arrastrar un PDF legible habilita «Guardar PDF firmado» o
-«Sustituir PDF firmado»; quitarlo oculta la acción. El envío explícito de ese
+La zona de arrastre ADMIN ocupa todo el ancho del contenido, sin panel explicativo.
+Seleccionar o arrastrar un PDF la sustituye por el archivo y su X; una vez validado
+aparece «Guardar PDF firmado» o «Sustituir PDF firmado» a su lado (apilado en mobile).
+Quitarlo limpia selección/errores y devuelve la zona y el foco al selector.
+El envío explícito de ese
 botón (`intent=save-signed-pdf`) constituye la confirmación ADMIN, sin checkbox
 ni confirmación oculta preaceptada. Servidor exige la intención, rol vigente,
 revisión, finalidad SIGNED y validación de extensión/MIME/tamaño/contenido PDF.
@@ -176,6 +195,12 @@ Un firmado nunca se actualiza automáticamente. Solo ofrece «Descargar firmado�
 la descarga unsigned también se deniega por URL directa. Sustituir exige un
 nuevo archivo y mantiene ID/metadata. Los errores y progreso de carga se
 presentan inline, sin toast persistente.
+
+Las descargas privadas de certificados usan una Promise real de Sileo, sin
+«Preparando descarga…» debajo del botón: preparación POST o lectura GET, respuesta
+PDF no redirigida, comprobación de Blob y entrega al navegador. «PDF listo.» no
+afirma que el usuario haya guardado el archivo. Se bloquea el envío duplicado,
+se restaura el control tras error y se mantienen POST/href sin JavaScript.
 
 El detalle ADMIN no presenta el bloque de datos para LinkedIn ni la acción de
 copiar credencial. Conserva el SHA-256 y «Consultar estado público» como enlace

@@ -1,5 +1,14 @@
 # Contrato backend de sesiones y asistencia (Fase 6)
 
+## Extensión de evaluación opcional (2026-10-15)
+
+Evaluaciones puede consumir el roster legítimo y las marcas efectivas como nota
+ATTENDANCE opcional; fórmula, origen/override y cierre transaccional se describen
+en `EVALUATIONS_CONTRACT.md`. El read model no escribe desde GET ni crea ausencias
+persistidas, y respeta revisión histórica y final del día civil Bolivia. La regla
+de rachas N y la elegibilidad permanecen independientes: no hay mínimo porcentual
+nuevo ni cambios retroactivos a cierres/certificados.
+
 ## Límites
 
 `src/domain/attendance` contiene las políticas puras; `src/application/attendance`

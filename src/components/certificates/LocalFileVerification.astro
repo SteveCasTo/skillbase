@@ -1,5 +1,12 @@
 ---
-import { FileText, FileUp, X } from "lucide-react";
+import {
+  CircleCheck,
+  CircleX,
+  FileText,
+  FileUp,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 interface Props {
   officialHash: string;
@@ -19,15 +26,15 @@ const { officialHash, state } = Astro.props;
     Comprobar tu archivo
   </h2>
   <div data-local-controls hidden>
+    <input
+      id="local-pdf"
+      type="file"
+      accept="application/pdf,.pdf"
+      aria-labelledby="local-pdf-label"
+      aria-describedby="local-pdf-help local-result"
+      class="sr-only"
+    />
     <label for="local-pdf" data-local-dropzone class="local-dropzone">
-      <input
-        id="local-pdf"
-        type="file"
-        accept="application/pdf,.pdf"
-        aria-labelledby="local-pdf-label"
-        aria-describedby="local-pdf-help local-result"
-        class="sr-only"
-      />
       <span class="flex size-14 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
         <FileUp size={28} aria-hidden="true" />
       </span>
@@ -52,9 +59,11 @@ const { officialHash, state } = Astro.props;
     <div
       data-local-selection
       hidden
-      class="local-selection mt-3 flex min-w-0 items-center gap-3 rounded-lg border bg-card p-3"
+      class="local-selection min-w-0 items-center gap-3 rounded-lg border bg-card p-4"
     >
-      <FileText size={24} className="shrink-0" aria-hidden="true" />
+      <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+        <FileText size={24} aria-hidden="true" />
+      </span>
       <span
         data-file-name
         class="min-w-0 flex-1 text-sm font-medium [overflow-wrap:anywhere]"
@@ -69,20 +78,33 @@ const { officialHash, state } = Astro.props;
       </button>
     </div>
   </div>
-  <p
+  <div
     id="local-result"
     role="status"
     aria-label="Resultado de comparación local"
     aria-live="polite"
     aria-atomic="true"
-    class="local-result text-sm leading-6 [overflow-wrap:anywhere]"
-  ></p>
-  <output
-    data-local-hash
-    hidden
-    class="break-all font-mono text-xs"
-    aria-label="SHA-256 del archivo seleccionado"
-  ></output>
+    class="local-result text-sm leading-6"
+  >
+    <span data-result-icon="valid" hidden class="mt-0.5 shrink-0 text-primary">
+      <CircleCheck size={20} aria-hidden="true" />
+    </span>
+    <span
+      data-result-icon="invalid"
+      hidden
+      class="mt-0.5 shrink-0 text-secondary-foreground"
+    >
+      <TriangleAlert size={20} aria-hidden="true" />
+    </span>
+    <span
+      data-result-icon="error"
+      hidden
+      class="mt-0.5 shrink-0 text-destructive"
+    >
+      <CircleX size={20} aria-hidden="true" />
+    </span>
+    <span data-result-message class="min-w-0 [overflow-wrap:anywhere]"></span>
+  </div>
   <noscript>
     <p class="text-sm">
       Activa JavaScript para comparar el archivo localmente. El estado del
@@ -95,40 +117,48 @@ const { officialHash, state } = Astro.props;
   const root = document.querySelector<HTMLElement>("[data-local-verification]");
   const input = root?.querySelector<HTMLInputElement>("#local-pdf");
   const result = root?.querySelector<HTMLElement>("#local-result");
-  const output = root?.querySelector<HTMLOutputElement>("[data-local-hash]");
+  const message = result?.querySelector<HTMLElement>("[data-result-message]");
   const controls = root?.querySelector<HTMLElement>("[data-local-controls]");
   const dropzone = root?.querySelector<HTMLElement>("[data-local-dropzone]");
   const selection = root?.querySelector<HTMLElement>("[data-local-selection]");
   const filename = root?.querySelector<HTMLElement>("[data-file-name]");
-  const prompt = root?.querySelector<HTMLElement>("[data-drop-prompt]");
   if (
     root &&
     input &&
     result &&
-    output &&
+    message &&
     controls &&
     dropzone &&
     selection &&
-    filename &&
-    prompt
+    filename
   ) {
     let latest = 0;
+    const showResult = (text: string, tone?: "valid" | "invalid" | "error") => {
+      message.textContent = text;
+      if (tone) result.dataset.tone = tone;
+      else delete result.dataset.tone;
+      result
+        .querySelectorAll<HTMLElement>("[data-result-icon]")
+        .forEach((icon) => {
+          icon.hidden = icon.dataset.resultIcon !== tone;
+        });
+    };
     if (window.crypto?.subtle) controls.hidden = false;
     else
-      result.textContent =
-        "La comparación local requiere un navegador compatible y una conexión segura.";
+      showResult(
+        "La comparación local requiere un navegador compatible y una conexión segura.",
+        "error",
+      );
     const clear = () => {
       latest += 1;
       input.value = "";
       filename.textContent = "";
       selection.hidden = true;
-      prompt.textContent = "Arrastra tu PDF aquí";
+      dropzone.hidden = false;
+      input.tabIndex = 0;
       dropzone.removeAttribute("data-invalid");
-      dropzone.removeAttribute("data-selected");
       input.removeAttribute("aria-invalid");
-      result.textContent = "";
-      output.textContent = "";
-      output.hidden = true;
+      showResult("");
       root.removeAttribute("aria-busy");
     };
     root.querySelector("[data-local-reset]")?.addEventListener("click", () => {
@@ -169,45 +199,45 @@ const { officialHash, state } = Astro.props;
       const file = input.files?.[0];
       filename.textContent = file?.name ?? "";
       selection.hidden = !file;
-      prompt.textContent = file
-        ? "Arrastra otro PDF para cambiarlo"
-        : "Arrastra tu PDF aquí";
-      dropzone.toggleAttribute("data-selected", Boolean(file));
+      dropzone.hidden = Boolean(file);
+      input.tabIndex = file ? -1 : 0;
+      if (file && document.activeElement === input)
+        root.querySelector<HTMLButtonElement>("[data-local-reset]")?.focus();
       dropzone.removeAttribute("data-invalid");
       input.removeAttribute("aria-invalid");
-      output.hidden = true;
-      output.textContent = "";
-      result.textContent = "";
+      showResult("");
       if (!file) {
         root.removeAttribute("aria-busy");
         return;
       }
       const validation = localPdfError(file);
       if (validation) {
-        result.textContent = validation;
+        showResult(validation, "error");
         dropzone.setAttribute("data-invalid", "");
         input.setAttribute("aria-invalid", "true");
         root.removeAttribute("aria-busy");
         return;
       }
       root.setAttribute("aria-busy", "true");
-      result.textContent = "Comprobando tu archivo…";
+      showResult("Comprobando tu archivo…");
       try {
         const hash = await localPdfSha256(file);
         if (token !== latest) return;
-        output.textContent = hash;
-        output.hidden = false;
-        result.textContent = hashComparison(
-          hash,
-          root.dataset.officialHash ?? "",
-          root.dataset.certificateState ?? "",
+        const official = root.dataset.officialHash ?? "";
+        const state = root.dataset.certificateState ?? "";
+        const matches = hash.toLowerCase() === official.toLowerCase();
+        showResult(
+          hashComparison(hash, official, state),
+          matches ? (state === "issued" ? "valid" : "invalid") : "error",
         );
       } catch (error) {
         if (token !== latest) return;
-        result.textContent =
+        showResult(
           error instanceof Error
             ? error.message
-            : "No se pudo leer el archivo. Selecciónalo de nuevo.";
+            : "No se pudo leer el archivo. Selecciónalo de nuevo.",
+          "error",
+        );
         dropzone.setAttribute("data-invalid", "");
         input.setAttribute("aria-invalid", "true");
       } finally {
@@ -238,18 +268,26 @@ const { officialHash, state } = Astro.props;
     border-color: var(--ring);
     background: var(--secondary);
   }
-  .local-dropzone:focus-within {
+  [data-local-controls]:has(input:focus-visible) .local-dropzone {
     outline: 3px solid var(--ring);
     outline-offset: 4px;
   }
   .local-dropzone[data-invalid] {
     border-color: var(--destructive);
   }
-  .local-dropzone[data-selected] {
-    border-style: solid;
-  }
-  .local-selection[hidden] {
+  .local-dropzone[hidden],
+  .local-selection[hidden],
+  [data-local-controls][hidden],
+  [data-result-icon][hidden] {
     display: none;
+  }
+  .local-selection,
+  .local-result {
+    display: flex;
+  }
+  .local-result {
+    align-items: flex-start;
+    gap: 0.75rem;
   }
   @media (prefers-reduced-motion: reduce) {
     .local-dropzone {

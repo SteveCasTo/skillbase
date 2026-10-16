@@ -140,9 +140,42 @@ const fallbackColumns = [
                 aria-labelledby="fallback-grades-title"
                 class="flex min-w-0 flex-col gap-4"
               >
-                <h2 id="fallback-grades-title" class="text-xl font-semibold">
-                  Notas de participantes
-                </h2>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <h2 id="fallback-grades-title" class="text-xl font-semibold">
+                    Notas de participantes
+                  </h2>
+                  {data.hasAttendanceOverrides &&
+                    !data.academicGroups?.some(
+                      (g) => g.groupId === groupId && g.closed,
+                    ) && (
+                      <form method="post" action={Astro.url.pathname}>
+                        <input
+                          type="hidden"
+                          name="action"
+                          value="reset-attendance"
+                        />
+                        <input
+                          type="hidden"
+                          name="requestKey"
+                          value={requestKey}
+                        />
+                        <input
+                          type="hidden"
+                          name="schemeRevision"
+                          value={data.scheme.revision}
+                        />
+                        <button
+                          type="submit"
+                          class={buttonVariants({
+                            variant: "outline",
+                            className: "min-h-11 max-w-full whitespace-normal",
+                          })}
+                        >
+                          Restablecer cálculo automático
+                        </button>
+                      </form>
+                    )}
+                </div>
                 {!data.scheme.components.length ? (
                   <p class="text-sm text-muted-foreground">
                     Define el esquema del curso antes de registrar notas.
@@ -258,7 +291,12 @@ const fallbackColumns = [
                                         name="score"
                                         inputmode="decimal"
                                         pattern="(?:100(?:\.0{1,2})?|(?:0|[1-9][0-9]?)(?:\.[0-9]{1,2})?)"
-                                        title="Introduce una nota de 0 a 100 con punto decimal y hasta dos decimales."
+                                        title={
+                                          component.type === "ATTENDANCE"
+                                            ? undefined
+                                            : "Introduce una nota de 0 a 100 con punto decimal y hasta dos decimales."
+                                        }
+                                        disabled={grade?.canEdit === false}
                                         required
                                         value={
                                           attempted?.score ?? grade?.score ?? ""
@@ -270,12 +308,14 @@ const fallbackColumns = [
                                         aria-describedby={
                                           attempted && message
                                             ? `${id}-error`
-                                            : grade?.score == null
+                                            : component.type !== "ATTENDANCE" &&
+                                                grade?.score == null
                                               ? `${id}-help`
                                               : undefined
                                         }
                                       />
-                                      {grade?.score == null &&
+                                      {component.type !== "ATTENDANCE" &&
+                                        grade?.score == null &&
                                         !(attempted && message) && (
                                           <p
                                             id={`${id}-help`}
@@ -295,6 +335,7 @@ const fallbackColumns = [
                                       )}
                                       <button
                                         type="submit"
+                                        disabled={grade?.canEdit === false}
                                         class={buttonVariants({
                                           variant: "outline",
                                           className: "row-start-4 min-h-11",
@@ -403,6 +444,12 @@ const fallbackColumns = [
                           selected={component.type === "PRACTICAL"}
                         >
                           Práctica
+                        </option>
+                        <option
+                          value="ATTENDANCE"
+                          selected={component.type === "ATTENDANCE"}
+                        >
+                          Asistencia
                         </option>
                       </select>
                     </div>

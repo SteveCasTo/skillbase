@@ -9,6 +9,7 @@ import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { resolve } from "node:path";
+import { readFile } from "node:fs/promises";
 import type { ClosureStateDto } from "@/domain/academic-closure/types";
 import type { CertificateDto } from "@/domain/certificates/types";
 import { courses } from "@/server/db/schema";
@@ -211,6 +212,104 @@ async function signedFixture(
   pdf.addPage().drawText(notice);
   return Buffer.from(await pdf.save());
 }
+async function checkDownloadFeedback(
+  page: Page,
+  signed: boolean,
+  info: TestInfo,
+) {
+  const control = page.getByRole(signed ? "link" : "button", {
+    name: signed ? "Descargar firmado" : "Descargar para firmar",
+    exact: true,
+  });
+  const endpoint = `**/app/certificados/*/${signed ? "firmado" : "generado"}.pdf`;
+  const toast = page.locator('[data-sileo-toast][data-exiting="false"]');
+  let release: (() => void) | undefined;
+  let calls = 0;
+  let received: Buffer | undefined;
+  let reject = true;
+  let downloads = 0;
+  const onDownload = () => {
+    downloads++;
+  };
+  page.on("download", onDownload);
+  await page.route(endpoint, async (route) => {
+    calls++;
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    if (reject) {
+      // A login/error HTML response must never become a PDF download or success.
+      await route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: "<html>Sesión no disponible</html>",
+      });
+    } else {
+      const response = await route.fetch();
+      received = await response.body();
+      await route.fulfill({ response, body: received });
+    }
+  });
+  for (const fail of [true, false]) {
+    reject = fail;
+    release = undefined;
+    const download = fail ? undefined : page.waitForEvent("download");
+    await control.click();
+    const loading = toast.filter({ hasText: "Preparando descarga…" });
+    await expect(loading).toHaveCount(1);
+    await expect(loading).toHaveAttribute("data-state", "loading");
+    const id = await loading.getAttribute("data-sileo-id");
+    await expect(control).toHaveAttribute("aria-busy", "true");
+    if (signed) await expect(control).toHaveAttribute("aria-disabled", "true");
+    else await expect(control).toBeDisabled();
+    await expect(
+      page.locator("[data-download-status], [data-download-error]"),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: info.outputPath(
+        `${signed ? "signed" : "unsigned"}-download-loading-${fail}.png`,
+      ),
+      fullPage: true,
+    });
+    await expect.poll(() => Boolean(release)).toBe(true);
+    release!();
+    const result = page.locator(
+      `[data-sileo-id="${id}"][data-exiting="false"]`,
+    );
+    await expect(result).toHaveAttribute(
+      "data-state",
+      fail ? "error" : "success",
+    );
+    if (fail) {
+      await expect(result).toContainText("No se pudo confirmar el PDF");
+      expect(downloads).toBe(0);
+    } else {
+      await expect(result).toContainText("PDF listo.");
+      const artifact = await download!;
+      expect(
+        createHash("sha256")
+          .update(new Uint8Array(await readFile((await artifact.path())!)))
+          .digest("hex"),
+      ).toBe(
+        createHash("sha256").update(new Uint8Array(received!)).digest("hex"),
+      );
+      expect(received!.subarray(0, 5).toString()).toBe("%PDF-");
+      expect(downloads).toBe(1);
+    }
+    await expect(control).not.toHaveAttribute("aria-busy");
+    await expect(control).not.toHaveAttribute("aria-disabled");
+    if (!signed) await expect(control).toBeEnabled();
+    await page.screenshot({
+      path: info.outputPath(
+        `${signed ? "signed" : "unsigned"}-download-${fail ? "error" : "success"}.png`,
+      ),
+      fullPage: true,
+    });
+  }
+  expect(calls).toBe(2);
+  await page.unroute(endpoint);
+  page.off("download", onDownload);
+}
 async function uploadReviewIssue(
   page: Page,
   record: CertificateDto,
@@ -226,6 +325,10 @@ async function uploadReviewIssue(
     exact: true,
   });
   await expect(save).toBeHidden();
+  const zone = page.locator("[data-dropzone]");
+  const details = page.locator("[data-file-details]");
+  await expect(zone).toBeVisible();
+  await expect(details).toBeHidden();
   await expect(page.getByRole("checkbox")).toHaveCount(0);
   const file = page.locator('input[type="file"]');
   await expect(page.locator("[data-signed-pdf-form]")).toHaveAttribute(
@@ -238,6 +341,11 @@ async function uploadReviewIssue(
     for (const width of [375, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       await assertNoOverflow(page);
+      const zoneBounds = await zone.boundingBox();
+      const formBounds = await page
+        .locator("[data-signed-pdf-form]")
+        .boundingBox();
+      expect(zoneBounds?.width).toBe(formBounds?.width);
       await page.screenshot({
         path: shot(`upload-empty-${width}.png`),
         fullPage: true,
@@ -250,15 +358,24 @@ async function uploadReviewIssue(
     });
     await expect(page.locator("[data-file-error]")).toContainText("dañado");
     await expect(save).toBeHidden();
-    await page.screenshot({
-      path: shot("upload-rejected.png"),
-      fullPage: true,
-    });
+    await expect(zone).toBeHidden();
+    await expect(details).toContainText("damaged.pdf");
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: shot(`upload-rejected-${width}.png`),
+        fullPage: true,
+      });
+    }
     await page
       .getByRole("button", { name: "Quitar archivo", exact: true })
       .click();
     await expect(save).toBeHidden();
     await expect(file).toBeFocused();
+    await expect(zone).toBeVisible();
+    await expect(details).toBeHidden();
+    await expect(page.locator("[data-file-error]")).toHaveText("");
   }
   const selectedFile = {
     name: "synthetic-qa-signed.pdf",
@@ -271,6 +388,8 @@ async function uploadReviewIssue(
     await (await chooser).setFiles(selectedFile);
   } else await file.setInputFiles(selectedFile);
   await expect(save).toBeEnabled();
+  await expect(zone).toBeHidden();
+  await expect(details).toContainText(selectedFile.name);
   if (visual) {
     for (const width of [375, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
@@ -293,6 +412,19 @@ async function uploadReviewIssue(
       .getByRole("button", { name: "Quitar archivo", exact: true })
       .click();
     await expect(save).toBeHidden();
+    await expect(zone).toBeVisible();
+    await expect(details).toBeHidden();
+    await expect(file).toBeFocused();
+    await expect(file).toHaveValue("");
+    await expect(page.locator("[data-upload-status]")).toHaveText("");
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: shot(`upload-reset-${width}.png`),
+        fullPage: true,
+      });
+    }
     // Exercise actual browser File/DataTransfer selection, not a fake success response.
     await page.locator("[data-dropzone]").evaluate(
       (zone, contents) => {
@@ -314,6 +446,7 @@ async function uploadReviewIssue(
       [...bytes],
     );
     await expect(save).toBeEnabled();
+    await expect(zone).toBeHidden();
     let release: (() => void) | undefined;
     await page.route(`**${path}/cargar`, async (route) => {
       await new Promise<void>((resolve) => {
@@ -334,7 +467,10 @@ async function uploadReviewIssue(
       "true",
     );
     await expect(
-      page.getByRole("button", { name: "Guardando PDF firmado…", exact: true }),
+      page.getByRole("button", {
+        name: "Guardando PDF firmado…",
+        exact: true,
+      }),
     ).toBeDisabled();
     await page.screenshot({
       path: shot("upload-loading.png"),
@@ -365,7 +501,9 @@ async function uploadReviewIssue(
     page.getByRole("link", { name: "Consultar estado público" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Datos para compartir o añadir a LinkedIn", { exact: true }),
+    page.getByText("Datos para compartir o añadir a LinkedIn", {
+      exact: true,
+    }),
   ).toHaveCount(0);
   await expect(
     page.getByRole("button", {
@@ -542,6 +680,7 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       .getByRole("button", { name: "Descargar para firmar", exact: true })
       .click();
     expect((await regenerated).status()).toBe(200);
+    await expect(page).toHaveURL(/\?prepared=updated$/u);
     await expect(
       page.getByRole("button", { name: "Descargar para firmar", exact: true }),
     ).toBeVisible();
@@ -551,6 +690,16 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     );
     record = ((await currentResponse.json()) as { data: CertificateDto }).data;
     expect(record.publicCredentialId).not.toBe(oldCode);
+    await checkDownloadFeedback(page, false, testInfo);
+    const stableDetail = await page.request.get(
+      `/app/certificados/${record.id}`,
+      { headers },
+    );
+    const stableRecord = (
+      (await stableDetail.json()) as { data: CertificateDto }
+    ).data;
+    expect(stableRecord.publicCredentialId).toBe(record.publicCredentialId);
+    expect(stableRecord.revision).toBe(record.revision);
     await publicPage.goto(`/certificados/${oldCode}`);
     await expect(
       publicPage.getByRole("heading", {
@@ -605,6 +754,7 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     expect((await privateFile.body()).toString("hex")).toBe(
       signed.toString("hex"),
     );
+    await checkDownloadFeedback(page, true, testInfo);
     await publicPage.goto(`/certificados/${record.publicCredentialId}`);
     await expect(
       publicPage.getByRole("heading", {
@@ -632,7 +782,14 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     publicPage.on("request", (request) => {
       if (request.method() !== "GET") transmitted += 1;
     });
-    await publicPage.getByLabel("Seleccionar PDF firmado").setInputFiles({
+    const publicPicker = publicPage.getByLabel("Seleccionar PDF firmado");
+    await publicPicker.focus();
+    await expect(publicPicker).toBeFocused();
+    const publicChooser = publicPage.waitForEvent("filechooser");
+    await publicPicker.press("Enter");
+    await (
+      await publicChooser
+    ).setFiles({
       name: "synthetic-qa-signed.pdf",
       mimeType: "application/pdf",
       buffer: signed,
@@ -643,11 +800,38 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       }),
     ).toContainText("certificado vigente");
     await expect(
-      publicPage.getByLabel("SHA-256 del archivo seleccionado"),
-    ).toHaveText(
+      publicPage.locator("[data-local-verification]"),
+    ).toHaveAttribute(
+      "data-official-hash",
       createHash("sha256").update(new Uint8Array(signed)).digest("hex"),
     );
+    const localResult = publicPage.getByRole("status", {
+      name: "Resultado de comparación local",
+    });
+    await expect(localResult).toHaveAttribute("data-tone", "valid");
+    await expect(publicPage.locator("[data-local-hash]")).toHaveCount(0);
+    await expect(publicPage.locator("main")).not.toContainText(
+      /[a-f0-9]{64}/iu,
+    );
+    await expect(
+      publicPage.getByText("Código de credencial", { exact: true }),
+    ).toHaveCount(0);
     const dropzone = publicPage.locator("[data-local-dropzone]");
+    await expect(dropzone).toBeHidden();
+    await expect(publicPage.locator("[data-local-selection]")).toBeVisible();
+    for (const width of [375, 768, 1440]) {
+      await publicPage.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(publicPage);
+      await publicPage.screenshot({
+        path: testInfo.outputPath(`public-selected-${width}.png`),
+        fullPage: true,
+      });
+    }
+    await publicPage
+      .getByRole("button", { name: "Quitar archivo", exact: true })
+      .click();
+    await expect(dropzone).toBeVisible();
+    await expect(publicPage.locator("[data-local-selection]")).toBeHidden();
     const changedTransfer = await publicPage.evaluateHandle(
       (bytes) => {
         const transfer = new DataTransfer();
@@ -672,6 +856,17 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         name: "Resultado de comparación local",
       }),
     ).toContainText("no coincide");
+    await expect(localResult).toHaveAttribute("data-tone", "error");
+    await expect(dropzone).toBeHidden();
+    await expect(publicPage.locator("[data-local-selection]")).toBeVisible();
+    for (const width of [375, 768, 1440]) {
+      await publicPage.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(publicPage);
+      await publicPage.screenshot({
+        path: testInfo.outputPath(`public-mismatch-${width}.png`),
+        fullPage: true,
+      });
+    }
     // Delay a genuine File read, not the digest or registry response. The older
     // calculation must not overwrite the newer selection or a reset.
     await publicPage.evaluate(() => {
@@ -725,10 +920,12 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         (window as typeof window & { completedDigests: number })
           .completedDigests === 2,
     );
-    await expect(
-      publicPage.getByLabel("SHA-256 del archivo seleccionado"),
-    ).toHaveText(
-      createHash("sha256").update(new Uint8Array(signed)).digest("hex"),
+    await expect(localResult).toHaveText(
+      "El archivo coincide con el PDF firmado del certificado vigente.",
+    );
+    await expect(localResult).toHaveAttribute("data-tone", "valid");
+    await expect(publicPage.locator("main")).not.toContainText(
+      /[a-f0-9]{64}/iu,
     );
     await publicPage.evaluate(() => {
       delete (window as typeof window & { releaseRead?: () => void })
@@ -754,6 +951,8 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     await expect(
       publicPage.getByRole("button", { name: "Quitar archivo", exact: true }),
     ).toBeHidden();
+    await expect(dropzone).toBeVisible();
+    await expect(publicPage.locator("[data-local-selection]")).toBeHidden();
     await publicPage.evaluate(() =>
       (window as typeof window & { releaseRead?: () => void }).releaseRead?.(),
     );
@@ -769,7 +968,10 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     ).toHaveText("");
     await expect(
       publicPage.getByLabel("SHA-256 del archivo seleccionado"),
-    ).toBeHidden();
+    ).toHaveCount(0);
+    await expect(publicPage.getByLabel("Seleccionar PDF firmado")).toHaveValue(
+      "",
+    );
     expect(transmitted).toBe(0);
     const anonymousFile = await publicPage.request.get(
       `/app/certificados/${record.id}/firmado.pdf`,
@@ -838,9 +1040,25 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       fullPage: true,
     });
     await page.goto(`/app/certificados/${record.id}`);
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      const publicAction = await page
+        .getByRole("link", { name: "Consultar estado público" })
+        .boundingBox();
+      const revokeAction = await page
+        .getByRole("button", { name: "Revocar certificado", exact: true })
+        .boundingBox();
+      if (width >= 768) expect(revokeAction!.y).toBe(publicAction!.y);
+      await page.screenshot({
+        path: testInfo.outputPath(`issued-actions-${width}.png`),
+        fullPage: true,
+      });
+    }
     await page
       .getByRole("button", { name: "Revocar certificado", exact: true })
-      .click();
+      .focus();
+    await page.keyboard.press("Enter");
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(
@@ -859,6 +1077,31 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     );
     await page.getByRole("button", { name: "Revocar", exact: true }).click();
     expect((await revoked).status()).toBe(200);
+    await expect(page.getByText("Revocado", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Documento", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Revocar certificado", exact: true }),
+    ).toHaveCount(0);
+    await expect(page.locator("[data-signed-pdf-form]")).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Descargar firmado", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Consultar estado público" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(substituted.signedSha256!, { exact: true }),
+    ).toBeVisible();
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: testInfo.outputPath(`revoked-detail-${width}.png`),
+        fullPage: true,
+      });
+    }
     await publicPage.reload();
     await expect(
       publicPage.getByRole("heading", {
@@ -876,12 +1119,121 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         name: "Resultado de comparación local",
       }),
     ).toContainText("coincide, pero el certificado no es válido");
+    await expect(localResult).toHaveAttribute("data-tone", "invalid");
+    await expect(dropzone).toBeHidden();
+    await expect(publicPage.locator("main")).not.toContainText(
+      /[a-f0-9]{64}/iu,
+    );
+    expect(transmitted).toBe(0);
+    for (const width of [375, 768, 1440]) {
+      await publicPage.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(publicPage);
+      await publicPage.screenshot({
+        path: testInfo.outputPath(`public-revoked-${width}.png`),
+        fullPage: true,
+      });
+    }
     await expect(
       page.getByRole("link", { name: "Preparar reemplazo" }),
     ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Regenerar PDF", exact: true }),
     ).toHaveCount(0);
+    const reissue = page.getByRole("button", {
+      name: "Emitir nuevo",
+      exact: true,
+    });
+    await expect(reissue).toBeVisible();
+    await reissue.focus();
+    await page.keyboard.press("Enter");
+    await expect(page).not.toHaveURL(
+      new RegExp(`/app/certificados/${record.id}$`),
+    );
+    await expect(page).toHaveURL(/\/app\/certificados\/[0-9a-f-]{36}$/u);
+    const newId = new URL(page.url()).pathname.split("/").at(-1)!;
+    expect(newId).not.toBe(record.id);
+    const reissued = (
+      (await (
+        await page.request.get(`/app/certificados/${newId}`, { headers })
+      ).json()) as { data: CertificateDto }
+    ).data;
+    expect(reissued.state).toBe("generated");
+    expect(reissued.publicCredentialId).not.toBe(record.publicCredentialId);
+    const history = page.getByRole("region", {
+      name: "Certificados revocados",
+    });
+    const historicalCard = history.getByRole("link");
+    await expect(historicalCard).toContainText("Corrección sintética QA");
+    await expect(historicalCard).toHaveAttribute(
+      "href",
+      `/app/certificados/${record.id}`,
+    );
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: testInfo.outputPath(`reissued-history-${width}.png`),
+        fullPage: true,
+      });
+    }
+    await historicalCard.click();
+    await expect(page.getByText("Revocado", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Emitir nuevo", exact: true }),
+    ).toHaveCount(0);
+    await page.goto(`/app/certificados/${newId}`);
+    await uploadReviewIssue(
+      page,
+      reissued,
+      await signedFixture("SYNTHETIC QA: reissued signed PDF"),
+    );
+    await publicPage.goto(`/certificados/${reissued.publicCredentialId}`);
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado vigente",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await publicPage.goto(`/certificados/${record.publicCredentialId}`);
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado revocado",
+        exact: true,
+      }),
+    ).toBeVisible();
+    const signedReissue = (
+      (await (
+        await page.request.get(`/app/certificados/${newId}`, { headers })
+      ).json()) as { data: CertificateDto }
+    ).data;
+    const secondRevocation = await page.request.post(
+      `/app/certificados/${newId}?operation=revoke`,
+      {
+        headers,
+        form: {
+          revision: String(signedReissue.revision),
+          requestKey: crypto.randomUUID(),
+          reason: "Segunda revocación sintética QA",
+        },
+      },
+    );
+    expect(secondRevocation.status()).toBe(200);
+    await page.reload();
+    await page
+      .getByRole("button", { name: "Emitir nuevo", exact: true })
+      .click();
+    await expect(page).not.toHaveURL(new RegExp(`/app/certificados/${newId}$`));
+    await expect(history.getByRole("link")).toHaveCount(2);
+    await expect(history).toContainText("Corrección sintética QA");
+    await expect(history).toContainText("Segunda revocación sintética QA");
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(page);
+      await page.screenshot({
+        path: testInfo.outputPath(`history-cards-${width}.png`),
+        fullPage: true,
+      });
+    }
   } finally {
     try {
       await anonymous?.close();

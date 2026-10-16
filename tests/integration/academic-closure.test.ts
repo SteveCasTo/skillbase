@@ -15,6 +15,8 @@ import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
 import { createClosureFixture } from "../fixtures/academic-closure";
 import { evaluationFixtureTables } from "../fixtures/evaluation-cleanup";
 import type { InternalUser } from "@/domain/auth/types";
+import { DrizzleCourseReportRepository } from "@/server/db/repositories/course-report-repository";
+import { buildCourseReport } from "@/application/courses/course-report";
 
 const connection = createDatabase(getTestSupabaseEnvironment().databaseUrl, {
   max: 8,
@@ -30,14 +32,25 @@ afterAll(async () => {
   );
   await connection.close();
 });
-async function setup() {
+async function setup(withAttendance = false) {
   now = new Date("2099-02-01T12:00:00Z");
   const f = await createClosureFixture(db, clock);
+  const components = withAttendance
+    ? [
+        { ...f.components[0]!, weight: "50" },
+        {
+          id: crypto.randomUUID(),
+          name: "Asistencia",
+          type: "ATTENDANCE" as const,
+          weight: "50",
+        },
+      ]
+    : f.components;
   await evaluations.saveScheme(f.admin.id, {
     courseId: f.course.id,
     requestKey: crypto.randomUUID(),
     schemeRevision: 0,
-    components: f.components,
+    components,
   });
   const groupId = f.groups[0]!.id;
   const command = {
@@ -60,7 +73,7 @@ async function setup() {
     revision: cancelled.revision,
     reason: "Synthetic cancellation",
   });
-  return { ...f, command, groupId };
+  return { ...f, components, command, groupId };
 }
 async function completeGrade(f: Awaited<ReturnType<typeof setup>>) {
   return evaluations.saveRow(f.instructor.id, {
@@ -123,6 +136,18 @@ test("academic closure lifecycle validates blockers, permissions and immutable h
   });
   expect(await db.select().from(s.participantAttendance)).toHaveLength(0);
   const first = await repo.close(f.instructor.id, f.command);
+  const courseReports = new DrizzleCourseReportRepository(db);
+  const reportFilter = { search: f.course.slug, status: "ALL" as const };
+  const closedReport = buildCourseReport(
+    await courseReports.read(f.admin.id, reportFilter, now),
+    reportFilter,
+    now,
+  );
+  expect(closedReport.courses[0]!.groups[0]).toMatchObject({
+    enrolled: 1,
+    passed: 0,
+    notPassed: 1,
+  });
   expect(first).toMatchObject({ status: "CLOSED", revision: 1, version: 1 });
   expect(await repo.close(f.instructor.id, f.command)).toEqual(first);
   await expect(
@@ -250,6 +275,16 @@ test("academic closure lifecycle validates blockers, permissions and immutable h
   expect(closedAttendance.reviewCandidates).toEqual([]);
   const reopened = await repo.reopen(f.admin2.id, reopen);
   expect(reopened).toMatchObject({ status: "OPEN", revision: 2, version: 1 });
+  const reopenedReport = buildCourseReport(
+    await courseReports.read(f.admin.id, reportFilter, now),
+    reportFilter,
+    now,
+  );
+  expect(reopenedReport.courses[0]!.groups[0]).toMatchObject({
+    enrolled: 1,
+    passed: null,
+    notPassed: null,
+  });
   expect(await repo.reopen(f.admin2.id, reopen)).toEqual(reopened);
   state = await repo.getGroup(f.admin.id, f.course.id, f.groupId);
   expect(state.official).toBeNull();
@@ -279,6 +314,16 @@ test("academic closure lifecycle validates blockers, permissions and immutable h
   const next = await repo.close(f.admin2.id, nextCommand);
   expect(next).toMatchObject({ version: 2, revision: 3, status: "CLOSED" });
   const official = await repo.getVersion(f.admin.id, f.course.id, f.groupId, 2);
+  const currentReport = buildCourseReport(
+    await courseReports.read(f.admin.id, reportFilter, now),
+    reportFilter,
+    now,
+  );
+  expect(currentReport.courses[0]!.groups[0]).toMatchObject({
+    enrolled: 1,
+    passed: 1,
+    notPassed: 0,
+  });
   await expect(
     repo.getVersion(f.instructor.id, f.course.id, f.groupId, 1),
   ).rejects.toMatchObject({ code: "FORBIDDEN" });
@@ -337,6 +382,240 @@ test("academic closure lifecycle validates blockers, permissions and immutable h
     code: "FORBIDDEN",
   });
 });
+async function attendanceGradeLifecycle() {
+  now = new Date("2099-02-01T12:00:00Z");
+  const f = await createClosureFixture(db, clock);
+  const courseId = f.course.id,
+    groupId = f.groups[0]!.id;
+  const components = [
+    {
+      id: crypto.randomUUID(),
+      name: "Asistencia",
+      type: "ATTENDANCE" as const,
+      weight: "25",
+    },
+    {
+      id: crypto.randomUUID(),
+      name: "Asistencia adicional",
+      type: "ATTENDANCE" as const,
+      weight: "25",
+    },
+    {
+      id: crypto.randomUUID(),
+      name: "Asistencia",
+      type: "THEORY" as const,
+      weight: "50",
+    },
+  ];
+  await evaluations.saveScheme(f.admin.id, {
+    courseId,
+    requestKey: crypto.randomUUID(),
+    schemeRevision: 0,
+    components,
+  });
+  let data = await evaluations.getCourse(f.admin.id, courseId, groupId);
+  await f.attendance.cancel(f.admin.id, {
+    courseId,
+    groupId,
+    sessionId: f.calendar.sessions[3]!.id,
+    revision: f.calendar.sessions[3]!.revision,
+    requestKey: crypto.randomUUID(),
+    reason: "Synthetic cancelled encounter",
+  });
+  await f.attendance.replace(f.admin.id, {
+    courseId,
+    groupId,
+    sessionId: f.calendar.sessions[2]!.id,
+    revision: f.calendar.sessions[2]!.revision,
+    requestKey: crypto.randomUUID(),
+    startsAt: "2099-03-10T08:00",
+  });
+  expect(data.scheme.frozenAt).toBeNull();
+  expect(data.hasAttendanceOverrides).toBe(false);
+  expect(data.participants).toHaveLength(0);
+  now = new Date("2099-03-02T12:00:00Z");
+  data = await evaluations.getCourse(f.admin.id, courseId, groupId);
+  let person = data.participants.find((p) => p.registrationId === f.paid.id)!;
+  expect(person.grades[0]).toMatchObject({
+    score: null,
+    canEdit: false,
+    origin: "AUTO",
+  });
+  const command = {
+    courseId,
+    groupId,
+    schemeRevision: 1,
+    requestKey: crypto.randomUUID(),
+  };
+  await expect(
+    evaluations.saveGrade(f.instructor.id, {
+      ...command,
+      registrationId: f.paid.id,
+      componentId: components[0]!.id,
+      gradeRevision: 0,
+      score: "100",
+    }),
+  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  const first = f.calendar.sessions[0]!;
+  await f.attendance.record(f.instructor.id, {
+    courseId,
+    groupId,
+    sessionId: first.id,
+    revision: first.revision,
+    requestKey: crypto.randomUUID(),
+    marks: [{ registrationId: f.paid.id, status: "EXCUSED" }],
+  });
+  data = await evaluations.getCourse(f.admin.id, courseId, groupId);
+  expect(
+    data.participants.find((p) => p.registrationId === f.paid.id)!.grades[0],
+  ).toMatchObject({ score: "100.00", canEdit: false });
+  expect(data.scheme.frozenAt).toBeNull();
+  expect(
+    await db
+      .select()
+      .from(s.evaluationGrades)
+      .where(eq(s.evaluationGrades.courseId, courseId)),
+  ).toHaveLength(0);
+  now = new Date("2099-03-03T03:59:59Z");
+  expect(
+    (await evaluations.getCourse(f.admin.id, courseId, groupId))
+      .participants[0]!.grades[0]!.score,
+  ).toBe("100.00");
+  now = new Date("2099-03-06T12:00:00Z");
+  data = await evaluations.getCourse(f.instructor.id, courseId, groupId);
+  expect(data.participants[0]!.grades[0]).toMatchObject({
+    score: "50.00",
+    canEdit: false,
+  });
+  expect(
+    (await repo.getGroup(f.admin.id, courseId, groupId)).blockers,
+  ).toContain("SESSIONS_UNFINISHED");
+  now = new Date("2099-03-11T12:00:00Z");
+  data = await evaluations.getCourse(f.instructor.id, courseId, groupId);
+  person = data.participants.find((p) => p.registrationId === f.paid.id)!;
+  expect(person.grades[0]).toMatchObject({
+    score: "33.33",
+    canEdit: true,
+    revision: 0,
+  });
+  expect(person.grades[1]!.score).toBe("33.33");
+  // No GET, including the closure read, may persist/freeze an automatic grade.
+  await repo.getGroup(f.admin.id, courseId, groupId);
+  expect(
+    (await evaluations.getCourse(f.admin.id, courseId, groupId)).scheme
+      .frozenAt,
+  ).toBeNull();
+  const saved = await evaluations.saveRow(f.instructor.id, {
+    ...command,
+    registrationId: f.paid.id,
+    grades: [
+      { componentId: components[0]!.id, gradeRevision: 0, score: "0" },
+      { componentId: components[2]!.id, gradeRevision: 0, score: "80" },
+    ],
+  });
+  expect(saved).toMatchObject({ kind: "row", result: { finalGrade: "48.33" } });
+  data = await evaluations.getCourse(f.admin.id, courseId, groupId);
+  expect(data.scheme.frozenAt).not.toBeNull();
+  expect(data.hasAttendanceOverrides).toBe(true);
+  await evaluations.saveGrade(f.admin.id, {
+    courseId,
+    groupId: f.groups[1]!.id,
+    schemeRevision: data.scheme.revision,
+    requestKey: crypto.randomUUID(),
+    registrationId: f.otherGroup.id,
+    componentId: components[0]!.id,
+    gradeRevision: 0,
+    score: "88",
+  });
+  const reset = {
+    ...command,
+    schemeRevision: data.scheme.revision,
+    requestKey: crypto.randomUUID(),
+  };
+  await expect(
+    evaluations.resetAttendance(f.foreign.id, reset),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  const snapshot = await repo.close(f.instructor.id, {
+    courseId,
+    groupId,
+    requestKey: crypto.randomUUID(),
+    revision: 0,
+  });
+  expect(snapshot.status).toBe("CLOSED");
+  await expect(
+    evaluations.resetAttendance(f.admin.id, reset),
+  ).rejects.toMatchObject({ code: "GROUP_CLOSED" });
+  const original = await repo.getVersion(f.admin.id, courseId, groupId, 1);
+  expect(original.report.participants[0]!.grades.map((g) => g.score)).toEqual([
+    "0.00",
+    "33.33",
+    "80.00",
+  ]);
+  const persisted = await db
+    .select()
+    .from(s.evaluationGrades)
+    .where(eq(s.evaluationGrades.courseId, courseId));
+  expect(
+    persisted.find((g) => g.componentId === components[1]!.id)!.origin,
+  ).toBe("AUTO");
+  await repo.reopen(f.admin.id, {
+    courseId,
+    groupId,
+    requestKey: crypto.randomUUID(),
+    revision: 1,
+  });
+  await f.attendance.record(f.admin.id, {
+    courseId,
+    groupId,
+    sessionId: first.id,
+    revision: first.revision + 1,
+    requestKey: crypto.randomUUID(),
+    marks: [{ registrationId: f.paid.id, status: "ABSENT" }],
+  });
+  data = await evaluations.getCourse(f.instructor.id, courseId, groupId);
+  person = data.participants.find((p) => p.registrationId === f.paid.id)!;
+  expect(person.grades.map((g) => g.score)).toEqual(["0.00", "0.00", "80.00"]);
+  expect(person.grades[0]!.origin).toBe("MANUAL");
+  const result = await evaluations.resetAttendance(f.instructor.id, reset);
+  expect(await evaluations.resetAttendance(f.instructor.id, reset)).toEqual(
+    result,
+  );
+  data = await evaluations.getCourse(f.admin.id, courseId, groupId);
+  expect(data.hasAttendanceOverrides).toBe(false);
+  const otherGroup = await evaluations.getCourse(
+    f.admin.id,
+    courseId,
+    f.groups[1]!.id,
+  );
+  expect(otherGroup.hasAttendanceOverrides).toBe(true);
+  expect(otherGroup.participants[0]!.grades[0]).toMatchObject({
+    origin: "MANUAL",
+    score: "88.00",
+  });
+  expect(data.participants[0]!.grades[2]).toMatchObject({
+    score: "80.00",
+    origin: "MANUAL",
+  });
+  expect(await repo.getVersion(f.admin.id, courseId, groupId, 1)).toEqual(
+    original,
+  );
+  expect(
+    (
+      await db
+        .select()
+        .from(s.auditEvents)
+        .where(
+          and(
+            eq(s.auditEvents.entityId, courseId),
+            eq(s.auditEvents.action, "EVALUATION_ATTENDANCE_GRADE_RECORDED"),
+          ),
+        )
+    ).some(
+      (a) =>
+        a.metadata.fromOrigin === "MANUAL" && a.metadata.toOrigin === "AUTO",
+    ),
+  ).toBe(true);
+}
 
 test("academic closure privacy projects open, official and historical loaders using fresh actor roles and ownership", async () => {
   const f = await setup();
@@ -593,10 +872,11 @@ test("academic closure waits for explicit historical attendance review and never
   expect(
     official.report.sessions[0]!.participants[0]!.attendance,
   ).toMatchObject({ status: "PRESENT", inferred: false, markedBy: f.admin.id });
+  await attendanceGradeLifecycle();
 });
 
 test("academic closure transactions serialize close with grade and attendance writes and competing revisions", async () => {
-  const f = await setup();
+  const f = await setup(true);
   now = new Date("2099-03-06T12:00:00Z");
   await completeGrade(f);
   const selected = f.calendar.sessions[0]!;
@@ -623,9 +903,10 @@ test("academic closure transactions serialize close with grade and attendance wr
   ]);
   expect(outcomes[2]!.status).toBe("fulfilled");
   const official = await repo.getVersion(f.admin.id, f.course.id, f.groupId, 1);
-  expect(official.report.participants[0]!.result.finalGrade).toBe(
+  expect(official.report.participants[0]!.grades.map((g) => g.score)).toEqual([
     outcomes[0]!.status === "fulfilled" ? "95.00" : "70.00",
-  );
+    outcomes[1]!.status === "fulfilled" ? "33.33" : "0.00",
+  ]);
   expect(
     official.report.sessions.find((session) => session.id === selected.id)!
       .participants[0]!.attendance.status,
@@ -639,6 +920,19 @@ test("academic closure transactions serialize close with grade and attendance wr
     revision: 1,
     reason: "QA competition",
   });
+  await evaluations.saveGrade(f.admin.id, {
+    ...gradeInput,
+    requestKey: crypto.randomUUID(),
+    componentId: f.components[1]!.id,
+    gradeRevision: 1,
+    score: "80",
+  });
+  const reset = {
+    courseId: f.course.id,
+    groupId: f.groupId,
+    schemeRevision: 2,
+    requestKey: crypto.randomUUID(),
+  };
   const competing = await Promise.allSettled([
     repo.close(f.admin.id, {
       ...f.command,
@@ -650,11 +944,24 @@ test("academic closure transactions serialize close with grade and attendance wr
       requestKey: crypto.randomUUID(),
       revision: 2,
     }),
+    evaluations.resetAttendance(f.instructor.id, reset),
   ]);
-  expect(competing.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-  expect(competing.filter((r) => r.status === "rejected")[0]).toMatchObject({
+  expect(
+    competing.slice(0, 2).filter((r) => r.status === "fulfilled"),
+  ).toHaveLength(1);
+  expect(
+    competing.slice(0, 2).filter((r) => r.status === "rejected")[0],
+  ).toMatchObject({
     reason: { code: "CONCURRENT_UPDATE" },
   });
+  const latest = await repo.getVersion(f.admin.id, f.course.id, f.groupId, 2);
+  expect(latest.report.participants[0]!.grades[1]!.score).toBe(
+    competing[2]!.status === "fulfilled"
+      ? official.report.participants[0]!.grades[1]!.score
+      : "80.00",
+  );
+  if (competing[2]!.status === "rejected")
+    expect(competing[2]!.reason).toMatchObject({ code: "GROUP_CLOSED" });
   expect(
     (await repo.getGroup(f.admin.id, f.course.id, f.groupId)).history.map(
       (v) => v.version,
@@ -835,6 +1142,26 @@ test("academic closure private HTTP and database guards preserve snapshots and d
   expect(functions).toHaveLength(2);
   expect(functions.every((r) => !r.granted)).toBe(true);
   await assertCurrentMigrationLedger(db);
+  const beforeReplay = await db
+    .select()
+    .from(s.academicClosureVersions)
+    .orderBy(s.academicClosureVersions.id);
+  const attendanceMigration = await Bun.file(
+    new URL("../../drizzle/0029_attendance_grade.sql", import.meta.url),
+  ).text();
+  for (const statement of attendanceMigration.split("--> statement-breakpoint"))
+    if (statement.trim()) await db.execute(sql.raw(statement));
+  expect(
+    await db
+      .select()
+      .from(s.academicClosureVersions)
+      .orderBy(s.academicClosureVersions.id),
+  ).toEqual(beforeReplay);
+  await assertCurrentMigrationLedger(db);
+  const originFunction = await db.execute<{ granted: boolean }>(
+    sql`select has_function_privilege('anon', 'public.record_attendance_grade_origin()', 'EXECUTE') or has_function_privilege('authenticated', 'public.record_attendance_grade_origin()', 'EXECUTE') or has_function_privilege('service_role', 'public.record_attendance_grade_origin()', 'EXECUTE') as granted`,
+  );
+  expect(originFunction[0]!.granted).toBe(false);
   // Revoked current roles also deny loader access despite a stale ADMIN DTO.
   await db
     .delete(s.userRoles)

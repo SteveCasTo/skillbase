@@ -10,16 +10,8 @@ import {
   registrationDisplayNames,
 } from "./columns";
 
-/** Quotes alone do not prevent spreadsheet formulas. Retain the original text
- * after the apostrophe, including leading whitespace/control/format characters.
- */
-export function csvText(value: string, identifier = false): string {
-  const unsafe =
-    /^[\s\p{Cc}\p{Cf}]*[=+\-@]/u.test(value) ||
-    /^[\s\p{Cc}\p{Cf}]*[\t\r\n]/u.test(value);
-  const safe = identifier || unsafe ? `'${value}` : value;
-  return `"${safe.replaceAll('"', '""')}"`;
-}
+import { csvText } from "@/server/exports/csv-text";
+export { csvText } from "@/server/exports/csv-text";
 export function renderRegistrationsCsv(
   rows: readonly RegistrationExportRow[],
 ): Uint8Array {

@@ -37,6 +37,11 @@ export async function prepareGroupCertificates(
       // These recipients were validated against their immutable official source.
       recipients = load.data
         .filter((row) => row.type === type)
+        .filter(
+          (row, index, rows) =>
+            rows.findIndex((other) => other.recipientId === row.recipientId) ===
+            index,
+        )
         .map((row) => ({ id: row.recipientId, name: row.data.recipientName }));
     }
     return {
@@ -44,9 +49,15 @@ export async function prepareGroupCertificates(
       recipients: recipients.map((recipient) => ({
         ...recipient,
         record: load.available
-          ? load.data.find(
+          ? (load.data.find(
+              (row) =>
+                row.type === type &&
+                row.recipientId === recipient.id &&
+                row.state !== "revoked",
+            ) ??
+            load.data.findLast(
               (row) => row.type === type && row.recipientId === recipient.id,
-            )
+            ))
           : undefined,
       })),
     };
