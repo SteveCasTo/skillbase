@@ -60,7 +60,8 @@ test("mobile drawer closes with Escape and restores keyboard focus", async ({
     "inert",
     "",
   );
-  await expect(page.getByRole("main")).toHaveCount(0);
+  await trigger.evaluate((element) => element.focus());
+  await expect(page.getByRole("button", { name: "Cerrar menú" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
