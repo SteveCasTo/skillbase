@@ -198,9 +198,12 @@ Cada página debe tener un `h1` coherente.
 
 Objetivo: WCAG 2.2 AA cuando sea razonable.
 
-El menú privado móvil aísla el fondo con `inert` mientras está abierto, además
-del ciclo de Tab, Escape y retorno de foco existentes. Al cerrar restaura el
-acceso al contenido sin cambiar el diseño ni añadir instrucciones.
+El menú privado móvil aísla el fondo y la isla externa de notificaciones con
+`inert` mientras está abierto. El panel utiliza la convención existente
+`data-slot="dialog-content"` / `data-state` para recibir el portal de Sileo;
+el ciclo de Tab incluye sus grupos enfocables y acciones. Escape, resize y
+descarte de navegación restauran los valores previos de `inert`, sin añadir
+instrucciones ni cambiar el diseño.
 
 Requisitos mínimos:
 

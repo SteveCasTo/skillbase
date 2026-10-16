@@ -123,6 +123,8 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
           role="dialog"
           aria-modal="true"
           aria-labelledby="private-mobile-title"
+          data-slot="dialog-content"
+          data-state="closed"
         >
           <div class="private-mobile-top">
             <h2 id="private-mobile-title" class="text-lg font-semibold">
@@ -189,7 +191,9 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
   </div>
   <script>
     let navigationListeners: AbortController | undefined;
+    let restoreDrawerBackground: (() => void) | undefined;
     document.addEventListener("astro:before-swap", () => {
+      restoreDrawerBackground?.();
       navigationListeners?.abort();
       document.body.classList.remove("private-drawer-open");
     });
@@ -213,9 +217,29 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
         const mobilePanel = drawer?.querySelector<HTMLElement>(
           ".private-mobile-panel",
         );
-        const background = shell.querySelectorAll<HTMLElement>(
-          ".private-sidebar, .private-mobile-header, .private-main-scroll",
-        );
+        const background = new Map<HTMLElement, boolean>();
+        const restoreBackground = () => {
+          background.forEach((wasInert, element) => (element.inert = wasInert));
+          background.clear();
+        };
+        restoreDrawerBackground = restoreBackground;
+        const isolateBackground = () => {
+          const elements = [
+            ...shell.querySelectorAll<HTMLElement>(
+              ".private-sidebar, .private-mobile-header, .private-main-scroll",
+            ),
+            // The persisted host starts outside the dialog. Its portal can move
+            // inside the panel without inheriting the island root's inert state.
+            ...document.querySelectorAll<HTMLElement>(
+              'astro-island[component-export="SileoHost"]',
+            ),
+          ];
+          elements.forEach((element) => {
+            if (!background.has(element))
+              background.set(element, element.inert);
+            element.inert = true;
+          });
+        };
         let keyboardFocus = false;
         let returnFocus: HTMLElement | null = null;
 
@@ -297,8 +321,9 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
           if (!drawer || drawer.hidden || drawer.dataset.state !== "open")
             return;
           drawer.dataset.state = "closed";
+          if (mobilePanel) mobilePanel.dataset.state = "closed";
           drawer.inert = true;
-          background.forEach((element) => (element.inert = false));
+          restoreBackground();
           openButton?.setAttribute("aria-expanded", "false");
           document.body.classList.remove("private-drawer-open");
           if (restoreFocus) returnFocus?.focus();
@@ -345,9 +370,10 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
           returnFocus = openButton;
           drawer.hidden = false;
           drawer.inert = false;
-          background.forEach((element) => (element.inert = true));
+          isolateBackground();
           mobilePanel?.getBoundingClientRect();
           drawer.dataset.state = "open";
+          if (mobilePanel) mobilePanel.dataset.state = "open";
           openButton.setAttribute("aria-expanded", "true");
           document.body.classList.add("private-drawer-open");
           closeButton?.focus();
@@ -368,9 +394,13 @@ const oauthLoginNotice = consumeOAuthLoginNotice(
           if (event.key !== "Tab") return;
           const focusable = Array.from(
             drawer.querySelectorAll<HTMLElement>(
-              "a, button:not([disabled]), summary",
+              'a[href], button:not([disabled]), summary, [tabindex]:not([tabindex="-1"])',
             ),
-          ).filter((element) => element.getClientRects().length > 0);
+          ).filter(
+            (element) =>
+              element.getClientRects().length > 0 &&
+              !element.closest("[inert]"),
+          );
           const first = focusable[0];
           const last = focusable.at(-1);
           if (event.shiftKey && document.activeElement === first) {
