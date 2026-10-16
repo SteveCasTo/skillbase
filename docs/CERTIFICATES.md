@@ -99,14 +99,23 @@ No mostrar:
 `/certificados` y el resultado público aprovechan el contenedor de `CourseShell`
 (máximo 86 rem), sin columnas exteriores estrechas adicionales; sus márgenes
 compactos coinciden con la landing sin cambiar otras páginas públicas. El resultado
-presenta el estado como título, los datos permitidos y «Comprobar tu archivo»;
-los errores de consulta y los resultados de comparación permanecen visibles
-inline, sin un toast duplicado.
+presenta el estado como título sobre dos columnas equivalentes. En desktop, la
+tarjeta de datos y la zona vacía de archivo comparten altura y bordes superior e
+inferior; en mobile se apilan sin forzar altura. «Comprobar tu archivo» conserva
+solo su encabezado accesible. Archivo seleccionado y resultado siguen compactos.
+Los errores de consulta y los resultados de comparación permanecen visibles
+inline; una Promise real de Sileo complementa la lectura local y el SHA-256.
+Solo la coincidencia vigente termina en éxito; coincidencia revocada/reemplazada
+y archivo distinto terminan en error, nunca en una confirmación verde. Quitar o
+cambiar archivo cancela el aviso pendiente sin reutilizar su resultado.
 El detalle de una credencial omite «Consultar otro certificado» para centrar la
 atención en su estado y comprobación local, también cuando aún no está emitida.
 La búsqueda inicial sigue disponible en `/certificados`; el desplegable de consulta
 se conserva únicamente como recuperación ante registro no encontrado o consulta
 no disponible. La navegación institucional y las URLs no cambian.
+El botón de consulta fuera de la landing conserva el fondo primario y usa el
+token `deep` del shell público para el texto, en lugar de blanco sobre coral,
+para mantener contraste AA sin cambiar tokens globales ni la variante landing.
 El selector público admite teclado y arrastre, muestra el nombre del archivo
 y ofrece «Quitar archivo» solo tras seleccionarlo. La zona de arrastre y el
 archivo seleccionado son mutuamente excluyentes; quitarlo limpia también el
@@ -179,6 +188,8 @@ sin JavaScript la descarga conserva POST/attachment y, si se actualizó, se debe
 recargar el detalle antes de cargar el firmado (la revisión anterior se deniega).
 
 La zona de arrastre ADMIN ocupa todo el ancho del contenido, sin panel explicativo.
+Su altura mínima se reduce moderadamente de 15 rem a 12.5 rem, manteniendo diseño,
+icono, texto y padding; este ajuste no se aplica al verificador público.
 Seleccionar o arrastrar un PDF la sustituye por el archivo y su X; una vez validado
 aparece «Guardar PDF firmado» o «Sustituir PDF firmado» a su lado (apilado en mobile).
 Quitarlo limpia selección/errores y devuelve la zona y el foco al selector.
@@ -193,8 +204,13 @@ la validación completa de contenido sigue siendo del servidor.
 
 Un firmado nunca se actualiza automáticamente. Solo ofrece «Descargar firmado»;
 la descarga unsigned también se deniega por URL directa. Sustituir exige un
-nuevo archivo y mantiene ID/metadata. Los errores y progreso de carga se
-presentan inline, sin toast persistente.
+nuevo archivo y mantiene ID/metadata. Guardar/sustituir usa una única Promise real
+de Sileo hasta recibir y validar el registro firmado confirmado por el servidor
+(estado, artefacto, hash y fecha de emisión). El botón conserva su texto y no
+añade spinner ni progreso inline; disabled/aria-busy previenen doble envío. Los
+errores permanecen junto al formulario y conservan selección para reintentar.
+Las tarjetas revocadas reutilizan la grilla, superficie, padding, espaciado,
+hover y foco del historial de cierres, sin ordinales ni datos técnicos nuevos.
 
 Las descargas privadas de certificados usan una Promise real de Sileo, sin
 «Preparando descarga…» debajo del botón: preparación POST o lectura GET, respuesta

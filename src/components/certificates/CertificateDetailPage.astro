@@ -278,29 +278,39 @@ const showDocument =
       {history.length > 0 && (
         <section
           aria-label="Certificados revocados"
-          class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          class="flex min-w-0 flex-col gap-4"
         >
-          {history.map((previous) => (
-            <a
-              href={`${instructorRoute ? "/app/mis-certificados" : "/app/certificados"}/${previous.id}`}
-              class="flex min-w-0 flex-col gap-2 rounded-xl border p-4 focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              <span class="font-medium">Revocado</span>
-              {previous.revokedAt && (
-                <time datetime={previous.revokedAt} class="text-sm">
-                  {new Intl.DateTimeFormat("es-BO", {
-                    dateStyle: "medium",
-                    timeZone: "America/La_Paz",
-                  }).format(new Date(previous.revokedAt))}
-                </time>
-              )}
-              {previous.reason && (
-                <p class="break-words text-sm text-muted-foreground">
-                  {previous.reason}
-                </p>
-              )}
-            </a>
-          ))}
+          <ol class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {history.map((previous) => (
+              <li class="min-w-0">
+                <a
+                  href={`${instructorRoute ? "/app/mis-certificados" : "/app/certificados"}/${previous.id}`}
+                  class="flex h-full min-w-0 flex-col gap-3 rounded-xl border bg-card p-5 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  <span class="font-semibold">
+                    Revocado
+                    {previous.revokedAt && (
+                      <>
+                        {" "}
+                        ·{" "}
+                        <time datetime={previous.revokedAt}>
+                          {new Intl.DateTimeFormat("es-BO", {
+                            dateStyle: "medium",
+                            timeZone: "America/La_Paz",
+                          }).format(new Date(previous.revokedAt))}
+                        </time>
+                      </>
+                    )}
+                  </span>
+                  {previous.reason && (
+                    <p class="break-words text-sm text-muted-foreground">
+                      {previous.reason}
+                    </p>
+                  )}
+                </a>
+              </li>
+            ))}
+          </ol>
         </section>
       )}
     </article>
