@@ -144,6 +144,16 @@ no una segunda distribución PDF. Una configuración persistida v1 requiere
 activación ADMIN explícita mediante el repositorio existente, con revisión y
 auditoría. El valor predeterminado para configuración ausente es v2.
 
+Refinamiento visual autorizado (2026-10-17), conservando v2 por indicación del
+usuario: franja navy redondeada con líneas laterales y rombos rojos discretos,
+destinatario en Merriweather Regular local (OFL), etiqueta/nombre/subrayado y
+curso con eje común. Se retiran la trama y los remates cuadrados inferiores de
+aprobación; los logos, QR, ID y contenido institucional se conservan. Se aplica
+solo a previews y futuras generaciones. No actualiza archivos, hashes ni snapshots
+existentes, no añade regeneración por GET ni cambia la comparación material del
+POST de descarga. Un borrador v2 ya almacenado conserva sus bytes si sus fuentes
+no cambiaron. Renovar datos seed requiere un plan y aprobación separados.
+
 El usuario autorizó sustituir los certificados de los namespaces **seed** local
 y cloud para que todos usen v2. Esa operación excepcional requiere PLAN con
 ownership/UUIDs/rutas/hashes/dependencias y aprobación antes de APPLY; no concede

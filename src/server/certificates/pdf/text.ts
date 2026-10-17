@@ -12,6 +12,7 @@ export interface TextBox {
   size: number;
   minimumSize: number;
   align?: "left" | "center";
+  verticalAlign?: "middle";
   color?: ReturnType<typeof rgb>;
 }
 
@@ -118,6 +119,11 @@ export function drawCertificateText(
 ) {
   const layout = fitCertificateText(text, font, box);
   const height = page.getHeight();
+  const top =
+    box.top +
+    (box.verticalAlign === "middle"
+      ? (box.height - layout.lines.length * layout.lineHeight) / 2
+      : 0);
   for (const [index, line] of layout.lines.entries()) {
     const offset =
       box.align === "center"
@@ -127,7 +133,7 @@ export function drawCertificateText(
       font,
       size: layout.size,
       x: box.x + offset,
-      y: height - box.top - layout.size - index * layout.lineHeight,
+      y: height - top - layout.size - index * layout.lineHeight,
       color: box.color ?? rgb(0, 0, 0),
     });
   }

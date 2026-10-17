@@ -183,6 +183,7 @@ for (const type of ["APPROVAL", "INSTRUCTOR"] as const) {
   test(`${type} produces exactly one Letter page with frozen fields, Unicode and three signature blocks`, async () => {
     const input = fixture(type);
     const signatureLines = spyOn(PDFPage.prototype, "drawLine");
+    const drawnText = spyOn(PDFPage.prototype, "drawText");
     const bytes = await renderCertificatePdf(input);
     const lineY = type === "APPROVAL" ? 80 : 120;
     expect(
@@ -190,6 +191,48 @@ for (const type of ["APPROVAL", "INSTRUCTOR"] as const) {
         ([line]) => line.start.y === lineY && line.end.y === lineY,
       ),
     ).toHaveLength(3);
+    const calls = drawnText.mock.calls;
+    const name = calls.find(([text]) => text === input.recipientName)![1]!;
+    const label = calls.find(
+      ([text]) => text === (type === "APPROVAL" ? "OTORGADO A:" : "A:"),
+    )!;
+    const introduction = calls.find(
+      ([text]) => text === certificateDocument(input).introduction,
+    )!;
+    const midpoint = (text: string, options: typeof name) =>
+      options.x! + options.font!.widthOfTextAtSize(text, options.size!) / 2;
+    const axis = midpoint(input.recipientName, name);
+    expect(name.font!.name).toBe("Merriweather-Regular");
+    expect(name.size).toBeGreaterThanOrEqual(14);
+    expect(axis).toBeCloseTo(midpoint(label[0], label[1]!), 5);
+    expect(axis).toBeCloseTo(midpoint(introduction[0], introduction[1]!), 5);
+    expect(Math.abs(axis - CERTIFICATE_PAGE_SIZES[type][0] / 2)).toBeLessThan(
+      20,
+    );
+    const underline = signatureLines.mock.calls.find(
+      ([line]) =>
+        line.start.y < name.y! &&
+        line.start.y > introduction[1]!.y! &&
+        line.start.y === line.end.y,
+    )![0];
+    expect((underline.start.x + underline.end.x) / 2).toBeCloseTo(axis, 5);
+    const band = calls.find(
+      ([text]) =>
+        text === (type === "APPROVAL" ? "DE APROBACIÓN" : "DE INSTRUCTOR"),
+    )!;
+    const bandLeft = band[1]!.x!;
+    const bandRight =
+      bandLeft + band[1]!.font!.widthOfTextAtSize(band[0], band[1]!.size!);
+    const rules = signatureLines.mock.calls.filter(
+      ([line]) => line.thickness === 0.65,
+    );
+    expect(rules).toHaveLength(2);
+    for (const [rule] of rules) {
+      expect(rule.end.x <= bandLeft || rule.start.x >= bandRight).toBe(true);
+      // Leave a clear gutter before the adjacent QR/code column at this height.
+      expect(rule.end.x).toBeLessThan((type === "APPROVAL" ? 612 : 414) - 12);
+    }
+    drawnText.mockRestore();
     signatureLines.mockRestore();
     const doc = await PDFDocument.load(bytes, { updateMetadata: false });
     expect(doc.getPageCount()).toBe(1);
@@ -372,6 +415,23 @@ test("long identities, course names and signatories wrap without truncation or a
     };
     const drawnText = spyOn(PDFPage.prototype, "drawText");
     const doc = await PDFDocument.load(await renderCertificatePdf(input));
+    const recipientLines = drawnText.mock.calls.filter(
+      ([, options]) => options?.font?.name === "Merriweather-Regular",
+    );
+    expect(recipientLines.map(([text]) => text).join(" ")).toBe(
+      input.recipientName,
+    );
+    for (const [text, options] of recipientLines) {
+      expect(options!.size).toBeGreaterThanOrEqual(14);
+      const axis =
+        options!.x! +
+        options!.font!.widthOfTextAtSize(text, options!.size!) / 2;
+      expect(Math.abs(axis - doc.getPage(0).getWidth() / 2)).toBeLessThan(20);
+      // Even a 128-character ID ends above the full-width recipient block.
+      expect(options!.y! + options!.size!).toBeLessThanOrEqual(
+        doc.getPage(0).getHeight() - (type === "APPROVAL" ? 243 : 288),
+      );
+    }
     const idLines = drawnText.mock.calls.slice(
       drawnText.mock.calls.findIndex(([text]) => text.startsWith("ID:")),
     );
