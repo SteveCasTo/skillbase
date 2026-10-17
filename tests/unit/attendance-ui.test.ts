@@ -113,10 +113,18 @@ function request(values: Record<string, string>, operation = "replace") {
     },
   );
 }
-test("attendance controls transport only a single explicit mark and keep pending out of commands", () => {
+test("attendance row controls keep one explicit mark while bulk payloads remain separate", () => {
   const id = crypto.randomUUID();
   expect(markValue(id, "PENDING")).toBe("");
   expect(validMarkValue(markValue(id, "EXCUSED"))).toBe(true);
+  const bulkMarks = [
+    { registrationId: id, status: "PRESENT" },
+    { registrationId: crypto.randomUUID(), status: "PRESENT" },
+  ];
+  expect(validMarkValue(JSON.stringify(bulkMarks))).toBe(false);
+  expect(
+    attendanceFormPayload({ marks: JSON.stringify(bulkMarks) }).marks,
+  ).toBe(JSON.stringify(bulkMarks));
   expect(
     validMarkValue(JSON.stringify([{ registrationId: id, status: "PENDING" }])),
   ).toBe(false);

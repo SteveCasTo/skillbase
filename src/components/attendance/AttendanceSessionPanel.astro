@@ -65,6 +65,14 @@ const candidates = detail.reviewCandidates.filter(
       (person) => person.registrationId === row.registrationId,
     ),
 );
+const editableParticipants = participants.filter(
+  (person) => session.canRecord && (isAdmin || person.currentlyEnrolled),
+);
+const showMarkAll =
+  !closedVersion &&
+  session.status !== "CANCELLED" &&
+  editableParticipants.length > 0 &&
+  editableParticipants.some((person) => person.attendance.status !== "PRESENT");
 const attemptedPerson = participants.find(
   (person) => person.registrationId === attemptedId,
 );
@@ -176,9 +184,32 @@ const inlineFailure =
         </section>
       )}
       <section aria-label="Asistencia de participantes" class="min-w-0">
-        <h2 class="text-lg font-semibold">
-          {correction ? "Corrección de asistencia" : "Asistencia"}
-        </h2>
+        <div class="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <h2
+            data-attendance-heading
+            tabindex="-1"
+            class="text-lg font-semibold"
+          >
+            {correction ? "Corrección de asistencia" : "Asistencia"}
+          </h2>
+          {showMarkAll && (
+            <button
+              type="button"
+              data-attendance-mark-all
+              data-targets={JSON.stringify(
+                editableParticipants.map((person) => person.registrationId),
+              )}
+              data-path={path}
+              data-revision={session.revision}
+              class={buttonVariants({
+                variant: "outline",
+                className: "min-h-11",
+              })}
+            >
+              Marcar todos presentes
+            </button>
+          )}
+        </div>
         {participants.length === 0 ? (
           <p class="py-5 text-sm text-muted-foreground">
             {session.administrativeReviewRequired

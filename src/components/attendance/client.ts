@@ -32,7 +32,11 @@ const cancelRefresh = () => {
   refreshController?.abort();
 };
 
-async function refreshSession(path: string, savedFormId?: string) {
+async function refreshSession(
+  path: string,
+  savedFormId?: string,
+  focusSelector?: string,
+) {
   cancelRefresh();
   const token = refreshGeneration;
   refreshController = new AbortController();
@@ -113,6 +117,9 @@ async function refreshSession(path: string, savedFormId?: string) {
     document.dispatchEvent(new Event("attendance:fragment"));
     const saved = savedFormId ? document.getElementById(savedFormId) : null;
     const focus =
+      (focusSelector
+        ? document.querySelector<HTMLElement>(focusSelector)
+        : null) ??
       saved?.querySelector<HTMLElement>("[data-mark-edit]") ??
       saved?.closest("article")?.querySelector<HTMLElement>("h3") ??
       document.querySelector<HTMLElement>("[data-attendance-title]");
@@ -125,6 +132,138 @@ async function refreshSession(path: string, savedFormId?: string) {
   } finally {
     current.removeAttribute("aria-busy");
   }
+}
+
+const hasPendingMutation = () =>
+  Boolean(
+    document.querySelector(
+      "[data-attendance-form][data-pending], [data-attendance-mark-all][data-pending]",
+    ),
+  );
+
+function initializeMarkAllButtons() {
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-attendance-mark-all]")
+    .forEach((button) => {
+      if (button.dataset.bound) return;
+      button.dataset.bound = "true";
+      button.addEventListener("click", async () => {
+        if (hasPendingMutation() || button.dataset.refreshRequired) return;
+        const path = button.dataset.path;
+        const revision = button.dataset.revision;
+        if (!path || !revision) return;
+        let targets: unknown;
+        try {
+          targets = JSON.parse(button.dataset.targets ?? "");
+        } catch {
+          return;
+        }
+        if (
+          !Array.isArray(targets) ||
+          targets.length === 0 ||
+          !targets.every((target) => typeof target === "string")
+        )
+          return;
+        const requestKey = crypto.randomUUID();
+        button.dataset.pending = "true";
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+        document
+          .querySelectorAll<HTMLFormElement>("[data-attendance-form]")
+          .forEach((form) => form.dispatchEvent(new Event("attendance:state")));
+        try {
+          await notifications.promise(
+            async () => {
+              cancelRefresh();
+              const response = await fetch(`${path}?operation=record`, {
+                method: "POST",
+                headers: { Accept: "application/json" },
+                body: new URLSearchParams({
+                  requestKey,
+                  revision,
+                  marks: JSON.stringify(
+                    targets.map((registrationId: string) => ({
+                      registrationId,
+                      status: "PRESENT",
+                    })),
+                  ),
+                }),
+                redirect: "manual",
+              });
+              if (response.type === "opaqueredirect")
+                throw new Error("La sesión cambió. Inicia sesión nuevamente.");
+              const payload = (await response.json()) as AttendanceHttpPayload;
+              if (!payload.ok) {
+                if (
+                  payload.code === "CONCURRENT_UPDATE" ||
+                  payload.code === "IDEMPOTENCY_CONFLICT"
+                ) {
+                  button.dataset.refreshRequired = "true";
+                  document
+                    .querySelectorAll<HTMLFormElement>("[data-attendance-form]")
+                    .forEach((form) => {
+                      form.dataset.refreshRequired = "true";
+                      form.dispatchEvent(new Event("attendance:state"));
+                    });
+                  document
+                    .querySelector<HTMLElement>("[data-attendance-refresh]")
+                    ?.removeAttribute("hidden");
+                }
+                throw new Error(payload.message);
+              }
+              try {
+                await refreshSession(
+                  path,
+                  undefined,
+                  "[data-attendance-heading]",
+                );
+              } catch {
+                button.dataset.refreshRequired = "true";
+                document
+                  .querySelectorAll<HTMLFormElement>("[data-attendance-form]")
+                  .forEach((form) => {
+                    form.dataset.refreshRequired = "true";
+                    form.dispatchEvent(new Event("attendance:state"));
+                  });
+                const error = document.querySelector<HTMLElement>(
+                  "[data-attendance-page-error]",
+                );
+                if (error)
+                  error.textContent =
+                    "Operación guardada. Recarga la sesión para ver los cambios.";
+                const refresh = document.querySelector<HTMLElement>(
+                  "[data-attendance-refresh]",
+                );
+                refresh?.removeAttribute("hidden");
+                refresh?.focus({ preventScroll: true });
+              }
+              return payload.value;
+            },
+            {
+              loading: { title: "Marcando participantes presentes…" },
+              success: { title: "Asistencia registrada" },
+              error: (error) => ({
+                title:
+                  error instanceof Error
+                    ? error.message
+                    : "No se pudo registrar la asistencia.",
+              }),
+            },
+          );
+        } catch {
+          // Sileo reports the rejected promise; keep current controls and drafts.
+        } finally {
+          delete button.dataset.pending;
+          button.disabled = Boolean(button.dataset.refreshRequired);
+          button.removeAttribute("aria-busy");
+          document
+            .querySelectorAll<HTMLFormElement>("[data-attendance-form]")
+            .forEach((form) =>
+              form.dispatchEvent(new Event("attendance:state")),
+            );
+        }
+      });
+    });
 }
 function updateSettings(
   form: HTMLFormElement,
@@ -212,7 +351,7 @@ function initializeAutosave(form: HTMLFormElement) {
     submit.textContent = "Reintentar";
   }
   edit?.addEventListener("click", () => {
-    if (document.querySelector("[data-attendance-form][data-pending]")) return;
+    if (hasPendingMutation()) return;
     open(true);
     editor
       ?.querySelector<HTMLElement>(
@@ -241,11 +380,7 @@ function initializeAutosave(form: HTMLFormElement) {
   });
   form.addEventListener("change", () => {
     const result = state(form);
-    if (
-      result.valid &&
-      result.dirty &&
-      !document.querySelector("[data-attendance-form][data-pending]")
-    )
+    if (result.valid && result.dirty && !hasPendingMutation())
       form.requestSubmit();
   });
   form.addEventListener("registration:updated", () => {
@@ -336,6 +471,7 @@ function bindAutosaveMutation(
   });
 }
 export function initializeAttendanceForms() {
+  initializeMarkAllButtons();
   initializeInlineFields();
   initializeSettingsInputs();
   document
@@ -348,15 +484,19 @@ export function initializeAttendanceForms() {
         // A successful POST is followed by an authoritative fragment GET.
         // Keep sibling session actions locked through both steps so a user
         // cannot open an obsolete dialog just before its island is replaced.
-        const sessionPending = Boolean(
-          document.querySelector("[data-attendance-form][data-pending]"),
-        );
+        const sessionPending = hasPendingMutation();
         document
           .querySelectorAll<HTMLButtonElement>(
             "[data-attendance-session-panel] button[data-operation-trigger]",
           )
           .forEach((button) => {
             button.disabled = sessionPending;
+          });
+        document
+          .querySelectorAll<HTMLButtonElement>("[data-attendance-mark-all]")
+          .forEach((button) => {
+            button.disabled =
+              sessionPending || Boolean(button.dataset.refreshRequired);
           });
         if (form.dataset.attendanceOperation === "cancel") {
           const choice = form.elements.namedItem("cancellationReasonChoice");
@@ -372,8 +512,7 @@ export function initializeAttendanceForms() {
         }
         if (form.hasAttribute("data-attendance-autosave")) {
           const locked = Boolean(
-            form.dataset.refreshRequired ||
-            document.querySelector("[data-attendance-form][data-pending]"),
+            form.dataset.refreshRequired || hasPendingMutation(),
           );
           const editor =
             form.querySelector<HTMLFieldSetElement>("[data-mark-editor]");
@@ -388,11 +527,7 @@ export function initializeAttendanceForms() {
         );
         if (submit)
           submit.disabled =
-            !result.valid ||
-            !result.dirty ||
-            Boolean(
-              document.querySelector("[data-attendance-form][data-pending]"),
-            );
+            !result.valid || !result.dirty || hasPendingMutation();
         return result;
       };
       form.addEventListener("input", update);
@@ -430,11 +565,7 @@ export function initializeAttendanceForms() {
       form.addEventListener("attendance:state", update);
       form.addEventListener("submit", (event) => {
         const result = update();
-        if (
-          !result.valid ||
-          !result.dirty ||
-          document.querySelector("[data-attendance-form][data-pending]")
-        )
+        if (!result.valid || !result.dirty || hasPendingMutation())
           event.preventDefault();
       });
       const bind = form.hasAttribute("data-attendance-autosave")
@@ -540,11 +671,7 @@ export function initializeAttendanceForms() {
       link.dataset.bound = "true";
       link.addEventListener("click", async (event) => {
         event.preventDefault();
-        if (
-          link.dataset.pending ||
-          document.querySelector("[data-attendance-form][data-pending]")
-        )
-          return;
+        if (link.dataset.pending || hasPendingMutation()) return;
         link.dataset.pending = "true";
         try {
           await refreshSession(link.href);
