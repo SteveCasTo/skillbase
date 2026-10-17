@@ -212,6 +212,15 @@ export async function rescheduleCourseGroups(
     return { group, plan, start };
   });
   const candidates = plans.flatMap(({ plan }) => plan.sessions);
+  if (plans.some(({ start }) => start <= now))
+    throw new CourseDomainError(
+      "VALIDATION_FAILED",
+      "Todos los grupos deben iniciar en el futuro.",
+      {
+        startsAt:
+          "Selecciona una fecha futura para todos los horarios de grupo.",
+      },
+    );
   if (
     await instructorHasConflict(tx, previous.id, next.instructorId, candidates)
   )
