@@ -1,53 +1,9 @@
 ---
-import "@/styles/public-certificates.css";
-import CourseShell from "@/components/public-courses/CourseShell.astro";
-import VerificationForm from "@/components/certificates/VerificationForm.astro";
-import { validCredentialCode } from "@/components/certificates/presentation";
 Astro.response.headers.set("Cache-Control", "no-store");
 if (Astro.request.method !== "GET")
-  return new Response(null, { status: 405, headers: { Allow: "GET" } });
-const code = (Astro.url.searchParams.get("codigo") ?? "").trim();
-if (validCredentialCode(code))
-  return Astro.redirect(`/certificados/${encodeURIComponent(code)}`, 303);
-const error = Astro.url.searchParams.has("codigo")
-  ? "Revisa el código de 32 caracteres del certificado."
-  : "";
-if (error) Astro.response.status = 422;
+  return new Response(null, {
+    status: 405,
+    headers: { Allow: "GET", "Cache-Control": "no-store" },
+  });
+return Astro.redirect(`/certificados/verificar${Astro.url.search}`, 303);
 ---
-
-<CourseShell
-  title="Verificar certificado | Formación continua"
-  description="Consulta el estado oficial de un certificado."
-  noindex
->
-  <div
-    data-public-verification
-    class="certificate-lookup flex w-full min-w-0 flex-col gap-6 py-8 sm:py-12"
-  >
-    <h1 class="text-3xl font-semibold tracking-tight">Verificar certificado</h1>
-    <p class="leading-7 text-muted-foreground">
-      Consulta el registro oficial mediante el código o el QR de tu certificado.
-    </p>
-    <VerificationForm value={code.slice(0, 32)} {error} />
-  </div>
-</CourseShell>
-<style>
-  h1 {
-    font-family: var(--font-sans);
-  }
-  @media (min-width: 48rem) {
-    .certificate-lookup :global(form) {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: start;
-    }
-    .certificate-lookup :global(label),
-    .certificate-lookup :global(p) {
-      grid-column: 1 / -1;
-    }
-    .certificate-lookup :global(button) {
-      grid-column: 2;
-      grid-row: 2;
-    }
-  }
-</style>

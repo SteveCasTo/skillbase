@@ -1,5 +1,36 @@
 # TESTING
 
+## Verificación pública dedicada (2026-10-17, candidata)
+
+Se adaptan los casos existentes de certificados y landing, sin añadir casos,
+specs ni suites. Cubren CTA a la página dedicada, fallback HTML por código,
+resultado común, PDF vigente/revocado/desconocido, contraste código/archivo,
+reset/foco y cancelación de una respuesta real pendiente. Las aserciones de
+privacidad distinguen comparación local sin solicitudes de la entrada por PDF,
+que envía solo `{sha256}`; nunca bytes, nombre de archivo ni upload multipart.
+Se conservan las pruebas de lectura/hash fuera de orden, historial/reemisión,
+IDs públicos inmutables revocados y límites privados.
+
+Unit existentes amplían el contrato HTTP de huella: Origin, allowlist, 64 hex,
+body, MIME, rate limit y error saneado. Integración existente amplía la consulta
+exacta, firmado sustituido, revocado, reemitido, ambigüedad y uso del índice
+parcial con EXPLAIN. Local: unit 464 PASS; integración 176 PASS, 1 SKIP existente;
+certificados + landing 21 E2E PASS sin retries en puerto aislado 4341. Check
+(lint/format/typecheck), build y Drizzle check PASS. Capturas de entrada en
+375/390/768/1440 px light/dark y resultados en 375/768/1440 px, sin overflow;
+panel vacío y datos mantienen igualdad de altura en desktop, selección compacta.
+La primera corrida dirigida expuso una expectativa de navegación HTML en lugar
+de la mejora cliente; el test ahora espera el control PDF realmente disponible
+antes de comprobar la consulta AJAX. El fallback sin JS se conserva por separado.
+La migración 0031 se prueba únicamente en stacks aislados. Estos resultados no
+acreditan aplicación canónica/cloud, revisión independiente ni release.
+
+La revisión independiente detectó que el guion del patrón HTML heredado debía
+escaparse para Unicode Sets (`v`) de Chromium. La corrección conserva exactamente
+32 caracteres base64url y no cambia el regex del controlador/servidor. El caso
+existente de landing ahora verifica validez nativa de códigos válidos, longitudes
+31/33, caracteres prohibidos y consola sin errores, además del atributo emitido.
+
 ## Evaluación opcional de asistencia (fuente 2026-10-15)
 
 Los casos existentes de evaluaciones/cierre se amplían sin añadir casos, specs ni

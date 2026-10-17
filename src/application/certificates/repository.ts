@@ -32,6 +32,8 @@ export interface CertificateRepository {
   get(actorId: string, id: string): Promise<CertificateDto>;
   history(actorId: string, id: string): Promise<CertificateEventDto[]>;
   verify(publicCredentialId: string): Promise<PublicCertificateDto>;
+  /** Exact current signed artifact only; ambiguous matches fail closed. */
+  verifySignedHash(sha256: string): Promise<PublicCertificateDto>;
   /** Server-resolved official sources for a revision-bound download preparation. */
   generationInput(
     actorId: string,

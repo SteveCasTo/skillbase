@@ -1,4 +1,64 @@
 /* Match the landing's compact gutters without changing other public pages. */
+[data-public-verification] h1,
+[data-public-verification] h2 {
+  font-family: var(--font-sans);
+}
+[data-public-verification] [hidden] {
+  display: none !important;
+}
+.verification-data {
+  order: 1;
+}
+.verification-code {
+  order: 3;
+}
+.verification-grid > .local-verification {
+  order: 2;
+}
+[data-has-record="false"] .verification-code {
+  order: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  padding: clamp(1.25rem, 3vw, 1.75rem);
+  display: grid;
+  align-content: center;
+}
+[data-has-record="false"] .verification-code summary {
+  display: none;
+}
+.verification-code form {
+  width: 100%;
+}
+[data-has-record="true"] .verification-code {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+[data-has-record="true"] .verification-code form {
+  margin-top: 1rem;
+  max-width: 40rem;
+}
+@media (min-width: 1024px) {
+  .verification-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .verification-data {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .verification-grid > .local-verification {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  [data-has-record="false"] .verification-code {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  [data-has-record="true"] .verification-code {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
 @scope (.public-courses) {
   @media (max-width: 860px) {
     main:has(> [data-public-verification]) {
