@@ -1360,7 +1360,7 @@ test("instructor is denied and mutation without expected origin is rejected", as
 test("course administration remains keyboard reachable and responsive", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   const expectNoHorizontalOverflow = async () => {
     const layout = await page.evaluate(() => {
       const viewportWidth = document.documentElement.clientWidth;
@@ -1465,6 +1465,7 @@ test("course administration remains keyboard reachable and responsive", async ({
   });
   expect(created.status()).toBe(201);
   const courseId = (await created.json()).id as string;
+  lifecycleCourseIds.set(testInfo.testId, courseId);
   const path = `/app/cursos/${courseId}/editar`;
   const group = await page.request.post(`/app/cursos/${courseId}/grupos`, {
     headers,
@@ -1614,6 +1615,18 @@ test("course administration remains keyboard reachable and responsive", async ({
         )[0]!.description,
       ).toBe("Editable content despite locked calendar");
     }
+    const [finalCourse] = await db.db
+      .select()
+      .from(schema.courses)
+      .where(eq(schema.courses.id, courseId));
+    const archived = await page.request.post(path, {
+      headers,
+      form: {
+        intent: "archive",
+        revision: finalCourse!.updatedAt.toISOString(),
+      },
+    });
+    expect(archived.status()).toBe(200);
   } finally {
     await db.close();
   }
