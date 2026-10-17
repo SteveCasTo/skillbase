@@ -1577,12 +1577,13 @@ test("course administration remains keyboard reachable and responsive", async ({
           level: stored!.level,
           conditions: stored!.conditions,
           minimumGrade: "70",
+          instructorId: courseInstructor(page).id,
           startDate: "2027-02-23",
           endsAt: "2027-03-11T23:59",
           artwork: "",
         },
       });
-      expect(tampered.status()).toBe(400);
+      expect(tampered.status()).toBe(422);
       expect((await tampered.json()).errors.startsAt).toBeTruthy();
       expect(
         (

@@ -336,6 +336,7 @@ const currentArtworkUrl = publicArtworkUrl(
                 .map((instructor) => ({
                   value: instructor.id,
                   label: `${instructor.firstName} ${instructor.lastName}`,
+                  disabled: instructor.status !== "ACTIVE",
                 })),
             ]}
           >
@@ -367,6 +368,7 @@ const currentArtworkUrl = publicArtworkUrl(
                     <option
                       value={instructor.id}
                       selected={values.instructorId === instructor.id}
+                      disabled={instructor.status !== "ACTIVE"}
                     >
                       {instructor.firstName} {instructor.lastName}
                     </option>
