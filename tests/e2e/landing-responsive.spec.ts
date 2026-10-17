@@ -395,14 +395,56 @@ test("course billboards are single whole-card links with complete metadata", asy
   await expect(featuredLink).toBeFocused();
   await expect(featuredLink).toHaveCSS("outline-style", "solid");
   await expect(page.locator("#certificados input")).toHaveCount(0);
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => consoleErrors.push(error.message));
   await page
     .locator("#certificados")
     .getByRole("link", { name: "Verificar certificado", exact: true })
     .click();
-  await expect(page.getByLabel("Código del certificado")).toHaveAttribute(
+  const credentialCode = page.getByLabel("Código del certificado");
+  await expect(credentialCode).toHaveAttribute(
     "pattern",
-    "[A-Za-z0-9_-]{32}",
+    "[A-Za-z0-9_\\-]{32}",
   );
+  await expect(
+    page.getByText("Seleccionar PDF firmado", { exact: true }),
+  ).toBeVisible();
+  for (const valid of [
+    "a_B-".repeat(8),
+    "Ab09_-".repeat(5) + "Z0",
+    "-".repeat(32),
+  ]) {
+    await credentialCode.fill(valid);
+    expect(
+      await credentialCode.evaluate((input: HTMLInputElement) =>
+        input.checkValidity(),
+      ),
+    ).toBe(true);
+  }
+  for (const invalid of [
+    "!".repeat(32),
+    "a".repeat(31),
+    "a".repeat(33),
+    "a".repeat(31) + "/",
+    "a".repeat(31) + "é",
+    "a".repeat(31) + " ",
+  ]) {
+    expect(
+      await credentialCode.evaluate((input: HTMLInputElement, value) => {
+        // Set the raw value so maxlength cannot silently truncate the 33-char probe.
+        input.value = value;
+        return {
+          valid: input.checkValidity(),
+          mismatch: input.validity.patternMismatch,
+        };
+      }, invalid),
+    ).toEqual({ valid: false, mismatch: true });
+  }
+  await credentialCode.fill("");
+  expect(consoleErrors).toEqual([]);
   await expect(page.locator("#credential-code-help")).toHaveCount(0);
 });
 

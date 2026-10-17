@@ -25,6 +25,12 @@ antes de comprobar la consulta AJAX. El fallback sin JS se conserva por separado
 La migración 0031 se prueba únicamente en stacks aislados. Estos resultados no
 acreditan aplicación canónica/cloud, revisión independiente ni release.
 
+La revisión independiente detectó que el guion del patrón HTML heredado debía
+escaparse para Unicode Sets (`v`) de Chromium. La corrección conserva exactamente
+32 caracteres base64url y no cambia el regex del controlador/servidor. El caso
+existente de landing ahora verifica validez nativa de códigos válidos, longitudes
+31/33, caracteres prohibidos y consola sin errores, además del atributo emitido.
+
 ## Evaluación opcional de asistencia (fuente 2026-10-15)
 
 Los casos existentes de evaluaciones/cierre se amplían sin añadir casos, specs ni
