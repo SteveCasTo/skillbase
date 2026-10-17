@@ -27,34 +27,8 @@ function decoration(page: PDFPage, approval: boolean) {
       "M0 0 L60 0 C65 132 24 243 30 352 C38 446 67 532 94 612 L0 612 Z",
       { x: 0, y: top, color: NAVY },
     );
-    for (let i = 0; i < 9; i++) {
-      page.drawSvgPath(
-        `M${115 + i * 8} 612 C${205 + i * 12} ${408 + i * 6} ${260 + i * 12} ${617 - i * 10} 792 ${365 + i * 6}`,
-        {
-          x: 0,
-          y: top,
-          borderColor: rgb(0.94, 0.94, 0.94),
-          borderWidth: 0.8,
-        },
-      );
-    }
-    page.drawSvgPath("M792 560 L792 612 L740 612 Z", {
-      x: 0,
-      y: top,
-      color: NAVY,
-    });
-    page.drawLine({
-      start: { x: 752, y: 4 },
-      end: { x: 775, y: 27 },
-      thickness: 11,
-      color: RED,
-    });
-    page.drawLine({
-      start: { x: 780, y: 25 },
-      end: { x: 792, y: 37 },
-      thickness: 11,
-      color: RED,
-    });
+    // The continuous left curve is the frame. Keep the signature area and the
+    // lower-right paper edge clear: no wave grid, corner wedge or red slashes.
   } else {
     page.drawSvgPath(
       "M0 0 L612 0 L612 67 C565 8 530 4 474 12 C310 28 250 96 0 27 Z",
@@ -67,6 +41,52 @@ function decoration(page: PDFPage, approval: boolean) {
   }
 }
 
+/** Separate rules stop before the rounded band; nothing crosses its lettering. */
+function certificateBand(
+  page: PDFPage,
+  text: string,
+  font: PDFFont,
+  center: number,
+  top: number,
+  span: number,
+) {
+  const width = 144;
+  const height = 22;
+  const radius = height / 2;
+  const x = center - width / 2;
+  const y = page.getHeight() - top - height / 2;
+  for (const side of [-1, 1]) {
+    const outer = center + (side * span) / 2;
+    const inner = center + side * (width / 2 + 12);
+    page.drawLine({
+      start: { x: Math.min(outer, inner), y },
+      end: { x: Math.max(outer, inner), y },
+      thickness: 0.65,
+      color: NAVY,
+    });
+    page.drawSvgPath("M0 -2.4 L2.4 0 L0 2.4 L-2.4 0 Z", {
+      x: outer,
+      y,
+      color: RED,
+    });
+  }
+  page.drawSvgPath(
+    `M${radius} 0 H${width - radius} C${width - radius / 2} 0 ${width} ${radius / 2} ${width} ${radius} C${width} ${height - radius / 2} ${width - radius / 2} ${height} ${width - radius} ${height} H${radius} C${radius / 2} ${height} 0 ${height - radius / 2} 0 ${radius} C0 ${radius / 2} ${radius / 2} 0 ${radius} 0 Z`,
+    { x, y: page.getHeight() - top, color: NAVY },
+  );
+  drawCertificateText(page, text, font, {
+    x,
+    top,
+    width,
+    height,
+    size: 10,
+    minimumSize: 10,
+    align: "center",
+    verticalAlign: "middle",
+    color: rgb(1, 1, 1),
+  });
+}
+
 function signatures(
   page: PDFPage,
   input: CertificateRenderInput,
@@ -74,8 +94,8 @@ function signatures(
   bold: PDFFont,
 ) {
   const approval = input.type === "APPROVAL";
-  const left = approval ? 116 : 42;
-  const width = approval ? 620 : 528;
+  const left = approval ? 92 : 42;
+  const width = approval ? 640 : 528;
   const cell = width / 3;
   const lineY = approval ? 80 : 120;
   for (const [index, signer] of input.signatories.entries()) {
@@ -121,7 +141,7 @@ export async function renderCertificatePdf(
   const resources = await certificateResources();
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
-  const [regular, bold, display] = await Promise.all([
+  const [regular, bold, display, recipient] = await Promise.all([
     doc.embedFont(resources.regular, {
       subset: true,
       customName: "Montserrat-Regular",
@@ -134,6 +154,10 @@ export async function renderCertificatePdf(
       subset: true,
       customName: "Merriweather-Bold",
     }),
+    doc.embedFont(resources.recipient, {
+      subset: true,
+      customName: "Merriweather-Regular",
+    }),
   ]);
   doc.setTitle(content.title);
   doc.setAuthor("Departamento de Informática y Sistemas");
@@ -145,8 +169,10 @@ export async function renderCertificatePdf(
   const page = doc.addPage([...CERTIFICATE_PAGE_SIZES[input.type]]);
   const approval = input.type === "APPROVAL";
   decoration(page, approval);
-  const x = approval ? 116 : 76;
-  const width = approval ? 620 : 460;
+  // Center the whole award block in the usable paper, not the remainder after
+  // an inline label. The landscape axis clears the asymmetric left curve.
+  const x = approval ? 92 : 60;
+  const width = approval ? 640 : 492;
   for (const [index, bytes] of resources.logos.entries()) {
     const logo = await doc.embedPng(bytes);
     const imageWidth = 190;
@@ -176,11 +202,10 @@ export async function renderCertificatePdf(
       minimumSize,
       align: "center",
     });
-  // The header's right column belongs to verification, not to the recipient or
-  // signature area. Keep the institutional logos and body widths unchanged.
+  // Verification retains its own right column, above the recipient area.
   const heading = (text: string, top: number, height: number, size: number) =>
     drawCertificateText(page, text, display, {
-      x,
+      x: approval ? x : 76,
       top,
       width: approval ? width : 376,
       height,
@@ -190,80 +215,43 @@ export async function renderCertificatePdf(
     });
   if (approval) {
     heading("CERTIFICADO", 111, 47, 32);
-    const badgeWidth = 125;
-    const badgeX = x + (width - badgeWidth) / 2;
-    page.drawLine({
-      start: { x: badgeX - 65, y: 445 },
-      end: { x: badgeX + badgeWidth + 65, y: 445 },
-      thickness: 1.2,
-      color: rgb(0, 0, 0),
-    });
-    page.drawRectangle({
-      x: badgeX,
-      y: 435,
-      width: badgeWidth,
-      height: 20,
-      color: NAVY,
-    });
-    drawCertificateText(page, "DE APROBACIÓN", regular, {
-      x: badgeX,
-      top: 158,
-      width: badgeWidth,
-      height: 20,
-      size: 10,
-      minimumSize: 10,
-      align: "center",
-      color: rgb(1, 1, 1),
-    });
+    certificateBand(page, "DE APROBACIÓN", regular, x + width / 2, 155, 302);
   } else {
     heading("CERTIFICADO", 161, 43, 28);
-    heading("DE", 201, 30, 18);
-    const headingOffset = -42;
-    page.drawLine({
-      start: { x: 180 + headingOffset, y: 578 },
-      end: { x: 278 + headingOffset, y: 578 },
-      thickness: 0.8,
-      color: rgb(0, 0, 0),
-    });
-    page.drawLine({
-      start: { x: 334 + headingOffset, y: 578 },
-      end: { x: 432 + headingOffset, y: 578 },
-      thickness: 0.8,
-      color: rgb(0, 0, 0),
-    });
-    heading("INSTRUCTOR", 227, 44, 28);
+    certificateBand(page, "DE INSTRUCTOR", regular, 264, 208, 268);
   }
-  const approvalOffset = 44;
-  const recipientTop = approval ? 206 + approvalOffset : 295;
-  const labelWidth = approval ? 116 : 28;
+  const recipientTop = approval ? 246 : 294;
   drawCertificateText(page, approval ? "OTORGADO A:" : "A:", regular, {
     x,
-    top: recipientTop + 3,
-    width: labelWidth,
-    height: 24,
-    size: approval ? 11 : 10,
+    top: approval ? 222 : 274,
+    width,
+    height: 16,
+    size: 10,
     minimumSize: 10,
-  });
-  drawCertificateText(page, input.recipientName, regular, {
-    x: x + labelWidth + 8,
-    top: recipientTop,
-    width: width - labelWidth - 8,
-    height: 43,
-    size: approval ? 18 : 15,
-    minimumSize: 11,
     align: "center",
   });
+  drawCertificateText(page, input.recipientName, recipient, {
+    x,
+    top: recipientTop,
+    width,
+    height: approval ? 52 : 58,
+    size: approval ? 24 : 22,
+    minimumSize: 14,
+    align: "center",
+    verticalAlign: "middle",
+    color: NAVY,
+  });
   page.drawLine({
-    start: { x: x + labelWidth + 8, y: page.getHeight() - recipientTop - 44 },
-    end: { x: x + width, y: page.getHeight() - recipientTop - 44 },
+    start: { x: x + 32, y: page.getHeight() - (approval ? 302 : 358) },
+    end: { x: x + width - 32, y: page.getHeight() - (approval ? 302 : 358) },
     thickness: 0.6,
-    color: rgb(0, 0, 0),
+    color: NAVY,
   });
   center(
     content.introduction,
     regular,
-    approval ? 264 + approvalOffset : 351,
-    31,
+    approval ? 314 : 370,
+    26,
     approval ? 11.2 : 10.5,
     10,
   );
@@ -272,27 +260,20 @@ export async function renderCertificatePdf(
   center(
     content.course,
     bold,
-    approval ? 291 + approvalOffset : 381,
-    approval ? 54 : 77,
+    approval ? 343 : 400,
+    approval ? 56 : 77,
     approval ? 26 : 25,
     15,
   );
   drawCertificateText(page, content.body, regular, {
     x,
-    top: approval ? 349 + approvalOffset : 476,
+    top: approval ? 406 : 485,
     width,
     height: approval ? 53 : 83,
     size: approval ? 11 : 10.5,
     minimumSize: 9.5,
   });
-  center(
-    content.date,
-    regular,
-    approval ? 406 + approvalOffset : 558,
-    24,
-    11,
-    10,
-  );
+  center(content.date, regular, approval ? 466 : 578, 24, 11, 10);
   signatures(page, input, regular, bold);
   const verification = approval
     ? { x: 538, top: 105, width: 220, codeHeight: 60 }
