@@ -505,6 +505,7 @@ html.dark:has(.public-courses) {
       min-height: 16rem;
     }
     .detail-hero {
+      padding-top: 0.75rem;
       padding-bottom: 2.5rem;
     }
     .detail-art {
