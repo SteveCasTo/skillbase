@@ -36,6 +36,7 @@ async function refreshSession(
   path: string,
   savedFormId?: string,
   focusSelector?: string,
+  savedFormIds: ReadonlySet<string> = new Set(),
 ) {
   cancelRefresh();
   const token = refreshGeneration;
@@ -46,7 +47,7 @@ async function refreshSession(
   if (!current) return;
   const captureDrafts = () =>
     [...current.querySelectorAll<HTMLFormElement>("[data-attendance-form]")]
-      .filter((form) => form.id !== savedFormId)
+      .filter((form) => form.id !== savedFormId && !savedFormIds.has(form.id))
       .map((form) => {
         const baseline = JSON.parse(form.dataset.baseline ?? "{}") as Record<
           string,
@@ -216,6 +217,7 @@ function initializeMarkAllButtons() {
                   path,
                   undefined,
                   "[data-attendance-heading]",
+                  new Set(targets.map((id: string) => `attendance-mark-${id}`)),
                 );
               } catch {
                 button.dataset.refreshRequired = "true";
