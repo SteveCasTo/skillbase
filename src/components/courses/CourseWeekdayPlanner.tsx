@@ -19,6 +19,8 @@ interface Props {
   error?: string;
   disabled?: boolean;
   newCourse?: boolean;
+  courseTypeId?: string;
+  scheduleDisabled?: boolean;
 }
 
 export default function CourseWeekdayPlanner({
@@ -28,22 +30,28 @@ export default function CourseWeekdayPlanner({
   error,
   disabled,
   newCourse = false,
+  courseTypeId = "",
+  scheduleDisabled = false,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const [start, setStart] = useState(startsAt);
   const [startDate, setStartDate] = useState(startsAt.slice(0, 10));
-  const [formatId, setFormatId] = useState("");
+  const [formatId, setFormatId] = useState(courseTypeId);
   // Older planned courses still have an hourly course schedule. Keep their
   // persisted instants on edit rather than silently converting grouped courses.
   const oldHourlyPlan =
     !newCourse && Boolean(startsAt) && !startsAt.endsWith("T00:00");
+  const plannedStart =
+    oldHourlyPlan && scheduleDisabled
+      ? `${startDate}T${startsAt.slice(11)}`
+      : start;
   useEffect(() => {
     const form = container.current?.closest("form");
     if (!form) return;
     const sync = () => {
       const data = new FormData(form);
-      if (oldHourlyPlan) setStart(String(data.get("startsAt") ?? ""));
-      setFormatId(String(data.get("courseTypeId") ?? ""));
+      if (oldHourlyPlan) setStart(String(data.get("startsAt") ?? startsAt));
+      setFormatId(String(data.get("courseTypeId") ?? courseTypeId));
     };
     sync();
     form.addEventListener("change", sync);
@@ -57,7 +65,7 @@ export default function CourseWeekdayPlanner({
       form.removeEventListener("change", sync);
       form.removeEventListener("course-form-change", sync);
     };
-  }, [oldHourlyPlan]);
+  }, [oldHourlyPlan, courseTypeId, startsAt]);
   const format = formats.find((item) => item.id === formatId);
   let plan: ReturnType<typeof planWeekdaySchedule> | null = null;
   let dates: ReturnType<typeof planCourseDates> | null = null;
@@ -75,7 +83,7 @@ export default function CourseWeekdayPlanner({
     try {
       if (oldHourlyPlan)
         plan = planWeekdaySchedule({
-          startsAt: start,
+          startsAt: plannedStart,
           weekdaysMask: 31,
           totalHours: format.totalHours,
           sessionMinutes: format.sessionMinutes,
@@ -96,10 +104,14 @@ export default function CourseWeekdayPlanner({
     : dates
       ? instantToBoliviaCivil(dates.endsAt)
       : "";
-  const courseStart = dates ? instantToBoliviaCivil(dates.startsAt) : "";
+  const courseStart = dates
+    ? instantToBoliviaCivil(dates.startsAt)
+    : oldHourlyPlan && scheduleDisabled && plan
+      ? plannedStart
+      : "";
   const schedule =
     oldHourlyPlan && plan
-      ? `Lunes a viernes, ${start.slice(11)}–${plan.endTime}`
+      ? `Lunes a viernes, ${plannedStart.slice(11)}–${plan.endTime}`
       : dates
         ? GROUP_SCHEDULE
         : "";
@@ -112,7 +124,7 @@ export default function CourseWeekdayPlanner({
   }, [end, schedule, courseStart]);
   return (
     <div ref={container} className="contents">
-      {oldHourlyPlan ? (
+      {oldHourlyPlan && !scheduleDisabled ? (
         <CourseDateTimePicker
           name="startsAt"
           label="Inicio de clases (Bolivia)"

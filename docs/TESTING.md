@@ -1,5 +1,19 @@
 # TESTING
 
+## Editabilidad e inicio del curso (candidata 2026-10-17)
+
+Se amplían casos existentes, sin nuevas suites/specs/casos: políticas por campo,
+restauración server-side de controles omitidos y conservación de intentos de
+tampering; cascada ordinaria con dos horas de grupo y pago completo, snapshots/
+ledger/receipts intactos, originales auditables, segundo cambio y revisión
+obsoleta; rechazo sin cambios ante horario, cierre/reapertura, asistencia y
+cancelación individual. Los E2E existentes de cursos y fallback sin JavaScript
+comprueban persistencia del cambio desde el formulario, campos deshabilitados y
+contenido aún editable. La matriz visual usa 375/768/1440 px y claro/oscuro.
+La migración 0032 se valida solo en stacks efímeros; ningún resultado implica
+aplicación en canónico/cloud, release a master o despliegue. Los resultados del
+SHA final y sus intentos quedan en el PR.
+
 ## Verificación pública dedicada (2026-10-17, candidata)
 
 Se adaptan los casos existentes de certificados y landing, sin añadir casos,

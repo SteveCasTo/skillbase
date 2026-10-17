@@ -14,7 +14,10 @@ import CourseBreadcrumbs from "@/components/courses/CourseBreadcrumbs.astro";
 import CourseTabs from "@/components/courses/CourseTabs.astro";
 import CourseForm from "@/components/courses/CourseForm.astro";
 import { CourseDomainError } from "@/domain/courses/errors";
-import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+import {
+  courseFormInput as valuesFromCourse,
+  restoreDisabledCourseFields,
+} from "@/domain/courses/form-input";
 import type { AdminCourseDto } from "@/domain/courses/types";
 import type { CourseInput } from "@/domain/courses/validation";
 import PrivateLayout from "@/layouts/PrivateLayout.astro";
@@ -70,44 +73,6 @@ try {
     logCourseInfrastructureError(error, { actorId: user.id, courseId: id });
 }
 
-const dateInput = (date: Date | null) =>
-  date ? instantToBoliviaCivil(date) : "";
-const dateOnlyPlan = (item: AdminCourseDto) =>
-  item.weekdaysMask === 31 &&
-  dateInput(item.startsAt).endsWith("T00:00") &&
-  dateInput(item.endsAt).endsWith("T23:59") &&
-  (!item.registrationStartAt ||
-    dateInput(item.registrationStartAt).endsWith("T00:00")) &&
-  (!item.registrationEndAt ||
-    dateInput(item.registrationEndAt).endsWith("T00:00"));
-const valuesFromCourse = (item: AdminCourseDto): CourseInput => ({
-  name: item.name,
-  description: item.description,
-  level: item.level,
-  courseTypeId: item.courseTypeId,
-  contentMarkdown: item.contentMarkdown ?? "",
-  instructorId: item.instructorId ?? "",
-  artwork: item.artwork ?? "",
-  schedule: item.schedule,
-  ...(item.weekdaysMask === 31 ? { weekdays: "1,2,3,4,5" } : {}),
-  conditions: item.conditions,
-  startsAt: dateInput(item.startsAt),
-  endsAt: dateInput(item.endsAt),
-  ...(dateOnlyPlan(item)
-    ? {
-        registrationStartDate: dateInput(item.registrationStartAt).slice(0, 10),
-        registrationEndDate: item.registrationEndAt
-          ? dateInput(
-              new Date(item.registrationEndAt.getTime() - 86400000),
-            ).slice(0, 10)
-          : "",
-      }
-    : {
-        registrationStartAt: dateInput(item.registrationStartAt),
-        registrationEndAt: dateInput(item.registrationEndAt),
-      }),
-  minimumGrade: String(item.minimumGrade),
-});
 // Keep the persisted snapshot even when a failed POST re-renders attempted values.
 const baseline = course ? valuesFromCourse(course) : undefined;
 let values: CourseInput = course ? valuesFromCourse(course) : {};
@@ -142,7 +107,10 @@ if (course && Astro.request.method === "POST") {
     const intent = formData.get("intent");
     try {
       if (intent === "update") {
-        values = courseInputFromFormData(formData);
+        values = restoreDisabledCourseFields(
+          courseInputFromFormData(formData),
+          course,
+        );
         const artwork =
           typeof values.artwork === "string" ? values.artwork : "";
         if (
@@ -183,6 +151,7 @@ if (course && Astro.request.method === "POST") {
               status: course.status,
               revision: course.updatedAt.toISOString(),
               featured: course.featured,
+              editability: (await repository.getAdmin(id))?.editability,
             }),
             {
               headers: {
@@ -208,6 +177,7 @@ if (course && Astro.request.method === "POST") {
               status: course.status,
               revision: course.updatedAt.toISOString(),
               featured: course.featured,
+              editability: (await repository.getAdmin(id))?.editability,
             }),
             {
               headers: {
@@ -233,6 +203,7 @@ if (course && Astro.request.method === "POST") {
               status: course.status,
               revision: course.updatedAt.toISOString(),
               featured: course.featured,
+              editability: (await repository.getAdmin(id))?.editability,
             }),
             {
               headers: {
@@ -255,6 +226,7 @@ if (course && Astro.request.method === "POST") {
               status: course.status,
               revision: course.updatedAt.toISOString(),
               featured: course.featured,
+              editability: (await repository.getAdmin(id))?.editability,
             }),
             {
               headers: {
@@ -629,6 +601,7 @@ const statusLabel = {
       </a>
       <div class="mt-8">
         <CourseForm
+          editability={course.editability}
           values={values}
           formats={formats}
           instructors={instructors}
@@ -640,10 +613,16 @@ const statusLabel = {
           courseId={course.id}
           {baseline}
           pinnedFormat={
-            course.status === "PUBLISHED"
+            !course.editability?.format
               ? {
                   totalHours: course.totalHours,
                   sessionMinutes: course.sessionMinutes,
+                  studentAmount: course.prices.find(
+                    (price) => price.participantType === "STUDENT",
+                  )!.amount,
+                  externalAmount: course.prices.find(
+                    (price) => price.participantType === "EXTERNAL",
+                  )!.amount,
                 }
               : undefined
           }
@@ -721,8 +700,15 @@ const statusLabel = {
             status: string;
             revision: string;
             featured: boolean;
+            editability?: import("@/domain/courses/editability").CourseEditability;
           }) => {
             if (!originalEditor?.isConnected) return;
+            if (result.editability)
+              originalEditor.dispatchEvent(
+                new CustomEvent("course-editability-change", {
+                  detail: result.editability,
+                }),
+              );
             const courseListLink = document.querySelector<HTMLAnchorElement>(
               'nav[aria-label="Ruta de navegación"] a[href^="/app/cursos?status="]',
             );

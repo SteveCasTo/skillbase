@@ -278,6 +278,31 @@ test("new courses preserve values and can be corrected after server validation w
   await page.locator('[data-confirm-fallback="publish"] summary').click();
   await page.getByRole("button", { name: "Publicar curso" }).click();
   await expect(page).toHaveURL(/success=published/);
+  await expect(course.getByLabel("Formato de curso")).toBeDisabled();
+  await expect(
+    course.getByLabel("Fecha de inicio de clases (Bolivia)", { exact: true }),
+  ).toBeEnabled();
+  await course
+    .getByLabel("Fecha de inicio de clases (Bolivia)", { exact: true })
+    .fill("2027-02-22");
+  await expect(
+    course.getByLabel("Fecha de finalización (Bolivia)", { exact: true }),
+  ).toBeDisabled();
+  await course
+    .getByLabel("Descripción")
+    .fill("Published content saved with disabled commercial terms");
+  await course.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(page).toHaveURL(/success=updated/);
+  await page.reload();
+  await expect(course.getByLabel("Formato de curso")).toHaveValue(
+    selectedFormat,
+  );
+  await expect(
+    course.getByLabel("Fecha de inicio de clases (Bolivia)", { exact: true }),
+  ).toHaveValue("2027-02-22");
+  await expect(course.getByLabel("Descripción")).toHaveValue(
+    "Published content saved with disabled commercial terms",
+  );
   await page.locator('[data-confirm-fallback="withdraw"] summary').click();
   await page.getByRole("button", { name: "Retirar curso" }).click();
   await expect(page).toHaveURL(/success=withdrawn/);

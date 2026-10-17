@@ -5,6 +5,13 @@ import type { CourseRepository } from "@/application/courses/course-repository";
 import { AuthorizationError } from "@/domain/auth/errors";
 import type { InternalUser } from "@/domain/auth/types";
 import { CourseDomainError } from "@/domain/courses/errors";
+import { restoreDisabledCourseFields } from "@/domain/courses/form-input";
+import {
+  GROUP_SCHEDULE,
+  planCourseDates,
+  planWeekdaySchedule,
+} from "@/domain/courses/weekday-schedule";
+import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 import {
   validateCourseData,
   type CourseInput,
@@ -87,12 +94,54 @@ export async function updateCourse(
   input: CourseInput,
 ) {
   requireAdmin(user);
-  return repository.update(
-    id,
-    validateCourseData(input),
-    user.id,
-    parseRevision(input.revision),
-  );
+  const expected = parseRevision(input.revision);
+  const course = await repository.getAdmin(id);
+  if (!course)
+    throw new CourseDomainError("COURSE_NOT_FOUND", "El curso no existe.");
+  let restored = restoreDisabledCourseFields(input, course);
+  if (
+    input.startDate &&
+    course.weekdaysMask === 31 &&
+    course.sessionMinutes !== null &&
+    !course.editability?.schedule &&
+    course.schedule !== GROUP_SCHEDULE &&
+    (input.schedule === undefined || input.schedule === course.schedule)
+  ) {
+    const startsAt = `${input.startDate}T${instantToBoliviaCivil(course.startsAt).slice(11)}`;
+    restored = {
+      ...restored,
+      startsAt,
+      schedule: course.schedule,
+      endsAt: instantToBoliviaCivil(
+        planWeekdaySchedule({
+          startsAt,
+          weekdaysMask: 31,
+          totalHours: course.totalHours,
+          sessionMinutes: course.sessionMinutes,
+        }).endsAt,
+      ),
+    };
+  }
+  if (
+    input.startDate &&
+    !input.endsAt &&
+    course.weekdaysMask === 31 &&
+    course.sessionMinutes !== null &&
+    course.schedule === GROUP_SCHEDULE
+  ) {
+    restored = {
+      ...restored,
+      endsAt: instantToBoliviaCivil(
+        planCourseDates({
+          startDate: input.startDate,
+          weekdaysMask: 31,
+          totalHours: course.totalHours,
+          sessionMinutes: course.sessionMinutes,
+        }).endsAt,
+      ),
+    };
+  }
+  return repository.update(id, validateCourseData(restored), user.id, expected);
 }
 
 export async function publishCourse(

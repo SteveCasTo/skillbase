@@ -225,6 +225,13 @@
       "when": 1792255702220,
       "tag": "0031_certificate_signed_hash_lookup",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792274693321,
+      "tag": "0032_course_start_rescheduling",
+      "breakpoints": true
     }
   ]
 }

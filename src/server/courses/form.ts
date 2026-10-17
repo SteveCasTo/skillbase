@@ -26,13 +26,7 @@ export function courseInputFromFormData(formData: FormData): CourseInput {
   ] as const;
   const values: CourseInput = Object.fromEntries(
     fields
-      .filter(
-        (field) =>
-          (field !== "weekdays" || formData.has(field)) &&
-          (!field.startsWith("registration") ||
-            !field.endsWith("Date") ||
-            formData.has(field)),
-      )
+      .filter((field) => formData.has(field))
       .map((field) => {
         const value = formData.get(field);
         return [
@@ -54,7 +48,9 @@ export function courseInputFromFormData(formData: FormData): CourseInput {
       endsAt: values.endDate
         ? `${values.endDate}T23:59`
         : (values.endsAt ?? ""),
-      schedule: GROUP_SCHEDULE,
+      ...(formData.get("intent") === "update" && !formData.has("schedule")
+        ? {}
+        : { schedule: values.schedule ?? GROUP_SCHEDULE }),
       weekdays: "1,2,3,4,5",
     };
   return values;

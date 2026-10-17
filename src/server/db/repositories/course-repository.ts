@@ -25,6 +25,8 @@ import type {
 import * as schema from "@/server/db/schema";
 import { traceSlowOperation } from "@/server/observability/slow-operation";
 import { CourseInfrastructureError } from "./course-infrastructure-error";
+import { courseEditability } from "@/domain/courses/editability";
+import { courseCalendarState, rescheduleCourseGroups } from "./course-calendar";
 import { assertInstructorChange } from "@/domain/instructors/assignment";
 import {
   lockInstructorSchedules,
@@ -430,7 +432,6 @@ export class DrizzleCourseRepository implements CourseRepository {
           );
         const nextInstructorId = input.instructorId ?? null;
         if (
-          previous.instructorId &&
           previous.startsAt <= new Date() &&
           (input.startsAt.getTime() !== previous.startsAt.getTime() ||
             input.endsAt.getTime() !== previous.endsAt.getTime())
@@ -489,23 +490,37 @@ export class DrizzleCourseRepository implements CourseRepository {
           instructorName: input.instructorName ?? previous.instructorName,
         };
         const fields = changed(previous, persistedInput, revision.id);
+        const datesChanged =
+          fields.includes("startsAt") || fields.includes("endsAt");
         if (
           group &&
           fields.some((field) =>
-            [
-              "startsAt",
-              "endsAt",
-              "weekdaysMask",
-              "schedule",
-              "courseTypeRevisionId",
-            ].includes(field),
+            ["weekdaysMask", "schedule", "courseTypeRevisionId"].includes(
+              field,
+            ),
           )
         )
           throw new CourseDomainError(
             "VALIDATION_FAILED",
-            "Un curso con grupos no puede cambiar sus fechas ni su horario.",
+            "Un curso con grupos no puede cambiar su horario ni su formato.",
             { startsAt: "El calendario ya está asignado a grupos." },
           );
+        if (datesChanged) {
+          const calendar = await courseCalendarState(
+            tx,
+            previous,
+            existing,
+            true,
+          );
+          await rescheduleCourseGroups(
+            tx,
+            previous,
+            persistedInput,
+            revision,
+            calendar,
+            actorId,
+          );
+        }
         if (!fields.length) return admin(previous, revision);
         const [row] = await tx
           .update(schema.courses)
@@ -545,7 +560,18 @@ export class DrizzleCourseRepository implements CourseRepository {
           entityType: "COURSE",
           entityId: id,
           action: "COURSE_UPDATED",
-          metadata: { fields: fields.join(",") },
+          metadata: {
+            fields: fields.join(","),
+            ...(datesChanged
+              ? {
+                  oldStartsAt: previous.startsAt.toISOString(),
+                  startsAt: row.startsAt.toISOString(),
+                  oldEndsAt: previous.endsAt.toISOString(),
+                  endsAt: row.endsAt.toISOString(),
+                  cascade: "GROUP_CALENDARS",
+                }
+              : {}),
+          },
         });
         return admin(row, revision);
       }),
@@ -775,9 +801,18 @@ export class DrizzleCourseRepository implements CourseRepository {
         .from(schema.courses)
         .where(eq(schema.courses.id, id))
         .limit(1);
-      return row
-        ? admin(row, revisionFor(row, await revisions(this.db, [row])))
-        : null;
+      if (!row) return null;
+      const revision = revisionFor(row, await revisions(this.db, [row]));
+      const calendar = await courseCalendarState(this.db, row, revision);
+      return {
+        ...admin(row, revision),
+        editability: courseEditability(
+          row,
+          calendar.groups.length > 0,
+          calendar.canReschedule,
+          calendar.now,
+        ),
+      };
     });
   }
   async listPublic(now = new Date()): Promise<readonly PublicCourseDto[]> {

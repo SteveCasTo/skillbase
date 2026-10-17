@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { isCourseEditability } from "@/domain/courses/editability";
 import { Check, ChevronDown } from "lucide-react";
 import { Select } from "radix-ui";
 
@@ -27,12 +28,31 @@ export default function CourseSelect({
   value,
   options,
   placeholder,
-  disabled,
+  disabled: initialDisabled,
   error,
   required = true,
   preserveDisabledValue = false,
 }: Props) {
   const [selectedValue, setSelectedValue] = useState(value);
+  const [disabled, setDisabled] = useState(initialDisabled);
+  const container = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const form = container.current?.closest("form");
+    if (!form) return;
+    const sync = (event: Event) => {
+      const policy: unknown = (event as CustomEvent<unknown>).detail;
+      if (!isCourseEditability(policy)) return;
+      const section =
+        name === "courseTypeId"
+          ? "format"
+          : name === "instructorId"
+            ? "instructor"
+            : "content";
+      setDisabled(!policy[section] || options.length === 0);
+    };
+    form.addEventListener("course-editability-change", sync);
+    return () => form.removeEventListener("course-editability-change", sync);
+  }, [name, options.length]);
   const preservesValue =
     preserveDisabledValue &&
     !disabled &&
@@ -40,6 +60,7 @@ export default function CourseSelect({
 
   return (
     <div
+      ref={container}
       className="flex min-w-0 flex-col gap-2 text-sm font-medium"
       data-invalid={Boolean(error)}
     >
@@ -64,9 +85,11 @@ export default function CourseSelect({
           className="bg-background focus-visible:ring-ring flex min-h-11 w-full min-w-0 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm shadow-xs outline-none focus-visible:ring-2 disabled:opacity-60"
         >
           <Select.Value placeholder={placeholder} />
-          <Select.Icon>
-            <ChevronDown size={16} aria-hidden="true" />
-          </Select.Icon>
+          {!disabled && (
+            <Select.Icon>
+              <ChevronDown size={16} aria-hidden="true" />
+            </Select.Icon>
+          )}
         </Select.Trigger>
         <Select.Portal>
           <Select.Content
