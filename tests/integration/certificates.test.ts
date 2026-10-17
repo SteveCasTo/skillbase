@@ -282,6 +282,23 @@ test("signed save is atomic, idempotent and serializes concurrent substitution/r
     await f.service.download(f.instructor.id, issued.id, "SIGNED"),
   ).toEqual(unsigned);
   expect((await repository.verify(issued.publicCredentialId)).valid).toBe(true);
+  expect(await repository.verifySignedHash(issued.signedSha256!)).toEqual(
+    await repository.verify(issued.publicCredentialId),
+  );
+  expect(await repository.verifySignedHash("0".repeat(64))).toEqual({
+    state: "not_found",
+    valid: false,
+  });
+  expect(await repository.verifySignedHash("0".repeat(63))).toEqual({
+    state: "not_found",
+    valid: false,
+  });
+  // The superseded signed bytes no longer identify this credential.
+  expect(
+    await repository.verifySignedHash(
+      createHash("sha256").update(signed).digest("hex"),
+    ),
+  ).toEqual({ state: "not_found", valid: false });
   await expect(
     f.service.download(f.admin.id, issued.id, "UNSIGNED"),
   ).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -299,6 +316,13 @@ test("signed save is atomic, idempotent and serializes concurrent substitution/r
     valid: false,
     signedSha256: issued.signedSha256,
   });
+  expect(await repository.verifySignedHash(issued.signedSha256!)).toMatchObject(
+    {
+      state: "revoked",
+      valid: false,
+      publicCredentialId: issued.publicCredentialId,
+    },
+  );
   expect(
     (await repository.history(f.admin2.id, issued.id)).at(-1),
   ).toMatchObject({
@@ -357,6 +381,20 @@ test("signed save is atomic, idempotent and serializes concurrent substitution/r
     signed,
   );
   expect(newSigned.state).toBe("issued");
+  expect(
+    await repository.verifySignedHash(newSigned.signedSha256!),
+  ).toMatchObject({
+    state: "issued",
+    valid: true,
+    publicCredentialId: newSigned.publicCredentialId,
+  });
+  expect(
+    await repository.verifySignedHash(revoked.signedSha256!),
+  ).toMatchObject({
+    state: "revoked",
+    valid: false,
+    publicCredentialId: revoked.publicCredentialId,
+  });
   expect((await repository.verify(newSigned.publicCredentialId)).valid).toBe(
     true,
   );
@@ -368,6 +406,20 @@ test("signed save is atomic, idempotent and serializes concurrent substitution/r
   expect(
     (await repository.history(f.admin.id, replacement.id))[0],
   ).toMatchObject({ action: "REISSUED", actorId: f.admin.id });
+  const duplicate = await f.service.uploadSigned(
+    f.admin.id,
+    command(newSigned),
+    unsigned,
+  );
+  expect(duplicate.publicCredentialId).toBe(newSigned.publicCredentialId);
+  expect(await repository.verifySignedHash(revoked.signedSha256!)).toEqual({
+    state: "not_found",
+    valid: false,
+  });
+  expect(await repository.verify(revoked.publicCredentialId)).toMatchObject({
+    state: "revoked",
+    valid: false,
+  });
   await expect(
     db.delete(s.certificates).where(eq(s.certificates.id, issued.id)).execute(),
   ).rejects.toThrow();
@@ -788,6 +840,18 @@ test("F9 tables are server-only with RLS and revoked Data API grants; current-fl
     sql`select count(*)::int as count from drizzle.__drizzle_migrations`,
   );
   expect(ledger[0]!.count).toBe(readApprovedDemoMigrations().length);
+  const index = await db.execute(
+    sql`select indexdef from pg_indexes where schemaname = 'public' and indexname = 'certificates_signed_hash_idx'`,
+  );
+  expect(index).toHaveLength(1);
+  expect(index[0]!.indexdef).toContain("signed_sha256");
+  const plan = await db.transaction(async (tx) => {
+    await tx.execute(sql`set local enable_seqscan = off`);
+    return tx.execute(
+      sql`explain select state, data, signed_sha256 from certificates where signed_sha256 = ${"0".repeat(64)} and state in ('issued', 'revoked') limit 2`,
+    );
+  });
+  expect(JSON.stringify(plan)).toContain("certificates_signed_hash_idx");
   // Exercise the actual forward guard against populated QA data. Its exclusive
   // table lock is released by rollback; no DDL or migration ledger is modified.
   const migration = await Bun.file(

@@ -2,15 +2,15 @@
 interface Props {
   value?: string;
   error?: string;
-  landing?: boolean;
 }
-const { value = "", error = "", landing = false } = Astro.props;
-const id = landing ? "landing-credential-code" : "credential-code";
+const { value = "", error = "" } = Astro.props;
+const id = "credential-code";
 ---
 
 <form
   method="get"
-  action="/certificados"
+  action="/certificados/verificar"
+  data-code-verification
   class="flex min-w-0 flex-col gap-3"
   aria-label="Verificar certificado"
 >
@@ -29,29 +29,22 @@ const id = landing ? "landing-credential-code" : "credential-code";
     autocomplete="off"
     spellcheck="false"
     aria-invalid={Boolean(error)}
-    aria-describedby={
-      [!landing && `${id}-help`, error && `${id}-error`]
-        .filter(Boolean)
-        .join(" ") || undefined
-    }
+    aria-describedby={`${id}-error`}
     class="min-h-11 w-full min-w-0 rounded-lg border bg-background px-3 font-mono text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring"
   />
-  {!landing && (
-    <p id={`${id}-help`} class="text-sm text-muted-foreground">
-      Introduce el código de 32 caracteres impreso junto al QR.
-    </p>
-  )}
-  {error && (
-    <p id={`${id}-error`} role="alert" class="text-sm text-destructive">
-      {error}
-    </p>
-  )}
+  <p
+    id={`${id}-error`}
+    role="status"
+    aria-live="polite"
+    hidden={!error}
+    class="text-sm text-destructive"
+  >
+    {error}
+  </p>
   <button
     type="submit"
     class:list={[
-      landing
-        ? "public-action certificate-action"
-        : "inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-semibold text-[var(--deep)]",
+      "inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-semibold text-[var(--deep)] disabled:cursor-wait disabled:opacity-60",
       "focus-visible:outline-2 focus-visible:outline-ring",
     ]}
   >

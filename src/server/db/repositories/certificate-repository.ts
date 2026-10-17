@@ -359,6 +359,29 @@ export class DrizzleCertificateRepository implements CertificateRepository {
       ? publicCertificate(r.state, r.data, r.hash)
       : ({ state: "not_found", valid: false } as const);
   }
+  async verifySignedHash(sha256: string) {
+    if (!/^[a-f0-9]{64}$/u.test(sha256))
+      return { state: "not_found", valid: false } as const;
+    const rows = await this.db
+      .select({
+        state: s.certificates.state,
+        data: s.certificates.data,
+        hash: s.certificates.signedSha256,
+      })
+      .from(s.certificates)
+      .where(
+        and(
+          eq(s.certificates.signedSha256, sha256),
+          sql`${s.certificates.state} in ('issued', 'revoked')`,
+        ),
+      )
+      .limit(2);
+    // Never select a valid credential over an identical revoked artifact.
+    const row = rows.length === 1 ? rows[0] : undefined;
+    return row
+      ? publicCertificate(row.state, row.data, row.hash)
+      : ({ state: "not_found", valid: false } as const);
+  }
   history(actorId: string, id: string) {
     return this.db.transaction(async (tx) => {
       await certificateActor(tx, actorId);

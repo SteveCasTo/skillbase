@@ -18,7 +18,10 @@ import { requireCertificateActor } from "@/server/certificates/http";
 import { previewCertificate } from "@/server/certificates/preview";
 import { updateCertificateSettingsField } from "@/application/certificates/update-settings-field";
 import { CertificateError } from "@/domain/certificates/rules";
-import { handlePublicCertificateGet } from "@/server/certificates/public-http";
+import {
+  handlePublicCertificateGet,
+  handlePublicCertificateFilePost,
+} from "@/server/certificates/public-http";
 import {
   certificatePdfInput,
   createCertificatePdfRenderer,
@@ -294,6 +297,89 @@ test("HTTP session guard permits ADMIN peers but never inactive or instructor mu
     (await PDFDocument.load(await preview.arrayBuffer())).getPageCount(),
   ).toBe(1);
   expect(reads).toBe(1);
+  const sha256 = "a".repeat(64);
+  let fileReads = 0;
+  const fileRepository = {
+    async verifySignedHash(value: string) {
+      expect(value).toBe(sha256);
+      fileReads++;
+      return { state: "not_found" as const, valid: false as const };
+    },
+  };
+  const lookup = (
+    body: string,
+    origin = "https://qa.invalid",
+    retry = 0,
+    mime = "application/json",
+  ) =>
+    handlePublicCertificateFilePost({
+      request: new Request(
+        "https://qa.invalid/certificados/verificar-archivo",
+        {
+          method: "POST",
+          headers: { Origin: origin, "Content-Type": mime },
+          body,
+        },
+      ),
+      siteUrl: new URL("https://qa.invalid"),
+      clientAddress: "192.0.2.1",
+      repository: fileRepository,
+      consumeLimit: async () => retry,
+    });
+  for (const body of [
+    JSON.stringify({ sha256: "a".repeat(63) }),
+    JSON.stringify({ sha256: "A".repeat(64) }),
+    JSON.stringify({ sha256, recipientName: "No search" }),
+    JSON.stringify({ publicCredentialId: "A".repeat(32) }),
+    "null",
+    "[]",
+    "{",
+  ])
+    expect((await lookup(body)).status).toBeGreaterThanOrEqual(400);
+  expect(
+    (await lookup(JSON.stringify({ sha256 }), "https://other.invalid")).status,
+  ).toBe(403);
+  expect((await lookup("x".repeat(257))).status).toBe(413);
+  expect(
+    (await lookup("%PDF-1.7", "https://qa.invalid", 0, "application/pdf"))
+      .status,
+  ).toBe(415);
+  const fileLimited = await lookup(
+    JSON.stringify({ sha256 }),
+    "https://qa.invalid",
+    30,
+  );
+  expect(fileLimited.status).toBe(429);
+  expect(fileLimited.headers.get("Retry-After")).toBe("30");
+  expect(fileReads).toBe(0);
+  const fileResponse = await lookup(JSON.stringify({ sha256 }));
+  expect(fileResponse.status).toBe(200);
+  expect(await fileResponse.json()).toEqual({
+    state: "not_found",
+    valid: false,
+  });
+  expect(fileResponse.headers.get("Cache-Control")).toContain("no-store");
+  expect(fileReads).toBe(1);
+  const unavailable = await handlePublicCertificateFilePost({
+    request: new Request("https://qa.invalid/certificados/verificar-archivo", {
+      method: "POST",
+      headers: {
+        Origin: "https://qa.invalid",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ sha256 }),
+    }),
+    siteUrl: new URL("https://qa.invalid"),
+    clientAddress: "192.0.2.1",
+    repository: {
+      async verifySignedHash() {
+        throw new Error("SQL private path");
+      },
+    },
+    consumeLimit: async () => 0,
+  });
+  expect(unavailable.status).toBe(503);
+  expect(await unavailable.text()).not.toContain("SQL");
   let current = {
     revision: 0,
     configuration: structuredClone(defaultCertificateConfiguration),
