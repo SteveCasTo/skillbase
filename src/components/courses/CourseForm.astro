@@ -38,7 +38,7 @@ interface Props {
 }
 
 const {
-  values,
+  values: attemptedValues,
   formats,
   instructors = [],
   errors = {},
@@ -64,6 +64,19 @@ const readonlyFields = [
   ...(datesDisabled ? ["startsAt", "endsAt"] : []),
   ...(scheduleDisabled || datesDisabled ? ["schedule", "weekdays"] : []),
 ];
+// Rejected POST attempts may retain editable inputs, never replace the visible
+// server-owned value of a locked control with caller-provided data.
+const values: CourseInput =
+  disabled && baseline
+    ? baseline
+    : {
+        ...attemptedValues,
+        ...Object.fromEntries(
+          readonlyFields
+            .filter((field) => baseline?.[field] !== undefined)
+            .map((field) => [field, baseline?.[field]]),
+        ),
+      };
 const control =
   "mt-2 min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";
 const area = `${control} min-h-28 resize-y`;
