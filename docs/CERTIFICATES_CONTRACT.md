@@ -296,6 +296,18 @@ criptográfica. El usuario debe comparar el titular/certificado mostrado con el
 documento; un QR copiado enlaza al registro indicado, no convierte otra hoja en
 auténtica.
 
+La entrada dedicada `/certificados/verificar` también permite resolver el registro
+sin código: `POST /certificados/verificar-archivo` recibe exclusivamente una huella
+SHA-256 completa de 64 caracteres hexadecimales minúsculos. Exige Origin esperado,
+body acotado a 256 bytes y allowlist de un campo; comparte el límite persistente
+por red del lookup por código y responde `private, no-store`/`nosniff`, con
+`Retry-After` cuando corresponde. La consulta exacta sobre `signed_sha256` incluye
+únicamente `issued`/`revoked`, limita a dos filas y falla cerrada ante ambigüedad.
+No busca en Storage ni expone listados, prefijos o datos administrativos. La
+migración forward 0031 añade solo un índice parcial no único para esa consulta,
+sin cambiar filas, guards, IDs ni bytes firmados. Su aplicación canónica/cloud
+queda en el flujo de release, no en esta implementación.
+
 Para LinkedIn ofrecer copiar/compartir URL, ID, nombre real del titular,
 organización, curso y fecha; no foto/imagen de identidad ni integración API u
 OAuth. El QR incluye solo la URL pública y no requiere imprimir la URL larga.
