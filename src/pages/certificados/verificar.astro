@@ -1,0 +1,28 @@
+---
+import "@/styles/public-certificates.css";
+import CourseShell from "@/components/public-courses/CourseShell.astro";
+import PublicVerification from "@/components/certificates/PublicVerification.astro";
+import { validCredentialCode } from "@/components/certificates/presentation";
+Astro.response.headers.set("Cache-Control", "no-store");
+Astro.response.headers.set("X-Content-Type-Options", "nosniff");
+if (Astro.request.method !== "GET")
+  return new Response(null, {
+    status: 405,
+    headers: { Allow: "GET", "Cache-Control": "no-store" },
+  });
+const code = (Astro.url.searchParams.get("codigo") ?? "").trim();
+if (validCredentialCode(code))
+  return Astro.redirect(`/certificados/${encodeURIComponent(code)}`, 303);
+const error = Astro.url.searchParams.has("codigo")
+  ? "Revisa el código de 32 caracteres del certificado."
+  : "";
+if (error) Astro.response.status = 422;
+---
+
+<CourseShell
+  title="Verificar certificado | Formación continua"
+  description="Consulta el estado oficial de un certificado."
+  noindex
+>
+  <PublicVerification code={code.slice(0, 32)} {error} />
+</CourseShell>

@@ -96,7 +96,14 @@ No mostrar:
 
 ### Presentación del verificador público
 
-`/certificados` y el resultado público aprovechan el contenedor de `CourseShell`
+La landing ofrece un único botón hacia `/certificados/verificar`, con dos entradas:
+código de 32 caracteres o PDF firmado. `/certificados` conserva compatibilidad y
+redirige a esa página; la consulta HTML por código sigue llevando a la URL del QR.
+Con JavaScript, ambas entradas presentan el mismo resultado sin abandonar la
+página ni perder el archivo seleccionado. El código alternativo queda en un
+desplegable compacto después del resultado, también en el detalle canónico.
+
+La página dedicada y el resultado público aprovechan el contenedor de `CourseShell`
 (máximo 86 rem), sin columnas exteriores estrechas adicionales; sus márgenes
 compactos coinciden con la landing sin cambiar otras páginas públicas. El resultado
 presenta el estado como título sobre dos columnas equivalentes. En desktop, la
@@ -108,11 +115,10 @@ inline; una Promise real de Sileo complementa la lectura local y el SHA-256.
 Solo la coincidencia vigente termina en éxito; coincidencia revocada/reemplazada
 y archivo distinto terminan en error, nunca en una confirmación verde. Quitar o
 cambiar archivo cancela el aviso pendiente sin reutilizar su resultado.
-El detalle de una credencial omite «Consultar otro certificado» para centrar la
-atención en su estado y comprobación local, también cuando aún no está emitida.
-La búsqueda inicial sigue disponible en `/certificados`; el desplegable de consulta
-se conserva únicamente como recuperación ante registro no encontrado o consulta
-no disponible. La navegación institucional y las URLs no cambian.
+Un archivo seleccionado se puede cotejar con otro código sin volver a elegirlo.
+Quitar un archivo que resolvió por sí solo la credencial devuelve a la entrada;
+si el registro se consultó por código, quitarlo conserva ese registro. La consulta
+por código funciona sin JavaScript; el archivo requiere WebCrypto.
 El botón de consulta fuera de la landing conserva el fondo primario y usa el
 token `deep` del shell público para el texto, en lugar de blanco sobre coral,
 para mantener contraste AA sin cambiar tokens globales ni la variante landing.
@@ -130,6 +136,14 @@ ADMIN no cambian.
 La comprobación conserva MIME/extensión PDF, límite de 10 MiB y SHA-256 de todos
 los bytes en el navegador: no transmite ni persiste el archivo ni habilita una
 descarga pública. Una coincidencia no cambia el estado oficial de la credencial.
+
+La entrada solo por PDF calcula la huella de todos sus bytes localmente y envía
+únicamente `{sha256}` a `POST /certificados/verificar-archivo`. El servidor busca
+el hash actual del firmado, nunca un borrador ni reservas/artefactos sustituidos.
+No hay subida, descarga ni persistencia del archivo. El resultado reutiliza la
+misma proyección pública y estado autoritativo. Una huella inexistente o ambigua
+no resuelve una credencial; una revocada permanece revocada. No hay búsquedas por
+prefijo, nombre, CI, email ni UUID interno.
 
 ## HASH
 

@@ -159,34 +159,37 @@ async function expectLandingContentBounds(page: Page) {
   );
   await expectWithinViewportWidth(
     page,
-    certificates.getByRole("form", {
+    certificates.getByRole("link", {
       name: "Verificar certificado",
       exact: true,
     }),
   );
-  const form = certificates.getByRole("form", {
+  const certificateAction = certificates.getByRole("link", {
     name: "Verificar certificado",
     exact: true,
   });
-  const code = form.getByRole("textbox", {
-    name: "Código del certificado",
-    exact: true,
-  });
-  const certificateAction = form.getByRole("button", {
-    name: "Verificar certificado",
-    exact: true,
-  });
-  await expect(code).toBeVisible();
-  await expect(code).toBeEditable();
-  await expect(certificateAction).toBeEnabled();
-  await expectWithinViewportWidth(page, code);
+  await expect(certificateAction).toHaveAttribute(
+    "href",
+    "/certificados/verificar",
+  );
+  await expect(certificates.getByRole("textbox")).toHaveCount(0);
   await expectWithinViewportWidth(page, certificateAction);
 }
 
 async function verifyUnknownCertificateFromLanding(page: Page) {
-  const form = page
+  await page
     .locator("section#certificados")
-    .getByRole("form", { name: "Verificar certificado", exact: true });
+    .getByRole("link", { name: "Verificar certificado", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/certificados\/verificar$/);
+  // The PDF control becomes available when the real verification controller is ready.
+  await expect(
+    page.getByText("Seleccionar PDF firmado", { exact: true }),
+  ).toBeVisible();
+  const form = page.getByRole("form", {
+    name: "Verificar certificado",
+    exact: true,
+  });
   const input = form.getByRole("textbox", {
     name: "Código del certificado",
     exact: true,
@@ -198,7 +201,6 @@ async function verifyUnknownCertificateFromLanding(page: Page) {
   // A bounded opaque code, not a fixture credential or a mocked success.
   const code = crypto.randomUUID().replaceAll("-", "");
   const path = `/certificados/${code}`;
-  const expectedUrl = new URL(path, page.url()).href;
   await input.fill(code);
   await expect(input).toBeFocused();
   await page.keyboard.press("Tab");
@@ -209,8 +211,8 @@ async function verifyUnknownCertificateFromLanding(page: Page) {
       new URL(response.url()).pathname === path,
   );
   await page.keyboard.press("Enter");
-  expect((await lookup).status()).toBe(404);
-  await expect(page).toHaveURL(expectedUrl);
+  expect((await lookup).status()).toBe(200);
+  await expect(page).toHaveURL(/\/certificados\/verificar$/);
   await expect(
     page.getByRole("heading", {
       level: 1,
@@ -392,14 +394,16 @@ test("course billboards are single whole-card links with complete metadata", asy
   await featuredLink.focus();
   await expect(featuredLink).toBeFocused();
   await expect(featuredLink).toHaveCSS("outline-style", "solid");
-  await expect(page.locator("#landing-credential-code")).not.toHaveAttribute(
-    "aria-describedby",
-  );
-  await expect(page.locator("#landing-credential-code")).toHaveAttribute(
+  await expect(page.locator("#certificados input")).toHaveCount(0);
+  await page
+    .locator("#certificados")
+    .getByRole("link", { name: "Verificar certificado", exact: true })
+    .click();
+  await expect(page.getByLabel("Código del certificado")).toHaveAttribute(
     "pattern",
     "[A-Za-z0-9_-]{32}",
   );
-  await expect(page.locator("#landing-credential-code-help")).toHaveCount(0);
+  await expect(page.locator("#credential-code-help")).toHaveCount(0);
 });
 
 test("editorial rows stay complete and preserve course order across breakpoints", async ({

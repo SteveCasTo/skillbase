@@ -1,0 +1,133 @@
+---
+import { CircleCheck, CircleX, TriangleAlert } from "lucide-react";
+import type { PublicCertificateDto } from "@/domain/certificates/types";
+import LocalFileVerification from "./LocalFileVerification.astro";
+import VerificationForm from "./VerificationForm.astro";
+import {
+  certificateTypeLabel,
+  civilDateLabel,
+  publicStateLabel,
+} from "./presentation";
+interface Props {
+  record?: PublicCertificateDto | null;
+  code?: string;
+  error?: string;
+  unavailable?: string;
+}
+const { record = null, code = "", error = "", unavailable = "" } = Astro.props;
+const details = record && "recipientName" in record ? record : null;
+---
+
+<article
+  data-public-verification
+  data-has-record={Boolean(details)}
+  class="flex w-full min-w-0 flex-col gap-8 py-8 sm:py-12"
+>
+  <header class="flex flex-col gap-3">
+    <h1
+      tabindex="-1"
+      data-public-title
+      class="flex items-start gap-3 text-3xl font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-ring"
+    >
+      <span
+        data-public-state-icon="issued"
+        hidden={record?.state !== "issued"}
+        class="mt-1 shrink-0 text-primary"
+      >
+        <CircleCheck aria-hidden="true" />
+      </span>
+      <span
+        data-public-state-icon="invalid"
+        hidden={!record || !["revoked", "replaced"].includes(record.state)}
+        class="mt-1 shrink-0 text-destructive"
+      >
+        <CircleX aria-hidden="true" />
+      </span>
+      <span
+        data-public-state-icon="unavailable"
+        hidden={!record || !["not_found", "not_issued"].includes(record.state)}
+        class="mt-1 shrink-0 text-secondary-foreground"
+      >
+        <TriangleAlert aria-hidden="true" />
+      </span>
+      <span data-public-state>
+        {record
+          ? publicStateLabel[record.state]
+          : unavailable
+            ? "Verificación no disponible"
+            : "Verificar certificado"}
+      </span>
+    </h1>
+    <p
+      data-public-error
+      hidden={!unavailable}
+      role="status"
+      aria-live="polite"
+      class="text-sm text-destructive"
+    >
+      {unavailable}
+    </p>
+  </header>
+  <div class="verification-grid grid min-w-0 items-stretch gap-8">
+    <section
+      data-public-data
+      hidden={!details}
+      class="verification-data min-w-0 rounded-xl border bg-card p-5 [overflow-wrap:anywhere] sm:p-7"
+      aria-label="Datos públicos del certificado"
+    >
+      <h2
+        data-public-field="recipientName"
+        class="break-words text-2xl font-semibold"
+      >
+        {details?.recipientName}
+      </h2>
+      <p data-public-field="courseName" class="mt-2 break-words leading-7">
+        {details?.courseName}
+      </p>
+      <dl class="mt-6 grid min-w-0 gap-x-8 gap-y-5 sm:grid-cols-2">
+        <div>
+          <dt class="text-sm text-muted-foreground">Tipo</dt>
+          <dd data-public-field="type" class="mt-1 font-medium">
+            {details && certificateTypeLabel[details.type]}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm text-muted-foreground">Duración</dt>
+          <dd data-public-field="academicHours" class="mt-1 font-medium">
+            {details && `${details.academicHours} horas académicas`}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm text-muted-foreground">Finalización del curso</dt>
+          <dd class="mt-1 font-medium">
+            <time data-public-field="endsOn" datetime={details?.endsOn}>
+              {details && civilDateLabel(details.endsOn)}
+            </time>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm text-muted-foreground">Organización</dt>
+          <dd
+            data-public-field="organization"
+            class="mt-1 break-words font-medium"
+          >
+            {details?.organization}
+          </dd>
+        </div>
+      </dl>
+    </section>
+    <details data-code-entry open={!details} class="verification-code min-w-0">
+      <summary class="min-h-11 cursor-pointer font-medium focus-visible:outline-2 focus-visible:outline-ring">
+        Consultar código
+      </summary>
+      <VerificationForm value={code} {error} />
+    </details>
+    <LocalFileVerification
+      officialHash={details?.signedSha256 ?? ""}
+      state={details?.state}
+    />
+  </div>
+</article>
+<script>
+  import "./public-verification";
+</script>

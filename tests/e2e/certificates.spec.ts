@@ -1390,11 +1390,10 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       page.getByRole("button", { name: "Emitir nuevo", exact: true }),
     ).toHaveCount(0);
     await page.goto(`/app/certificados/${newId}`);
-    await uploadReviewIssue(
-      page,
-      reissued,
-      await signedFixture("SYNTHETIC QA: reissued signed PDF"),
+    const reissuedBytes = await signedFixture(
+      "SYNTHETIC QA: reissued signed PDF",
     );
+    await uploadReviewIssue(page, reissued, reissuedBytes);
     await publicPage.goto(`/certificados/${reissued.publicCredentialId}`);
     await expect(
       publicPage.getByRole("heading", {
@@ -1414,6 +1413,206 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         await page.request.get(`/app/certificados/${newId}`, { headers })
       ).json()) as { data: CertificateDto }
     ).data;
+    // Both entry paths converge on the same public projection, without uploading
+    // a PDF or losing the selected file when comparing another credential code.
+    await publicPage.goto("/certificados/verificar");
+    const codeInput = publicPage.getByLabel("Código del certificado", {
+      exact: true,
+    });
+    const verifyCode = publicPage.getByRole("button", {
+      name: "Verificar certificado",
+      exact: true,
+    });
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Verificar certificado",
+        exact: true,
+      }),
+    ).toBeVisible();
+    for (const width of [375, 390, 768, 1440]) {
+      await publicPage.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(publicPage);
+      await publicPage.screenshot({
+        path: testInfo.outputPath(`verification-entry-${width}.png`),
+        fullPage: true,
+      });
+      await captureDark(
+        publicPage,
+        testInfo,
+        `verification-entry-dark-${width}.png`,
+      );
+    }
+    await codeInput.fill("x".repeat(32));
+    await verifyCode.click();
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado no disponible",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(publicPage.locator("#credential-code-error")).toContainText(
+      "no disponible",
+    );
+    await codeInput.fill(reissued.publicCredentialId);
+    await verifyCode.click();
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado vigente",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      publicPage.getByRole("region", {
+        name: "Datos públicos del certificado",
+      }),
+    ).toContainText(reissued.data.recipientName);
+    const hashRequests: { path: string; body: string | null }[] = [];
+    publicPage.on("request", (request) => {
+      if (request.method() === "POST")
+        hashRequests.push({
+          path: new URL(request.url()).pathname,
+          body: request.postData(),
+        });
+    });
+    await publicPage.goto("/certificados/verificar");
+    await publicPicker.setInputFiles({
+      name: "reissued.pdf",
+      mimeType: "application/pdf",
+      buffer: reissuedBytes,
+    });
+    await expect(localResult).toHaveAttribute("data-tone", "valid");
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado vigente",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await publicPage.getByText("Consultar código", { exact: true }).click();
+    await codeInput.fill(record.publicCredentialId);
+    await verifyCode.click();
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado revocado",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(localResult).toContainText("no coincide");
+    await expect(localResult).toHaveAttribute("data-tone", "error");
+    await expect(publicPage.locator("[data-file-name]")).toHaveText(
+      "reissued.pdf",
+    );
+    await codeInput.fill(reissued.publicCredentialId);
+    await verifyCode.click();
+    await expect(localResult).toHaveAttribute("data-tone", "valid");
+    expect(hashRequests).toHaveLength(1);
+    await publicPage.goto("/certificados/verificar");
+    await publicPicker.setInputFiles({
+      name: "revoked.pdf",
+      mimeType: "application/pdf",
+      buffer: replacementBytes,
+    });
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado revocado",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(localResult).toHaveAttribute("data-tone", "invalid");
+    await expect(
+      publicPage.locator(
+        '[data-sileo-toast][data-exiting="false"][data-state="success"]',
+      ),
+    ).toHaveCount(0);
+    await publicPage
+      .getByRole("button", { name: "Quitar archivo", exact: true })
+      .click();
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Verificar certificado",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(publicPicker).toBeFocused();
+    await publicPicker.setInputFiles({
+      name: "unknown.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from([...reissuedBytes, 0]),
+    });
+    await expect(localResult).toContainText("No se encontró");
+    await expect(localResult).toHaveAttribute("data-tone", "error");
+    await expect(
+      publicPage.getByRole("region", {
+        name: "Datos públicos del certificado",
+      }),
+    ).toHaveCount(0);
+    expect(hashRequests).toHaveLength(3);
+    await publicPage
+      .getByRole("button", { name: "Quitar archivo", exact: true })
+      .click();
+    let releaseLookup: (() => void) | undefined;
+    let lookupFinished = false;
+    await publicPage.route(
+      "**/certificados/verificar-archivo",
+      async (route) => {
+        const response = await route.fetch();
+        await new Promise<void>((resolve) => {
+          releaseLookup = resolve;
+        });
+        await route.fulfill({ response });
+        lookupFinished = true;
+      },
+    );
+    await publicPicker.setInputFiles({
+      name: "cancelled.pdf",
+      mimeType: "application/pdf",
+      buffer: reissuedBytes,
+    });
+    await expect.poll(() => typeof releaseLookup).toBe("function");
+    await expect(
+      publicPage.locator("[data-local-verification]"),
+    ).toHaveAttribute("aria-busy", "true");
+    const lookupNotice = publicPage.locator(
+      '[data-sileo-toast][data-exiting="false"][data-state="loading"]',
+    );
+    await expect(lookupNotice).toHaveCount(1);
+    const cancelledNotice = await lookupNotice.getAttribute("data-sileo-id");
+    await publicPage
+      .getByRole("button", { name: "Quitar archivo", exact: true })
+      .click();
+    await expect(publicPicker).toBeFocused();
+    releaseLookup!();
+    await expect.poll(() => lookupFinished).toBe(true);
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Verificar certificado",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(localResult).toHaveText("");
+    await expect(
+      publicPage.locator(
+        `[data-sileo-id="${cancelledNotice}"][data-exiting="false"]`,
+      ),
+    ).toHaveCount(0);
+    await expect(
+      publicPage.locator(
+        '[data-sileo-toast][data-exiting="false"][data-state="success"]',
+      ),
+    ).toHaveCount(0);
+    await publicPage.unroute("**/certificados/verificar-archivo");
+    expect(hashRequests).toHaveLength(4);
+    for (const request of hashRequests) {
+      expect(request.path).toBe("/certificados/verificar-archivo");
+      expect(JSON.parse(request.body!)).toEqual({
+        sha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      });
+      expect(request.body).not.toMatch(
+        /%PDF|reissued\.pdf|revoked\.pdf|unknown\.pdf/u,
+      );
+    }
+    await expect(publicPage.locator("main")).not.toContainText(
+      /[a-f0-9]{64}/iu,
+    );
     const secondRevocation = await page.request.post(
       `/app/certificados/${newId}?operation=revoke`,
       {
