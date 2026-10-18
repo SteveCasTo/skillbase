@@ -230,16 +230,17 @@ function initializeMarkAllButtons() {
               cancelRefresh();
               const response = await fetch(`${path}?operation=record`, {
                 method: "POST",
-                headers: { Accept: "application/json" },
-                body: new URLSearchParams({
+                headers: {
+                  Accept: "application/json",
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
                   requestKey,
-                  revision,
-                  marks: JSON.stringify(
-                    targets.map((registrationId: string) => ({
-                      registrationId,
-                      status: "PRESENT",
-                    })),
-                  ),
+                  revision: Number(revision),
+                  marks: targets.map((registrationId: string) => ({
+                    registrationId,
+                    status: "PRESENT",
+                  })),
                 }),
                 redirect: "manual",
               });

@@ -151,19 +151,18 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     await markAll.press("Enter");
     const bulkResponse = await bulkWrite;
     expect(bulkResponse.status()).toBe(200);
-    expect(bulkResponse.request().postData()).not.toContain("instructorStatus");
-    expect(
-      (
-        JSON.parse(
-          new URLSearchParams(bulkResponse.request().postData() ?? "").get(
-            "marks",
-          ) ?? "[]",
-        ) as { registrationId: string; status: string }[]
-      ).map((mark) => mark.registrationId),
-    ).toEqual([fixture.paid.id]);
-    expect(bulkResponse.request().postData()).not.toContain(
-      "completeAdministrativeReview",
-    );
+    const bulkPayload = JSON.parse(
+      bulkResponse.request().postData() ?? "{}",
+    ) as {
+      marks: { registrationId: string; status: string }[];
+      instructorStatus?: unknown;
+      completeAdministrativeReview?: unknown;
+    };
+    expect(bulkPayload.marks.map((mark) => mark.registrationId)).toEqual([
+      fixture.paid.id,
+    ]);
+    expect(bulkPayload).not.toHaveProperty("instructorStatus");
+    expect(bulkPayload).not.toHaveProperty("completeAdministrativeReview");
     await expect(page.locator("[data-attendance-page-error]")).toHaveText(
       "Operación guardada. Recarga la sesión para ver los cambios.",
     );
@@ -579,16 +578,16 @@ test("INSTRUCTOR records only enrolled own participants without contacts or fina
     await markAll.click();
     const bulkResponse = await bulkWrite;
     expect(bulkResponse.status()).toBe(200);
-    expect(bulkResponse.request().postData()).not.toContain("instructorStatus");
-    expect(
-      (
-        JSON.parse(
-          new URLSearchParams(bulkResponse.request().postData() ?? "").get(
-            "marks",
-          ) ?? "[]",
-        ) as { registrationId: string; status: string }[]
-      ).map((mark) => mark.registrationId),
-    ).toEqual([fixture.paid.id]);
+    const bulkPayload = JSON.parse(
+      bulkResponse.request().postData() ?? "{}",
+    ) as {
+      marks: { registrationId: string; status: string }[];
+      instructorStatus?: unknown;
+    };
+    expect(bulkPayload.marks.map((mark) => mark.registrationId)).toEqual([
+      fixture.paid.id,
+    ]);
+    expect(bulkPayload).not.toHaveProperty("instructorStatus");
     await expect(markAll).toHaveCount(0);
     expect(
       (await detail(page, path)).participants.find(
