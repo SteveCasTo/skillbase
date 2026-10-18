@@ -764,6 +764,12 @@ test("grouped courses replan ordinary future calendars atomically and require an
   expect(again.startsAt).toEqual(data("2027-02-23").startsAt);
   expect(await financialSnapshot()).toEqual(money);
   await expect(
+    reactivateGroup(repo, admin, retired.id, retired.updatedAt.toISOString()),
+  ).rejects.toMatchObject({ code: "COURSE_UNAVAILABLE" });
+  expect(
+    (await repo.list(courseId)).find((group) => group.id === retired.id),
+  ).toEqual(retired);
+  await expect(
     courseRepo.update(courseId, data("2027-02-22"), admin.id, moved.updatedAt),
   ).rejects.toMatchObject({ code: "STALE_COURSE" });
   const unchanged = async () => ({
