@@ -165,7 +165,7 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     expect((await malformedSave).status()).toBe(503);
     await expect(
       page
-        .locator('[data-sileo-toast][data-state="error"][data-exiting="false]')
+        .locator('[data-sileo-toast][data-state="error"][data-exiting="false"]')
         .last(),
     ).toContainText("respuesta inválida");
     await expect(markAll).toBeEnabled();
