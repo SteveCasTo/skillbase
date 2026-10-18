@@ -415,6 +415,7 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
     mimeType: "image/webp",
     buffer: Buffer.from(bytes),
   });
+  await expect(cropDialog).toBeVisible();
   await cropDialog.getByRole("button", { name: "Guardar recorte" }).click();
   await expect(
     page.getByRole("button", { name: "Guardar cambios" }),
