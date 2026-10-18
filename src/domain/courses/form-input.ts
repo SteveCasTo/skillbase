@@ -49,12 +49,16 @@ export function restoreDisabledCourseFields(
   course: AdminCourseDto,
 ): CourseInput {
   const original = courseFormInput(course);
-  const policy = course.editability;
+  // A control may have been disabled at render time and become editable before
+  // this fresh read (for example, deletion of the last pristine draft group).
+  // Omission never means clearing a protected value, regardless of that race.
   const fields = [
-    ...(!policy?.format ? ["courseTypeId"] : []),
-    ...(!policy?.instructor ? ["instructorId"] : []),
-    ...(!policy?.dates ? ["startsAt", "endsAt"] : []),
-    ...(!policy?.schedule ? ["schedule", "weekdays"] : []),
+    "courseTypeId",
+    "instructorId",
+    "startsAt",
+    "endsAt",
+    "schedule",
+    "weekdays",
   ];
   // Explicit attempted changes are NOT overwritten: command guards reject them.
   return {

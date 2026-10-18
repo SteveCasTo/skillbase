@@ -134,6 +134,18 @@ describe("course domain", () => {
       schedule: result.schedule,
     });
     expect(
+      restoreDisabledCourseFields(omitted, {
+        ...stored,
+        editability: {
+          content: true,
+          format: true,
+          instructor: true,
+          dates: true,
+          schedule: true,
+        },
+      }),
+    ).toEqual(restoreDisabledCourseFields(omitted, stored));
+    expect(
       restoreDisabledCourseFields(
         { courseTypeId: "tampered", startsAt: "tampered" },
         stored,
