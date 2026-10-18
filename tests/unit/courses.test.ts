@@ -126,6 +126,15 @@ describe("course domain", () => {
     };
     const omitted = courseInputFromFormData(new FormData());
     expect(omitted.courseTypeId).toBeUndefined();
+    expect(
+      restoreDisabledCourseFields(
+        { courseTypeId: undefined, startsAt: undefined },
+        stored,
+      ),
+    ).toMatchObject({
+      courseTypeId: result.courseTypeId,
+      startsAt: validInput.startsAt,
+    });
     expect(restoreDisabledCourseFields(omitted, stored)).toMatchObject({
       courseTypeId: result.courseTypeId,
       startsAt: validInput.startsAt,

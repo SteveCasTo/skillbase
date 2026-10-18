@@ -62,11 +62,11 @@ export function restoreDisabledCourseFields(
   ];
   // Explicit attempted changes are NOT overwritten: command guards reject them.
   return {
+    ...input,
     ...Object.fromEntries(
       fields
         .filter((field) => input[field] === undefined)
         .map((field) => [field, original[field]]),
     ),
-    ...input,
   };
 }
