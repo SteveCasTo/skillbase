@@ -6,6 +6,7 @@ import {
   type AttendanceSessionDto,
 } from "@/domain/attendance/types";
 import type { AttendanceHttpPayload } from "@/server/attendance/http";
+import { isRevision, isUuid } from "@/domain/courses/mutation-result";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -27,14 +28,20 @@ function isAttendanceCommandResult(
   if (!isRecord(value)) return false;
   if (value.kind === "session")
     return (
-      typeof value.sessionId === "string" &&
-      Number.isSafeInteger(value.revision)
+      isUuid(value.sessionId) &&
+      typeof value.revision === "number" &&
+      Number.isSafeInteger(value.revision) &&
+      value.revision > 0
     );
   if (value.kind === "settings" && isRecord(value.settings))
     return (
+      typeof value.settings.consecutiveAbsenceLimit === "number" &&
       Number.isSafeInteger(value.settings.consecutiveAbsenceLimit) &&
+      value.settings.consecutiveAbsenceLimit > 0 &&
+      typeof value.settings.revision === "number" &&
       Number.isSafeInteger(value.settings.revision) &&
-      typeof value.settings.updatedAt === "string"
+      value.settings.revision > 0 &&
+      isRevision(value.settings.updatedAt)
     );
   return false;
 }
@@ -52,11 +59,14 @@ export function parseAttendanceHttpPayload(
     return undefined;
   if (value.ok)
     return typeof value.message === "string" &&
+      value.message.trim().length > 0 &&
       isAttendanceCommandResult(value.value)
       ? { ok: true, value: value.value, message: value.message }
       : undefined;
   return typeof value.code === "string" &&
+    value.code.trim().length > 0 &&
     typeof value.message === "string" &&
+    value.message.trim().length > 0 &&
     isStringRecord(value.issues)
     ? {
         ok: false,

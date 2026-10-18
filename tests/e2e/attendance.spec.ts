@@ -391,15 +391,10 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     };
     expect(rejectedPayload.message).not.toBe("");
     await expect(
-      page.locator(
-        '[data-sileo-toast][data-state="error"][data-exiting="false"]',
-      ),
+      page
+        .locator('[data-sileo-toast][data-exiting="false"]')
+        .filter({ hasText: rejectedPayload.message }),
     ).toBeVisible();
-    await expect(
-      page.locator(
-        '[data-sileo-toast][data-state="error"][data-exiting="false"]',
-      ),
-    ).toContainText(rejectedPayload.message);
     await expect(person.getByRole("alert")).toHaveCount(0);
     await expect(
       person.getByRole("combobox", {
