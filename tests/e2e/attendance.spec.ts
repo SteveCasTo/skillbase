@@ -139,6 +139,55 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     await chooseStateWithRejectedResponse(page, row, "Justificada", path);
     await expect(markAll).toBeEnabled();
     await page.route(
+      `${e2eSiteUrl()}${path}?operation=record`,
+      (route) =>
+        route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({
+            ok: true,
+            value: {
+              kind: "session",
+              sessionId: fixture.session.id,
+              revision: fixture.session.revision + 1,
+            },
+            message: "Asistencia registrada.",
+          }),
+        }),
+      { times: 1 },
+    );
+    const malformedSave = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === path,
+    );
+    await markAll.press("Enter");
+    expect((await malformedSave).status()).toBe(503);
+    await expect(
+      page
+        .locator('[data-sileo-toast][data-state="error"][data-exiting="false]')
+        .last(),
+    ).toContainText("respuesta inválida");
+    await expect(markAll).toBeEnabled();
+    await expect(
+      page.getByRole("link", { name: "Reintentar actualización", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="loading"][data-exiting="false"]',
+      ),
+    ).toHaveCount(0);
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="success"][data-exiting="false"]',
+      ),
+    ).toHaveCount(0);
+    expect(
+      (await detail(page, path)).participants.find(
+        (person) => person.registrationId === fixture.paid.id,
+      )?.attendance.status,
+    ).toBe("PENDING");
+    await page.route(
       `${e2eSiteUrl()}${path}`,
       (route) => route.fulfill({ status: 503, body: "Fragment unavailable" }),
       { times: 1 },
