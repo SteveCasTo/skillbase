@@ -878,6 +878,9 @@ const statusLabel = {
                       status: result.status,
                       revision: result.revision,
                       featured: result.featured,
+                      ...(result.editability
+                        ? { editability: result.editability }
+                        : {}),
                     });
                   } catch (failure) {
                     failedForm = dialogForm;
@@ -990,6 +993,9 @@ const statusLabel = {
                         status: result.status,
                         revision: result.revision,
                         featured: result.featured,
+                        ...(result.editability
+                          ? { editability: result.editability }
+                          : {}),
                       });
                     } catch (failure) {
                       failedForm = form;

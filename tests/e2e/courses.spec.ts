@@ -1628,6 +1628,105 @@ test("course administration remains keyboard reachable and responsive", async ({
       },
     });
     expect(archived.status()).toBe(200);
+    // Own publication must apply the fresh policy without a reload: a legacy
+    // hourly draft becomes date-only as soon as its new group pins the hour.
+    const historical = await page.request.post("/app/cursos/nuevo", {
+      headers,
+      form: {
+        requestKey: randomUUID(),
+        name: `Historical calendar UI ${randomUUID()}`,
+        description: "Synthetic hourly draft",
+        level: "BASIC",
+        courseTypeId: formatId,
+        instructorId: courseInstructor(page).id,
+        schedule: "Lunes a viernes, 18:00–19:30",
+        weekdays: "1,2,3,4,5",
+        startsAt: "2027-03-01T18:00",
+        endsAt: "2027-03-17T19:30",
+        conditions: "Synthetic",
+        minimumGrade: "70",
+      },
+    });
+    expect(historical.status()).toBe(201);
+    const historicalId = (await historical.json()).id as string;
+    lifecycleCourseIds.set(testInfo.testId, historicalId);
+    const historicalPath = `/app/cursos/${historicalId}/editar`;
+    const unsavedFormatName = `Unsaved calendar format ${randomUUID()}`;
+    expect(
+      (
+        await page.request.post("/app/formatos/nuevo", {
+          headers,
+          form: {
+            name: unsavedFormatName,
+            totalHours: "20",
+            sessionMinutes: "90",
+            studentAmount: "80",
+            externalAmount: "100",
+          },
+        })
+      ).status(),
+    ).toBe(201);
+    await page.goto(historicalPath);
+    const historicalFormat = page.getByRole("combobox", {
+      name: "Formato de curso",
+      exact: true,
+    });
+    const persistedFormatLabel = await historicalFormat.textContent();
+    await historicalFormat.click();
+    await page
+      .getByRole("option", { name: new RegExp(unsavedFormatName) })
+      .click();
+    await expect(
+      page.getByRole("textbox", {
+        name: "Inicio de clases (Bolivia)",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    expect(
+      (
+        await page.request.post(`/app/cursos/${historicalId}/grupos`, {
+          headers,
+          form: { intent: "create", startTime: "11:00", capacity: "10" },
+        })
+      ).status(),
+    ).toBe(200);
+    await page
+      .getByRole("button", { name: "Publicar curso", exact: true })
+      .click();
+    const published = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === historicalPath,
+    );
+    await page
+      .getByRole("dialog", { name: "Publicar curso" })
+      .getByRole("button", { name: "Publicar curso", exact: true })
+      .click();
+    expect((await published).status()).toBe(200);
+    await expect(
+      page.getByRole("combobox", { name: "Formato de curso", exact: true }),
+    ).toBeDisabled();
+    await expect(historicalFormat).toHaveText(persistedFormatLabel!);
+    await expect(
+      page.getByRole("textbox", {
+        name: "Inicio de clases (Bolivia)",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(start).toBeEnabled();
+    expect(
+      (
+        await page.request.post(historicalPath, {
+          headers,
+          form: {
+            intent: "archive",
+            revision: await page
+              .locator('.course-form input[name="revision"]')
+              .inputValue(),
+          },
+        })
+      ).status(),
+    ).toBe(200);
   } finally {
     await db.close();
   }

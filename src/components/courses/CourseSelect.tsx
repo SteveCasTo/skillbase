@@ -49,6 +49,17 @@ export default function CourseSelect({
             ? "instructor"
             : "content";
       setDisabled(!policy[section] || options.length === 0);
+      if (!policy[section]) {
+        const baseline = JSON.parse(form.dataset.baseline ?? "{}") as Record<
+          string,
+          unknown
+        >;
+        const persisted = baseline[name];
+        if (typeof persisted === "string")
+          setSelectedValue(
+            name === "instructorId" && !persisted ? "unassigned" : persisted,
+          );
+      }
     };
     form.addEventListener("course-editability-change", sync);
     return () => form.removeEventListener("course-editability-change", sync);
