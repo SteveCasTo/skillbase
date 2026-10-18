@@ -605,6 +605,18 @@ test("creates canonical date-only courses and rejects forged date bounds", async
 
 test("grouped courses replan ordinary future calendars atomically and require an active format to republish", async () => {
   const morning = await createGroup(repo, admin, courseId, "08:00", 2);
+  const retiredPlan = await createGroup(repo, admin, courseId, "11:00", 2);
+  const retired = await cancelGroup(
+    repo,
+    admin,
+    retiredPlan.id,
+    retiredPlan.updatedAt.toISOString(),
+  );
+  const retiredSessions = await database.db
+    .select()
+    .from(groupSessions)
+    .where(eq(groupSessions.groupId, retired.id))
+    .orderBy(groupSessions.id);
   const existing = await courseRepo.getAdmin(courseId);
   if (!existing) throw new Error("Missing course");
   const registrations = new DrizzleRegistrationRepository(database.db);
@@ -695,8 +707,19 @@ test("grouped courses replan ordinary future calendars atomically and require an
   expect(moved.prices).toEqual(existing.prices);
   expect(await financialSnapshot()).toEqual(money);
   const stored = await repo.list(courseId);
-  expect(stored).toHaveLength(2);
+  expect(stored).toHaveLength(3);
   for (const group of stored) {
+    if (group.id === retired.id) {
+      expect(group).toEqual(retired);
+      expect(
+        await database.db
+          .select()
+          .from(groupSessions)
+          .where(eq(groupSessions.groupId, retired.id))
+          .orderBy(groupSessions.id),
+      ).toEqual(retiredSessions);
+      continue;
+    }
     const hour = group.id === morning.id ? "08:00" : "18:00";
     const plan = planWeekdaySchedule({
       startsAt: `2027-02-22T${hour}`,
@@ -760,6 +783,15 @@ test("grouped courses replan ordinary future calendars atomically and require an
       .orderBy(auditEvents.id),
   });
   const snapshot = await unchanged();
+  expect(
+    snapshot.audit.some(
+      (event) =>
+        event.entityId === courseId &&
+        event.action === "COURSE_UPDATED" &&
+        event.metadata?.oldStartsAt === existing.startsAt.toISOString() &&
+        event.metadata?.cascade === "GROUP_CALENDARS",
+    ),
+  ).toBe(true);
   // Force a final course CHECK failure after replacement/group writes. Every
   // calendar row, revision and audit event must roll back with the course.
   await expect(
