@@ -3,6 +3,10 @@ import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
 import { registerCourseInstructor } from "./instructor-helper";
+import { createDatabase } from "@/server/db/client";
+import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
+import { courses } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 
 test.use({ javaScriptEnabled: false });
 
@@ -100,8 +104,9 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
     "Lunes a viernes, 08:00–09:30",
   );
   await expect(
-    page.getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)"),
-  ).toHaveValue("2027-03-01T08:00");
+    page.getByLabel("Fecha de inicio de clases (Bolivia)"),
+  ).toHaveValue("2027-03-01");
+  await expect(page.getByLabel("Horario planificado histórico")).toBeDisabled();
   await expect(page.locator('[name="registrationStartDate"]')).toHaveCount(0);
   await expect(page.locator('[name="registrationEndDate"]')).toHaveCount(0);
   await expect(page.locator('[name="registrationStartAt"]')).toHaveValue(
@@ -123,8 +128,19 @@ test("cancellation requires explicit HTML confirmation without JavaScript", asyn
     "Lunes a viernes, 08:00–09:30",
   );
   await expect(
-    page.getByLabel("Inicio del curso (AAAA-MM-DDTHH:mm)"),
-  ).toHaveValue("2027-03-01T08:00");
+    page.getByLabel("Fecha de inicio de clases (Bolivia)"),
+  ).toHaveValue("2027-03-01");
+  const db = createDatabase(getTestSupabaseEnvironment().databaseUrl);
+  try {
+    const [stored] = await db.db
+      .select()
+      .from(courses)
+      .where(eq(courses.id, id));
+    expect(stored!.startsAt.toISOString()).toBe("2027-03-01T12:00:00.000Z");
+    expect(stored!.endsAt.toISOString()).toBe("2027-03-17T13:30:00.000Z");
+  } finally {
+    await db.close();
+  }
   await expect(page.locator('[name="registrationStartAt"]')).toHaveValue(
     "2027-01-01T08:00",
   );

@@ -17,6 +17,7 @@ import {
   replanFutureGroupSessions,
 } from "./attendance-calendar";
 import { instructorSchedulesOverlap } from "@/domain/instructors/schedule";
+import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 import { AttendanceError } from "@/domain/attendance/rules";
 import {
   instructorHasConflict,
@@ -339,6 +340,19 @@ export class DrizzleGroupRepository implements GroupRepository {
           throw new GroupError(
             "COURSE_UNAVAILABLE",
             "El formato del curso ya no coincide con el grupo.",
+          );
+        const currentPlan = groupPlan(
+          course,
+          revision,
+          instantToBoliviaCivil(previous.startsAt).slice(11),
+        );
+        if (
+          previous.startsAt.getTime() !== currentPlan.startsAt.getTime() ||
+          previous.endsAt.getTime() !== currentPlan.endsAt.getTime()
+        )
+          throw new GroupError(
+            "COURSE_UNAVAILABLE",
+            "El calendario del grupo ya no coincide con el curso.",
           );
         await this.assertFree(
           tx,

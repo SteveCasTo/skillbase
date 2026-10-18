@@ -25,6 +25,9 @@ import {
 } from "@/server/courses/errors";
 import { CourseInfrastructureError } from "@/server/db/repositories/course-infrastructure-error";
 import { courseInputFromFormData } from "@/server/courses/form";
+import { courseEditability } from "@/domain/courses/editability";
+import { restoreDisabledCourseFields } from "@/domain/courses/form-input";
+import type { AdminCourseDto } from "@/domain/courses/types";
 import {
   buildCourseReport,
   loadCourseReport,
@@ -76,6 +79,87 @@ describe("course domain", () => {
       externalAmount: "100.50",
     });
     expect(result.startsAt.toISOString()).toBe("2027-01-10T22:00:00.000Z");
+    const now = new Date("2026-10-17T12:00Z");
+    const policy = courseEditability(
+      { ...result, status: "PUBLISHED" },
+      true,
+      true,
+      now,
+    );
+    expect(policy).toEqual({
+      content: true,
+      format: false,
+      instructor: true,
+      dates: true,
+      schedule: false,
+    });
+    expect(
+      courseEditability({ ...result, status: "PUBLISHED" }, true, false, now),
+    ).toMatchObject({ content: true, dates: false });
+    expect(
+      courseEditability(
+        { ...result, status: "PUBLISHED" },
+        true,
+        true,
+        result.startsAt,
+      ),
+    ).toMatchObject({ content: true, instructor: false, dates: false });
+    expect(
+      Object.values(
+        courseEditability({ ...result, status: "ARCHIVED" }, false, true, now),
+      ),
+    ).toEqual([false, false, false, false, false]);
+    const stored: AdminCourseDto = {
+      ...result,
+      id: "course",
+      slug: "course",
+      courseTypeRevisionId: "revision",
+      totalHours: 20,
+      sessionMinutes: 90,
+      prices: [],
+      featured: false,
+      status: "PUBLISHED",
+      createdAt: now,
+      updatedAt: now,
+      registrationAvailability: "UPCOMING",
+      editability: { ...policy, dates: false, instructor: false },
+    };
+    const omitted = courseInputFromFormData(new FormData());
+    expect(omitted.courseTypeId).toBeUndefined();
+    expect(
+      restoreDisabledCourseFields(
+        { courseTypeId: undefined, startsAt: undefined },
+        stored,
+      ),
+    ).toMatchObject({
+      courseTypeId: result.courseTypeId,
+      startsAt: validInput.startsAt,
+    });
+    expect(restoreDisabledCourseFields(omitted, stored)).toMatchObject({
+      courseTypeId: result.courseTypeId,
+      startsAt: validInput.startsAt,
+      endsAt: validInput.endsAt,
+      instructorId: "",
+      schedule: result.schedule,
+    });
+    expect(
+      restoreDisabledCourseFields(omitted, {
+        ...stored,
+        editability: {
+          content: true,
+          format: true,
+          instructor: true,
+          dates: true,
+          schedule: true,
+        },
+      }),
+    ).toEqual(restoreDisabledCourseFields(omitted, stored));
+    expect(
+      restoreDisabledCourseFields(
+        { courseTypeId: "tampered", startsAt: "tampered" },
+        stored,
+      ),
+    ).toMatchObject({ courseTypeId: "tampered", startsAt: "tampered" });
   });
 
   test("converts Bolivia civil time symmetrically without process timezone", () => {
