@@ -76,6 +76,12 @@ const values: CourseInput =
             .filter((field) => baseline?.[field] !== undefined)
             .map((field) => [field, baseline?.[field]]),
         ),
+        ...(datesDisabled && baseline
+          ? {
+              startDate: baseline.startsAt?.slice(0, 10),
+              endDate: baseline.endsAt?.slice(0, 10),
+            }
+          : {}),
       };
 const control =
   "mt-2 min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";

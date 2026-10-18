@@ -1563,7 +1563,7 @@ test("course administration remains keyboard reachable and responsive", async ({
       await page.reload();
       await expect(start).toBeDisabled();
       await expect(
-        page.getByLabel("Descripción", { exact: true }),
+        page.getByRole("textbox", { name: "Descripción", exact: true }),
       ).toBeEnabled();
       const persistedRevision = await page
         .locator('.course-form input[name="revision"]')
@@ -1595,7 +1595,7 @@ test("course administration remains keyboard reachable and responsive", async ({
         )[0]!.startsAt,
       ).toEqual(stored!.startsAt);
       await page
-        .getByLabel("Descripción", { exact: true })
+        .getByRole("textbox", { name: "Descripción", exact: true })
         .fill("Editable content despite locked calendar");
       const contentSaved = page.waitForResponse(
         (response) =>
