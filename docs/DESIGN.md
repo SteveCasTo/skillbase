@@ -545,7 +545,7 @@ PRs 219, 221, 222 y 223 integraron las correcciones funcionales en `development`
 - La página dedicada del grupo presenta breadcrumb, participantes permitidos y para INSTRUCTOR únicamente nombres y su propia asistencia por sesión; no expone CI, contacto ni finanzas.
 - Mantener la tarjeta del grupo como destino semántico claro, sin enlaces repetidos; errores/reintentos reales sin reload incondicional; calendario con navegación a fechas pasadas, tokens y separadores solo entre elementos visibles.
 - Sesión cancelada muestra motivo y reemplazo, sin acciones operativas de asistencia. Estados alineados a la derecha y diferenciados semánticamente; acciones de roster en cabecera; diálogos «Cancelar»/«Confirmar» 50/50 y checkbox alineado.
-- No añadir edición de la asistencia de un día histórico desde ese flujo ni acción «Marcar todo» que cierre asistencia. Conservar SSR, teclado, foco, privacidad e idempotencia.
+- No añadir edición de la asistencia de un día histórico desde ese flujo ni acción masiva que cierre asistencia. «Marcar todos presentes» se limita a participantes editables en sesiones que ya permiten registrar; queda junto al título de asistencia, desaparece cuando todos están presentes y nunca incluye asistencia del instructor ni completa revisión. Conservar SSR, teclado, foco, privacidad e idempotencia.
 
 La UI liberada conserva SSR, teclado, foco, privacidad e idempotencia conforme a las pruebas focales y al cierre PR 228. El test de guardado de grupo había mostrado intermitencia sin causa raíz; el full run de release pasó, pero no se atribuye una corrección de código a la intermitencia.
 

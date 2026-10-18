@@ -4,6 +4,7 @@ import {
   attendanceFieldIssues,
   sessionCancellationLabel,
   markValue,
+  parseAttendanceHttpPayload,
   validMarkValue,
   durationLabel,
   timeLabel,
@@ -113,13 +114,46 @@ function request(values: Record<string, string>, operation = "replace") {
     },
   );
 }
-test("attendance controls transport only a single explicit mark and keep pending out of commands", () => {
+test("attendance row controls keep one explicit mark while bulk payloads remain separate", () => {
   const id = crypto.randomUUID();
   expect(markValue(id, "PENDING")).toBe("");
   expect(validMarkValue(markValue(id, "EXCUSED"))).toBe(true);
+  const bulkMarks = [
+    { registrationId: id, status: "PRESENT" },
+    { registrationId: crypto.randomUUID(), status: "PRESENT" },
+  ];
+  expect(validMarkValue(JSON.stringify(bulkMarks))).toBe(false);
+  expect(
+    attendanceFormPayload({ marks: JSON.stringify(bulkMarks) }).marks,
+  ).toBe(JSON.stringify(bulkMarks));
   expect(
     validMarkValue(JSON.stringify([{ registrationId: id, status: "PENDING" }])),
   ).toBe(false);
+  const success = {
+    ok: true as const,
+    value: {
+      kind: "session" as const,
+      sessionId: context.sessionId,
+      revision: 2,
+    },
+    message: "Asistencia registrada.",
+  };
+  expect(parseAttendanceHttpPayload(success, false)).toBeUndefined();
+  expect(
+    parseAttendanceHttpPayload({ ok: "false", message: "Malformed" }, true),
+  ).toBeUndefined();
+  expect(parseAttendanceHttpPayload(success, true)).toEqual(success);
+  expect(
+    parseAttendanceHttpPayload(
+      {
+        ok: false,
+        code: "CONCURRENT_UPDATE",
+        message: "La sesión cambió.",
+        issues: {},
+      },
+      false,
+    ),
+  ).toMatchObject({ ok: false, code: "CONCURRENT_UPDATE" });
   expect(timeLabel("2026-10-03T18:30:00.000Z")).toBe("14:30");
   expect(
     durationLabel({

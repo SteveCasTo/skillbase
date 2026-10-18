@@ -1,10 +1,82 @@
 import {
   ATTENDANCE_STATUSES,
+  type AttendanceCommandResult,
   type AttendanceMarkDto,
   type AttendanceStatus,
   type AttendanceSessionDto,
 } from "@/domain/attendance/types";
+import type { AttendanceHttpPayload } from "@/server/attendance/http";
+import { isRevision, isUuid } from "@/domain/courses/mutation-result";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isStringRecord(
+  value: unknown,
+): value is Readonly<Record<string, string>> {
+  return (
+    isRecord(value) &&
+    Object.values(value).every((entry) => typeof entry === "string")
+  );
+}
+
+function isAttendanceCommandResult(
+  value: unknown,
+): value is AttendanceCommandResult {
+  if (!isRecord(value)) return false;
+  if (value.kind === "session")
+    return (
+      isUuid(value.sessionId) &&
+      typeof value.revision === "number" &&
+      Number.isSafeInteger(value.revision) &&
+      value.revision > 0
+    );
+  if (value.kind === "settings" && isRecord(value.settings))
+    return (
+      typeof value.settings.consecutiveAbsenceLimit === "number" &&
+      Number.isSafeInteger(value.settings.consecutiveAbsenceLimit) &&
+      value.settings.consecutiveAbsenceLimit > 0 &&
+      typeof value.settings.revision === "number" &&
+      Number.isSafeInteger(value.settings.revision) &&
+      value.settings.revision > 0 &&
+      isRevision(value.settings.updatedAt)
+    );
+  return false;
+}
+
+/** Reject status/body mismatches and malformed business payloads before UI success. */
+export function parseAttendanceHttpPayload(
+  value: unknown,
+  httpSuccess: boolean,
+): AttendanceHttpPayload | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.ok !== "boolean" ||
+    value.ok !== httpSuccess
+  )
+    return undefined;
+  if (value.ok)
+    return typeof value.message === "string" &&
+      value.message.trim().length > 0 &&
+      isAttendanceCommandResult(value.value)
+      ? { ok: true, value: value.value, message: value.message }
+      : undefined;
+  return typeof value.code === "string" &&
+    value.code.trim().length > 0 &&
+    typeof value.message === "string" &&
+    value.message.trim().length > 0 &&
+    isStringRecord(value.issues)
+    ? {
+        ok: false,
+        code: value.code,
+        message: value.message,
+        issues: value.issues,
+      }
+    : undefined;
+}
+
 export const sessionLabels: Record<AttendanceSessionDto["status"], string> = {
   UPCOMING: "Próxima",
   ONGOING: "En curso",
