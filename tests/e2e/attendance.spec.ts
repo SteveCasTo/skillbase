@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import type { AttendanceSessionDetailDto } from "@/domain/attendance/types";
 import { civilDay } from "@/domain/attendance/rules";
+import { markValue } from "@/components/attendance/presentation";
 import { createAttendanceFlowFixture } from "../fixtures/attendance-flow";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
@@ -39,6 +40,34 @@ async function chooseState(
 async function openMarkEditor(form: Locator) {
   if (await form.getByRole("combobox").count()) return;
   await form.getByRole("button", { name: /^Editar asistencia de /u }).click();
+}
+async function chooseStateWithRejectedResponse(
+  page: Page,
+  form: Locator,
+  status: "Presente" | "Ausente" | "Justificada",
+  path: string,
+) {
+  await page.route(
+    `${e2eSiteUrl()}${path}?operation=record`,
+    (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "text/plain",
+        body: "Unavailable",
+      }),
+    { times: 1 },
+  );
+  const response = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === path &&
+      response.request().method() === "POST",
+  );
+  const select = form.getByRole("combobox", { name: /^Asistencia de /u });
+  await select.click();
+  await page.getByRole("option", { name: status, exact: true }).click();
+  expect((await response).status()).toBe(503);
+  await expect(form).not.toHaveAttribute("aria-busy", "true");
+  await expect(form).toHaveAttribute("data-save-failed", "true");
 }
 async function detail(page: Page, path: string) {
   const response = await page.request.get(path, {
@@ -102,6 +131,18 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
       .locator("html")
       .evaluate((html) => html.classList.remove("dark"));
     await page.setViewportSize({ width: 1280, height: 900 });
+    const row = page.getByRole("form", {
+      name: "Enrolled Attendance Quispe",
+      exact: true,
+    });
+    await openMarkEditor(row);
+    await chooseStateWithRejectedResponse(page, row, "Justificada", path);
+    await expect(markAll).toBeEnabled();
+    await page.route(
+      `${e2eSiteUrl()}${path}`,
+      (route) => route.fulfill({ status: 503, body: "Fragment unavailable" }),
+      { times: 1 },
+    );
     const bulkWrite = page.waitForResponse(
       (response) =>
         response.request().method() === "POST" &&
@@ -123,17 +164,31 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     expect(bulkResponse.request().postData()).not.toContain(
       "completeAdministrativeReview",
     );
-    await expect(markAll).toHaveCount(0);
-    await expect(page.locator("[data-attendance-heading]")).toBeFocused();
+    await expect(page.locator("[data-attendance-page-error]")).toHaveText(
+      "Operación guardada. Recarga la sesión para ver los cambios.",
+    );
+    await expect(
+      page.getByRole("link", { name: "Reintentar actualización", exact: true }),
+    ).toBeFocused();
     expect(
       (await detail(page, path)).participants.find(
         (person) => person.registrationId === fixture.paid.id,
       )?.attendance,
     ).toMatchObject({ status: "PRESENT", markedBy: fixture.adminId });
-    const row = page.getByRole("form", {
-      name: "Enrolled Attendance Quispe",
-      exact: true,
-    });
+    await page
+      .getByRole("link", { name: "Reintentar actualización", exact: true })
+      .click();
+    await expect(markAll).toHaveCount(0);
+    expect(
+      JSON.parse((await row.getAttribute("data-baseline")) ?? "{}"),
+    ).toMatchObject({ marks: markValue(fixture.paid.id, "PRESENT") });
+    await expect(
+      row.getByRole("button", {
+        name: "Editar asistencia de Enrolled Attendance Quispe",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(page.locator("[data-attendance-title]")).toBeFocused();
     await openMarkEditor(row);
     await chooseState(page, row, "Ausente");
     await expect(markAll).toBeVisible();

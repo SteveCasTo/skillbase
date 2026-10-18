@@ -4,6 +4,7 @@ import {
   attendanceFieldIssues,
   sessionCancellationLabel,
   markValue,
+  parseAttendanceHttpPayload,
   validMarkValue,
   durationLabel,
   timeLabel,
@@ -128,6 +129,31 @@ test("attendance row controls keep one explicit mark while bulk payloads remain 
   expect(
     validMarkValue(JSON.stringify([{ registrationId: id, status: "PENDING" }])),
   ).toBe(false);
+  const success = {
+    ok: true as const,
+    value: {
+      kind: "session" as const,
+      sessionId: context.sessionId,
+      revision: 2,
+    },
+    message: "Asistencia registrada.",
+  };
+  expect(parseAttendanceHttpPayload(success, false)).toBeUndefined();
+  expect(
+    parseAttendanceHttpPayload({ ok: "false", message: "Malformed" }, true),
+  ).toBeUndefined();
+  expect(parseAttendanceHttpPayload(success, true)).toEqual(success);
+  expect(
+    parseAttendanceHttpPayload(
+      {
+        ok: false,
+        code: "CONCURRENT_UPDATE",
+        message: "La sesión cambió.",
+        issues: {},
+      },
+      false,
+    ),
+  ).toMatchObject({ ok: false, code: "CONCURRENT_UPDATE" });
   expect(timeLabel("2026-10-03T18:30:00.000Z")).toBe("14:30");
   expect(
     durationLabel({

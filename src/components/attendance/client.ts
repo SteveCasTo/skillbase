@@ -23,6 +23,7 @@ import type { AttendanceHttpPayload } from "@/server/attendance/http";
 import {
   attendanceFormPayload,
   attendanceFieldIssues,
+  parseAttendanceHttpPayload,
   validMarkValue,
 } from "./presentation";
 let refreshGeneration = 0;
@@ -31,6 +32,48 @@ const cancelRefresh = () => {
   ++refreshGeneration;
   refreshController?.abort();
 };
+
+const confirmedMarksAttribute = "data-attendance-confirmed-marks";
+
+function confirmedMarkFormIds(panel: HTMLElement): Set<string> {
+  try {
+    const ids: unknown = JSON.parse(
+      panel.getAttribute(confirmedMarksAttribute) ?? "[]",
+    );
+    return Array.isArray(ids) && ids.every((id) => typeof id === "string")
+      ? new Set(ids.map((id: string) => `attendance-mark-${id}`))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function rememberConfirmedMarks(
+  panel: HTMLElement,
+  registrationIds: readonly string[],
+) {
+  const ids = new Set(
+    [...confirmedMarkFormIds(panel)].map((id) =>
+      id.slice("attendance-mark-".length),
+    ),
+  );
+  registrationIds.forEach((id) => ids.add(id));
+  panel.setAttribute(confirmedMarksAttribute, JSON.stringify([...ids]));
+}
+
+async function readAttendanceResponse(
+  response: Response,
+): Promise<AttendanceHttpPayload> {
+  let value: unknown;
+  try {
+    value = await response.json();
+  } catch {
+    throw new Error("El servidor devolvió una respuesta inválida.");
+  }
+  const payload = parseAttendanceHttpPayload(value, response.ok);
+  if (!payload) throw new Error("El servidor devolvió una respuesta inválida.");
+  return payload;
+}
 
 async function refreshSession(
   path: string,
@@ -45,9 +88,14 @@ async function refreshSession(
     "[data-attendance-session-panel]",
   );
   if (!current) return;
+  const excludedFormIds = new Set([
+    ...savedFormIds,
+    ...confirmedMarkFormIds(current),
+    ...(savedFormId ? [savedFormId] : []),
+  ]);
   const captureDrafts = () =>
     [...current.querySelectorAll<HTMLFormElement>("[data-attendance-form]")]
-      .filter((form) => form.id !== savedFormId && !savedFormIds.has(form.id))
+      .filter((form) => !excludedFormIds.has(form.id))
       .map((form) => {
         const baseline = JSON.parse(form.dataset.baseline ?? "{}") as Record<
           string,
@@ -150,6 +198,10 @@ function initializeMarkAllButtons() {
       button.dataset.bound = "true";
       button.addEventListener("click", async () => {
         if (hasPendingMutation() || button.dataset.refreshRequired) return;
+        const panel = button.closest<HTMLElement>(
+          "[data-attendance-session-panel]",
+        );
+        if (!panel) return;
         const path = button.dataset.path;
         const revision = button.dataset.revision;
         if (!path || !revision) return;
@@ -193,7 +245,7 @@ function initializeMarkAllButtons() {
               });
               if (response.type === "opaqueredirect")
                 throw new Error("La sesión cambió. Inicia sesión nuevamente.");
-              const payload = (await response.json()) as AttendanceHttpPayload;
+              const payload = await readAttendanceResponse(response);
               if (!payload.ok) {
                 if (
                   payload.code === "CONCURRENT_UPDATE" ||
@@ -212,13 +264,23 @@ function initializeMarkAllButtons() {
                 }
                 throw new Error(payload.message);
               }
+              if (
+                payload.value.kind !== "session" ||
+                payload.value.sessionId !== path.split("/").at(-1)
+              )
+                throw new Error("El servidor devolvió una respuesta inválida.");
+              rememberConfirmedMarks(panel, targets);
               try {
-                await refreshSession(
-                  path,
-                  undefined,
-                  "[data-attendance-heading]",
-                  new Set(targets.map((id: string) => `attendance-mark-${id}`)),
-                );
+                if (
+                  panel.isConnected &&
+                  document.querySelector("[data-attendance-session-panel]") ===
+                    panel
+                )
+                  await refreshSession(
+                    path,
+                    undefined,
+                    "[data-attendance-heading]",
+                  );
               } catch {
                 button.dataset.refreshRequired = "true";
                 document
@@ -596,9 +658,19 @@ export function initializeAttendanceForms() {
                 "La sesión cambió. Inicia sesión nuevamente para continuar.",
               issues: {},
             };
-          const payload = (await response.json()) as AttendanceHttpPayload;
-          if (typeof payload.ok !== "boolean")
-            throw new Error("Invalid response");
+          const payload = await readAttendanceResponse(response);
+          if (payload.ok) {
+            const operation = form.dataset.attendanceOperation;
+            const sessionId = new URL(form.action).pathname.split("/").at(-1);
+            const expectedResult =
+              operation === "settings"
+                ? payload.value.kind === "settings"
+                : payload.value.kind === "session" &&
+                  (operation === "replace" ||
+                    payload.value.sessionId === sessionId);
+            if (!expectedResult)
+              throw new Error("El servidor devolvió una respuesta inválida.");
+          }
           if (!payload.ok)
             form
               .querySelector<HTMLElement>("[data-attendance-settings-refresh]")

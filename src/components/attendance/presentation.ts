@@ -1,10 +1,72 @@
 import {
   ATTENDANCE_STATUSES,
+  type AttendanceCommandResult,
   type AttendanceMarkDto,
   type AttendanceStatus,
   type AttendanceSessionDto,
 } from "@/domain/attendance/types";
+import type { AttendanceHttpPayload } from "@/server/attendance/http";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isStringRecord(
+  value: unknown,
+): value is Readonly<Record<string, string>> {
+  return (
+    isRecord(value) &&
+    Object.values(value).every((entry) => typeof entry === "string")
+  );
+}
+
+function isAttendanceCommandResult(
+  value: unknown,
+): value is AttendanceCommandResult {
+  if (!isRecord(value)) return false;
+  if (value.kind === "session")
+    return (
+      typeof value.sessionId === "string" &&
+      Number.isSafeInteger(value.revision)
+    );
+  if (value.kind === "settings" && isRecord(value.settings))
+    return (
+      Number.isSafeInteger(value.settings.consecutiveAbsenceLimit) &&
+      Number.isSafeInteger(value.settings.revision) &&
+      typeof value.settings.updatedAt === "string"
+    );
+  return false;
+}
+
+/** Reject status/body mismatches and malformed business payloads before UI success. */
+export function parseAttendanceHttpPayload(
+  value: unknown,
+  httpSuccess: boolean,
+): AttendanceHttpPayload | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.ok !== "boolean" ||
+    value.ok !== httpSuccess
+  )
+    return undefined;
+  if (value.ok)
+    return typeof value.message === "string" &&
+      isAttendanceCommandResult(value.value)
+      ? { ok: true, value: value.value, message: value.message }
+      : undefined;
+  return typeof value.code === "string" &&
+    typeof value.message === "string" &&
+    isStringRecord(value.issues)
+    ? {
+        ok: false,
+        code: value.code,
+        message: value.message,
+        issues: value.issues,
+      }
+    : undefined;
+}
+
 export const sessionLabels: Record<AttendanceSessionDto["status"], string> = {
   UPCOMING: "Próxima",
   ONGOING: "En curso",
