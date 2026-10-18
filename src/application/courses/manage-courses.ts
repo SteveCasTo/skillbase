@@ -2,6 +2,7 @@ import { requireRoles } from "@/application/auth/authorize";
 import { createHash } from "node:crypto";
 import { isUuid } from "@/domain/courses/mutation-result";
 import type { CourseRepository } from "@/application/courses/course-repository";
+import type { FormatRepository } from "@/application/courses/format-repository";
 import { AuthorizationError } from "@/domain/auth/errors";
 import type { InternalUser } from "@/domain/auth/types";
 import { CourseDomainError } from "@/domain/courses/errors";
@@ -92,6 +93,7 @@ export async function updateCourse(
   user: InternalUser,
   id: string,
   input: CourseInput,
+  formatRepository?: FormatRepository,
 ) {
   requireAdmin(user);
   const expected = parseRevision(input.revision);
@@ -99,6 +101,21 @@ export async function updateCourse(
   if (!course)
     throw new CourseDomainError("COURSE_NOT_FOUND", "El curso no existe.");
   let restored = restoreDisabledCourseFields(input, course);
+  const selectedFormat =
+    input.startDate &&
+    !input.endsAt &&
+    course.editability?.format &&
+    input.courseTypeId &&
+    input.courseTypeId !== course.courseTypeId &&
+    formatRepository
+      ? await formatRepository.get(input.courseTypeId)
+      : course;
+  if (!selectedFormat)
+    throw new CourseDomainError(
+      "FORMAT_NOT_FOUND",
+      "Selecciona un formato existente.",
+      { courseTypeId: "Selecciona un formato existente." },
+    );
   if (
     input.startDate &&
     course.weekdaysMask === 31 &&
@@ -126,7 +143,7 @@ export async function updateCourse(
     input.startDate &&
     !input.endsAt &&
     course.weekdaysMask === 31 &&
-    course.sessionMinutes !== null &&
+    selectedFormat.sessionMinutes !== null &&
     course.schedule === GROUP_SCHEDULE
   ) {
     restored = {
@@ -135,8 +152,8 @@ export async function updateCourse(
         planCourseDates({
           startDate: input.startDate,
           weekdaysMask: 31,
-          totalHours: course.totalHours,
-          sessionMinutes: course.sessionMinutes,
+          totalHours: selectedFormat.totalHours,
+          sessionMinutes: selectedFormat.sessionMinutes,
         }).endsAt,
       ),
     };

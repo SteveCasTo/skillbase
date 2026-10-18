@@ -123,7 +123,13 @@ if (course && Astro.request.method === "POST") {
           );
         if (artwork && artwork !== (course.artwork ?? ""))
           await verifyArtworkForCourse(id, artwork, artworkStorage());
-        course = await updateCourse(repository, user, id, values);
+        course = await updateCourse(
+          repository,
+          user,
+          id,
+          values,
+          new DrizzleFormatRepository(getDatabase()),
+        );
         if (wantsJson)
           return new Response(
             JSON.stringify({
