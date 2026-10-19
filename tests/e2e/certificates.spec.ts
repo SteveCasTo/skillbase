@@ -1612,6 +1612,7 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     await verifyCode.click();
     await expect(localResult).toHaveAttribute("data-tone", "valid");
     await expect(codeInput).toHaveValue(reissued.publicCredentialId);
+    await expect(codeInput).toBeFocused();
     await expect(publicPage.locator("[data-code-verification]")).toHaveCount(1);
     await expect(publicPicker).toHaveCount(0);
     expect(hashRequests).toHaveLength(1);

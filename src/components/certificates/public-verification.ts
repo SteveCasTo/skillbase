@@ -94,8 +94,8 @@ function initialize(root: HTMLElement) {
       // controls with the complementary code input in the same grid cell.
       local.remove();
       entry.hidden = false;
-      grid.append(entry);
-      entry.append(result);
+      if (entry.parentElement !== grid) grid.append(entry);
+      if (result.parentElement !== entry) entry.append(result);
       code.setAttribute(
         "aria-describedby",
         "credential-code-error local-result",
@@ -423,6 +423,7 @@ function initialize(root: HTMLElement) {
         // primary origin and its digest remain stable throughout comparisons.
         applyRecord(record, "file");
         code.value = value;
+        code.focus();
         return compare(selectedHash!);
       }
       applyRecord(record, "code");
