@@ -21,11 +21,13 @@ archivo subido al servidor. La comparación nunca suplanta el estado oficial.
 light/dark, 86 rem, dos paneles equivalentes, borde fino y radios existentes.
 
 **STORY:** Elegir código o PDF; revisar titular, curso y estado; cotejar la otra
-entrada sin perder el archivo. Código alternativo discreto tras resolver.
+entrada ligada al mismo certificado. El resultado solo muestra el método complementario.
 
 **FIRST VIEWPORT:** Título compacto y dos paneles de igual anchura: código a la
 izquierda, zona PDF a la derecha. Los datos sustituyen la entrada por código;
-con archivo elegido, el control se reduce a nombre y X. Mobile conserva lectura
+si el PDF identifica el registro, su zona se sustituye completamente por código,
+sin desplegable ni fila adicional. El código complementario nunca sustituye el
+registro original. El PDF complementario conserva nombre y X. Mobile conserva lectura
 completa, sin alto mínimo del panel ni desbordamiento.
 
 **FORM:** Composición fijada explícitamente por la petición y el detalle público

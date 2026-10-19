@@ -23,6 +23,13 @@ SHA final y sus intentos quedan en el PR.
 
 ## Verificación pública dedicada (2026-10-17, candidata)
 
+La adaptación del caso existente del 2026-10-19 conserva las pruebas de privacidad,
+hash, carreras, reset y revocación. Añade el contrato complementario: código/QR
+mantiene solo PDF; PDF identificado mantiene solo código, sin controles de archivo
+ni desplegable. Un código distinto conserva URL, datos y estado del PDF original;
+el mismo código revalida ese registro. Capturas light/dark y assertions responsive
+cubren 375/390/768/1440 px sin añadir casos, specs ni suites.
+
 Se adaptan los casos existentes de certificados y landing, sin añadir casos,
 specs ni suites. Cubren CTA a la página dedicada, fallback HTML por código,
 resultado común, PDF vigente/revocado/desconocido, contraste código/archivo,

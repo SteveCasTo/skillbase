@@ -937,6 +937,11 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     const dropzone = publicPage.locator("[data-local-dropzone]");
     await expect(dropzone).toBeHidden();
     await expect(publicPage.locator("[data-local-selection]")).toBeVisible();
+    await expect(publicPage.locator("[data-code-verification]")).toHaveCount(0);
+    await expect(publicPage.locator("summary")).toHaveCount(0);
+    await expect(publicPage).toHaveURL(
+      `/certificados/${record.publicCredentialId}`,
+    );
     for (const width of [375, 768, 1440]) {
       await publicPage.setViewportSize({ width, height: 1000 });
       await assertNoOverflow(publicPage);
@@ -989,6 +994,16 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       }),
     ).toContainText("no coincide");
     await expect(localResult).toHaveAttribute("data-tone", "error");
+    await expect(publicPage.locator("[data-code-verification]")).toHaveCount(0);
+    await expect(publicPage).toHaveURL(
+      `/certificados/${record.publicCredentialId}`,
+    );
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado vigente",
+        exact: true,
+      }),
+    ).toBeVisible();
     await expect(
       publicPage
         .locator('[data-sileo-toast][data-exiting="false"][data-state="error"]')
@@ -1413,8 +1428,8 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         await page.request.get(`/app/certificados/${newId}`, { headers })
       ).json()) as { data: CertificateDto }
     ).data;
-    // Both entry paths converge on the same public projection, without uploading
-    // a PDF or losing the selected file when comparing another credential code.
+    // The primary entry binds the result. Only its complementary method remains;
+    // another code must never replace the credential resolved from the PDF.
     await publicPage.goto("/certificados/verificar");
     const codeInput = publicPage.getByLabel("Código del certificado", {
       exact: true,
@@ -1492,6 +1507,7 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         name: "Datos públicos del certificado",
       }),
     ).toContainText(reissued.data.recipientName);
+    await expect(codeInput).toHaveCount(0);
     const hashRequests: { path: string; body: string | null }[] = [];
     publicPage.on("request", (request) => {
       if (request.method() === "POST")
@@ -1513,23 +1529,91 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         exact: true,
       }),
     ).toBeVisible();
-    await publicPage.getByText("Consultar código", { exact: true }).click();
+    await expect(codeInput).toBeFocused();
+    await expect(publicPicker).toHaveCount(0);
+    await expect(publicPage.locator("[data-local-verification]")).toHaveCount(
+      0,
+    );
+    await expect(
+      publicPage.locator(
+        "[data-file-name], [data-local-reset], [data-local-dropzone], summary",
+      ),
+    ).toHaveCount(0);
+    await expect(publicPage.locator("[data-code-verification]")).toHaveCount(1);
+    for (const width of [375, 390, 768, 1440]) {
+      await publicPage.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(publicPage);
+      const information = await publicPage
+        .locator("[data-public-data]")
+        .boundingBox();
+      const complement = await publicPage
+        .locator("[data-code-entry]")
+        .boundingBox();
+      if (width >= 1024) {
+        expect(complement!.y).toBe(information!.y);
+        expect(complement!.width).toBe(information!.width);
+        expect(complement!.height).toBeLessThan(information!.height);
+      } else
+        expect(complement!.y).toBeGreaterThan(
+          information!.y + information!.height,
+        );
+      await publicPage.screenshot({
+        path: testInfo.outputPath(`pdf-first-code-${width}.png`),
+        fullPage: true,
+      });
+      await captureDark(
+        publicPage,
+        testInfo,
+        `pdf-first-code-dark-${width}.png`,
+      );
+    }
     await codeInput.fill(record.publicCredentialId);
     await verifyCode.click();
     await expect(
       publicPage.getByRole("heading", {
-        name: "Certificado revocado",
+        name: "Certificado vigente",
         exact: true,
       }),
     ).toBeVisible();
-    await expect(localResult).toContainText("no coincide");
-    await expect(localResult).toHaveAttribute("data-tone", "error");
-    await expect(publicPage.locator("[data-file-name]")).toHaveText(
-      "reissued.pdf",
+    await expect(localResult).toContainText(
+      "El código no coincide con el certificado del archivo.",
     );
+    await expect(localResult).toHaveAttribute("data-tone", "error");
+    await expect(publicPage).toHaveURL(
+      `/certificados/${reissued.publicCredentialId}`,
+    );
+    await expect(publicPage.locator("[data-public-data]")).toContainText(
+      reissued.data.recipientName,
+    );
+    await expect(
+      publicPage.locator(
+        '[data-sileo-toast][data-exiting="false"][data-state="success"]',
+      ),
+    ).toHaveCount(0);
+    await expect(
+      publicPage.locator(
+        '[data-sileo-toast][data-exiting="false"][data-state="error"]',
+      ),
+    ).toContainText("El código no coincide");
+    for (const width of [375, 390, 768, 1440]) {
+      await publicPage.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(publicPage);
+      await publicPage.screenshot({
+        path: testInfo.outputPath(`pdf-first-mismatch-${width}.png`),
+        fullPage: true,
+      });
+      await captureDark(
+        publicPage,
+        testInfo,
+        `pdf-first-mismatch-dark-${width}.png`,
+      );
+    }
     await codeInput.fill(reissued.publicCredentialId);
     await verifyCode.click();
     await expect(localResult).toHaveAttribute("data-tone", "valid");
+    await expect(codeInput).toHaveValue(reissued.publicCredentialId);
+    await expect(publicPage.locator("[data-code-verification]")).toHaveCount(1);
+    await expect(publicPicker).toHaveCount(0);
     expect(hashRequests).toHaveLength(1);
     await publicPage.goto("/certificados/verificar");
     await publicPicker.setInputFiles({
@@ -1549,16 +1633,43 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         '[data-sileo-toast][data-exiting="false"][data-state="success"]',
       ),
     ).toHaveCount(0);
-    await publicPage
-      .getByRole("button", { name: "Quitar archivo", exact: true })
-      .click();
+    await expect(codeInput).toBeFocused();
+    await expect(publicPicker).toHaveCount(0);
+    await codeInput.fill(record.publicCredentialId);
+    await verifyCode.click();
+    await expect(localResult).toHaveAttribute("data-tone", "invalid");
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado revocado",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      publicPage.locator(
+        '[data-sileo-toast][data-exiting="false"][data-state="success"]',
+      ),
+    ).toHaveCount(0);
+    for (const width of [375, 390, 768, 1440]) {
+      await publicPage.setViewportSize({ width, height: 1000 });
+      await assertNoOverflow(publicPage);
+      await publicPage.screenshot({
+        path: testInfo.outputPath(`pdf-first-revoked-${width}.png`),
+        fullPage: true,
+      });
+      await captureDark(
+        publicPage,
+        testInfo,
+        `pdf-first-revoked-dark-${width}.png`,
+      );
+    }
+    await publicPage.goto("/certificados/verificar");
     await expect(
       publicPage.getByRole("heading", {
         name: "Verificar certificado",
         exact: true,
       }),
     ).toBeVisible();
-    await expect(publicPicker).toBeFocused();
+    await expect(publicPage.locator("[data-local-controls]")).toBeVisible();
     await publicPicker.setInputFiles({
       name: "unknown.pdf",
       mimeType: "application/pdf",

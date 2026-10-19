@@ -33,7 +33,8 @@ function initialize(root: HTMLElement) {
   const code = form.querySelector<HTMLInputElement>("[name=codigo]")!;
   const submit = form.querySelector<HTMLButtonElement>("[type=submit]")!;
   const codeError = form.querySelector<HTMLElement>("#credential-code-error")!;
-  const entry = root.querySelector<HTMLDetailsElement>("[data-code-entry]")!;
+  const entry = root.querySelector<HTMLElement>("[data-code-entry]")!;
+  const grid = root.querySelector<HTMLElement>(".verification-grid")!;
   const data = root.querySelector<HTMLElement>("[data-public-data]")!;
   const title = root.querySelector<HTMLElement>("[data-public-title]")!;
   const publicError = root.querySelector<HTMLElement>("[data-public-error]")!;
@@ -77,7 +78,7 @@ function initialize(root: HTMLElement) {
     source = origin;
     publicError.hidden = true;
     const details = record && "recipientName" in record ? record : null;
-    // Keep the QR/manual URL authoritative without navigating or discarding the file.
+    // Keep the QR/manual URL bound to the primary credential without navigation.
     if (details)
       history.replaceState(
         null,
@@ -86,8 +87,31 @@ function initialize(root: HTMLElement) {
       );
     else history.replaceState(null, "", "/certificados/verificar");
     root.dataset.hasRecord = String(Boolean(details));
+    root.dataset.publicCredentialId = details?.publicCredentialId ?? "";
     data.hidden = !details;
-    entry.open = !details;
+    if (details && origin === "file") {
+      // The primary PDF has resolved: keep only its digest, and replace its
+      // controls with the complementary code input in the same grid cell.
+      local.remove();
+      entry.hidden = false;
+      grid.append(entry);
+      entry.append(result);
+      code.setAttribute(
+        "aria-describedby",
+        "credential-code-error local-result",
+      );
+      input.value = "";
+      filename.textContent = "";
+      code.value = "";
+    } else {
+      local.append(result);
+      grid.append(local);
+      if (details) entry.remove();
+      else {
+        entry.hidden = false;
+        grid.insertBefore(entry, local);
+      }
+    }
     root.querySelector<HTMLElement>("[data-public-state]")!.textContent = record
       ? publicStateLabel[record.state]
       : "Verificar certificado";
@@ -222,7 +246,8 @@ function initialize(root: HTMLElement) {
         },
       );
       if (token !== latest || current.signal.aborted) return;
-      if (kind === "file" || input.files?.length) showResult(text, "valid");
+      if (kind === "file" || source === "file" || input.files?.length)
+        showResult(text, "valid");
     } catch (failure) {
       if (token !== latest || current.signal.aborted) return;
       const text =
@@ -231,11 +256,13 @@ function initialize(root: HTMLElement) {
           : "No se pudo completar la verificación. Intenta de nuevo.";
       const tone =
         failure instanceof VerificationFailure ? failure.tone : "error";
-      if (kind === "file" || input.files?.length) showResult(text, tone);
+      if (kind === "file" || source === "file" || input.files?.length)
+        showResult(text, tone);
       if (kind === "code") {
-        if (!input.files?.length) showCodeError(text);
-        entry.open = true;
-        code.focus();
+        if (source !== "file") showCodeError(text);
+        else code.setAttribute("aria-invalid", "true");
+        if (code.isConnected) code.focus();
+        else title.focus();
       }
     } finally {
       if (abortRead) current.signal.removeEventListener("abort", abortRead);
@@ -257,7 +284,6 @@ function initialize(root: HTMLElement) {
     input.removeAttribute("aria-invalid");
     showResult("");
     showCodeError("");
-    if (source === "file") applyRecord(null, null);
   };
   reset.addEventListener("click", () => {
     clear();
@@ -307,7 +333,6 @@ function initialize(root: HTMLElement) {
   input.addEventListener("change", () => {
     cancel();
     selectedHash = undefined;
-    if (source === "file") applyRecord(null, null);
     const file = input.files?.[0];
     filename.textContent = file?.name ?? "";
     selection.hidden = !file;
@@ -346,12 +371,12 @@ function initialize(root: HTMLElement) {
           }),
         );
         signal.throwIfAborted();
-        applyRecord(record, "file");
-        title.focus();
         if (!("recipientName" in record))
           throw new VerificationFailure(
             "No se encontró un certificado para este archivo.",
           );
+        applyRecord(record, "file");
+        code.focus();
       }
       return compare(hash);
     });
@@ -359,6 +384,7 @@ function initialize(root: HTMLElement) {
   code.addEventListener("input", () => {
     cancel();
     showCodeError("");
+    if (source === "file") showResult("");
   });
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -371,6 +397,13 @@ function initialize(root: HTMLElement) {
     showCodeError("");
     showResult("");
     void run("code", async (signal) => {
+      const primaryId = root.dataset.publicCredentialId;
+      // Complementary input can only verify this primary PDF, never select
+      // another credential (even if its public code is otherwise valid).
+      if (source === "file" && value !== primaryId)
+        throw new VerificationFailure(
+          "El código no coincide con el certificado del archivo.",
+        );
       const record = await readRecord(
         await fetch(`/certificados/${encodeURIComponent(value)}`, {
           headers: { Accept: "application/json" },
@@ -380,17 +413,30 @@ function initialize(root: HTMLElement) {
         }),
       );
       signal.throwIfAborted();
+      if (source === "file") {
+        if (
+          !("recipientName" in record) ||
+          record.publicCredentialId !== primaryId
+        )
+          throw new VerificationFailure(publicStateLabel[record.state]);
+        // Refresh only the same credential's authoritative status/hash. The
+        // primary origin and its digest remain stable throughout comparisons.
+        applyRecord(record, "file");
+        code.value = value;
+        return compare(selectedHash!);
+      }
       applyRecord(record, "code");
       if (!("recipientName" in record))
         throw new VerificationFailure(publicStateLabel[record.state]);
       const file = input.files?.[0];
       if (file) {
+        const validation = localPdfError(file);
+        if (validation) throw new VerificationFailure(validation);
         const hash = selectedHash ?? (await localPdfSha256(file));
         signal.throwIfAborted();
         selectedHash = hash;
-        const text = compare(hash);
         title.focus();
-        return text;
+        return compare(hash);
       }
       if (!record.valid)
         throw new VerificationFailure(
@@ -402,6 +448,8 @@ function initialize(root: HTMLElement) {
     });
   });
   window.addEventListener("pagehide", cancel, { once: true });
+  document.addEventListener("astro:before-swap", cancel, { once: true });
+  if (source === "code") entry.remove();
 }
 const root = document.querySelector<HTMLElement>("[data-public-verification]");
 if (root) initialize(root);

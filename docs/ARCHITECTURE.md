@@ -368,7 +368,10 @@ detalle canónico, con un controlador cliente acotado a código/hash/feedback.
 `POST /certificados/verificar-archivo` limita origen/body/abuso y delega a
 `verifySignedFile` y al repositorio de certificados. La consulta exacta usa el
 índice parcial del firmado; no lee ni escribe Storage. El navegador conserva el
-archivo y cambia la URL pública sin navegar cuando resuelve otro registro.
+digest en memoria y cambia la URL pública sin navegar al resolver el registro
+primario. La comparación complementaria queda ligada a su ID; nunca resuelve otro
+certificado. El PDF deja de conservarse tras identificarlo y no se persiste contexto
+en el navegador.
 
 El registro de interesados de Fase 3 se accede desde el detalle existente `/cursos/[slug]`; no se define una ruta pública independiente `/preinscripcion/[slug]`. La preinscripción presencial/pagada pertenece a Fase 5.
 

@@ -21,6 +21,7 @@ const details = record && "recipientName" in record ? record : null;
 <article
   data-public-verification
   data-has-record={Boolean(details)}
+  data-public-credential-id={details?.publicCredentialId ?? ""}
   class="flex w-full min-w-0 flex-col gap-8 py-8 sm:py-12"
 >
   <header class="flex flex-col gap-3">
@@ -116,12 +117,14 @@ const details = record && "recipientName" in record ? record : null;
         </div>
       </dl>
     </section>
-    <details data-code-entry open={!details} class="verification-code min-w-0">
-      <summary class="min-h-11 cursor-pointer font-medium focus-visible:outline-2 focus-visible:outline-ring">
-        Consultar código
-      </summary>
+    <section
+      data-code-entry
+      hidden={Boolean(details)}
+      class="verification-code min-w-0"
+      aria-label="Comprobar código"
+    >
       <VerificationForm value={code} {error} />
-    </details>
+    </section>
     <LocalFileVerification
       officialHash={details?.signedSha256 ?? ""}
       state={details?.state}
