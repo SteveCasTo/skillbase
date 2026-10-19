@@ -254,11 +254,28 @@ test("new courses preserve values and can be corrected after server validation w
   await expect(page.getByLabel("Nombre")).toHaveValue(courseName);
   await expect(markdown).toBeVisible();
   await expect(markdown).toHaveValue("## Temario visible sin JavaScript");
+  const replacementFormat = await page.request.post("/app/formatos/nuevo", {
+    headers: { Origin: e2eSiteUrl(), Accept: "application/json" },
+    form: {
+      name: `Formato alternativo sin JS ${Date.now()}`,
+      totalHours: "20",
+      sessionMinutes: "90",
+      studentAmount: "90",
+      externalAmount: "110",
+    },
+  });
+  expect(replacementFormat.status()).toBe(201);
+  const replacementFormatId = (await replacementFormat.json()).id as string;
+  await page.reload();
   await page
     .getByRole("combobox", { name: "Instructor", exact: true })
     .selectOption(instructor.id);
+  await course.getByLabel("Formato de curso").selectOption(replacementFormatId);
   await page.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(page).toHaveURL(/success=updated/);
+  await expect(
+    course.getByLabel("Fecha de finalización (Bolivia)", { exact: true }),
+  ).toHaveValue("2027-03-17");
   const prerequisite = await page.request.post(
     new URL(page.url()).pathname.replace(/\/editar$/u, "/grupos"),
     {
@@ -278,6 +295,34 @@ test("new courses preserve values and can be corrected after server validation w
   await page.locator('[data-confirm-fallback="publish"] summary').click();
   await page.getByRole("button", { name: "Publicar curso" }).click();
   await expect(page).toHaveURL(/success=published/);
+  await expect(course.getByLabel("Formato de curso")).toBeDisabled();
+  await expect(
+    course.getByLabel("Fecha de inicio de clases (Bolivia)", { exact: true }),
+  ).toBeEnabled();
+  await course
+    .getByLabel("Fecha de inicio de clases (Bolivia)", { exact: true })
+    .fill("2027-02-22");
+  await expect(
+    course.getByLabel("Fecha de finalización (Bolivia)", { exact: true }),
+  ).toBeDisabled();
+  await course
+    .getByLabel("Descripción")
+    .fill("Published content saved with disabled commercial terms");
+  await course.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(page).toHaveURL(/success=updated/);
+  await page.reload();
+  await expect(course.getByLabel("Formato de curso")).toHaveValue(
+    replacementFormatId,
+  );
+  await expect(
+    course.getByLabel("Fecha de inicio de clases (Bolivia)", { exact: true }),
+  ).toHaveValue("2027-02-22");
+  await expect(
+    course.getByLabel("Fecha de finalización (Bolivia)", { exact: true }),
+  ).toHaveValue("2027-03-10");
+  await expect(course.getByLabel("Descripción")).toHaveValue(
+    "Published content saved with disabled commercial terms",
+  );
   await page.locator('[data-confirm-fallback="withdraw"] summary').click();
   await page.getByRole("button", { name: "Retirar curso" }).click();
   await expect(page).toHaveURL(/success=withdrawn/);

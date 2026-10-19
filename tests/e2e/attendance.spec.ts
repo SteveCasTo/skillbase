@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import type { AttendanceSessionDetailDto } from "@/domain/attendance/types";
 import { civilDay } from "@/domain/attendance/rules";
+import { markValue } from "@/components/attendance/presentation";
 import { createAttendanceFlowFixture } from "../fixtures/attendance-flow";
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
@@ -36,6 +37,38 @@ async function chooseState(
     revision,
   );
 }
+async function openMarkEditor(form: Locator) {
+  if (await form.getByRole("combobox").count()) return;
+  await form.getByRole("button", { name: /^Editar asistencia de /u }).click();
+}
+async function chooseStateWithRejectedResponse(
+  page: Page,
+  form: Locator,
+  status: "Presente" | "Ausente" | "Justificada",
+  path: string,
+) {
+  await page.route(
+    `${e2eSiteUrl()}${path}?operation=record`,
+    (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "text/plain",
+        body: "Unavailable",
+      }),
+    { times: 1 },
+  );
+  const response = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === path &&
+      response.request().method() === "POST",
+  );
+  const select = form.getByRole("combobox", { name: /^Asistencia de /u });
+  await select.click();
+  await page.getByRole("option", { name: status, exact: true }).click();
+  expect((await response).status()).toBe(503);
+  await expect(form).not.toHaveAttribute("aria-busy", "true");
+  await expect(form).toHaveAttribute("data-save-failed", "true");
+}
 async function detail(page: Page, path: string) {
   const response = await page.request.get(path, {
     headers: { Accept: "application/json" },
@@ -61,6 +94,157 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
       fixture.session.id,
     );
     await page.goto(path);
+    const markAll = page.getByRole("button", {
+      name: "Marcar todos presentes",
+      exact: true,
+    });
+    await expect(markAll).toBeVisible();
+    for (const theme of ["light", "dark"] as const) {
+      await page.locator("html").evaluate((html, value) => {
+        html.classList.toggle("dark", value === "dark");
+      }, theme);
+      for (const [width, height] of [
+        [375, 812],
+        [768, 1024],
+        [1440, 1000],
+      ] as const) {
+        await page.setViewportSize({ width, height });
+        await expect(markAll).toBeVisible();
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth,
+          ),
+        ).toBe(true);
+        if (width === 1440) {
+          const heading = await page
+            .locator("[data-attendance-heading]")
+            .boundingBox();
+          const action = await markAll.boundingBox();
+          expect(heading).not.toBeNull();
+          expect(action).not.toBeNull();
+          expect(Math.abs(heading!.y - action!.y)).toBeLessThan(44);
+          expect(action!.x).toBeGreaterThan(heading!.x);
+        }
+      }
+    }
+    await page
+      .locator("html")
+      .evaluate((html) => html.classList.remove("dark"));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const row = page.getByRole("form", {
+      name: "Enrolled Attendance Quispe",
+      exact: true,
+    });
+    await openMarkEditor(row);
+    await chooseStateWithRejectedResponse(page, row, "Justificada", path);
+    await expect(markAll).toBeEnabled();
+    await page.route(
+      `${e2eSiteUrl()}${path}?operation=record`,
+      (route) =>
+        route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({
+            ok: true,
+            value: {
+              kind: "session",
+              sessionId: fixture.session.id,
+              revision: fixture.session.revision + 1,
+            },
+            message: "Asistencia registrada.",
+          }),
+        }),
+      { times: 1 },
+    );
+    const malformedSave = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === path,
+    );
+    await markAll.press("Enter");
+    expect((await malformedSave).status()).toBe(503);
+    await expect(
+      page
+        .locator('[data-sileo-toast][data-state="error"][data-exiting="false"]')
+        .last(),
+    ).toContainText("respuesta inválida");
+    await expect(markAll).toBeEnabled();
+    await expect(
+      page.getByRole("link", { name: "Reintentar actualización", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="loading"][data-exiting="false"]',
+      ),
+    ).toHaveCount(0);
+    await expect(
+      page.locator(
+        '[data-sileo-toast][data-state="success"][data-exiting="false"]',
+      ),
+    ).toHaveCount(0);
+    expect(
+      (await detail(page, path)).participants.find(
+        (person) => person.registrationId === fixture.paid.id,
+      )?.attendance.status,
+    ).toBe("PENDING");
+    await page.route(
+      `${e2eSiteUrl()}${path}`,
+      (route) => route.fulfill({ status: 503, body: "Fragment unavailable" }),
+      { times: 1 },
+    );
+    const bulkWrite = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === path,
+    );
+    await markAll.press("Enter");
+    const bulkResponse = await bulkWrite;
+    expect(bulkResponse.status()).toBe(200);
+    const bulkPayload = JSON.parse(
+      bulkResponse.request().postData() ?? "{}",
+    ) as {
+      marks: { registrationId: string; status: string }[];
+      instructorStatus?: unknown;
+      completeAdministrativeReview?: unknown;
+    };
+    expect(bulkPayload.marks.map((mark) => mark.registrationId)).toEqual([
+      fixture.paid.id,
+    ]);
+    expect(bulkPayload).not.toHaveProperty("instructorStatus");
+    expect(bulkPayload).not.toHaveProperty("completeAdministrativeReview");
+    await expect(page.locator("[data-attendance-page-error]")).toHaveText(
+      "Operación guardada. Recarga la sesión para ver los cambios.",
+    );
+    await expect(
+      page.getByRole("link", { name: "Reintentar actualización", exact: true }),
+    ).toBeFocused();
+    expect(
+      (await detail(page, path)).participants.find(
+        (person) => person.registrationId === fixture.paid.id,
+      )?.attendance,
+    ).toMatchObject({ status: "PRESENT", markedBy: fixture.adminId });
+    await page
+      .getByRole("link", { name: "Reintentar actualización", exact: true })
+      .click();
+    await expect(markAll).toHaveCount(0);
+    expect(
+      JSON.parse((await row.getAttribute("data-baseline")) ?? "{}"),
+    ).toMatchObject({ marks: markValue(fixture.paid.id, "PRESENT") });
+    await expect(
+      row.getByRole("button", {
+        name: "Editar asistencia de Enrolled Attendance Quispe",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(page.locator("[data-attendance-title]")).toBeFocused();
+    await openMarkEditor(row);
+    await chooseState(page, row, "Ausente");
+    await expect(markAll).toBeVisible();
+    expect(
+      (await detail(page, path)).participants.find(
+        (person) => person.registrationId === fixture.paid.id,
+      )?.attendance.status,
+    ).toBe("ABSENT");
     const writes: string[] = [];
     page.on("request", (request) => {
       if (
@@ -73,6 +257,7 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
       name: "Enrolled Attendance Quispe",
       exact: true,
     });
+    await openMarkEditor(person);
     await chooseState(page, person, "Presente");
     await expect(person.getByRole("combobox")).toHaveCount(0);
     await expect(
@@ -206,15 +391,10 @@ test("ADMIN records and corrects attendance, persists a holiday and links a same
     };
     expect(rejectedPayload.message).not.toBe("");
     await expect(
-      page.locator(
-        '[data-sileo-toast][data-state="error"][data-exiting="false"]',
-      ),
+      page
+        .locator('[data-sileo-toast][data-exiting="false"]')
+        .filter({ hasText: rejectedPayload.message }),
     ).toBeVisible();
-    await expect(
-      page.locator(
-        '[data-sileo-toast][data-state="error"][data-exiting="false"]',
-      ),
-    ).toContainText(rejectedPayload.message);
     await expect(person.getByRole("alert")).toHaveCount(0);
     await expect(
       person.getByRole("combobox", {
@@ -429,6 +609,35 @@ test("INSTRUCTOR records only enrolled own participants without contacts or fina
       name: "Enrolled Attendance Quispe",
       exact: true,
     });
+    const markAll = page.getByRole("button", {
+      name: "Marcar todos presentes",
+      exact: true,
+    });
+    await expect(markAll).toBeVisible();
+    const bulkWrite = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === path,
+    );
+    await markAll.click();
+    const bulkResponse = await bulkWrite;
+    expect(bulkResponse.status()).toBe(200);
+    const bulkPayload = JSON.parse(
+      bulkResponse.request().postData() ?? "{}",
+    ) as {
+      marks: { registrationId: string; status: string }[];
+      instructorStatus?: unknown;
+    };
+    expect(bulkPayload.marks.map((mark) => mark.registrationId)).toEqual([
+      fixture.paid.id,
+    ]);
+    expect(bulkPayload).not.toHaveProperty("instructorStatus");
+    await expect(markAll).toHaveCount(0);
+    expect(
+      (await detail(page, path)).participants.find(
+        (participant) => participant.registrationId === fixture.paid.id,
+      )?.attendance,
+    ).toMatchObject({ status: "PRESENT", markedBy: fixture.instructorId });
     await expect(
       page.getByRole("heading", {
         name: "Awaiting Attendance Quispe",
@@ -453,7 +662,9 @@ test("INSTRUCTOR records only enrolled own participants without contacts or fina
     ).toBe(false);
     expect(JSON.stringify(own)).not.toContain('"balanceCents"');
     expect(JSON.stringify(own)).not.toContain('"paidCents"');
+    await openMarkEditor(person);
     await chooseState(page, person, "Ausente");
+    await expect(markAll).toBeVisible();
     const [saved] = await fixture.database.db
       .select({
         status: schema.participantAttendance.status,
@@ -475,6 +686,7 @@ test("INSTRUCTOR records only enrolled own participants without contacts or fina
       fixture.pastSession.id,
     );
     await page.goto(past);
+    await expect(markAll).toHaveCount(0);
     await expect(
       page.getByRole("form", {
         name: "Enrolled Attendance Quispe",

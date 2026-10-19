@@ -1,8 +1,12 @@
-import { randomUUID } from "node:crypto";
+﻿import { randomUUID } from "node:crypto";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { e2eSiteUrl } from "../../scripts/e2e-port";
 import { getTestSupabaseEnvironment } from "../../scripts/supabase-local-env";
+import { createDatabase } from "@/server/db/client";
+import * as schema from "@/server/db/schema";
+import { eq, and, isNull } from "drizzle-orm";
+import { GROUP_SCHEDULE } from "@/domain/courses/weekday-schedule";
 
 import { AUTH_FIXTURES } from "../fixtures/auth-users";
 import { signInFixture } from "./auth-helper";
@@ -411,6 +415,7 @@ test("admin crops a photo in the new-course form and can retry a failed upload w
     mimeType: "image/webp",
     buffer: Buffer.from(bytes),
   });
+  await expect(cropDialog).toBeVisible();
   await cropDialog.getByRole("button", { name: "Guardar recorte" }).click();
   await expect(
     page.getByRole("button", { name: "Guardar cambios" }),
@@ -1356,7 +1361,7 @@ test("instructor is denied and mutation without expected origin is rejected", as
 test("course administration remains keyboard reachable and responsive", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   const expectNoHorizontalOverflow = async () => {
     const layout = await page.evaluate(() => {
       const viewportWidth = document.documentElement.clientWidth;
@@ -1427,4 +1432,302 @@ test("course administration remains keyboard reachable and responsive", async ({
     page.getByRole("toolbar", { name: "Formato Markdown" }),
   ).toBeVisible();
   await expectNoHorizontalOverflow();
+  // Same editor, ordinary published groups: disabled terms, editable start and
+  // content. Assert real persistence rather than only client feedback.
+  const headers = { Origin: e2eSiteUrl(), Accept: "application/json" };
+  const formatResult = await page.request.post("/app/formatos/nuevo", {
+    headers,
+    form: {
+      name: `Calendar UI ${randomUUID()}`,
+      totalHours: "20",
+      sessionMinutes: "90",
+      studentAmount: "80",
+      externalAmount: "100",
+    },
+  });
+  expect(formatResult.status()).toBe(201);
+  const formatId = (await formatResult.json()).id as string;
+  const created = await page.request.post("/app/cursos/nuevo", {
+    headers,
+    form: {
+      requestKey: randomUUID(),
+      name: `Calendar UI ${randomUUID()}`,
+      description: "Synthetic calendar editability",
+      level: "BASIC",
+      courseTypeId: formatId,
+      instructorId: courseInstructor(page).id,
+      schedule: GROUP_SCHEDULE,
+      weekdays: "1,2,3,4,5",
+      startsAt: "2027-03-01T00:00",
+      endsAt: "2027-03-17T23:59",
+      conditions: "Synthetic",
+      minimumGrade: "70",
+    },
+  });
+  expect(created.status()).toBe(201);
+  const courseId = (await created.json()).id as string;
+  lifecycleCourseIds.set(testInfo.testId, courseId);
+  const path = `/app/cursos/${courseId}/editar`;
+  const group = await page.request.post(`/app/cursos/${courseId}/grupos`, {
+    headers,
+    form: { intent: "create", startTime: "08:00", capacity: "10" },
+  });
+  expect(group.status()).toBe(200);
+  await page.goto(path);
+  const revision = await page
+    .locator('.course-form input[name="revision"]')
+    .inputValue();
+  expect(
+    (
+      await page.request.post(path, {
+        headers,
+        form: { intent: "publish", revision },
+      })
+    ).status(),
+  ).toBe(200);
+  await page.reload();
+  const start = page.getByRole("textbox", {
+    name: "Fecha de inicio de clases (Bolivia)",
+    exact: true,
+  });
+  await expect(
+    page.getByRole("combobox", { name: "Formato de curso", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("combobox", { name: "Instructor", exact: true }),
+  ).toBeEnabled();
+  await expect(start).toBeEnabled();
+  const db = createDatabase(getTestSupabaseEnvironment().databaseUrl);
+  try {
+    for (const state of ["editable", "blocked"] as const) {
+      for (const width of [375, 768, 1440]) {
+        await page.setViewportSize({ width, height: 960 });
+        for (const theme of ["light", "dark"] as const) {
+          await page.evaluate(
+            (theme) =>
+              document.documentElement.classList.toggle(
+                "dark",
+                theme === "dark",
+              ),
+            theme,
+          );
+          await expectNoHorizontalOverflow();
+          await start.scrollIntoViewIfNeeded();
+          if (process.env.E2E_EVIDENCE_DIR)
+            await page.screenshot({
+              path: `${process.env.E2E_EVIDENCE_DIR}/course-editability-${state}-${width}-${theme}.png`,
+              animations: "disabled",
+              fullPage: true,
+            });
+        }
+      }
+      if (state === "blocked") break;
+      await start.fill("22/02/2027");
+      const save = page.getByRole("button", {
+        name: "Guardar cambios",
+        exact: true,
+      });
+      await expect(save).toBeEnabled();
+      const saved = page.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          new URL(response.url()).pathname === path,
+      );
+      await save.click();
+      expect((await saved).status()).toBe(200);
+      const [stored] = await db.db
+        .select()
+        .from(schema.courses)
+        .where(eq(schema.courses.id, courseId));
+      expect(stored!.startsAt.toISOString()).toBe("2027-02-22T04:00:00.000Z");
+      const [ownGroup] = await db.db
+        .select()
+        .from(schema.groups)
+        .where(eq(schema.groups.courseId, courseId));
+      expect(ownGroup!.startsAt.toISOString()).toBe("2027-02-22T12:00:00.000Z");
+      const [active] = await db.db
+        .select()
+        .from(schema.groupSessions)
+        .where(
+          and(
+            eq(schema.groupSessions.groupId, ownGroup!.id),
+            isNull(schema.groupSessions.cancelledAt),
+          ),
+        );
+      await db.db.insert(schema.instructorAttendance).values({
+        sessionId: active!.id,
+        instructorId: courseInstructor(page).id,
+        status: "PRESENT",
+        markedBy: courseInstructor(page).id,
+        markedAt: new Date(),
+      });
+      await page.reload();
+      await expect(start).toBeDisabled();
+      await expect(
+        page.getByRole("textbox", { name: "Descripción", exact: true }),
+      ).toBeEnabled();
+      const persistedRevision = await page
+        .locator('.course-form input[name="revision"]')
+        .inputValue();
+      const tampered = await page.request.post(path, {
+        headers,
+        form: {
+          intent: "update",
+          revision: persistedRevision,
+          name: stored!.name,
+          description: stored!.description,
+          level: stored!.level,
+          conditions: stored!.conditions,
+          minimumGrade: "70",
+          instructorId: courseInstructor(page).id,
+          startDate: "2027-02-23",
+          endsAt: "2027-03-11T23:59",
+          artwork: "",
+        },
+      });
+      expect(tampered.status()).toBe(422);
+      expect((await tampered.json()).errors.startsAt).toBeTruthy();
+      expect(
+        (
+          await db.db
+            .select()
+            .from(schema.courses)
+            .where(eq(schema.courses.id, courseId))
+        )[0]!.startsAt,
+      ).toEqual(stored!.startsAt);
+      await page
+        .getByRole("textbox", { name: "Descripción", exact: true })
+        .fill("Editable content despite locked calendar");
+      const contentSaved = page.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          new URL(response.url()).pathname === path,
+      );
+      await page
+        .getByRole("button", { name: "Guardar cambios", exact: true })
+        .click();
+      expect((await contentSaved).status()).toBe(200);
+      expect(
+        (
+          await db.db
+            .select()
+            .from(schema.courses)
+            .where(eq(schema.courses.id, courseId))
+        )[0]!.description,
+      ).toBe("Editable content despite locked calendar");
+    }
+    const [finalCourse] = await db.db
+      .select()
+      .from(schema.courses)
+      .where(eq(schema.courses.id, courseId));
+    const archived = await page.request.post(path, {
+      headers,
+      form: {
+        intent: "archive",
+        revision: finalCourse!.updatedAt.toISOString(),
+      },
+    });
+    expect(archived.status()).toBe(200);
+    // Own publication must apply the fresh policy without a reload: a legacy
+    // hourly draft becomes date-only as soon as its new group pins the hour.
+    const historical = await page.request.post("/app/cursos/nuevo", {
+      headers,
+      form: {
+        requestKey: randomUUID(),
+        name: `Historical calendar UI ${randomUUID()}`,
+        description: "Synthetic hourly draft",
+        level: "BASIC",
+        courseTypeId: formatId,
+        instructorId: courseInstructor(page).id,
+        schedule: "Lunes a viernes, 18:00–19:30",
+        weekdays: "1,2,3,4,5",
+        startsAt: "2027-03-01T18:00",
+        endsAt: "2027-03-17T19:30",
+        conditions: "Synthetic",
+        minimumGrade: "70",
+      },
+    });
+    expect(historical.status()).toBe(201);
+    const historicalId = (await historical.json()).id as string;
+    lifecycleCourseIds.set(testInfo.testId, historicalId);
+    const historicalPath = `/app/cursos/${historicalId}/editar`;
+    const unsavedFormatName = `Unsaved calendar format ${randomUUID()}`;
+    expect(
+      (
+        await page.request.post("/app/formatos/nuevo", {
+          headers,
+          form: {
+            name: unsavedFormatName,
+            totalHours: "20",
+            sessionMinutes: "90",
+            studentAmount: "80",
+            externalAmount: "100",
+          },
+        })
+      ).status(),
+    ).toBe(201);
+    await page.goto(historicalPath);
+    const historicalFormat = page.getByRole("combobox", {
+      name: "Formato de curso",
+      exact: true,
+    });
+    const persistedFormatLabel = await historicalFormat.textContent();
+    await historicalFormat.click();
+    await page
+      .getByRole("option", { name: new RegExp(unsavedFormatName) })
+      .click();
+    await expect(
+      page.getByRole("textbox", {
+        name: "Inicio de clases (Bolivia)",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    expect(
+      (
+        await page.request.post(`/app/cursos/${historicalId}/grupos`, {
+          headers,
+          form: { intent: "create", startTime: "11:00", capacity: "10" },
+        })
+      ).status(),
+    ).toBe(200);
+    await page
+      .getByRole("button", { name: "Publicar curso", exact: true })
+      .click();
+    const published = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === historicalPath,
+    );
+    await page
+      .getByRole("dialog", { name: "Publicar curso" })
+      .getByRole("button", { name: "Publicar curso", exact: true })
+      .click();
+    expect((await published).status()).toBe(200);
+    await expect(
+      page.getByRole("combobox", { name: "Formato de curso", exact: true }),
+    ).toBeDisabled();
+    await expect(historicalFormat).toHaveText(persistedFormatLabel!);
+    await expect(
+      page.getByRole("textbox", {
+        name: "Inicio de clases (Bolivia)",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(start).toBeEnabled();
+    expect(
+      (
+        await page.request.post(historicalPath, {
+          headers,
+          form: {
+            intent: "archive",
+            revision: await page
+              .locator('.course-form input[name="revision"]')
+              .inputValue(),
+          },
+        })
+      ).status(),
+    ).toBe(200);
+  } finally {
+    await db.close();
+  }
 });

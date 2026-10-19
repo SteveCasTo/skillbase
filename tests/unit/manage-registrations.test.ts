@@ -13,6 +13,7 @@ import {
   getRegistrationDetail,
   getRegistrationForm,
   getRegistrationSettings,
+  listRegistrationFilterChoices,
   listRegistrations,
   recordRegistrationPayment,
   recordRegistrationRefund,
@@ -78,6 +79,7 @@ const repository: RegistrationRepository = {
   transfer: fail,
   settings: fail,
   updateSettings: fail,
+  listFilterChoices: fail,
   list: fail,
   detail: fail,
   findParticipants: fail,
@@ -123,6 +125,7 @@ test("all administrative use cases authorize before touching the repository or v
           auxiliaryDiscountPercent: 50,
         }),
       () => listRegistrations(repository, actor, { page: 1, pageSize: 20 }),
+      () => listRegistrationFilterChoices(repository, actor),
       () => getRegistrationDetail(repository, actor, id),
       () => findParticipants(repository, actor, "Synthetic"),
     ];

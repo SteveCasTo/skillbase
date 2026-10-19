@@ -29,6 +29,7 @@ export function isEditorialResult(
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   revision: string;
   featured: boolean;
+  editability?: CourseEditability;
 } {
   if (!["publish", "withdraw", "archive", "feature"].includes(intent))
     return false;
@@ -40,6 +41,12 @@ export function isEditorialResult(
     !("status" in value) ||
     !("featured" in value) ||
     typeof value.featured !== "boolean"
+  )
+    return false;
+  if (
+    "editability" in value &&
+    value.editability !== undefined &&
+    !isCourseEditability(value.editability)
   )
     return false;
   const expected =
@@ -54,3 +61,4 @@ export function isEditorialResult(
     (intent !== "feature" || value.featured)
   );
 }
+import { isCourseEditability, type CourseEditability } from "./editability";

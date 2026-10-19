@@ -53,6 +53,7 @@ export interface AdminCourseCardDto extends AdminCourseDto {
 
 export interface AdminCourseDto extends Course {
   readonly registrationAvailability: RegistrationAvailability;
+  readonly editability?: import("./editability").CourseEditability;
 }
 
 export interface PublicCourseDto {

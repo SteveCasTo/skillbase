@@ -1,6 +1,9 @@
 import type { InternalUser } from "@/domain/auth/types";
 import { listAdminCourses } from "@/application/courses/manage-courses";
-import { getRegistrationForm } from "@/application/pre-registrations/manage-registrations";
+import {
+  getRegistrationForm,
+  listRegistrationFilterChoices,
+} from "@/application/pre-registrations/manage-registrations";
 import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
 import { DrizzleCourseRepository } from "@/server/db/repositories/course-repository";
 import { getDatabase } from "@/server/db/client";
@@ -51,6 +54,22 @@ export async function loadRegistrationChoices(
       ),
   );
 }
+
+export async function loadRegistrationFilterChoices(actor: InternalUser) {
+  const [adminCourses, history] = await Promise.all([
+    listAdminCourses(new DrizzleCourseRepository(getDatabase()), actor),
+    listRegistrationFilterChoices(createRegistrationRepository(), actor),
+  ]);
+  const courses = new Map(
+    adminCourses.map((course) => [
+      course.id,
+      { id: course.id, name: course.name },
+    ]),
+  );
+  for (const course of history.courses) courses.set(course.id, course);
+  return { courses: [...courses.values()], groups: history.groups };
+}
+
 export async function lookupRegistrationPeople(
   actor: InternalUser,
   search: string,

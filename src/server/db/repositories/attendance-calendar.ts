@@ -303,6 +303,7 @@ export async function replanFutureGroupSessions(
   startsAt: Date,
   actorId: string,
   now: Date,
+  allowFutureToday = false,
 ): Promise<void> {
   const current = await tx
     .select()
@@ -315,7 +316,13 @@ export async function replanFutureGroupSessions(
     )
     .orderBy(asc(schema.groupSessions.startsAt));
   if (!current.length) return;
-  if (current.some((row) => civilDay(row.startsAt) <= civilDay(now)))
+  if (
+    current.some((row) =>
+      allowFutureToday
+        ? row.startsAt <= now
+        : civilDay(row.startsAt) <= civilDay(now),
+    )
+  )
     throw new AttendanceError(
       "VALIDATION_FAILED",
       "El calendario ya comenzó o tiene ajustes. Reprograma sesiones individuales.",

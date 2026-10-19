@@ -283,6 +283,18 @@ son privados; la descarga requiere autorización server-side. La comparación de
 PDF que seleccione el titular ocurre en el navegador sin enviar ni persistir el
 archivo.
 
+El lookup solo por PDF transmite únicamente el SHA-256 completo en un POST del
+mismo origen a `/certificados/verificar-archivo`, nunca bytes, nombre ni MIME del
+archivo. Body máximo 256 bytes, allowlist `sha256` y validación estricta de 64
+hexadecimales minúsculos; sin prefijos, búsqueda por PII ni consultas generales.
+La huella actúa como capacidad de posesión del artefacto, no como autorización
+para descargarlo. Solo se consulta el hash firmado actual de `issued`/`revoked`;
+coincidencias múltiples fallan cerradas, sin escoger un vigente sobre un revocado.
+La proyección pública, límite HMAC persistente por red, errores saneados y
+`private, no-store` se reutilizan. No se registran huellas/códigos en logs ni se escriben
+certificados o Storage durante la lectura. El GET canónico admite el mismo DTO
+con `Accept: application/json`; no abre un bypass administrativo.
+
 Cada certificado debe tener:
 
 - ID interno;

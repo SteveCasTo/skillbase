@@ -897,6 +897,51 @@ export class DrizzleRegistrationRepository implements RegistrationRepository {
     return this.registrationList(raw, actorId, (row) => row);
   }
 
+  async listFilterChoices(actorId: string) {
+    return this.read(actorId, async (tx) => {
+      const rows = await tx
+        .select({
+          courseId: schema.courses.id,
+          courseName: schema.courses.name,
+          groupId: schema.groups.id,
+          startsAt: schema.groups.startsAt,
+          endsAt: schema.groups.endsAt,
+        })
+        .from(schema.preRegistrations)
+        .innerJoin(
+          schema.courses,
+          eq(schema.courses.id, schema.preRegistrations.courseId),
+        )
+        .innerJoin(
+          schema.groups,
+          eq(schema.groups.id, schema.preRegistrations.groupId),
+        )
+        .groupBy(
+          schema.courses.id,
+          schema.courses.name,
+          schema.groups.id,
+          schema.groups.startsAt,
+          schema.groups.endsAt,
+        )
+        .orderBy(asc(schema.courses.name), asc(schema.groups.startsAt));
+      const courses = new Map<string, { id: string; name: string }>();
+      for (const row of rows)
+        courses.set(row.courseId, { id: row.courseId, name: row.courseName });
+      return {
+        courses: [...courses.values()],
+        groups: rows.map((row) => ({
+          id: row.groupId,
+          courseId: row.courseId,
+          groupName: registrationGroupName({
+            startsAt: row.startsAt,
+            endsAt: row.endsAt,
+          }),
+          startsAt: row.startsAt.toISOString(),
+        })),
+      };
+    });
+  }
+
   /** Reuses the authorized transactional gate and batched ledger, never detail N+1. */
   async listForExport(raw: RegistrationFilter, actorId: string) {
     return this.registrationList(raw, actorId, registrationExportFinance);

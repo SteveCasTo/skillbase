@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CourseFormat } from "@/domain/courses/formats";
+import { isCourseEditability } from "@/domain/courses/editability";
 import { instantToBoliviaCivil } from "@/domain/courses/bolivia-time";
 import {
   GROUP_SCHEDULE,
@@ -19,6 +20,8 @@ interface Props {
   error?: string;
   disabled?: boolean;
   newCourse?: boolean;
+  courseTypeId?: string;
+  scheduleDisabled?: boolean;
 }
 
 export default function CourseWeekdayPlanner({
@@ -26,28 +29,61 @@ export default function CourseWeekdayPlanner({
   startsAt,
   endsAt,
   error,
-  disabled,
+  disabled: initialDisabled,
   newCourse = false,
+  courseTypeId = "",
+  scheduleDisabled: initialScheduleDisabled = false,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
+  const [disabled, setDisabled] = useState(initialDisabled);
+  const [scheduleDisabled, setScheduleDisabled] = useState(
+    initialScheduleDisabled,
+  );
   const [start, setStart] = useState(startsAt);
   const [startDate, setStartDate] = useState(startsAt.slice(0, 10));
-  const [formatId, setFormatId] = useState("");
+  const [persistedStart, setPersistedStart] = useState(startsAt);
+  const [formatId, setFormatId] = useState(courseTypeId);
   // Older planned courses still have an hourly course schedule. Keep their
   // persisted instants on edit rather than silently converting grouped courses.
   const oldHourlyPlan =
     !newCourse && Boolean(startsAt) && !startsAt.endsWith("T00:00");
+  const plannedStart =
+    oldHourlyPlan && scheduleDisabled
+      ? `${startDate}T${persistedStart.slice(11)}`
+      : start;
   useEffect(() => {
     const form = container.current?.closest("form");
     if (!form) return;
     const sync = () => {
       const data = new FormData(form);
-      if (oldHourlyPlan) setStart(String(data.get("startsAt") ?? ""));
-      setFormatId(String(data.get("courseTypeId") ?? ""));
+      if (oldHourlyPlan && !scheduleDisabled) {
+        const candidate = String(data.get("startsAt") ?? persistedStart);
+        setStart(candidate);
+        setStartDate(candidate.slice(0, 10));
+      }
+      setFormatId(String(data.get("courseTypeId") ?? courseTypeId));
+    };
+    const policyChanged = (event: Event) => {
+      const policy: unknown = (event as CustomEvent<unknown>).detail;
+      if (!isCourseEditability(policy)) return;
+      const baseline = JSON.parse(form.dataset.baseline ?? "{}") as Record<
+        string,
+        unknown
+      >;
+      if (typeof baseline.startsAt === "string") {
+        setPersistedStart(baseline.startsAt);
+        if (!policy.dates) {
+          setStart(baseline.startsAt);
+          setStartDate(baseline.startsAt.slice(0, 10));
+        }
+      }
+      setDisabled(!policy.dates);
+      setScheduleDisabled(!policy.schedule);
     };
     sync();
     form.addEventListener("change", sync);
     form.addEventListener("course-form-change", sync);
+    form.addEventListener("course-editability-change", policyChanged);
     // The format selector is a separate client-only island. Its initial native
     // control can mount after this effect without emitting a change event.
     const controls = new MutationObserver(sync);
@@ -56,8 +92,9 @@ export default function CourseWeekdayPlanner({
       controls.disconnect();
       form.removeEventListener("change", sync);
       form.removeEventListener("course-form-change", sync);
+      form.removeEventListener("course-editability-change", policyChanged);
     };
-  }, [oldHourlyPlan]);
+  }, [oldHourlyPlan, courseTypeId, persistedStart, scheduleDisabled]);
   const format = formats.find((item) => item.id === formatId);
   let plan: ReturnType<typeof planWeekdaySchedule> | null = null;
   let dates: ReturnType<typeof planCourseDates> | null = null;
@@ -75,7 +112,7 @@ export default function CourseWeekdayPlanner({
     try {
       if (oldHourlyPlan)
         plan = planWeekdaySchedule({
-          startsAt: start,
+          startsAt: plannedStart,
           weekdaysMask: 31,
           totalHours: format.totalHours,
           sessionMinutes: format.sessionMinutes,
@@ -96,10 +133,14 @@ export default function CourseWeekdayPlanner({
     : dates
       ? instantToBoliviaCivil(dates.endsAt)
       : "";
-  const courseStart = dates ? instantToBoliviaCivil(dates.startsAt) : "";
+  const courseStart = dates
+    ? instantToBoliviaCivil(dates.startsAt)
+    : oldHourlyPlan && scheduleDisabled && plan
+      ? plannedStart
+      : "";
   const schedule =
     oldHourlyPlan && plan
-      ? `Lunes a viernes, ${start.slice(11)}–${plan.endTime}`
+      ? `Lunes a viernes, ${plannedStart.slice(11)}–${plan.endTime}`
       : dates
         ? GROUP_SCHEDULE
         : "";
@@ -112,11 +153,12 @@ export default function CourseWeekdayPlanner({
   }, [end, schedule, courseStart]);
   return (
     <div ref={container} className="contents">
-      {oldHourlyPlan ? (
+      {oldHourlyPlan && !scheduleDisabled ? (
         <CourseDateTimePicker
+          key={disabled ? persistedStart : "editable"}
           name="startsAt"
           label="Inicio de clases (Bolivia)"
-          value={startsAt}
+          value={disabled ? persistedStart : startsAt}
           required
           disabled={disabled ?? false}
           error={error ?? ""}
@@ -126,9 +168,10 @@ export default function CourseWeekdayPlanner({
       ) : (
         <div className="min-w-0">
           <CourseDatePicker
+            key={disabled ? persistedStart : "editable"}
             name="startDate"
             label="Fecha de inicio de clases (Bolivia)"
-            value={startsAt.slice(0, 10)}
+            value={(disabled ? persistedStart : startDate).slice(0, 10)}
             onDateChange={setStartDate}
             futureOnly={newCourse}
             required

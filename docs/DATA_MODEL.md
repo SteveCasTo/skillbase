@@ -459,6 +459,12 @@ after commit. 0025 fails closed on nonempty certificates and requires the
 reviewed synthetic reset; it does not migrate issued credentials implicitly.
 The private Storage bucket is `certificate-documents`.
 
+0031 añade `certificates_signed_hash_idx`, B-tree parcial no único sobre
+`signed_sha256` para `state in ('issued', 'revoked')`. El lookup exacto del PDF
+solo lee dos candidatos como máximo y no resuelve resultados ambiguos. No cambia
+la unicidad vigente, datos congelados, guards, artefactos ni permisos RLS/Data
+API. No se aplica a canónico/cloud desde la tarea de implementación.
+
 ### AuditEvent
 
 - id

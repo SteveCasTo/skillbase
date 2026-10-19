@@ -144,6 +144,16 @@ no una segunda distribución PDF. Una configuración persistida v1 requiere
 activación ADMIN explícita mediante el repositorio existente, con revisión y
 auditoría. El valor predeterminado para configuración ausente es v2.
 
+Refinamiento visual autorizado (2026-10-17), conservando v2 por indicación del
+usuario: franja navy redondeada con líneas laterales y rombos rojos discretos,
+destinatario en Merriweather Regular local (OFL), etiqueta/nombre/subrayado y
+curso con eje común. Se retiran la trama y los remates cuadrados inferiores de
+aprobación; los logos, QR, ID y contenido institucional se conservan. Se aplica
+solo a previews y futuras generaciones. No actualiza archivos, hashes ni snapshots
+existentes, no añade regeneración por GET ni cambia la comparación material del
+POST de descarga. Un borrador v2 ya almacenado conserva sus bytes si sus fuentes
+no cambiaron. Renovar datos seed requiere un plan y aprobación separados.
+
 El usuario autorizó sustituir los certificados de los namespaces **seed** local
 y cloud para que todos usen v2. Esa operación excepcional requiere PLAN con
 ownership/UUIDs/rutas/hashes/dependencias y aprobación antes de APPLY; no concede
@@ -295,6 +305,18 @@ escaneada es una atestación administrativa, **no** una firma digital
 criptográfica. El usuario debe comparar el titular/certificado mostrado con el
 documento; un QR copiado enlaza al registro indicado, no convierte otra hoja en
 auténtica.
+
+La entrada dedicada `/certificados/verificar` también permite resolver el registro
+sin código: `POST /certificados/verificar-archivo` recibe exclusivamente una huella
+SHA-256 completa de 64 caracteres hexadecimales minúsculos. Exige Origin esperado,
+body acotado a 256 bytes y allowlist de un campo; comparte el límite persistente
+por red del lookup por código y responde `private, no-store`/`nosniff`, con
+`Retry-After` cuando corresponde. La consulta exacta sobre `signed_sha256` incluye
+únicamente `issued`/`revoked`, limita a dos filas y falla cerrada ante ambigüedad.
+No busca en Storage ni expone listados, prefijos o datos administrativos. La
+migración forward 0031 añade solo un índice parcial no único para esa consulta,
+sin cambiar filas, guards, IDs ni bytes firmados. Su aplicación canónica/cloud
+queda en el flujo de release, no en esta implementación.
 
 Para LinkedIn ofrecer copiar/compartir URL, ID, nombre real del titular,
 organización, curso y fecha; no foto/imagen de identidad ni integración API u

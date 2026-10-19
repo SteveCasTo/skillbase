@@ -1272,6 +1272,22 @@ test("ADMIN display labels use joined current course and Bolivia group schedule 
   });
   await db
     .update(schema.courses)
+    .set({ status: "ARCHIVED" })
+    .where(eq(schema.courses.id, f.course.id));
+  const filterChoices = await repository.listFilterChoices(f.actor.id);
+  expect(filterChoices.courses).toContainEqual({
+    id: f.course.id,
+    name: "Synthetic Course",
+  });
+  expect(filterChoices.groups).toContainEqual(
+    expect.objectContaining({
+      id: row.groupId,
+      courseId: f.course.id,
+      groupName: "08:00–09:30",
+    }),
+  );
+  await db
+    .update(schema.courses)
     .set({ name: "Current course title" })
     .where(eq(schema.courses.id, f.course.id));
   const detail = (await repository.detail(row.id, f.actor.id))!;

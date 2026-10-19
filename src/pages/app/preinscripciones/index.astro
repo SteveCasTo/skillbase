@@ -9,7 +9,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { requireInternalUser } from "@/server/auth/context";
 import { listRegistrations } from "@/application/pre-registrations/manage-registrations";
 import { createRegistrationRepository } from "@/server/db/repositories/registration-repository";
-import { loadRegistrationChoices } from "@/server/pre-registrations/loaders";
+import { loadRegistrationFilterChoices } from "@/server/pre-registrations/loaders";
+import { RegistrationError } from "@/domain/pre-registrations/errors";
 import {
   parseRegistrationFilter,
   registrationFailure,
@@ -17,7 +18,6 @@ import {
 } from "@/server/pre-registrations/http";
 import type {
   RegistrationPageDto,
-  RegistrationFormDto,
   RegistrationFilter,
 } from "@/domain/pre-registrations/types";
 void jsonResponse; // Astro checker omits imported references in returned responses.
@@ -30,29 +30,41 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
 const actor = requireInternalUser(Astro.locals);
 const fragment = Astro.request.headers.get("X-Registration-Fragment") === "1";
 let page: RegistrationPageDto | null = null;
-let forms: readonly RegistrationFormDto[] = [];
+let choices: Awaited<ReturnType<typeof loadRegistrationFilterChoices>> = {
+  courses: [],
+  groups: [],
+};
 let filter: RegistrationFilter = { page: 1, pageSize: 20 };
 let message = "";
 try {
   filter = parseRegistrationFilter(Astro.url.searchParams);
-  [page, forms] = await Promise.all([
-    listRegistrations(createRegistrationRepository(), actor, filter),
-    loadRegistrationChoices(actor),
+  const repository = createRegistrationRepository();
+  [page, choices] = await Promise.all([
+    listRegistrations(repository, actor, filter),
+    loadRegistrationFilterChoices(actor),
   ]);
+  if (
+    filter.courseId &&
+    !choices.courses.some(({ id }) => id === filter.courseId)
+  )
+    throw new RegistrationError("NOT_FOUND", "Curso no encontrado.");
+  if (
+    filter.groupId &&
+    !choices.groups.some(
+      ({ id, courseId }) =>
+        id === filter.groupId &&
+        (!filter.courseId || courseId === filter.courseId),
+    )
+  )
+    throw new RegistrationError("NOT_FOUND", "Grupo no encontrado.");
 } catch (error) {
   const failure = registrationFailure(error);
   Astro.response.status = failure.status;
   message = failure.payload.message;
   if (fragment) return jsonResponse(failure.payload, failure.status);
 }
-const selectedForm = forms.find((form) => form.course.id === filter.courseId);
-const courseLabels = Object.fromEntries(
-  forms.map((form) => [form.course.id, form.course.name]),
-);
-const groupLabels = Object.fromEntries(
-  forms.flatMap((form) =>
-    form.groups.map((group) => [group.id, group.groupName ?? group.id]),
-  ),
+const selectedGroups = choices.groups.filter(
+  (group) => group.courseId === filter.courseId,
 );
 const query = new URLSearchParams(Astro.url.searchParams);
 query.delete("format");
@@ -68,13 +80,11 @@ const exportHref = (format: string) =>
           id="registration-filters"
           action="/app/preinscripciones"
           {filter}
-          courses={forms.map((form) => form.course)}
-          groups={selectedForm?.groups ?? []}
+          courses={choices.courses}
+          groups={selectedGroups}
         />
         <RegistrationList
           {page}
-          {courseLabels}
-          {groupLabels}
           detailHrefs={Object.fromEntries(
             page.items.map((row) => [
               row.id,
@@ -127,13 +137,11 @@ const exportHref = (format: string) =>
             id="registration-filters"
             action="/app/preinscripciones"
             {filter}
-            courses={forms.map((form) => form.course)}
-            groups={selectedForm?.groups ?? []}
+            courses={choices.courses}
+            groups={selectedGroups}
           />
           <RegistrationList
             {page}
-            {courseLabels}
-            {groupLabels}
             detailHrefs={Object.fromEntries(
               page.items.map((row) => [
                 row.id,

@@ -116,6 +116,16 @@ son reales; una ausencia inferida tiene `inferred:true`, actor/fecha nulos.
 
 ## Calendario y membresía
 
+- El cambio ordinario del inicio del curso reutiliza los reemplazos vinculados
+  del cambio de horario de grupo. Solo afecta grupos `PLANNED` antes del inicio,
+  sin evidencia académica/asistencia ni ajustes individuales; conserva sus horas,
+  revisión y duración. La barrera compartida de horarios precede curso, grupos y
+  sesiones; el reloj se consulta después de los locks. La auditoría existente
+  distingue cascadas ordinarias de recuperaciones individuales y permite un
+  segundo cambio ordinario. Grupos cancelados y datos financieros quedan intactos.
+  La migración forward `0032_course_start_rescheduling` adapta el guard previo de
+  curso sin flags de bypass. No está aplicada a canónico/cloud por este cambio.
+
 - Crear grupo genera sus sesiones en la misma transacción. Grupos existentes
   se materializan idempotentemente al leer por primera vez. Se reutiliza el
   planificador L–V y redondeo vigente: 20 h / 90 min = 13 encuentros completos,

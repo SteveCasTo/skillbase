@@ -10,10 +10,10 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { SileoHost } from "@/components/SileoHost";
 interface Props {
-  officialHash: string;
-  state: "issued" | "revoked" | "replaced";
+  officialHash?: string;
+  state?: "issued" | "revoked" | "replaced" | undefined;
 }
-const { officialHash, state } = Astro.props;
+const { officialHash = "", state } = Astro.props;
 ---
 
 <section
@@ -93,7 +93,7 @@ const { officialHash, state } = Astro.props;
     <span
       data-result-icon="invalid"
       hidden
-      class="mt-0.5 shrink-0 text-secondary-foreground"
+      class="mt-0.5 shrink-0 text-destructive"
     >
       <TriangleAlert size={20} aria-hidden="true" />
     </span>
@@ -108,221 +108,12 @@ const { officialHash, state } = Astro.props;
   </div>
   <noscript>
     <p class="text-sm">
-      Activa JavaScript para comparar el archivo localmente. El estado del
-      registro mostrado arriba no requiere JavaScript.
+      Activa JavaScript para comparar un PDF. También puedes consultar su
+      código.
     </p>
   </noscript>
 </section>
 <SileoHost client:load />
-<script>
-  import { notifications } from "@/lib/notifications";
-  import { hashComparison, localPdfSha256, localPdfError } from "./local-hash";
-  const root = document.querySelector<HTMLElement>("[data-local-verification]");
-  const input = root?.querySelector<HTMLInputElement>("#local-pdf");
-  const result = root?.querySelector<HTMLElement>("#local-result");
-  const message = result?.querySelector<HTMLElement>("[data-result-message]");
-  const controls = root?.querySelector<HTMLElement>("[data-local-controls]");
-  const dropzone = root?.querySelector<HTMLElement>("[data-local-dropzone]");
-  const selection = root?.querySelector<HTMLElement>("[data-local-selection]");
-  const filename = root?.querySelector<HTMLElement>("[data-file-name]");
-  if (
-    root &&
-    input &&
-    result &&
-    message &&
-    controls &&
-    dropzone &&
-    selection &&
-    filename
-  ) {
-    let latest = 0;
-    let calculation: AbortController | undefined;
-    let activeNotice: string | undefined;
-    const cancelCalculation = () => {
-      calculation?.abort();
-      calculation = undefined;
-      if (activeNotice) notifications.dismiss(activeNotice);
-      activeNotice = undefined;
-    };
-    window.addEventListener("pagehide", cancelCalculation, { once: true });
-    const showResult = (text: string, tone?: "valid" | "invalid" | "error") => {
-      message.textContent = text;
-      if (tone) result.dataset.tone = tone;
-      else delete result.dataset.tone;
-      result
-        .querySelectorAll<HTMLElement>("[data-result-icon]")
-        .forEach((icon) => {
-          icon.hidden = icon.dataset.resultIcon !== tone;
-        });
-    };
-    if (window.crypto?.subtle) controls.hidden = false;
-    else
-      showResult(
-        "La comparación local requiere un navegador compatible y una conexión segura.",
-        "error",
-      );
-    const clear = () => {
-      latest += 1;
-      cancelCalculation();
-      input.value = "";
-      filename.textContent = "";
-      selection.hidden = true;
-      dropzone.hidden = false;
-      input.tabIndex = 0;
-      dropzone.removeAttribute("data-invalid");
-      input.removeAttribute("aria-invalid");
-      showResult("");
-      root.removeAttribute("aria-busy");
-    };
-    root.querySelector("[data-local-reset]")?.addEventListener("click", () => {
-      clear();
-      input.focus();
-    });
-    let dragDepth = 0;
-    const resetDrag = () => {
-      dragDepth = 0;
-      dropzone.removeAttribute("data-dragging");
-    };
-    dropzone.addEventListener("dragenter", (event) => {
-      event.preventDefault();
-      dragDepth += 1;
-      dropzone.setAttribute("data-dragging", "");
-    });
-    dropzone.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
-    });
-    dropzone.addEventListener("dragleave", () => {
-      dragDepth -= 1;
-      if (dragDepth <= 0) resetDrag();
-    });
-    dropzone.addEventListener("drop", (event) => {
-      event.preventDefault();
-      resetDrag();
-      const files = event.dataTransfer?.files;
-      if (!files?.length) return;
-      if (files.length !== 1) {
-        clear();
-        showResult("Selecciona un archivo PDF.", "error");
-        input.setAttribute("aria-invalid", "true");
-        dropzone.setAttribute("data-invalid", "");
-        return;
-      }
-      const transfer = new DataTransfer();
-      transfer.items.add(files[0]!);
-      input.files = transfer.files;
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    input.addEventListener("change", async () => {
-      const token = ++latest;
-      cancelCalculation();
-      const file = input.files?.[0];
-      filename.textContent = file?.name ?? "";
-      selection.hidden = !file;
-      dropzone.hidden = Boolean(file);
-      input.tabIndex = file ? -1 : 0;
-      if (file && document.activeElement === input)
-        root.querySelector<HTMLButtonElement>("[data-local-reset]")?.focus();
-      dropzone.removeAttribute("data-invalid");
-      input.removeAttribute("aria-invalid");
-      showResult("");
-      if (!file) {
-        root.removeAttribute("aria-busy");
-        return;
-      }
-      const validation = localPdfError(file);
-      if (validation) {
-        showResult(validation, "error");
-        dropzone.setAttribute("data-invalid", "");
-        input.setAttribute("aria-invalid", "true");
-        root.removeAttribute("aria-busy");
-        return;
-      }
-      root.setAttribute("aria-busy", "true");
-      const current = new AbortController();
-      calculation = current;
-      const notificationId = `local-pdf-${crypto.randomUUID()}`;
-      activeNotice = notificationId;
-      let failureTone: "invalid" | "error" = "error";
-      // File reads and WebCrypto cannot be aborted. Settle their notification
-      // immediately on reset/reselection while ignoring the superseded digest.
-      let abortRead: (() => void) | undefined;
-      try {
-        const comparison = await notifications.promise(
-          async () => {
-            const hash = await Promise.race([
-              localPdfSha256(file),
-              new Promise<never>((_, reject) => {
-                abortRead = () =>
-                  reject(
-                    new DOMException("Comprobación cancelada.", "AbortError"),
-                  );
-                current.signal.addEventListener("abort", abortRead, {
-                  once: true,
-                });
-              }),
-            ]);
-            current.signal.throwIfAborted();
-            const official = root.dataset.officialHash ?? "";
-            const state = root.dataset.certificateState ?? "";
-            const text = hashComparison(hash, official, state);
-            if (
-              hash.toLowerCase() === official.toLowerCase() &&
-              state !== "issued"
-            )
-              failureTone = "invalid";
-            if (
-              !/^[a-f0-9]{64}$/iu.test(official) ||
-              hash.toLowerCase() !== official.toLowerCase() ||
-              state !== "issued"
-            )
-              throw new Error(text);
-            return text;
-          },
-          {
-            id: notificationId,
-            loading: { title: "Comprobando tu archivo…" },
-            success: {
-              title: "El archivo coincide.",
-              description: "El certificado está vigente.",
-            },
-            error: (failure: unknown) => {
-              if (current.signal.aborted) {
-                // The vendor updates after this callback; dismiss that same ID
-                // next, so cancellation cannot revive an old loading notification.
-                queueMicrotask(() => notifications.dismiss(notificationId));
-              }
-              return {
-                title: current.signal.aborted
-                  ? "Comprobación cancelada."
-                  : failureTone === "invalid"
-                    ? "Certificado no válido."
-                    : "Certificado no verificado.",
-                description:
-                  failure instanceof Error
-                    ? failure.message
-                    : "No se pudo leer el archivo. Selecciónalo de nuevo.",
-              };
-            },
-          },
-        );
-        if (token !== latest) return;
-        showResult(comparison, "valid");
-      } catch (error) {
-        if (token !== latest || current.signal.aborted) return;
-        showResult(
-          error instanceof Error
-            ? error.message
-            : "No se pudo leer el archivo. Selecciónalo de nuevo.",
-          failureTone,
-        );
-      } finally {
-        if (abortRead) current.signal.removeEventListener("abort", abortRead);
-        if (token === latest) root.removeAttribute("aria-busy");
-      }
-    });
-  }
-</script>
 <style>
   .local-dropzone {
     display: flex;
@@ -352,12 +143,6 @@ const { officialHash, state } = Astro.props;
   }
   .local-dropzone[data-invalid] {
     border-color: var(--destructive);
-  }
-  .local-dropzone[hidden],
-  .local-selection[hidden],
-  [data-local-controls][hidden],
-  [data-result-icon][hidden] {
-    display: none;
   }
   .local-selection,
   .local-result {
@@ -389,8 +174,5 @@ const { officialHash, state } = Astro.props;
     .local-dropzone {
       transition: none;
     }
-  }
-  h2 {
-    font-family: var(--font-sans);
   }
 </style>

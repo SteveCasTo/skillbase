@@ -5,6 +5,7 @@ import department from "../../../../assets/certificates/informatica-sistemas.png
 import regular from "@fontsource/montserrat/files/montserrat-latin-400-normal.woff?inline";
 import bold from "@fontsource/montserrat/files/montserrat-latin-700-normal.woff?inline";
 import display from "@fontsource/merriweather/files/merriweather-latin-700-normal.woff?inline";
+import recipient from "@fontsource/merriweather/files/merriweather-latin-400-normal.woff?inline";
 
 /** Vite embeds the original bytes in the SSR bundle (not public URLs/Storage).
  * Bun's unit-test file loader resolves the same static imports to local paths.
@@ -25,13 +26,17 @@ export async function certificateResources() {
     regularBytes,
     boldBytes,
     displayBytes,
+    recipientBytes,
   ] = await Promise.all(
-    [umss, faculty, department, regular, bold, display].map(bundledBytes),
+    [umss, faculty, department, regular, bold, display, recipient].map(
+      bundledBytes,
+    ),
   );
   return {
     logos: [umssBytes!, facultyBytes!, departmentBytes!] as const,
     regular: regularBytes!,
     bold: boldBytes!,
     display: displayBytes!,
+    recipient: recipientBytes!,
   };
 }

@@ -1,0 +1,1 @@
+CREATE INDEX "certificates_signed_hash_idx" ON "certificates" USING btree ("signed_sha256") WHERE "certificates"."state" in ('issued', 'revoked');

@@ -1,18 +1,25 @@
 ---
-import type {
-  RegistrationFilter,
-  RegistrationFormDto,
-} from "@/domain/pre-registrations/types";
+import type { RegistrationFilter } from "@/domain/pre-registrations/types";
 import { Input } from "@/components/ui/input";
 import { buttonVariants } from "@/components/ui/button";
 import RegistrationSelect from "./RegistrationSelect";
 import { financeLabels, formatDate, membershipLabels } from "./presentation";
+interface FilterCourse {
+  id: string;
+  name: string;
+}
+interface FilterGroup {
+  id: string;
+  courseId: string;
+  groupName: string;
+  startsAt: string;
+}
 interface Props {
   id: string;
   action: string;
   filter: RegistrationFilter;
-  courses: readonly RegistrationFormDto["course"][];
-  groups: RegistrationFormDto["groups"];
+  courses: readonly FilterCourse[];
+  groups: readonly FilterGroup[];
 }
 const { id, action, filter, courses, groups } = Astro.props;
 ---
@@ -59,9 +66,9 @@ const { id, action, filter, courses, groups } = Astro.props;
       value={filter.groupId ?? ""}
       required={false}
       placeholder="Todos los grupos"
-      options={groups.map((group, index) => ({
+      options={groups.map((group) => ({
         value: group.id,
-        label: `${group.groupName ?? `Grupo ${index + 1}`} · ${formatDate(group.startsAt)}`,
+        label: `${group.groupName} · ${formatDate(group.startsAt)}`,
       }))}
     />
   </div>

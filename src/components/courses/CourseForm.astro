@@ -11,6 +11,7 @@ import CourseWeekdayPlanner from "./CourseWeekdayPlanner";
 import CourseMarkdownEditor from "./CourseMarkdownEditor";
 import { GROUP_SCHEDULE } from "@/domain/courses/weekday-schedule";
 import { publicArtworkUrl } from "@/server/courses/artwork";
+import type { CourseEditability } from "@/domain/courses/editability";
 
 interface Props {
   values: CourseInput;
@@ -18,6 +19,7 @@ interface Props {
   instructors?: readonly InstructorProfile[];
   errors?: Readonly<Record<string, string>>;
   disabled?: boolean;
+  editability?: CourseEditability | undefined;
   submitLabel: string;
   requestKey?: string;
   intent?: "update";
@@ -26,11 +28,17 @@ interface Props {
   /** Persisted course values, distinct from the attempted values after a failed POST. */
   baseline?: CourseInput | undefined;
   pinnedFormat?:
-    { totalHours: number; sessionMinutes: number | null } | undefined;
+    | {
+        totalHours: number;
+        sessionMinutes: number | null;
+        studentAmount: string;
+        externalAmount: string;
+      }
+    | undefined;
 }
 
 const {
-  values,
+  values: attemptedValues,
   formats,
   instructors = [],
   errors = {},
@@ -42,7 +50,39 @@ const {
   courseId,
   baseline,
   pinnedFormat,
+  editability,
 } = Astro.props;
+const formatDisabled = disabled || Boolean(courseId && !editability?.format);
+const instructorDisabled =
+  disabled || Boolean(courseId && !editability?.instructor);
+const datesDisabled = disabled || Boolean(courseId && !editability?.dates);
+const scheduleDisabled =
+  disabled || Boolean(courseId && !editability?.schedule);
+const readonlyFields = [
+  ...(formatDisabled ? ["courseTypeId"] : []),
+  ...(instructorDisabled ? ["instructorId"] : []),
+  ...(datesDisabled ? ["startsAt", "endsAt"] : []),
+  ...(scheduleDisabled || datesDisabled ? ["schedule", "weekdays"] : []),
+];
+// Rejected POST attempts may retain editable inputs, never replace the visible
+// server-owned value of a locked control with caller-provided data.
+const values: CourseInput =
+  disabled && baseline
+    ? baseline
+    : {
+        ...attemptedValues,
+        ...Object.fromEntries(
+          readonlyFields
+            .filter((field) => baseline?.[field] !== undefined)
+            .map((field) => [field, baseline?.[field]]),
+        ),
+        ...(datesDisabled && baseline
+          ? {
+              startDate: baseline.startsAt?.slice(0, 10),
+              endDate: baseline.endsAt?.slice(0, 10),
+            }
+          : {}),
+      };
 const control =
   "mt-2 min-h-11 w-full rounded-lg border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";
 const area = `${control} min-h-28 resize-y`;
@@ -88,6 +128,7 @@ const currentArtworkUrl = publicArtworkUrl(
   data-course-id={courseId}
   data-course-mutation-id={courseId}
   data-baseline={baseline ? JSON.stringify(initialValues) : undefined}
+  data-readonly-fields={JSON.stringify(readonlyFields)}
   data-group-formats={JSON.stringify(
     formats.map(({ id, sessionMinutes }) => [id, sessionMinutes]),
   )}
@@ -215,7 +256,7 @@ const currentArtworkUrl = publicArtworkUrl(
             label="Formato de curso"
             value={values.courseTypeId ?? ""}
             error={errors.courseTypeId ?? ""}
-            disabled={disabled || formats.length === 0}
+            disabled={formatDisabled || formats.length === 0}
             placeholder="Selecciona un formato"
             options={formats
               .filter(
@@ -223,7 +264,10 @@ const currentArtworkUrl = publicArtworkUrl(
               )
               .map((format) => ({
                 value: format.id,
-                label: `${format.name} · ${format.totalHours} h · ${format.studentAmount} / ${format.externalAmount} BOB`,
+                label:
+                  format.id === baseline?.courseTypeId && pinnedFormat
+                    ? `${format.name} · ${pinnedFormat.totalHours} h · ${pinnedFormat.studentAmount} / ${pinnedFormat.externalAmount} BOB`
+                    : `${format.name} · ${format.totalHours} h · ${format.studentAmount} / ${format.externalAmount} BOB`,
                 disabled:
                   !format.active ||
                   (!courseId && format.sessionMinutes === null),
@@ -262,7 +306,7 @@ const currentArtworkUrl = publicArtworkUrl(
               class={control}
               name="courseTypeId"
               required
-              disabled={disabled || formats.length === 0}
+              disabled={formatDisabled || formats.length === 0}
             >
               <option value="">Selecciona un formato</option>
               {formats
@@ -294,7 +338,7 @@ const currentArtworkUrl = publicArtworkUrl(
             value={values.instructorId || "unassigned"}
             placeholder="Selecciona un instructor"
             required={false}
-            disabled={disabled}
+            disabled={instructorDisabled}
             error={errors.instructorId ?? ""}
             options={[
               {
@@ -303,10 +347,15 @@ const currentArtworkUrl = publicArtworkUrl(
                 disabled: Boolean(courseId),
               },
               ...instructors
-                .filter((instructor) => instructor.status === "ACTIVE")
+                .filter(
+                  (instructor) =>
+                    instructor.status === "ACTIVE" ||
+                    instructor.id === values.instructorId,
+                )
                 .map((instructor) => ({
                   value: instructor.id,
                   label: `${instructor.firstName} ${instructor.lastName}`,
+                  disabled: instructor.status !== "ACTIVE",
                 })),
             ]}
           >
@@ -318,7 +367,7 @@ const currentArtworkUrl = publicArtworkUrl(
                 id="instructorId-native"
                 name="instructorId"
                 class={control}
-                disabled={disabled}
+                disabled={instructorDisabled}
                 aria-invalid={Boolean(errors.instructorId)}
               >
                 <option
@@ -329,11 +378,16 @@ const currentArtworkUrl = publicArtworkUrl(
                   Sin asignar (solo borrador)
                 </option>
                 {instructors
-                  .filter((instructor) => instructor.status === "ACTIVE")
+                  .filter(
+                    (instructor) =>
+                      instructor.status === "ACTIVE" ||
+                      instructor.id === values.instructorId,
+                  )
                   .map((instructor) => (
                     <option
                       value={instructor.id}
                       selected={values.instructorId === instructor.id}
+                      disabled={instructor.status !== "ACTIVE"}
                     >
                       {instructor.firstName} {instructor.lastName}
                     </option>
@@ -372,7 +426,7 @@ const currentArtworkUrl = publicArtworkUrl(
             client:only="react"
             value={values.schedule ?? ""}
             error={errors.schedule ?? ""}
-            disabled={disabled}
+            disabled={scheduleDisabled}
           />
         )}
         <noscript>
@@ -388,7 +442,7 @@ const currentArtworkUrl = publicArtworkUrl(
                   data-course-input="text"
                   value={values.schedule ?? ""}
                   required
-                  disabled={disabled}
+                  disabled={scheduleDisabled}
                 />
               </label>
               {historicalHourlyPlan && (
@@ -444,7 +498,7 @@ const currentArtworkUrl = publicArtworkUrl(
               label={label}
               value={values[name] ?? ""}
               required={name === "startsAt" || name === "endsAt"}
-              disabled={disabled}
+              disabled={datesDisabled}
               error={errors[name] ?? ""}
             />
           ))
@@ -452,6 +506,8 @@ const currentArtworkUrl = publicArtworkUrl(
           <CourseWeekdayPlanner
             client:only="react"
             newCourse={!courseId}
+            courseTypeId={values.courseTypeId ?? ""}
+            scheduleDisabled={scheduleDisabled}
             formats={formats.map((format) =>
               format.id === values.courseTypeId && pinnedFormat
                 ? { ...format, ...pinnedFormat }
@@ -466,7 +522,7 @@ const currentArtworkUrl = publicArtworkUrl(
               errors.weekdays ??
               ""
             }
-            disabled={disabled}
+            disabled={datesDisabled}
           />
         )}
         {dateOnlyRegistration
@@ -529,7 +585,7 @@ const currentArtworkUrl = publicArtworkUrl(
           </p>
         )}
         <noscript>
-          {legacy || historicalHourlyPlan
+          {legacy || (historicalHourlyPlan && !scheduleDisabled)
             ? [
                 { name: "startsAt", label: "Inicio del curso" },
                 { name: "endsAt", label: "Finalización del curso" },
@@ -541,7 +597,7 @@ const currentArtworkUrl = publicArtworkUrl(
                     name={name}
                     value={values[name] ?? ""}
                     required
-                    disabled={disabled}
+                    disabled={datesDisabled}
                   />
                 </label>
               ))
@@ -563,7 +619,9 @@ const currentArtworkUrl = publicArtworkUrl(
                       ""
                     }
                     required
-                    disabled={disabled}
+                    disabled={
+                      datesDisabled || Boolean(courseId && name === "endDate")
+                    }
                   />
                 </label>
               ))}
@@ -735,6 +793,7 @@ const currentArtworkUrl = publicArtworkUrl(
 </form>
 
 <script>
+  import { isCourseEditability } from "@/domain/courses/editability";
   import { notifyInlineOperation } from "@/lib/inline-operation-feedback";
   import {
     acquireCourseMutation,
@@ -769,6 +828,19 @@ const currentArtworkUrl = publicArtworkUrl(
       .querySelectorAll<HTMLFormElement>(".course-form")
       .forEach((form) => {
         const mutationPath = window.location.pathname;
+        form.addEventListener("course-editability-change", (event) => {
+          const policy: unknown = (event as CustomEvent<unknown>).detail;
+          if (!isCourseEditability(policy)) return;
+          form.dataset.readonlyFields = JSON.stringify([
+            ...(!policy.format ? ["courseTypeId"] : []),
+            ...(!policy.instructor ? ["instructorId"] : []),
+            ...(!policy.dates ? ["startsAt", "endsAt"] : []),
+            ...(!policy.schedule || !policy.dates
+              ? ["schedule", "weekdays"]
+              : []),
+          ]);
+          form.dispatchEvent(new Event("course-form-change"));
+        });
         const button = form.querySelector<HTMLButtonElement>(".submit-button");
         const groupList = form.querySelector<HTMLElement>(
           "[data-initial-group-list]",
@@ -966,6 +1038,13 @@ const currentArtworkUrl = publicArtworkUrl(
           const fields = baseline ? Object.keys(baseline) : [];
           const sync = () => {
             const current = new FormData(form);
+            // Only the local readiness/dirty comparison needs disabled values.
+            // POST omits them; the server restores its own fresh snapshot.
+            for (const name of JSON.parse(
+              form.dataset.readonlyFields ?? "[]",
+            ) as string[])
+              if (!current.has(name) && baseline?.[name] !== undefined)
+                current.set(name, baseline[name]!);
             if (
               !ready &&
               (baseline
@@ -1422,13 +1501,16 @@ const currentArtworkUrl = publicArtworkUrl(
                       pendingArtworkKey = null;
                     }
                   }
-                  baseline = Object.fromEntries(
-                    [...fields].filter(
-                      (entry): entry is [string, string] =>
-                        typeof entry[1] === "string" &&
-                        entry[0] in (baseline ?? {}),
+                  baseline = {
+                    ...baseline,
+                    ...Object.fromEntries(
+                      [...fields].filter(
+                        (entry): entry is [string, string] =>
+                          typeof entry[1] === "string" &&
+                          entry[0] in (baseline ?? {}),
+                      ),
                     ),
-                  );
+                  };
                   form.dataset.baseline = JSON.stringify(baseline);
                   form.dispatchEvent(new Event("course-form-change"));
                   const breadcrumb = document.querySelector<HTMLElement>(

@@ -1,5 +1,57 @@
 # TESTING
 
+## Preinscripciones históricas y revalidación de eliminación de grupos (2026-10-19)
+
+- Se adaptó el caso E2E existente de preinscripciones para filtrar un curso archivado con curso/estado/búsqueda, comprobar etiquetas reales y verificar que CSV/PDF exportan exactamente ese alcance; las opciones de alta siguen excluyendo cursos archivados.
+- Diagnóstico del fallo de `tests/integration/group-repository.test.ts` en el caso existente «deletion rejects stale revisions and rolls back if audit cannot be written»: CI registró `starts_at = 2026-10-19 03:49:38.781+00` y `ends_at = 2026-10-19 05:19:38.781+00`. En `America/La_Paz` eran 23:49:38 del 18-oct y 01:19:38 del 19-oct. La restricción `group_sessions_interval_check` de 0019 exige que ambas marcas pertenezcan al mismo día civil; el fixture usaba `clock_timestamp() + 90 minutes`, por lo que la fila sintética era inválida y además quedaba fuera del intervalo fixture del grupo (01-mar-2027 10:00 a 17-mar-2027 11:30 Bolivia). No era un defecto del calendario de producción. La migración 0032 solo protege reprogramaciones de inicio de curso y no modifica esta restricción.
+- Se corrigió únicamente el setup de ese caso: usa un slot de 90 minutos a partir del horario planificado del grupo (`2027-03-01 11:30–13:00` Bolivia, `15:30–17:00Z`), dentro del intervalo y del mismo día civil, y registra su cancelación/auditoría concurrente después de iniciarse la transacción de borrado. Se conservan la carrera, el guard de borrado, la revisión `afterStart` y las assertions existentes del grupo retenido.
+- Validación focal posterior en stack temporal aislado: `tests/integration/group-repository.test.ts` **177/177 PASS**. No se ejecutaron migraciones ni escrituras en bases canónicas.
+
+## Editabilidad e inicio del curso (candidata 2026-10-17)
+
+Se amplían casos existentes, sin nuevas suites/specs/casos: políticas por campo,
+restauración server-side de controles omitidos y conservación de intentos de
+tampering; cascada ordinaria con dos horas de grupo y pago completo, snapshots/
+ledger/receipts intactos, originales auditables, segundo cambio y revisión
+obsoleta; rechazo sin cambios ante horario, cierre/reapertura, asistencia y
+cancelación individual. Los E2E existentes de cursos y fallback sin JavaScript
+comprueban persistencia del cambio desde el formulario, campos deshabilitados y
+contenido aún editable. La matriz visual usa 375/768/1440 px y claro/oscuro.
+La migración 0032 se valida solo en stacks efímeros; ningún resultado implica
+aplicación en canónico/cloud, release a master o despliegue. Los resultados del
+SHA final y sus intentos quedan en el PR.
+
+## Verificación pública dedicada (2026-10-17, candidata)
+
+Se adaptan los casos existentes de certificados y landing, sin añadir casos,
+specs ni suites. Cubren CTA a la página dedicada, fallback HTML por código,
+resultado común, PDF vigente/revocado/desconocido, contraste código/archivo,
+reset/foco y cancelación de una respuesta real pendiente. Las aserciones de
+privacidad distinguen comparación local sin solicitudes de la entrada por PDF,
+que envía solo `{sha256}`; nunca bytes, nombre de archivo ni upload multipart.
+Se conservan las pruebas de lectura/hash fuera de orden, historial/reemisión,
+IDs públicos inmutables revocados y límites privados.
+
+Unit existentes amplían el contrato HTTP de huella: Origin, allowlist, 64 hex,
+body, MIME, rate limit y error saneado. Integración existente amplía la consulta
+exacta, firmado sustituido, revocado, reemitido, ambigüedad y uso del índice
+parcial con EXPLAIN. Local: unit 464 PASS; integración 176 PASS, 1 SKIP existente;
+certificados + landing 21 E2E PASS sin retries en puerto aislado 4341. Check
+(lint/format/typecheck), build y Drizzle check PASS. Capturas de entrada en
+375/390/768/1440 px light/dark y resultados en 375/768/1440 px, sin overflow;
+panel vacío y datos mantienen igualdad de altura en desktop, selección compacta.
+La primera corrida dirigida expuso una expectativa de navegación HTML en lugar
+de la mejora cliente; el test ahora espera el control PDF realmente disponible
+antes de comprobar la consulta AJAX. El fallback sin JS se conserva por separado.
+La migración 0031 se prueba únicamente en stacks aislados. Estos resultados no
+acreditan aplicación canónica/cloud, revisión independiente ni release.
+
+La revisión independiente detectó que el guion del patrón HTML heredado debía
+escaparse para Unicode Sets (`v`) de Chromium. La corrección conserva exactamente
+32 caracteres base64url y no cambia el regex del controlador/servidor. El caso
+existente de landing ahora verifica validez nativa de códigos válidos, longitudes
+31/33, caracteres prohibidos y consola sin errores, además del atributo emitido.
+
 ## Evaluación opcional de asistencia (fuente 2026-10-15)
 
 Los casos existentes de evaluaciones/cierre se amplían sin añadir casos, specs ni
