@@ -672,7 +672,7 @@ registrationTest.describe(() => {
         expect(response.headers()["x-registration-row-count"]).toBe("1");
         if (format === "CSV") {
           const content = await response.text();
-          expect(content).toContain(`"${personCi}"`);
+          expect(content).toContain(`"'${personCi.toUpperCase()}"`);
           expect(content).toContain(`"${courseLabel}"`);
           expect(content).toContain('"20:00–21:30"');
         } else {
