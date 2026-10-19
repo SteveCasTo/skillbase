@@ -607,6 +607,15 @@ registrationTest.describe(() => {
           .getByRole("region", { name: "Historial de pagos y devoluciones" })
           .getByText("Devolución registrada", { exact: true }),
       ).toHaveCount(1);
+      const database = createDatabase(getTestSupabaseEnvironment().databaseUrl);
+      try {
+        await database.db
+          .update(schema.courses)
+          .set({ status: "ARCHIVED" })
+          .where(eq(schema.courses.id, f.id));
+      } finally {
+        await database.close();
+      }
       for (const width of [320, 768, 1280]) {
         await page.setViewportSize({ width, height: 900 });
         expect(
@@ -625,6 +634,10 @@ registrationTest.describe(() => {
       await expect
         .poll(() => new URL(page.url()).searchParams.get("search"))
         .toBe(personCi);
+      await page.getByRole("combobox", { name: "Estado" }).click();
+      await page
+        .getByRole("option", { name: "Cancelado", exact: true })
+        .click();
       await expect(
         page.getByRole("link", { name: /Sintética Registration/u }),
       ).toBeVisible();
@@ -635,6 +648,37 @@ registrationTest.describe(() => {
               .registrationMarker,
         ),
       ).toBe("list-kept");
+      const courseLabel =
+        (await page
+          .locator('select[name="courseId"] option:checked')
+          .textContent()) ?? "";
+      await expect(
+        page.getByRole("region", { name: "Preinscripciones" }),
+      ).toContainText(`${courseLabel} · 20:00–21:30`);
+      for (const format of ["CSV", "PDF"] as const) {
+        const href = await page
+          .locator(`[data-registration-export="${format}"]`)
+          .getAttribute("href");
+        expect(href).toBeTruthy();
+        const url = new URL(href!, e2eSiteUrl());
+        expect(url.searchParams.get("courseId")).toBe(f.id);
+        expect(url.searchParams.get("membershipStatus")).toBe("CANCELADO");
+        expect(url.searchParams.get("search")).toBe(personCi);
+        const response = await page.request.get(url.toString());
+        expect(response.status()).toBe(200);
+        expect(response.headers()["x-registration-row-count"]).toBe("1");
+        if (format === "CSV") {
+          const content = await response.text();
+          expect(content).toContain(`"${personCi}"`);
+          expect(content).toContain(`"${courseLabel}"`);
+          expect(content).toContain('"20:00–21:30"');
+        } else {
+          expect(response.headers()["content-type"]).toBe("application/pdf");
+          expect((await response.body()).subarray(0, 5).toString()).toBe(
+            "%PDF-",
+          );
+        }
+      }
       const exportRoute = "**/app/preinscripciones/exportar?**";
       const unexpectedDownloads: string[] = [];
       const recordDownload = (download: import("@playwright/test").Download) =>
@@ -710,6 +754,10 @@ registrationTest.describe(() => {
             .last(),
         ).toContainText("Exportación descargada");
       }
+      await page.goto("/app/preinscripciones/nueva");
+      await expect(
+        page.locator(`a[href="/app/preinscripciones/nueva?courseId=${f.id}"]`),
+      ).toHaveCount(0);
     },
   );
 });

@@ -70,8 +70,13 @@ const {
               {registration.participant.email}
             </p>
             <p class="break-words text-sm">
-              {courseLabels[registration.courseId] ?? "Curso"} ·{" "}
-              {groupLabels[registration.groupId] ?? "Grupo asignado"}
+              {registration.courseName ??
+                courseLabels[registration.courseId] ??
+                "Curso"}{" "}
+              ·{" "}
+              {registration.groupName ??
+                groupLabels[registration.groupId] ??
+                "Grupo asignado"}
             </p>
             <p class="text-sm text-muted-foreground">
               {membershipLabels[registration.membershipStatus]}

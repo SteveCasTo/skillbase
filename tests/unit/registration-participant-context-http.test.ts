@@ -37,6 +37,7 @@ function repository(
     transfer: unexpected,
     settings: unexpected,
     updateSettings: unexpected,
+    listFilterChoices: unexpected,
     list: unexpected,
     detail: unexpected,
     findParticipants: unexpected,

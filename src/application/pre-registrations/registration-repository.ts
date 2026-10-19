@@ -48,6 +48,15 @@ import type {
  * checks and application authorization, and must prove last-seat races in DB.
  */
 export interface RegistrationRepository {
+  listFilterChoices(actorId: string): Promise<{
+    courses: readonly { id: string; name: string }[];
+    groups: readonly {
+      id: string;
+      courseId: string;
+      groupName: string;
+      startsAt: string;
+    }[];
+  }>;
   form(
     courseId: string,
     actorId: string,
