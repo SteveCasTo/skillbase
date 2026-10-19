@@ -204,7 +204,13 @@ for (const type of ["APPROVAL", "INSTRUCTOR"] as const) {
     const axis = midpoint(input.recipientName, name);
     expect(name.font!.name).toBe("Merriweather-Regular");
     expect(name.size).toBeGreaterThanOrEqual(14);
-    expect(axis).toBeCloseTo(midpoint(label[0], label[1]!), 5);
+    expect(axis).toBeCloseTo(type === "APPROVAL" ? 412 : 306, 5);
+    expect(label[1]!.x).toBe(type === "APPROVAL" ? 92 : 60);
+    expect(label[1]!.y).toBeCloseTo(name.y!, 5);
+    expect(
+      label[1]!.x! +
+        label[1]!.font!.widthOfTextAtSize(label[0], label[1]!.size!),
+    ).toBeLessThanOrEqual(name.x! - 12);
     expect(axis).toBeCloseTo(midpoint(introduction[0], introduction[1]!), 5);
     expect(Math.abs(axis - CERTIFICATE_PAGE_SIZES[type][0] / 2)).toBeLessThan(
       20,
@@ -216,6 +222,12 @@ for (const type of ["APPROVAL", "INSTRUCTOR"] as const) {
         line.start.y === line.end.y,
     )![0];
     expect((underline.start.x + underline.end.x) / 2).toBeCloseTo(axis, 5);
+    const date = calls.find(
+      ([text]) => text === certificateDocument(input).date,
+    )![1]!;
+    // Removing the separate row must release real space above fixed ink lines,
+    // not merely move the label while leaving the course/date in place.
+    expect(date.y! - lineY).toBeGreaterThan(type === "APPROVAL" ? 75 : 100);
     const band = calls.find(
       ([text]) =>
         text === (type === "APPROVAL" ? "DE APROBACIÓN" : "DE INSTRUCTOR"),
@@ -421,12 +433,20 @@ test("long identities, course names and signatories wrap without truncation or a
     expect(recipientLines.map(([text]) => text).join(" ")).toBe(
       input.recipientName,
     );
+    const label = drawnText.mock.calls.find(
+      ([text]) => text === (type === "APPROVAL" ? "OTORGADO A:" : "A:"),
+    )!;
+    expect(label[1]!.y).toBeCloseTo(recipientLines[0]![1]!.y!, 5);
     for (const [text, options] of recipientLines) {
       expect(options!.size).toBeGreaterThanOrEqual(14);
       const axis =
         options!.x! +
         options!.font!.widthOfTextAtSize(text, options!.size!) / 2;
       expect(Math.abs(axis - doc.getPage(0).getWidth() / 2)).toBeLessThan(20);
+      expect(
+        label[1]!.x! +
+          label[1]!.font!.widthOfTextAtSize(label[0], label[1]!.size!),
+      ).toBeLessThanOrEqual(options!.x! - 12);
       // Even a 128-character ID ends above the full-width recipient block.
       expect(options!.y! + options!.size!).toBeLessThanOrEqual(
         doc.getPage(0).getHeight() - (type === "APPROVAL" ? 243 : 288),

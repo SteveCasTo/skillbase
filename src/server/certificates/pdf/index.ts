@@ -2,7 +2,7 @@ import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { certificateResources } from "./resources";
 import { certificateDocument } from "./document";
-import { drawCertificateText } from "./text";
+import { drawCertificateText, fitCertificateText } from "./text";
 import { CERTIFICATE_QR_SIZE, drawCertificateQr } from "./qr";
 import type { CertificateRenderInput } from "./types";
 
@@ -220,37 +220,72 @@ export async function renderCertificatePdf(
     heading("CERTIFICADO", 161, 43, 28);
     certificateBand(page, "DE INSTRUCTOR", regular, 264, 208, 268);
   }
-  const recipientTop = approval ? 246 : 294;
-  drawCertificateText(page, approval ? "OTORGADO A:" : "A:", regular, {
-    x,
-    top: approval ? 222 : 274,
-    width,
-    height: 16,
-    size: 10,
-    minimumSize: 10,
-    align: "center",
-  });
-  drawCertificateText(page, input.recipientName, recipient, {
-    x,
+  const verification = approval
+    ? { x: 538, top: 105, width: 220, codeHeight: 60 }
+    : { x: 414, top: 140, width: 180, codeHeight: 70 };
+  const codeBox = {
+    x: verification.x,
+    top: verification.top + CERTIFICATE_QR_SIZE + 6,
+    width: verification.width,
+    height: verification.codeHeight,
+    size: 8,
+    minimumSize: 7,
+    align: "center" as const,
+  };
+  const code = `ID: ${input.publicCredentialId}`;
+  const codeLayout = fitCertificateText(code, regular, codeBox);
+  // Reclaim the separate label row, but never lift a name into a long ID.
+  const recipientTop = Math.max(
+    approval ? 222 : 274,
+    codeBox.top +
+      codeLayout.size +
+      (codeLayout.lines.length - 1) * codeLayout.lineHeight +
+      4,
+  );
+  const lift = (approval ? 246 : 294) - recipientTop;
+  const label = approval ? "OTORGADO A:" : "A:";
+  const labelSize = 10;
+  const labelWidth = regular.widthOfTextAtSize(label, labelSize);
+  const nameInset = labelWidth + 12;
+  const recipientHeight = approval ? 52 : 58;
+  // Reserve the label on BOTH sides, preserving the approved name axis.
+  // Only the name may wrap; the label shares its first baseline at body left.
+  const name = drawCertificateText(page, input.recipientName, recipient, {
+    x: x + nameInset,
     top: recipientTop,
-    width,
-    height: approval ? 52 : 58,
+    width: width - nameInset * 2,
+    height: recipientHeight,
     size: approval ? 24 : 22,
     minimumSize: 14,
     align: "center",
     verticalAlign: "middle",
     color: NAVY,
   });
+  drawCertificateText(page, label, regular, {
+    x,
+    top:
+      recipientTop +
+      (recipientHeight - name.lines.length * name.lineHeight) / 2 +
+      name.size -
+      labelSize,
+    width: labelWidth,
+    height: 16,
+    size: labelSize,
+    minimumSize: labelSize,
+  });
   page.drawLine({
-    start: { x: x + 32, y: page.getHeight() - (approval ? 302 : 358) },
-    end: { x: x + width - 32, y: page.getHeight() - (approval ? 302 : 358) },
+    start: { x: x + 32, y: page.getHeight() - (approval ? 302 : 358) + lift },
+    end: {
+      x: x + width - 32,
+      y: page.getHeight() - (approval ? 302 : 358) + lift,
+    },
     thickness: 0.6,
     color: NAVY,
   });
   center(
     content.introduction,
     regular,
-    approval ? 314 : 370,
+    (approval ? 314 : 370) - lift,
     26,
     approval ? 11.2 : 10.5,
     10,
@@ -260,24 +295,21 @@ export async function renderCertificatePdf(
   center(
     content.course,
     bold,
-    approval ? 343 : 400,
+    (approval ? 343 : 400) - lift,
     approval ? 56 : 77,
     approval ? 26 : 25,
     15,
   );
   drawCertificateText(page, content.body, regular, {
     x,
-    top: approval ? 406 : 485,
+    top: (approval ? 406 : 485) - lift,
     width,
     height: approval ? 53 : 83,
     size: approval ? 11 : 10.5,
     minimumSize: 9.5,
   });
-  center(content.date, regular, approval ? 466 : 578, 24, 11, 10);
+  center(content.date, regular, (approval ? 466 : 578) - lift, 24, 11, 10);
   signatures(page, input, regular, bold);
-  const verification = approval
-    ? { x: 538, top: 105, width: 220, codeHeight: 60 }
-    : { x: 414, top: 140, width: 180, codeHeight: 70 };
   drawCertificateQr(
     doc,
     page,
@@ -285,14 +317,6 @@ export async function renderCertificatePdf(
     verification.x + (verification.width - CERTIFICATE_QR_SIZE) / 2,
     page.getHeight() - verification.top - CERTIFICATE_QR_SIZE,
   );
-  drawCertificateText(page, `ID: ${input.publicCredentialId}`, regular, {
-    x: verification.x,
-    top: verification.top + CERTIFICATE_QR_SIZE + 6,
-    width: verification.width,
-    height: verification.codeHeight,
-    size: 8,
-    minimumSize: 7,
-    align: "center",
-  });
+  drawCertificateText(page, code, regular, codeBox);
   return doc.save({ useObjectStreams: false });
 }
