@@ -146,8 +146,12 @@ auditoría. El valor predeterminado para configuración ausente es v2.
 
 Refinamiento visual autorizado (2026-10-17), conservando v2 por indicación del
 usuario: franja navy redondeada con líneas laterales y rombos rojos discretos,
-destinatario en Merriweather Regular local (OFL), etiqueta/nombre/subrayado y
-curso con eje común. Se retiran la trama y los remates cuadrados inferiores de
+destinatario en Merriweather Regular local (OFL), nombre/subrayado y curso con
+eje común. Corrección autorizada (2026-10-19): la etiqueta vuelve a la izquierda,
+en la primera línea del nombre, sin desplazar su eje. Se elimina su fila separada
+y se sube el bloque siguiente para liberar espacio sobre las firmas; un ID largo
+limita esa subida para evitar colisiones. Solo el nombre puede envolver, sin
+truncarse ni bajar de 14 pt. Se retiran la trama y los remates cuadrados inferiores de
 aprobación; los logos, QR, ID y contenido institucional se conservan. Se aplica
 solo a previews y futuras generaciones. No actualiza archivos, hashes ni snapshots
 existentes, no añade regeneración por GET ni cambia la comparación material del
