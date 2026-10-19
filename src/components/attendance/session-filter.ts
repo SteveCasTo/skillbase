@@ -29,6 +29,7 @@ export function filterSessionRows(
   for (const row of rows) {
     row.hidden = Boolean(
       (selectedDay && row.dataset.sessionDay !== selectedDay) ||
+      (selectedState === "COMPLETED" && row.dataset.sessionDay === today) ||
       (selectedState !== "ALL" &&
         row.dataset.sessionStatus !== selectedState &&
         !(

@@ -316,6 +316,8 @@ test("calendar selection exposes only matching SSR session links and reset resto
   expect(rows.every((row) => !row.hidden)).toBe(true);
 });
 test("calendar upcoming includes today's non-cancelled sessions without changing their authoritative status", () => {
+  const today = civilDay(new Date("2026-10-20T01:00:00.000Z"));
+  expect(today).toBe("2026-10-19");
   const rows = [
     {
       hidden: false,
@@ -338,7 +340,7 @@ test("calendar upcoming includes today's non-cancelled sessions without changing
       dataset: { sessionDay: "2026-10-18", sessionStatus: "COMPLETED" },
     },
   ];
-  expect(filterSessionRows(rows, "", "UPCOMING", "2026-10-19")).toBe(3);
+  expect(filterSessionRows(rows, "", "UPCOMING", today)).toBe(3);
   expect(rows.filter((row) => !row.hidden)).toEqual([
     rows[0]!,
     rows[2]!,
@@ -350,8 +352,10 @@ test("calendar upcoming includes today's non-cancelled sessions without changing
     rows[1]!,
     rows[3]!,
   ]);
-  expect(filterSessionRows(rows, "", "COMPLETED")).toBe(2);
-  expect(rows.filter((row) => !row.hidden)).toEqual([rows[3]!, rows[4]!]);
+  expect(filterSessionRows(rows, "", "COMPLETED", today)).toBe(1);
+  expect(rows.filter((row) => !row.hidden)).toEqual([rows[4]!]);
+  expect(rows[3]!.hidden).toBe(true);
+  expect(rows[4]!.hidden).toBe(false);
   expect(filterSessionRows(rows, "", "ALL")).toBe(5);
 });
 test("session state toggles allow no pressed filter and preserve authoritative ongoing rows", () => {
