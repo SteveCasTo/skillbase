@@ -140,6 +140,13 @@ La comprobación conserva MIME/extensión PDF, límite de 10 MiB y SHA-256 de to
 los bytes en el navegador: no transmite ni persiste el archivo ni habilita una
 descarga pública. Una coincidencia no cambia el estado oficial de la credencial.
 
+Ambos métodos complementarios reconsultan el mismo ID público con `no-store`
+dentro de la Promise real antes de comparar la huella local. No se acepta el hash
+ni el estado almacenados al abrir la página como autoridad de una comparación
+nueva: una sustitución rechaza el PDF anterior y una revocación actualiza el título
+y devuelve no válido, nunca éxito. Un fallo HTTP, payload inválido, ID distinto o
+registro no disponible impide confirmar coincidencia; no se vuelve al dato cacheado.
+
 La entrada solo por PDF calcula la huella de todos sus bytes localmente y envía
 únicamente `{sha256}` a `POST /certificados/verificar-archivo`. El servidor busca
 el hash actual del firmado, nunca un borrador ni reservas/artefactos sustituidos.

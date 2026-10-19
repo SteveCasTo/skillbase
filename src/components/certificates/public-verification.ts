@@ -104,8 +104,8 @@ function initialize(root: HTMLElement) {
       filename.textContent = "";
       code.value = "";
     } else {
-      local.append(result);
-      grid.append(local);
+      if (result.parentElement !== local) local.append(result);
+      if (local.parentElement !== grid) grid.append(local);
       if (details) entry.remove();
       else {
         entry.hidden = false;
@@ -175,6 +175,31 @@ function initialize(root: HTMLElement) {
         "No se pudo consultar el registro. Intenta de nuevo.",
       );
     return payload;
+  };
+  const lookupCode = async (value: string, signal: AbortSignal) => {
+    const record = await readRecord(
+      await fetch(`/certificados/${encodeURIComponent(value)}`, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        credentials: "omit",
+        signal,
+      }),
+    );
+    signal.throwIfAborted();
+    if ("recipientName" in record && record.publicCredentialId !== value)
+      throw new VerificationFailure(
+        "No se pudo consultar el registro. Intenta de nuevo.",
+      );
+    return record;
+  };
+  const refreshBoundRecord = async (signal: AbortSignal) => {
+    const origin = source;
+    const record = await lookupCode(root.dataset.publicCredentialId!, signal);
+    if (!("recipientName" in record))
+      throw new VerificationFailure(publicStateLabel[record.state]);
+    // A complementary comparison always uses current authority for this ID,
+    // never cached page state or a digest lookup that could select another ID.
+    applyRecord(record, origin);
   };
   const compare = (hash: string) => {
     const official = local.dataset.officialHash ?? "";
@@ -355,7 +380,9 @@ function initialize(root: HTMLElement) {
       const hash = await localPdfSha256(file);
       signal.throwIfAborted();
       selectedHash = hash;
-      if (!local.dataset.officialHash) {
+      if (root.dataset.publicCredentialId) {
+        await refreshBoundRecord(signal);
+      } else {
         // Only a digest crosses this boundary. Never send the PDF, name or bytes.
         const record = await readRecord(
           await fetch("/certificados/verificar-archivo", {
@@ -404,28 +431,13 @@ function initialize(root: HTMLElement) {
         throw new VerificationFailure(
           "El código no coincide con el certificado del archivo.",
         );
-      const record = await readRecord(
-        await fetch(`/certificados/${encodeURIComponent(value)}`, {
-          headers: { Accept: "application/json" },
-          cache: "no-store",
-          credentials: "omit",
-          signal,
-        }),
-      );
-      signal.throwIfAborted();
       if (source === "file") {
-        if (
-          !("recipientName" in record) ||
-          record.publicCredentialId !== primaryId
-        )
-          throw new VerificationFailure(publicStateLabel[record.state]);
-        // Refresh only the same credential's authoritative status/hash. The
-        // primary origin and its digest remain stable throughout comparisons.
-        applyRecord(record, "file");
+        await refreshBoundRecord(signal);
         code.value = value;
         code.focus();
         return compare(selectedHash!);
       }
+      const record = await lookupCode(value, signal);
       applyRecord(record, "code");
       if (!("recipientName" in record))
         throw new VerificationFailure(publicStateLabel[record.state]);
@@ -436,6 +448,7 @@ function initialize(root: HTMLElement) {
         const hash = selectedHash ?? (await localPdfSha256(file));
         signal.throwIfAborted();
         selectedHash = hash;
+        await refreshBoundRecord(signal);
         title.focus();
         return compare(hash);
       }

@@ -884,8 +884,11 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       publicPage.getByRole("button", { name: "Quitar archivo", exact: true }),
     ).toBeHidden();
     let transmitted = 0;
+    const publicReads: string[] = [];
     publicPage.on("request", (request) => {
       if (request.method() !== "GET") transmitted += 1;
+      if (request.headers().accept === "application/json")
+        publicReads.push(new URL(request.url()).pathname);
     });
     const publicPicker = publicPage.getByLabel("Seleccionar PDF firmado");
     const accessibleFileHeading = publicPage.getByRole("heading", {
@@ -922,6 +925,7 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       name: "Resultado de comparación local",
     });
     await expect(localResult).toHaveAttribute("data-tone", "valid");
+    expect(publicReads).toEqual([`/certificados/${record.publicCredentialId}`]);
     await expect(
       publicPage.locator(
         '[data-sileo-toast][data-exiting="false"][data-state="success"]',
@@ -1201,6 +1205,24 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
     const replacementBytes = await signedFixture(
       "SYNTHETIC QA: replacement file, no institutional signature",
     );
+    // Leave both primary contexts open while the normal ADMIN flow changes
+    // the same signed artifact. Neither comparison may trust its cached hash.
+    const pdfPrimary = await anonymous.newPage();
+    const pdfPrimaryCode = pdfPrimary.getByLabel("Código del certificado", {
+      exact: true,
+    });
+    const pdfPrimaryResult = pdfPrimary.getByRole("status", {
+      name: "Resultado de comparación local",
+    });
+    await pdfPrimary.goto("/certificados/verificar");
+    await expect(pdfPrimary.locator("[data-local-controls]")).toBeVisible();
+    await pdfPrimary.getByLabel("Seleccionar PDF firmado").setInputFiles({
+      name: "original.pdf",
+      mimeType: "application/pdf",
+      buffer: signed,
+    });
+    await expect(pdfPrimaryCode).toBeFocused();
+    await expect(pdfPrimaryResult).toHaveAttribute("data-tone", "valid");
     const currentSigned = await page.request.get(
       `/app/certificados/${record.id}`,
       { headers },
@@ -1232,6 +1254,59 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         .update(new Uint8Array(replacementBytes))
         .digest("hex"),
     );
+    await publicPicker.setInputFiles({
+      name: "old-signed.pdf",
+      mimeType: "application/pdf",
+      buffer: signed,
+    });
+    await expect(localResult).toHaveAttribute("data-tone", "error");
+    await expect(localResult).toContainText("no coincide");
+    await expect(
+      publicPage.locator("[data-local-verification]"),
+    ).toHaveAttribute("data-official-hash", substituted.signedSha256!);
+    await expect(publicPage).toHaveURL(
+      `/certificados/${record.publicCredentialId}`,
+    );
+    await expect(publicPage.locator("[data-code-verification]")).toHaveCount(0);
+    await expect(
+      publicPage.locator(
+        '[data-sileo-toast][data-exiting="false"][data-state="success"]',
+      ),
+    ).toHaveCount(0);
+    await pdfPrimaryCode.fill(record.publicCredentialId);
+    await pdfPrimary
+      .getByRole("button", { name: "Verificar certificado", exact: true })
+      .click();
+    await expect(pdfPrimaryResult).toHaveAttribute("data-tone", "error");
+    await expect(pdfPrimaryResult).toContainText("no coincide");
+    await expect(pdfPrimaryCode).toBeFocused();
+    await expect(pdfPrimary).toHaveURL(
+      `/certificados/${record.publicCredentialId}`,
+    );
+    await expect(pdfPrimary.locator("[data-local-verification]")).toHaveCount(
+      0,
+    );
+    await expect(
+      pdfPrimary.locator(
+        '[data-sileo-toast][data-exiting="false"][data-state="success"]',
+      ),
+    ).toHaveCount(0);
+    await publicPicker.setInputFiles({
+      name: "current-signed.pdf",
+      mimeType: "application/pdf",
+      buffer: replacementBytes,
+    });
+    await expect(localResult).toHaveAttribute("data-tone", "valid");
+    // Bind the current PDF, then revoke without reloading either public page.
+    await pdfPrimary.goto("/certificados/verificar");
+    await expect(pdfPrimary.locator("[data-local-controls]")).toBeVisible();
+    await pdfPrimary.getByLabel("Seleccionar PDF firmado").setInputFiles({
+      name: "current.pdf",
+      mimeType: "application/pdf",
+      buffer: replacementBytes,
+    });
+    await expect(pdfPrimaryCode).toBeFocused();
+    await expect(pdfPrimaryResult).toHaveAttribute("data-tone", "valid");
     await page.goto(`${groupPath(fixture)}/certificados`);
     expect(
       (await records(page, fixture)).filter((r) => r.type === "APPROVAL"),
@@ -1310,10 +1385,9 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         fullPage: true,
       });
     }
-    await publicPage.reload();
     await expect(
       publicPage.getByRole("heading", {
-        name: "Certificado revocado",
+        name: "Certificado vigente",
         exact: true,
       }),
     ).toBeVisible();
@@ -1328,6 +1402,33 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       }),
     ).toContainText("coincide, pero el certificado no es válido");
     await expect(localResult).toHaveAttribute("data-tone", "invalid");
+    await expect(
+      publicPage.getByRole("heading", {
+        name: "Certificado revocado",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await pdfPrimaryCode.fill(record.publicCredentialId);
+    await pdfPrimary
+      .getByRole("button", { name: "Verificar certificado", exact: true })
+      .click();
+    await expect(pdfPrimaryResult).toHaveAttribute("data-tone", "invalid");
+    await expect(
+      pdfPrimary.getByRole("heading", {
+        name: "Certificado revocado",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(pdfPrimaryCode).toBeFocused();
+    await expect(pdfPrimary.locator("[data-local-verification]")).toHaveCount(
+      0,
+    );
+    await expect(
+      pdfPrimary.locator(
+        '[data-sileo-toast][data-exiting="false"][data-state="success"]',
+      ),
+    ).toHaveCount(0);
+    await pdfPrimary.close();
     await expect(
       publicPage.locator(
         '[data-sileo-toast][data-exiting="false"][data-state="success"]',
