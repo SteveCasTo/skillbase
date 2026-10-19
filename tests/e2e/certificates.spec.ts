@@ -1429,6 +1429,32 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
         exact: true,
       }),
     ).toBeVisible();
+    await publicPage.goto("/certificados/verificar?codigo=abc");
+    const codeError = publicPage.locator("#credential-code-error");
+    await expect(codeError).toHaveRole("status");
+    await expect(codeError).toContainText(
+      "Revisa el código de 32 caracteres del certificado.",
+    );
+    const errorColors = await codeError.evaluate((error) => {
+      const resolveToken = (token: string) => {
+        const probe = document.createElement("span");
+        probe.style.color = `var(${token})`;
+        document.body.append(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+      };
+      const light = getComputedStyle(error).color;
+      const lightDestructive = resolveToken("--destructive");
+      document.documentElement.classList.add("dark");
+      const dark = getComputedStyle(error).color;
+      const darkForeground = resolveToken("--foreground");
+      document.documentElement.classList.remove("dark");
+      return { light, lightDestructive, dark, darkForeground };
+    });
+    expect(errorColors.light).toBe(errorColors.lightDestructive);
+    expect(errorColors.dark).toBe(errorColors.darkForeground);
+    await publicPage.goto("/certificados/verificar");
     for (const width of [375, 390, 768, 1440]) {
       await publicPage.setViewportSize({ width, height: 1000 });
       await assertNoOverflow(publicPage);
