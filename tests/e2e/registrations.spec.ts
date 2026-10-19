@@ -639,6 +639,9 @@ registrationTest.describe(() => {
         .getByRole("option", { name: "Cancelado", exact: true })
         .click();
       await expect(
+        page.locator('[data-registration-export="CSV"]'),
+      ).toHaveAttribute("href", /membershipStatus=CANCELADO/u);
+      await expect(
         page.getByRole("link", { name: /Sintética Registration/u }),
       ).toBeVisible();
       expect(
