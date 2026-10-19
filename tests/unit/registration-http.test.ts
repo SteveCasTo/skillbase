@@ -107,6 +107,7 @@ function repository(
     transfer: fail,
     settings: fail,
     updateSettings: fail,
+    listFilterChoices: fail,
     list: fail,
     detail: fail,
     findParticipants: fail,

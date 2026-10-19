@@ -474,9 +474,10 @@ test("deletion rejects stale revisions and rolls back if audit cannot be written
     deleteGroup(repo, admin, group.id, updated.updatedAt.toISOString()),
   ).rejects.toMatchObject({ code: "GROUP_NOT_FOUND" });
 
-  // Coordinate with the real schedule gate: begin deletion first, establish a
-  // session strictly after its transaction starts, then release the lock.
-  // No wall-clock sleeps or precomputed application clock can satisfy this.
+  // Coordinate with the real schedule gate: begin deletion first, then add and
+  // cancel a same-day 90-minute session inside the group's future course interval.
+  // Its start is after the delete transaction, but the committed cancellation
+  // makes the group historical before deletion rechecks it. No wall-clock sleep.
   const crossing = await createGroup(repo, admin, courseId, "10:00", 2);
   let deletion: Promise<void> | undefined;
   let outcome: Promise<unknown> | undefined;
@@ -502,17 +503,41 @@ test("deletion rejects stale revisions and rolls back if audit cannot be written
       }
       expect(waiting).toBeDefined();
       if (!waiting) throw new Error("Deletion did not reach the schedule gate");
+      // The first planned slot already exists; place this cancelled fixture
+      // immediately after it, on the same Bolivia civil day and inside the
+      // group's March 2027 interval. A clock_timestamp-based slot can cross
+      // local midnight and lie outside the fixture's course dates.
+      const sessionStartsAt = new Date(
+        crossing.startsAt.getTime() + 90 * 60_000,
+      );
       const [session] = await holder.execute<{
         id: string;
         afterStart: boolean;
       }>(sql`
-        with instant as (select date_trunc('milliseconds', clock_timestamp()) as starts_at)
+        with instant as (select ${sessionStartsAt.toISOString()}::timestamptz as starts_at)
         insert into group_sessions (group_id, course_type_revision_id, ordinal, starts_at, ends_at)
         select ${crossing.id}, ${crossing.courseTypeRevisionId}, 999,
           instant.starts_at, instant.starts_at + interval '90 minutes' from instant
         returning id, starts_at > (select xact_start from pg_stat_activity where pid = ${waiting.pid}) as "afterStart"
       `);
       expect(session?.afterStart).toBe(true);
+      if (!session) throw new Error("Concurrent session was not inserted");
+      await holder
+        .update(groupSessions)
+        .set({
+          cancelledAt: sql`clock_timestamp()`,
+          cancelledBy: admin.id,
+          cancellationReason: "Concurrent deletion test",
+          revision: 2,
+        })
+        .where(eq(groupSessions.id, session.id));
+      await holder.insert(auditEvents).values({
+        actorId: admin.id,
+        entityType: "SESSION",
+        entityId: session.id,
+        action: "SESSION_CANCELLED",
+        metadata: { reason: "Concurrent deletion test" },
+      });
     });
     expect(await outcome).toMatchObject({ code: "GROUP_PUBLISHED" });
   } finally {

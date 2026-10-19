@@ -198,6 +198,7 @@ La preinscripción presencial de Fase 5 ocupa cupo y puede registrar pagos parci
 - Cuando la política server-side impide una cancelación voluntaria, la UI omite el botón (sin texto sustituto ni diálogo); el deadline autoritativo existente no se altera. Implementado en las correcciones post-release; validación final del milestone sigue pendiente.
 - Cambio de grupo solo dentro del mismo curso, hasta cutoff, con destino activo y cupo; sin transferir entre cursos ni recalcular precio snapshot porque los grupos del curso comparten revisión/tarifa. Garantizar consistencia de cupos entre origen y destino.
 - Solo `ADMIN` crea/cambia participantes, preinscripciones, pagos, configuración y devoluciones. Instructor lee únicamente cursos/grupos propios y roster desde inicio oficial, solo nombre/apellidos; sin CI/email/finanzas ni exportación. Listados CSV/PDF solo ADMIN, neutralizan formula injection, se limitan a 1000 filas y no son recibos/boletas. Sesiones, asistencia, notas y certificados no se adelantan (Fase 6+).
+- El listado ADMIN permite filtrar registros históricos y actuales por curso, grupo, estado, finanzas y búsqueda combinables; PDF/CSV conservan el mismo alcance. El selector de alta mantiene únicamente destinos elegibles para nuevas preinscripciones.
 
 ### Límite de definición
 

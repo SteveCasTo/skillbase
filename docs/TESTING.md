@@ -1,5 +1,12 @@
 # TESTING
 
+## Preinscripciones históricas y revalidación de eliminación de grupos (2026-10-19)
+
+- Se adaptó el caso E2E existente de preinscripciones para filtrar un curso archivado con curso/estado/búsqueda, comprobar etiquetas reales y verificar que CSV/PDF exportan exactamente ese alcance; las opciones de alta siguen excluyendo cursos archivados.
+- Diagnóstico del fallo de `tests/integration/group-repository.test.ts` en el caso existente «deletion rejects stale revisions and rolls back if audit cannot be written»: CI registró `starts_at = 2026-10-19 03:49:38.781+00` y `ends_at = 2026-10-19 05:19:38.781+00`. En `America/La_Paz` eran 23:49:38 del 18-oct y 01:19:38 del 19-oct. La restricción `group_sessions_interval_check` de 0019 exige que ambas marcas pertenezcan al mismo día civil; el fixture usaba `clock_timestamp() + 90 minutes`, por lo que la fila sintética era inválida y además quedaba fuera del intervalo fixture del grupo (01-mar-2027 10:00 a 17-mar-2027 11:30 Bolivia). No era un defecto del calendario de producción. La migración 0032 solo protege reprogramaciones de inicio de curso y no modifica esta restricción.
+- Se corrigió únicamente el setup de ese caso: usa un slot de 90 minutos a partir del horario planificado del grupo (`2027-03-01 11:30–13:00` Bolivia, `15:30–17:00Z`), dentro del intervalo y del mismo día civil, y registra su cancelación/auditoría concurrente después de iniciarse la transacción de borrado. Se conservan la carrera, el guard de borrado, la revisión `afterStart` y las assertions existentes del grupo retenido.
+- Validación focal posterior en stack temporal aislado: `tests/integration/group-repository.test.ts` **177/177 PASS**. No se ejecutaron migraciones ni escrituras en bases canónicas.
+
 ## Editabilidad e inicio del curso (candidata 2026-10-17)
 
 Se amplían casos existentes, sin nuevas suites/specs/casos: políticas por campo,

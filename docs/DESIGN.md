@@ -518,6 +518,7 @@ Los comportamientos abajo se implementaron en `8735d676fe0d96e7230b4636efa8cb510
 - Calendario shadcn compartido reemplaza pickers nativos. El descuento solo aparece para AUXILIARY; se quitaron banners de origen, ficha técnica global y copy redundante de servidor.
 - El actor se presenta por nombre humano. Métricas de devolución solo aparecen cuando son pertinentes. Acciones financieras usan diálogos breves, importes al centavo acotados por saldo y motivo de pago opcional; teléfono/CI mantienen validación conservadora.
 - Operaciones mantienen UUID por solicitud, estados de carga/resultado y fallback SSR sin JavaScript. Tests se acoplan a resultados observables y no a copy/CSS/orden/conteos inestables. Estas correcciones se incluyeron en producción mediante PR 228; el gate y la evidencia final están en [`docs/TESTING.md`](TESTING.md).
+- El filtro de curso del listado ADMIN incluye cursos consultables con registros históricos, incluso archivados, sin reutilizar esas opciones en el alta. Las tarjetas muestran etiquetas actuales de curso/grupo desde sus relaciones; filtros combinados, paginación y exportes mantienen el mismo alcance.
 
 ### Sesiones y asistencia (Fase 6, release de producción)
 

@@ -226,6 +226,14 @@ export async function listRegistrations(
   requireRegistrationAdmin(actor);
   return repository.list(validateRegistrationFilter(filter), actor.id);
 }
+
+export async function listRegistrationFilterChoices(
+  repository: RegistrationRepository,
+  actor: InternalUser | null,
+) {
+  requireRegistrationAdmin(actor);
+  return repository.listFilterChoices(actor.id);
+}
 export async function getRegistrationDetail(
   repository: RegistrationRepository,
   actor: InternalUser | null,
