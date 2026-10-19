@@ -315,32 +315,44 @@ test("calendar selection exposes only matching SSR session links and reset resto
   filterSessionRows(rows, "");
   expect(rows.every((row) => !row.hidden)).toBe(true);
 });
-test("calendar dates show every authoritative status on that date, and status selections clear the date", () => {
+test("calendar upcoming includes today's non-cancelled sessions without changing their authoritative status", () => {
   const rows = [
     {
       hidden: false,
-      dataset: { sessionDay: "2026-10-08", sessionStatus: "ONGOING" },
+      dataset: { sessionDay: "2026-10-19", sessionStatus: "ONGOING" },
     },
     {
       hidden: false,
-      dataset: { sessionDay: "2026-10-08", sessionStatus: "CANCELLED" },
+      dataset: { sessionDay: "2026-10-19", sessionStatus: "CANCELLED" },
     },
     {
       hidden: false,
-      dataset: { sessionDay: "2026-10-09", sessionStatus: "UPCOMING" },
+      dataset: { sessionDay: "2026-10-20", sessionStatus: "UPCOMING" },
     },
     {
       hidden: false,
-      dataset: { sessionDay: "2026-10-07", sessionStatus: "COMPLETED" },
+      dataset: { sessionDay: "2026-10-19", sessionStatus: "COMPLETED" },
+    },
+    {
+      hidden: false,
+      dataset: { sessionDay: "2026-10-18", sessionStatus: "COMPLETED" },
     },
   ];
-  expect(filterSessionRows(rows, "", "UPCOMING")).toBe(1);
-  expect(rows.filter((row) => !row.hidden)).toEqual([rows[2]!]);
-  expect(filterSessionRows(rows, "2026-10-08", "ALL")).toBe(2);
-  expect(rows.filter((row) => !row.hidden)).toEqual([rows[0]!, rows[1]!]);
-  expect(filterSessionRows(rows, "", "COMPLETED")).toBe(1);
-  expect(rows.filter((row) => !row.hidden)).toEqual([rows[3]!]);
-  expect(filterSessionRows(rows, "", "ALL")).toBe(4);
+  expect(filterSessionRows(rows, "", "UPCOMING", "2026-10-19")).toBe(3);
+  expect(rows.filter((row) => !row.hidden)).toEqual([
+    rows[0]!,
+    rows[2]!,
+    rows[3]!,
+  ]);
+  expect(filterSessionRows(rows, "2026-10-19", "ALL")).toBe(3);
+  expect(rows.filter((row) => !row.hidden)).toEqual([
+    rows[0]!,
+    rows[1]!,
+    rows[3]!,
+  ]);
+  expect(filterSessionRows(rows, "", "COMPLETED")).toBe(2);
+  expect(rows.filter((row) => !row.hidden)).toEqual([rows[3]!, rows[4]!]);
+  expect(filterSessionRows(rows, "", "ALL")).toBe(5);
 });
 test("session state toggles allow no pressed filter and preserve authoritative ongoing rows", () => {
   const rows = ["UPCOMING", "COMPLETED", "CANCELLED", "ONGOING"].map(

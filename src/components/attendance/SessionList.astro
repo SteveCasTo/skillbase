@@ -55,9 +55,17 @@ const { group, sessionBase, id = "attendance-sessions" } = Astro.props;
                       {dateLabel(session.startsAt)}
                     </time>
                   </h2>
-                  <span class="text-sm text-muted-foreground">
-                    {sessionLabels[session.status]}
-                  </span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-muted-foreground">
+                      {sessionLabels[session.status]}
+                    </span>
+                    {session.civilDate === civilDay(new Date()) &&
+                      session.status !== "CANCELLED" && (
+                        <span class="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground">
+                          Hoy
+                        </span>
+                      )}
+                  </div>
                 </div>
                 <p class="text-sm tabular-nums">
                   {timeLabel(session.startsAt)}–{timeLabel(session.endsAt)}

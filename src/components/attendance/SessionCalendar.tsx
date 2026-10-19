@@ -67,13 +67,14 @@ export default function SessionCalendar({ listId, days, today }: Props) {
       list.querySelectorAll<HTMLElement>("[data-session-day]"),
       day,
       state,
+      today,
     );
     list.hidden = visible === 0;
     const empty = list.parentElement?.querySelector<HTMLElement>(
       "[data-session-empty]",
     );
     if (empty) empty.hidden = visible !== 0;
-  }, [day, state, enhanced, listId]);
+  }, [day, state, enhanced, listId, today]);
   const filter = (next: string, nextState = state) => {
     setDay(next);
     setState(nextState);
@@ -82,7 +83,7 @@ export default function SessionCalendar({ listId, days, today }: Props) {
       .getElementById(listId)
       ?.querySelectorAll<HTMLElement>("[data-session-day]");
     if (rows && list) {
-      const visible = filterSessionRows(rows, next, nextState);
+      const visible = filterSessionRows(rows, next, nextState, today);
       list.hidden = visible === 0;
       const empty = list.parentElement?.querySelector<HTMLElement>(
         "[data-session-empty]",
