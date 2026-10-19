@@ -100,8 +100,9 @@ La landing ofrece un único botón hacia `/certificados/verificar`, con dos entr
 código de 32 caracteres o PDF firmado. `/certificados` conserva compatibilidad y
 redirige a esa página; la consulta HTML por código sigue llevando a la URL del QR.
 Con JavaScript, ambas entradas presentan el mismo resultado sin abandonar la
-página ni perder el archivo seleccionado. El código alternativo queda en un
-desplegable compacto después del resultado, también en el detalle canónico.
+página. El método primario queda ligado a ese certificado: código (también QR y
+URL canónica) deja únicamente el PDF como comparación; PDF identificado sustituye
+completamente sus controles por el código. No hay desplegable ni formulario extra.
 
 La página dedicada y el resultado público aprovechan el contenedor de `CourseShell`
 (máximo 86 rem), sin columnas exteriores estrechas adicionales; sus márgenes
@@ -115,9 +116,11 @@ inline; una Promise real de Sileo complementa la lectura local y el SHA-256.
 Solo la coincidencia vigente termina en éxito; coincidencia revocada/reemplazada
 y archivo distinto terminan en error, nunca en una confirmación verde. Quitar o
 cambiar archivo cancela el aviso pendiente sin reutilizar su resultado.
-Un archivo seleccionado se puede cotejar con otro código sin volver a elegirlo.
-Quitar un archivo que resolvió por sí solo la credencial devuelve a la entrada;
-si el registro se consultó por código, quitarlo conserva ese registro. La consulta
+El código complementario se compara con el ID del mismo PDF; un código distinto
+muestra discrepancia sin consultar ni sustituir el certificado original. Un código
+coincidente reconsulta únicamente ese registro para refrescar estado/hash. Solo se
+conserva la huella en memoria, no el PDF; recargar su URL canónica vuelve al flujo
+por código. Quitar el archivo complementario conserva el registro. La consulta
 por código funciona sin JavaScript; el archivo requiere WebCrypto.
 El botón de consulta fuera de la landing conserva el fondo primario y usa el
 token `deep` del shell público para el texto, en lugar de blanco sobre coral,
@@ -136,6 +139,13 @@ ADMIN no cambian.
 La comprobación conserva MIME/extensión PDF, límite de 10 MiB y SHA-256 de todos
 los bytes en el navegador: no transmite ni persiste el archivo ni habilita una
 descarga pública. Una coincidencia no cambia el estado oficial de la credencial.
+
+Ambos métodos complementarios reconsultan el mismo ID público con `no-store`
+dentro de la Promise real antes de comparar la huella local. No se acepta el hash
+ni el estado almacenados al abrir la página como autoridad de una comparación
+nueva: una sustitución rechaza el PDF anterior y una revocación actualiza el título
+y devuelve no válido, nunca éxito. Un fallo HTTP, payload inválido, ID distinto o
+registro no disponible impide confirmar coincidencia; no se vuelve al dato cacheado.
 
 La entrada solo por PDF calcula la huella de todos sus bytes localmente y envía
 únicamente `{sha256}` a `POST /certificados/verificar-archivo`. El servidor busca

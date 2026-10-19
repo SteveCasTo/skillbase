@@ -23,12 +23,26 @@ SHA final y sus intentos quedan en el PR.
 
 ## Verificación pública dedicada (2026-10-17, candidata)
 
+La adaptación del caso existente del 2026-10-19 conserva las pruebas de privacidad,
+hash, carreras, reset y revocación. Añade el contrato complementario: código/QR
+mantiene solo PDF; PDF identificado mantiene solo código, sin controles de archivo
+ni desplegable. Un código distinto conserva URL, datos y estado del PDF original;
+el mismo código revalida ese registro. Capturas light/dark y assertions responsive
+cubren 375/390/768/1440 px sin añadir casos, specs ni suites.
+
+La corrección de frescura extiende el mismo caso de ciclo de vida: deja abiertos
+los contextos por código/QR y PDF, sustituye el firmado y revoca mediante las
+operaciones normales del fixture aislado, y compara sin recargar. Comprueba rechazo
+del PDF anterior contra el hash actual, estado/título revocado en ambos métodos,
+ausencia de éxito Sileo y continuidad del método/ID/foco. Los GET públicos actuales
+son lecturas permitidas; nunca equivalen a enviar el PDF ni sus metadatos.
+
 Se adaptan los casos existentes de certificados y landing, sin añadir casos,
 specs ni suites. Cubren CTA a la página dedicada, fallback HTML por código,
 resultado común, PDF vigente/revocado/desconocido, contraste código/archivo,
 reset/foco y cancelación de una respuesta real pendiente. Las aserciones de
-privacidad distinguen comparación local sin solicitudes de la entrada por PDF,
-que envía solo `{sha256}`; nunca bytes, nombre de archivo ni upload multipart.
+privacidad distinguen comparación local con relectura del mismo ID público de la
+entrada por PDF, que envía solo `{sha256}`; nunca bytes, nombre de archivo ni upload multipart.
 Se conservan las pruebas de lectura/hash fuera de orden, historial/reemisión,
 IDs públicos inmutables revocados y límites privados.
 

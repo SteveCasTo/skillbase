@@ -23,12 +23,20 @@ export function filterSessionRows(
   }>,
   selectedDay: string,
   selectedState: SessionStateFilter = "ALL",
+  today = "",
 ) {
   let visible = 0;
   for (const row of rows) {
     row.hidden = Boolean(
       (selectedDay && row.dataset.sessionDay !== selectedDay) ||
-      (selectedState !== "ALL" && row.dataset.sessionStatus !== selectedState),
+      (selectedState === "COMPLETED" && row.dataset.sessionDay === today) ||
+      (selectedState !== "ALL" &&
+        row.dataset.sessionStatus !== selectedState &&
+        !(
+          selectedState === "UPCOMING" &&
+          row.dataset.sessionDay === today &&
+          row.dataset.sessionStatus !== "CANCELLED"
+        )),
     );
     if (!row.hidden) visible++;
   }
