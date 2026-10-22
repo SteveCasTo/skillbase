@@ -11,6 +11,7 @@ import { readMigrationFiles } from "drizzle-orm/migrator";
 import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import type { ClosureStateDto } from "@/domain/academic-closure/types";
+import { CERTIFICATE_PDF_MAX_BYTES } from "@/domain/certificates/constants";
 import type { CertificateDto } from "@/domain/certificates/types";
 import { courses } from "@/server/db/schema";
 
@@ -381,6 +382,18 @@ async function uploadReviewIssue(
     await expect(zone).toBeVisible();
     await expect(details).toBeHidden();
     await expect(page.locator("[data-file-error]")).toHaveText("");
+    await file.setInputFiles({
+      name: "large.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.alloc(CERTIFICATE_PDF_MAX_BYTES + 1),
+    });
+    await expect(page.locator("[data-file-error]")).toContainText("4 MiB");
+    await expect(save).toBeHidden();
+    await page
+      .getByRole("button", { name: "Quitar archivo", exact: true })
+      .click();
+    await expect(page.locator("[data-file-error]")).toHaveText("");
+    await expect(file).toBeFocused();
   }
   const selectedFile = {
     name: "synthetic-qa-signed.pdf",
@@ -1161,7 +1174,7 @@ test("ADMIN configures a single recipient certificate, regenerates drafts, saves
       {
         name: "large.pdf",
         mimeType: "application/pdf",
-        buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
+        buffer: Buffer.alloc(CERTIFICATE_PDF_MAX_BYTES + 1),
       },
     ]) {
       await publicPicker.setInputFiles(rejected);
@@ -1921,10 +1934,24 @@ test("historical instructor reads remain scoped; reopening blocks obsolete draft
       });
       await expect(htmlSave).toBeHidden();
       await expect(htmlPage.getByRole("checkbox")).toHaveCount(0);
+      const signedFixtureBytes = await signedFixture();
+      const boundaryPdf = Buffer.alloc(CERTIFICATE_PDF_MAX_BYTES);
+      const eof = Buffer.from("%%EOF");
+      const pdfBeforeEof = signedFixtureBytes.subarray(
+        0,
+        signedFixtureBytes.length - eof.length,
+      );
+      boundaryPdf.set(pdfBeforeEof);
+      boundaryPdf.fill(
+        0x20,
+        pdfBeforeEof.length,
+        boundaryPdf.length - eof.length,
+      );
+      boundaryPdf.set(eof, boundaryPdf.length - eof.length);
       await htmlPage.locator('input[type="file"]').setInputFiles({
         name: "synthetic-html.pdf",
         mimeType: "application/pdf",
-        buffer: await signedFixture(),
+        buffer: boundaryPdf,
       });
       await expect(htmlSave).toBeVisible();
       await htmlSave.click();

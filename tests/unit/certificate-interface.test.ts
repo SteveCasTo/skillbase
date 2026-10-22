@@ -51,11 +51,18 @@ describe("certificate public verification", () => {
   test("bounds local file reads before allocating full bytes", async () => {
     expect(
       localPdfError({
+        name: "boundary.pdf",
+        type: "application/pdf",
+        size: LOCAL_PDF_MAX_BYTES,
+      }),
+    ).toBe("");
+    expect(
+      localPdfError({
         name: "bad.pdf",
         type: "application/pdf",
         size: LOCAL_PDF_MAX_BYTES + 1,
       }),
-    ).toContain("10 MiB");
+    ).toContain("4 MiB");
     expect(
       localPdfError({ name: "photo.jpg", type: "image/jpeg", size: 100 }),
     ).toContain("PDF");
