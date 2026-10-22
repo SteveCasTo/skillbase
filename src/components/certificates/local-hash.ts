@@ -1,4 +1,6 @@
-export const LOCAL_PDF_MAX_BYTES = 10 * 1024 * 1024;
+import { CERTIFICATE_PDF_MAX_BYTES } from "@/domain/certificates/constants";
+
+export const LOCAL_PDF_MAX_BYTES = CERTIFICATE_PDF_MAX_BYTES;
 
 export function localPdfError(
   file: Pick<File, "name" | "size" | "type">,
@@ -6,7 +8,7 @@ export function localPdfError(
   if (!/\.pdf$/iu.test(file.name) || file.type !== "application/pdf")
     return "Selecciona un archivo PDF.";
   if (!file.size || file.size > LOCAL_PDF_MAX_BYTES)
-    return "El PDF debe tener contenido y pesar como máximo 10 MiB.";
+    return "El PDF debe tener contenido y pesar como máximo 4 MiB.";
   return "";
 }
 

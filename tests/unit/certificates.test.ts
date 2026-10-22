@@ -229,6 +229,20 @@ test("PDF upload rejects mismatched MIME extension sniff size purpose malformed 
   await expect(
     validateCertificatePdf(bytes, "scan.PDF", "application/pdf", "SIGNED"),
   ).resolves.toBeUndefined();
+  const boundaryPdf = new Uint8Array(CERTIFICATE_PDF_MAX_BYTES);
+  const eof = new TextEncoder().encode("%%EOF");
+  const pdfBeforeEof = bytes.subarray(0, bytes.length - eof.length);
+  boundaryPdf.set(pdfBeforeEof);
+  boundaryPdf.fill(0x20, pdfBeforeEof.length, boundaryPdf.length - eof.length);
+  boundaryPdf.set(eof, boundaryPdf.length - eof.length);
+  await expect(
+    validateCertificatePdf(
+      boundaryPdf,
+      "boundary.pdf",
+      "application/pdf",
+      "SIGNED",
+    ),
+  ).resolves.toBeUndefined();
   for (const [name, mime, purpose] of [
     ["scan.txt", "application/pdf", "SIGNED"],
     ["scan.pdf", "text/plain", "SIGNED"],
