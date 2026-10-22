@@ -1,5 +1,13 @@
 # AUTHENTICATION
 
+## Estado vigente y aceptación del responsable — 2026-10-22
+
+El usuario confirma el 22 de octubre de 2026 que **Google OAuth funciona**, que **la recuperación por correo funciona** y que **los datos locales y de producción están bien tras las restauraciones**. Esta aceptación cierra el pendiente documental de confirmación de esos flujos y del estado de los datos; no exige repetir consentimiento, envío de correo ni restauración para actualizar los informes. No se dispone aquí de una nueva ejecución externa, un SHA de entorno o una comparación de hashes atribuible a esa comunicación.
+
+**AUTH-1 está resuelto/aceptado bajo la regla aprobada**, con cierre operacional registrado en PR 342: identidad/UUID, correo verificado coincidente, usuario interno activo y roles se revalidan también para PASSWORD y recovery. Se acepta la primera contraseña nativa de la misma cuenta Google legítima; el proveedor no garantiza la prueba OAuth reciente de cinco minutos que sí exige el formulario de SkillBase. No se amplían permisos ni se certifica globalmente la seguridad.
+
+Las notas de releases y operaciones de abajo conservan sus fechas, resultados y límites históricos. Las referencias a OAuth/recovery «pendiente» o AUTH-1 «abierto/parcial» describen esos momentos y quedan supersedidas por este resumen y por el cierre PR 342, sin atribuirles pruebas posteriores. La cobertura automatizada usa proveedores controlados y se distingue de la aceptación del usuario en [`TESTING.md`](TESTING.md).
+
 ## OBJETIVO
 
 Definir autenticación, identidad y autorización inicial.
@@ -121,9 +129,9 @@ La URL compatible `/app` resuelve la entrada operativa después del guard existe
 
 ### Configuración cloud
 
-El proyecto `SkillBase` está enlazado con referencia `fvzxqlezdrlzykyoevub`. Google OAuth, Site URL y el callback `https://skillbase-alpha.vercel.app/auth/callback` están configurados. El primer administrador permanece como invitación `INVITED` hasta completar su primer acceso Google, momento en que se vinculará su UUID Auth y pasará a `ACTIVE`.
+El proyecto `SkillBase` está enlazado con referencia `fvzxqlezdrlzykyoevub`. Google OAuth, Site URL y el callback `https://skillbase-alpha.vercel.app/auth/callback` están configurados. En el bootstrap, el primer administrador permanece como invitación `INVITED` hasta completar su primer acceso Google, cuando se vinculan su UUID Auth y estado `ACTIVE`; no es un inventario del estado actual de esa cuenta.
 
-El flujo cloud fue verificado manualmente en un boundary histórico desde Vercel hasta Google y de regreso a `/app`. El primer administrador quedó vinculado a su identidad Auth, en estado `ACTIVE` y con rol `ADMIN`. Esa evidencia histórica se conserva, pero no sustituye la aceptación OAuth/recovery local y de producción end-to-end que queda en Fase 10A.
+El flujo cloud fue verificado manualmente en un boundary histórico desde Vercel hasta Google y de regreso a `/app`. El primer administrador quedó vinculado a su identidad Auth, en estado `ACTIVE` y con rol `ADMIN`. Esa evidencia histórica se conserva separada de la aceptación del responsable del 2026-10-22; no se atribuye retrospectivamente al release original.
 
 ## AUTENTICACIÓN DUAL (Fase 4 liberada mediante PR 126)
 
@@ -135,7 +143,7 @@ La plantilla `supabase/templates/recovery.html` está en español, explica una �
 
 La configuración SMTP local está integrada en `development` mediante `supabase/config.toml`/plantilla y referencias privadas; el `.env` ignorado del checkout canónico contiene secretos, nunca versionados. Las suites aisladas eliminan el transporte SMTP externo y sus variables antes de arrancar, y copian únicamente las plantillas públicas. No necesitan credenciales de Gmail ni envían correo real.
 
-La configuración SMTP cloud está comprobada por lectura de Admin API, pero la identidad destinataria autorizada no existe en Auth cloud; no se creó otra cuenta ni se hizo una prueba recovery cloud. El usuario confirmó históricamente la recepción de un correo de prueba en el buzón autorizado local, verificando entrega SMTP local. Esto no prueba clic de recovery/cambio de contraseña, ni entrega cloud. La prueba OAuth end-to-end local/cloud sigue en Fase 10A; el callback debe coincidir con el runtime usado (`55321` en config versionada, `54321` en el ajuste local temporal F9).
+En la comprobación original de SMTP, la lectura de Admin API confirmó configuración cloud, pero la identidad destinataria autorizada no existía allí; no se creó otra cuenta ni se hizo una prueba recovery cloud. El usuario confirmó entonces la recepción de un correo de prueba local, no el clic de recovery/cambio de contraseña ni entrega cloud. Son límites históricos de esa operación, separados de la aceptación del responsable del 2026-10-22. El callback debe coincidir con el runtime usado (`55321` en config versionada, `54321` en el ajuste local histórico F9).
 
 ### Flujos internos y reglas del release dual
 
@@ -151,13 +159,13 @@ La configuración SMTP cloud está comprobada por lectura de Admin API, pero la 
 - Los campos profesionales de INSTRUCTOR y las acciones lifecycle se editan por acción/campo desde PR 222; ciclo de vida se restringe según exclusividad de rol, asignaciones e historial. Estos cambios se liberaron junto con las correcciones mediante PR 228.
 - Las migraciones 0012/0013 definen buckets Auth y requests de asociación; 0014 añade perfiles/asignación y 0015 repara el guard de borrado forward-only. PR 126 aplicó 0012–0015 (ledger 16); Fase 5 llegó a ledger 18 y el release de Fase 6/PR 211 avanzó cloud a ledger 20. El hook, email/manual-link provider config, redirects de recovery y `AUTH_RATE_LIMIT_SECRET` están configurados server-only en cloud; nunca registrar el valor.
 - Los endpoints de Auth validan origen y límites de intentos (bucket persistente por red y, cuando aplica, cuenta/acción; claves HMAC y no IP/email crudos), limitan y validan cuerpos, usan cookies seguras, callbacks allowlisted y `private, no-store`. Supabase Admin API/service role permanece solo en servidor.
-- Supabase Auth es el único almacén de passwords; no guardarlas en PostgreSQL, DTOs ni logs. Gmail SMTP está configurado en cloud y local; se confirmó recepción de un correo de prueba local. La entrega cloud y el flujo completo de recovery/cambio no están verificados; el login inicial password asignado por ADMIN no depende de recovery.
+- Supabase Auth es el único almacén de passwords; no guardarlas en PostgreSQL, DTOs ni logs. Gmail SMTP está configurado en cloud y local. La recepción de prueba local y la posterior aceptación de recuperación por correo del responsable se distinguen en el estado vigente; el login inicial password asignado por ADMIN no depende de recovery.
 
 ### Estado operacional SMTP
 
-La configuración Supabase Auth SMTP autorizada se aplicó en cloud y local con el remitente de SkillBase. Secretos quedan exclusivamente en Auth y `.env` local ignorado; no se incluyen valores en Git, frontend, CI ni esta documentación. La recepción local de un correo de prueba fue confirmada históricamente por el usuario. Continúan pendientes el recovery/cambio completo end-to-end local y cloud y la prueba real OAuth local/cloud prevista para Fase 10A. Cualquier login/email real requiere coordinación autorizada con el usuario; no automatizar consentimiento, reutilizar acceso a un perfil real ni enviar correo como parte de una actualización documental.
+La configuración Supabase Auth SMTP autorizada se aplicó en cloud y local con el remitente de SkillBase. Secretos quedan exclusivamente en Auth y `.env` local ignorado; no se incluyen valores en Git, frontend, CI ni esta documentación. Además de la recepción de prueba histórica, el responsable confirmó el 2026-10-22 que la recuperación por correo funciona. No queda pendiente solicitar esa confirmación. Esta conciliación no ejecuta logins, cambios de contraseña ni envíos reales y no afirma una nueva medición por entorno.
 
-La autorización manual del callback en Google Console debe verificarse con el usuario para el puerto del runtime de la prueba (configuración versionada `55321`, runtime F9 local `54321`). No afirmar OAuth real validado por configurar SMTP ni por el redirect HTTP parcial observado.
+El callback de Google debe corresponder al puerto del runtime (configuración versionada `55321`, ajuste local histórico F9 `54321`). La confirmación actual de funcionamiento proviene del responsable, no de configurar SMTP ni del redirect HTTP parcial histórico; no se requiere repetirla para conciliar documentos.
 
 Al cierre inicial de PR 126 no había acción de baja ni esta política. La corrección posterior se integró por PRs 134/136 y se liberó con PR 211/Fase 6. PR 222 añadió edición inline individual de perfiles/lifecycle; ese cambio se promovió a producción con PR 228.
 
@@ -168,16 +176,16 @@ Al cierre inicial de PR 126 no había acción de baja ni esta política. La corr
 - Todas las rutas/acciones revalidan estado interno; cookie ya emitida no mantiene acceso para instructor desactivado. Reactivación recupera la identidad preservada y la autorización sin recrear ni resetear credenciales.
 - La página de cambio de contraseña es independiente de `/app/perfil`. Cuenta password exige validar password actual en servidor, además de nueva/confirmación. La acción «Crear contraseña» de Google-only exige claims firmados de sesión OAuth Google aprobada, `getUser()`/cuenta live y prueba OAuth reciente (menos de 5 minutos); no depende de metadata, de una identidad histórica aislada ni añade verificación por correo en ese formulario. Una prueba de recuperación válida es un camino distinto desde recovery. Auth vuelve a comprobar actor/sesión antes de escribir. Error de password igual a anterior se muestra de forma específica/recuperable. El recovery «Olvidaste tu contraseña» está en página independiente con validez del email y respuesta neutra.
 - El cambio normal transmite además la contraseña actual validada como `current_password` a `auth.updateUser`; recovery y primera contraseña Google aprobada omiten esa propiedad, aunque el formulario envíe un valor. El gateway conserva esta separación fuera de presentación. Los códigos del proveedor `current_password_required`/`current_password_mismatch` se convierten al error seguro del campo actual; no se muestran detalles crudos ni se registran credenciales. La fuente fue liberada en PR 335; la configuración cloud nativa se activó después del deploy, según `docs/DEPLOYMENT.md`.
-- Supabase JS/auth-js 2.116.0 tipa el parámetro; GoTrue implementa excepciones para sesión recovery y cuenta sin contraseña previa. CLI 2.117.0 no ofrece una clave TOML para activar `UpdatePasswordRequireCurrentPassword`; `auth.email.secure_password_change` es reautenticación/nonce, no contraseña actual. El release coordinado confirmó el boolean nativo cloud activo; no se alteró la configuración local ni se reinició el runtime local existente. El proveedor no conoce la aprobación Google interna: la frontera de primera contraseña Google sigue pendiente en AUTH-1.
+- Supabase JS/auth-js 2.116.0 tipa el parámetro; GoTrue implementa excepciones para sesión recovery y cuenta sin contraseña previa. CLI 2.117.0 no ofrece una clave TOML para activar `UpdatePasswordRequireCurrentPassword`; `auth.email.secure_password_change` es reautenticación/nonce, no contraseña actual. PR 335 confirmó el boolean nativo cloud activo sin alterar la configuración local; PR 340 y la operación local posterior se registran abajo. El proveedor no conoce la aprobación Google interna: la excepción para la misma identidad legítima se aceptó expresamente en AUTH-1, no garantiza OAuth reciente fuera de la aplicación.
 
-- SMTP cloud/local está configurado; el usuario confirmó recepción de un correo de prueba local. No equivale a recovery/cambio completo ni a entrega cloud, que permanecen sin verificar. La verificación manual de Google OAuth/allowlist continúa pendiente de forma independiente.
-- La fuente final `8735d676fe0d96e7230b4636efa8cb51045d1eca` (base `ddd0f3de`) pasó 178 unit, 98 integration y full E2E 120/120, además de lint/format/typecheck/build/Drizzle/diff checks; se integró en `development` por PR 136 (`8cdb38f`). Después, PR 211 liberó Fase 6 y PR 228 liberó las correcciones/profile UI. SMTP recovery y Google OAuth real mantienen verificaciones independientes pendientes.
+- SMTP cloud/local está configurado; la recepción de prueba local histórica no equivalía a recovery completo ni entrega cloud. La confirmación posterior de funcionamiento de recovery y Google OAuth proviene del responsable, según el resumen vigente.
+- La fuente final `8735d676fe0d96e7230b4636efa8cb51045d1eca` (base `ddd0f3de`) pasó 178 unit, 98 integration y full E2E 120/120, además de lint/format/typecheck/build/Drizzle/diff checks; se integró en `development` por PR 136 (`8cdb38f`). Después, PR 211 liberó Fase 6 y PR 228 liberó las correcciones/profile UI. En aquellos gates no se probaron SMTP recovery ni Google OAuth reales.
 
-### Estado post-release de enforcement nativo (2026-10-11)
+### Estado histórico post-release de enforcement nativo (2026-10-11)
 
 PR 334 integró el envío de `current_password` en `development`; PR 335 liberó el árbol completo de desarrollo a `master` (`07042f851c8d0fe6b133288c088051bad6973bb5`). Después de CI exitoso y Vercel `READY` para ese SHA, se activó en Supabase cloud el boolean nativo `security_update_password_require_current_password` (`false` → `true`), y una lectura filtrada posterior confirmó que seguía activo. El cambio normal valida y envía la contraseña actual. Las sesiones de recovery y el alta de primera contraseña Google aprobada conservan la omisión semántica.
 
-No se ejecutó un flujo autenticado de cambio/recovery/primera contraseña en producción ni se probaron Google OAuth o entrega SMTP real en este release. El usuario había confirmado anteriormente una asociación manual de recovery; esa observación es previa y no acredita compatibilidad con este último release. AUTH-1 permanece abierto/parcial por la frontera del proveedor en la primera contraseña Google y la falta de validación de esos flujos reales. No solicitar/repetir la asociación anterior salvo que se vaya a afirmar compatibilidad de ese flujo.
+No se ejecutó un flujo autenticado de cambio/recovery/primera contraseña en producción ni se probaron Google OAuth o entrega SMTP real en ese release. El usuario había confirmado anteriormente una asociación manual de recovery; esa observación previa no se atribuye al gate de PR 335. AUTH-1 quedó entonces abierto/parcial y fue aceptado posteriormente bajo la regla aprobada en PR 342. La aceptación del responsable del 2026-10-22 cierra la falta de confirmación de funcionamiento; esta conciliación no solicita repetir la asociación.
 
 En el checkout local canónico, `development` está sincronizado con `dbf7f3158f24dccf9f2f271ab8d6a24e715ab291`; el proceso existente (PID 37512) conserva la app en `http://127.0.0.1:4321`, login HTTP 200 y el toast «Solicitud rechazada» al probar una clave inválida. La instancia Auth local observada es GoTrue v2.196.0 y no tiene asignación explícita de `GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD`; esto **no** demuestra que el boolean esté en `false` ni que el control nativo local esté aplicado. El runtime y el WIP de `supabase/config.toml` no se reiniciaron ni modificaron para este release.
 
@@ -211,7 +219,7 @@ de cierre operacional coordinado, con evidencia de configuración y flujos norma
 autorizados; no repetir procedimientos de bypass del proveedor. Resultados y
 límites en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md).
 
-### Configuración nativa local reproducible (candidata; sin apply canónico)
+### Configuración nativa local reproducible (candidata histórica; apply posterior abajo)
 
 `scripts/local-auth-config.ts` prepara/verifica únicamente la propiedad nativa
 `GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD=true` para el proceso
@@ -281,7 +289,7 @@ real, comprobó el bloqueo tras recreación CLI directa y reaplicó mediante el
 mismo wrapper antes de habilitar el consumidor. También fue limpiada por el
 runner estricto, sin repetir la suite Auth.
 
-El full E2E Auth PR 118 pasó 104/104 y PR 120 había pasado 107/107 antes de cambios posteriores. Tras restaurar la dependencia opcional Astro Sharp con `bun install --frozen-lockfile`, la fuente final pasó full E2E 107/107 en `127.0.0.1:4321`; el smoke público/privado pasó y el release CI/deploy de PR 126 se completó. Google OAuth real y SMTP/recovery no estaban probados en ese release histórico. El estado operacional vigente de SMTP (configuración cloud/local y receipt local confirmada, límites de recovery/cloud pendientes) está arriba y en `docs/DEPLOYMENT.md`.
+El full E2E Auth PR 118 pasó 104/104 y PR 120 había pasado 107/107 antes de cambios posteriores. Tras restaurar la dependencia opcional Astro Sharp con `bun install --frozen-lockfile`, la fuente final pasó full E2E 107/107 en `127.0.0.1:4321`; el smoke público/privado pasó y el release CI/deploy de PR 126 se completó. Google OAuth real y SMTP/recovery no estaban probados en ese release histórico. El estado operacional vigente y la aceptación del responsable están arriba y en [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ### Gestión multi-ADMIN de Fase 8 (release PR 286)
 
@@ -387,6 +395,7 @@ interno activo con roles sigan siendo los mismos. Esa excepción del proveedor e
 intencional; no autoriza otra identidad ni otorga roles. El guard común valida
 esa propiedad de cuenta en accesos PASSWORD y recovery; el formulario de la
 aplicación mantiene sus propias pruebas recientes. La aceptación no certifica
-todos los flujos externos ni la seguridad global. AUTH-1 queda validado bajo la
-regla aprobada; la verificación real de Google OAuth, recovery y SMTP permanece
-pendiente como bloque independiente de Fase 10.
+todos los flujos externos ni la seguridad global. AUTH-1 queda resuelto/aceptado
+bajo la regla aprobada. En aquel release no se probaron Google OAuth, recovery ni
+SMTP reales; su funcionamiento fue confirmado posteriormente por el responsable
+el 2026-10-22, según el resumen vigente, no por una nueva prueba de este informe.

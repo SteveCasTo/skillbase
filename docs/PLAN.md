@@ -521,7 +521,7 @@ La corrección agrega una baja controlada de instructor; PR 126 no la incluía. 
 - [x] Perfil responsivo. Cambio de contraseña se inicia desde acción hacia página dedicada: cuentas password validan password actual/nueva/confirmación; Google-only establece password sin pedir password anterior ni enviar botón de confirmación por correo, con sesión Google OAuth aprobada, reciente y revalidación server-side de cuenta/actor. Errors son inline, incluidos same-password accionable; recuperación está en página propia y botón email condicionado a validez.
 - [x] Se preserva SSR/POST, validación y autorización server-side; la UI no sustituye garantías de sesión/identidad ni confía en metadata para Google-only.
 - [x] Mutaciones usan UUID por operación y mismo ID de notificación loading/resultado; mantienen foco, valores recuperables y estados pending/error/result.
-- [ ] Verificar entrega real de recovery/perfil tras configurar SMTP propio autorizado; configuración y entrega siguen pendientes. La comprobación del callback/Google OAuth real es independiente y también queda pendiente.
+- [x] Registrar configuración SMTP autorizada y aceptación posterior del responsable (2026-10-22) de recuperación por correo y Google OAuth funcionando. Este pendiente del release original quedó supersedido; ver Fase 10 y [`AUTHENTICATION.md`](AUTHENTICATION.md), sin atribuir la aceptación a los gates históricos de Fase 4.
 - [x] Integrar lifecycle/correcciones en `development` mediante PR 134 (`b1855b1`) y el cambio de puertos mediante PR 135 (`ddd0f3d`). No se afirma CI remoto PASS a partir de los resultados locales.
 - [x] Aplicar migración 0016 al Supabase local estándar sin reset; ledger avanzó 16→17 y se preservaron Auth identities/ADMIN/roles/perfiles/sesiones/Storage/cursos/intereses. Smoke local public/privado PASS; los únicos cambios no técnicos fueron el ledger y el timestamp de login del usuario sintético de comprobación.
 - [x] Fuente final `8735d676fe0d96e7230b4636efa8cb51045d1eca` pasó 178 unit, 98 integration y full canonical E2E 120/120; lint, formatter, typecheck (0 errores/0 warnings), build, Drizzle y `git diff --check` PASS. No hay avisos/errores de hidratación `Astro.session`/React en el run final.
@@ -868,7 +868,7 @@ La interfaz no cambia reglas aprobadas ni autoriza generación desde versiones n
 - [x] Ejecutar por separado la operación F9 protegida en cloud tras release y deployment READY; la operación no forma parte de CI/deploy.
 - [x] Reconstruir la instancia Supabase local canónica con reset expresamente autorizado por el usuario, dado el origen/hash no identificados del ledger anterior (0003/0005/0008); reaplicar el source completo hasta ledger 24. Los datos previos quedaron reemplazados, no preservados. El demo validado y los límites están en [`TESTING.md`](TESTING.md).
 - [x] Preparar el proyecto aislado `skillbase_demo_f9_clean_20261009` (API 60421, DB 60422) como fallback; su app permanece pausada y no es la instancia del demo principal.
-- [x] Verificar login PASSWORD normal y navegación privada de identidades sintéticas internas autorizadas en la aceptación local y en producción posterior a PR 342; se preservaron identidad/UUID y roles existentes. Esto no es OAuth Google real ni valida delivery/recovery, que siguen pendientes por separado.
+- [x] Verificar login PASSWORD normal y navegación privada de identidades sintéticas internas autorizadas en la aceptación local y en producción posterior a PR 342; se preservaron identidad/UUID y roles existentes. Esto no mide OAuth Google real ni delivery/recovery; su aceptación posterior por el responsable está registrada en Fase 10.
 - [x] El operador reportó pausar la app previa durante la operación local e iniciar de nuevo Bun en `127.0.0.1:4321`; no se capturó el PID del proceso Bun y no se afirma quién posee hoy el puerto. La instancia Supabase local reconstruida usa API 54321/DB 55322; el ajuste de puerto es local y no constituye un cambio de código/release. No modificar `source.env` ni volver a conectar al proyecto fallback por error.
 
 Límites relevantes de la interfaz actual: no se inventan un instante público de emisión ni un enlace/ID de reemplazo ausentes del DTO; la verificación presenta la fecha nominal de finalización definida por el contrato. El índice global histórico de instructores no existe; la navegación disponible es por grupo y acceso directo autorizado. El archivo elegido para comparar SHA-256 no se transmite ni persiste. Los fixtures PDF sintéticos de QA no representan documentos institucionales firmados. Reglas aprobadas, seguridad y evidencia están en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md), [`CERTIFICATES.md`](CERTIFICATES.md), [`DESIGN.md`](DESIGN.md) y [`TESTING.md`](TESTING.md).
@@ -906,25 +906,30 @@ posterior al release F9 y queda sustituida por este alcance aclarado por el
 usuario. No se inició ni se completó ninguna de esas etapas por haberlas
 documentado.
 
-### Estado de alcance
+### Estado de alcance — conciliación 2026-10-22
 
-- Google OAuth real y recovery/correo ya estaban identificados como pendientes
-  de verificación. Se mantienen dentro de la validación; no se declaran probados
-  ni se da por completada la aceptación end-to-end.
-- El rediseño específico de Fase 9 sigue esperando indicaciones del usuario. Sí
-  queda autorizada la revisión transversal de feedback Sileo en todas las
-  secciones, incluido login, con las correcciones descritas abajo.
+- El responsable confirmó el 2026-10-22 que Google OAuth y recuperación por correo
+  funcionan y que los datos locales y de producción están bien tras las
+  restauraciones. Se cierra el pendiente de confirmación; es aceptación comunicada,
+  no una nueva prueba externa o comparación de datos realizada por este informe.
+- El rediseño específico de Fase 9 sigue esperando indicaciones del usuario. La
+  revisión transversal de feedback Sileo, incluido login, tiene informe y
+  correcciones integradas: [`SILEO_AUDIT.md`](SILEO_AUDIT.md), PR 426. Su alcance
+  y límites no equivalen a probar manualmente todas las acciones del producto.
 - Se registran propuestas de consultas/reportes en [`REQUIREMENTS.md`](REQUIREMENTS.md)
   para futura definición. Ninguna autoriza por sí sola una pantalla, módulo,
   exportación o formato; no implementar hasta recibir definición/aprobación.
 
-Estado posterior a PR 342: el bloque de rendimiento ya tiene medición
-diagnóstica antes/después en producción para navegación pública y privada, y la
-región desplegada se verificó alineada con Supabase. Esto no sustituye el
-baseline Lighthouse reproducible que exige el checklist ni permite afirmar una
-garantía de latencia; el punto Lighthouse sigue pendiente. AUTH-1 se validó bajo
-la regla de identidad aprobada y quedó en el release, pero la aceptación real de
-Google OAuth, recovery y entrega de correo continúa separada y pendiente.
+El diagnóstico productivo de PR 342 se conserva en
+[`validation/PRODUCTION-PERFORMANCE.md`](validation/PRODUCTION-PERFORMANCE.md).
+Sí existen baselines Lighthouse reproducibles: la medición local anterior en
+[`validation/PERFORMANCE.md`](validation/PERFORMANCE.md) y la auditoría ampliada de
+[`PERFORMANCE_20261016.md`](PERFORMANCE_20261016.md), con
+[`72 pares de informes`](PERFORMANCE_20261016_MATRIX.md) antes/después. Esta última
+usa preview local del artefacto de producción, 36 páginas por dos dispositivos y
+una muestra por ruta/dispositivo/build; no garantiza scores, latencia ni salud de
+producción hoy. AUTH-1 está resuelto/aceptado bajo la regla de identidad aprobada,
+según [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md).
 
 ### Bloques aprobados
 
@@ -955,29 +960,29 @@ implementación; preferir reutilizar superficies existentes cuando proceda.
 
 ### Verificación y cierre
 
-- [ ] Completar auditoría/correcciones de feedback Sileo transversal conforme al
-      bloque aprobado, incluida la sección de login.
-- [ ] Medir y registrar baseline Lighthouse reproducible de landing; después
-      aplicar optimizaciones respaldadas por medición, incluyendo WebP solo si no
-      reduce perceptiblemente la calidad.
-- [ ] Completar auditoría de seguridad y entregar reporte de hallazgos, sin
-      aplicar remediaciones bajo esta autorización.
-- [ ] Coordinar y realizar la verificación de Google OAuth real y recovery ya
-      pendientes, sin declarar éxito hasta tener evidencia del flujo completo.
-      El release PR 342 desplegó el guard común de identidad aprobado; se verificó
-      navegación PASSWORD de una cuenta sintética autorizada con UUID Auth,
-      credencial, identidad y roles preservados. El boolean nativo cloud sigue
-      activo. La primera contraseña Google de esa misma identidad legítima es la
-      excepción aprobada del proveedor, no una concesión de acceso. AUTH-1 queda
-      validado bajo esa regla; esta evidencia no incluye OAuth Google real,
-      recovery/cambio autenticado ni entrega SMTP, que siguen pendientes como
-      verificaciones independientes (ver `AUTHENTICATION.md`/`DEPLOYMENT.md`).
+- [x] Registrar auditoría/correcciones Sileo transversal, incluido login, en
+      [`SILEO_AUDIT.md`](SILEO_AUDIT.md) y PR 426; conservar la evidencia histórica
+      anterior y sus límites en [`validation/SILEO.md`](validation/SILEO.md).
+- [x] Medir y registrar baseline Lighthouse y optimizaciones de imágenes con
+      comparación antes/después y límites de calidad/muestreo en los informes de
+      rendimiento enlazados arriba; no presentar sus scores locales como garantía
+      productiva actual.
+- [x] Entregar el reporte acotado de seguridad y mantener su historia y resolución
+      de AUTH-1/DEP-1 en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md).
+      Las remediaciones posteriores tuvieron autorización separada; no se deduce
+      de este bloque permiso para nuevas actuaciones.
+- [x] Registrar la aceptación de funcionamiento de Google OAuth y recovery/correo
+      comunicada por el responsable el 2026-10-22, separada del CI controlado y de la
+      aceptación PASSWORD de PR 342. Ver [`AUTHENTICATION.md`](AUTHENTICATION.md).
 - [ ] Mantener el rediseño específico F9 en espera; el trabajo transversal de
       Sileo sí incluye F9.
 
 El cierre de Fase 10 requiere evidencia de los bloques aprobados y sus límites.
 No requiere implementar las propuestas funcionales pendientes ni corregir
-hallazgos de seguridad dentro de esta fase sin autorización adicional.
+hallazgos de seguridad dentro de esta fase sin autorización adicional. Esta
+conciliación no declara toda Fase 10 completada ni transforma el rediseño F9 en
+implementación aprobada. Las reservas de OAuth/recovery en fases anteriores son
+históricas y quedan supersedidas por la aceptación del responsable indicada aquí.
 
 ### Resultado demostrable
 
