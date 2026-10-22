@@ -1,0 +1,57 @@
+name: "Tarea Técnica (Task)"
+description: "Plantilla para tareas técnicas individuales, refactorizaciones, migraciones o pruebas."
+title: "[Task] "
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Define una unidad técnica de trabajo con alcance delimitado y lista de comprobación clara.
+  - type: textarea
+    id: description
+    attributes:
+      label: Descripción de la Tarea
+      description: Explica brevemente el objetivo técnico y la necesidad del cambio.
+      placeholder: "Objetivo técnico, motivación y alcance del cambio..."
+    validations:
+      required: true
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Tareas Técnicas / Checklist
+      description: Acciones concretas a implementar para cerrar la tarea.
+      placeholder: |
+        - [ ] Modificar componente o servicio en...
+        - [ ] Agregar validación en servidor / esquema Drizzle...
+        - [ ] Actualizar o incorporar pruebas unitarias / integración / E2E...
+        - [ ] Ejecutar comprobaciones de calidad (bun run check)...
+    validations:
+      required: true
+  - type: dropdown
+    id: domain_area
+    attributes:
+      label: Área o Dominio
+      description: Selecciona el módulo relacionado.
+      options:
+        - "core"
+        - "courses"
+        - "registrations"
+        - "attendance"
+        - "evaluations"
+        - "academic-closure"
+        - "certificates"
+        - "auth"
+        - "landing"
+        - "devops"
+        - "testing"
+        - "accessibility"
+    validations:
+      required: true
+  - type: textarea
+    id: pull_requests
+    attributes:
+      label: Pull Requests o Enlaces Asociados
+      description: Enlaces a ramas, PRs o issues vinculados.
+      placeholder: "- PR #..."
+    validations:
+      required: false

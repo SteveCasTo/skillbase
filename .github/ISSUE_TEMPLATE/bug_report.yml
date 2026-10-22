@@ -1,0 +1,58 @@
+name: "Reporte de Error (Bug Report)"
+description: "Reportar un fallo, comportamiento erróneo o regresión en la plataforma."
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportar un defecto. Proporciona detalles precisos para facilitar la reproducción y corrección.
+        Este issue es público: no incluyas secretos, tokens, cookies, contraseñas, datos personales ni documentos firmados reales.
+        Si sospechas una vulnerabilidad, no la publiques aquí: usa https://github.com/SteveCasTo/skillbase/security/advisories/new.
+  - type: textarea
+    id: current_behavior
+    attributes:
+      label: Comportamiento Observado
+      description: ¿Qué ocurrió? Describe el error de forma clara y directa.
+      placeholder: "Al hacer clic en..., el sistema responde con..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Comportamiento Esperado
+      description: ¿Qué debería haber ocurrido de acuerdo a las reglas de negocio?
+      placeholder: "El sistema debería mostrar..."
+    validations:
+      required: true
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Pasos para Reproducir
+      description: Lista paso a paso cómo replicar el problema.
+      placeholder: |
+        1. Iniciar sesión como administrador / instructor...
+        2. Navegar a /app/...
+        3. Realizar la acción...
+        4. Observar el error...
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Entorno donde ocurre
+      options:
+        - "Desarrollo Local (Docker + Supabase local)"
+        - "Producción (Vercel + Supabase Cloud)"
+        - "Pipeline de CI (GitHub Actions)"
+        - "Ambos entornos"
+    validations:
+      required: true
+  - type: textarea
+    id: logs_or_evidence
+    attributes:
+      label: Evidencia y Logs
+      description: Adjunta solo logs o capturas sanitizados. Oculta credenciales y datos personales; usa datos sintéticos. Reporta vulnerabilidades por el canal privado, no en este issue.
+      placeholder: "Logs o capturas sanitizados, sin secretos ni datos personales..."
+    validations:
+      required: false

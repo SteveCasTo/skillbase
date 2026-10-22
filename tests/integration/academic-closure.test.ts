@@ -1,4 +1,4 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, beforeAll, expect, test } from "bun:test";
 import { assertCurrentMigrationLedger } from "../fixtures/migration-ledger";
 import { and, eq, sql } from "drizzle-orm";
 import { createDatabase } from "@/server/db/client";
@@ -26,11 +26,27 @@ let now = new Date("2099-02-01T12:00:00Z");
 const clock = () => now;
 const repo = new DrizzleClosureRepository(db, clock);
 const evaluations = new DrizzleEvaluationRepository(db, clock);
+let originalAttendanceSettings: typeof s.attendanceSettings.$inferSelect;
+beforeAll(async () => {
+  const [settings] = await db.select().from(s.attendanceSettings);
+  if (!settings) throw new Error("Missing attendance settings singleton");
+  originalAttendanceSettings = settings;
+});
 afterAll(async () => {
-  await db.execute(
-    sql`truncate ${evaluationFixtureTables}, participant_attendance, instructor_attendance, session_roster, attendance_command_receipts, group_sessions, registration_ledger, registration_command_receipts, pre_registrations, participants restrict`,
-  );
-  await connection.close();
+  try {
+    await db
+      .update(s.attendanceSettings)
+      .set(originalAttendanceSettings)
+      .where(eq(s.attendanceSettings.id, originalAttendanceSettings.id));
+  } finally {
+    try {
+      await db.execute(
+        sql`truncate ${evaluationFixtureTables}, participant_attendance, instructor_attendance, session_roster, attendance_command_receipts, group_sessions, registration_ledger, registration_command_receipts, pre_registrations, participants restrict`,
+      );
+    } finally {
+      await connection.close();
+    }
+  }
 });
 async function setup(withAttendance = false) {
   now = new Date("2099-02-01T12:00:00Z");
