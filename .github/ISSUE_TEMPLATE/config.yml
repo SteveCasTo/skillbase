@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: "Reportar una vulnerabilidad en privado"
+    url: "https://github.com/SteveCasTo/skillbase/security/advisories/new"
+    about: "No publiques vulnerabilidades ni pruebas de explotación en issues públicos."
+  - name: "Documentación del Proyecto"
+    url: "https://github.com/SteveCasTo/skillbase/tree/development/docs"
+    about: "Consulta los contratos, arquitectura y reglas de negocio antes de abrir un issue."
