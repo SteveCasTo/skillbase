@@ -1,6 +1,14 @@
 # Revisión de seguridad — 2026-10-09
 
-## Estado y alcance
+## Estado vigente — conciliación 2026-10-22
+
+- **AUTH-1: RESUELTO/ACEPTADO bajo la regla aprobada.** El guard común valida también PASSWORD y EMAIL_CONFIRMATION (`src/domain/auth/identity.ts`, `requireApprovedProviders`), con identidad/UUID, correo verificado, provenance y autorización interna. El cambio normal transmite `current_password`; la excepción nativa de primera contraseña para la misma cuenta Google legítima es intencional. El cierre operacional se registró en el release PR 342, al final de este informe. No se atribuye al proveedor una prueba OAuth reciente de cinco minutos fuera del formulario de la aplicación.
+- **DEP-1: RESUELTO para las dos coincidencias reportadas.** `package.json` y `bun.lock` fijan devalue 5.9.3 y Sharp 0.35.5; ver «DEP-1: versiones corregidas fijadas». No se ejecutó un nuevo escaneo de advisories para esta conciliación.
+- **Aceptación del responsable (2026-10-22):** el usuario confirma que Google OAuth y recuperación por correo funcionan y que los datos locales y de producción están bien tras las restauraciones. Es comunicación de aceptación, no una nueva prueba externa, auditoría global o comparación de hashes realizada por quien actualiza este documento. Detalle vigente en [`AUTHENTICATION.md`](../AUTHENTICATION.md).
+
+Los apartados siguientes conservan cronológicamente el reporte inicial y sus seguimientos. Sus estados «abierto», «parcial» o «pendiente» describen aquel boundary, no hallazgos vigentes ni trabajo urgente.
+
+## Estado y alcance originales — 2026-10-09
 
 - **Base inspeccionada:** `f388327424b9010a0ec5e5c209fe46d09b960d9f` (`development`).
 - **Naturaleza:** revisión estática reportada de código, configuración y lockfile; este documento registra el reporte, no afirma una nueva ejecución de la auditoría.
@@ -9,9 +17,9 @@
 
 ## Hallazgos
 
-### AUTH-1 — La reautenticación de cambio de contraseña depende de los guards de aplicación
+### AUTH-1 — Reporte original de reautenticación (resuelto/aceptado posteriormente)
 
-**Clasificación reportada:** potencialmente alta; requiere validación. **Estado:** no confirmado como exploit end-to-end.
+**Clasificación original reportada:** potencialmente alta; requería validación. **Estado original:** no confirmado como exploit end-to-end. El análisis de las líneas siguientes corresponde exclusivamente a la base del 2026-10-09, no a la implementación actual.
 
 En `src/domain/auth/identity.ts:133-134`, `requireApprovedProviders` da por válida una sesión cuyo método actual sea `PASSWORD` o `EMAIL_CONFIRMATION` sin comprobar si la identidad Google enlazada está aprobada. La decisión es coherente con que una identidad asociada en Supabase no concede por sí sola acceso OAuth a la aplicación, pero no vincula la operación de cambio de contraseña del proveedor a esa aprobación.
 
@@ -23,9 +31,9 @@ El adapter de aplicación `src/server/auth/profile.ts:118-129` exige aprobación
 
 **Seguimiento:** requiere validación de la operación y configuración efectivas del proveedor y decisión del responsable sobre el límite de seguridad esperado antes de elegir una remediación. Este registro no prescribe ni implementa un mecanismo específico.
 
-### DEP-1 — Versiones fijadas de dependencias coinciden con advisories
+### DEP-1 — Coincidencias originales de dependencias (versiones corregidas posteriormente)
 
-**Estado:** coincidencia de paquete/versión reportada; aplicabilidad y exposición de la aplicación pendientes de validar. No se confirmó explotación.
+**Estado original:** coincidencia de paquete/versión reportada; aplicabilidad y exposición de la aplicación pendientes de validar. No se confirmó explotación. Las versiones de esta tabla son históricas, no las del lockfile actual.
 
 | Paquete fijado en `bun.lock` | Advisory                                                                 | Riesgo resumido por la revisión                                                    | Versión corregida indicada por la revisión |
 | ---------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------------ |
@@ -48,9 +56,9 @@ No se verificaron dinámicamente integraciones, E2E, permisos cloud, configuraci
 - Las pruebas existentes de Auth dual reportadas cubren rechazo de OAuth no aprobado; no cubren cambio/conversión de contraseña directo en el proveedor.
 - No se añadieron pruebas: esta entrega es solo documental.
 
-## Seguimiento
+## Seguimiento original
 
-Mantener los hallazgos abiertos hasta que el responsable decida el tratamiento y se aporte evidencia de validación correspondiente. Cualquier remediación, test adicional o cambio de configuración pertenece a una tarea aprobada separada y no debe inferirse como aceptado a partir de este reporte.
+En el reporte inicial se mantuvieron los hallazgos abiertos hasta decidir su tratamiento y aportar validación. Las actuaciones autorizadas posteriores se registran a continuación; el resumen vigente recoge su resolución sin convertir esta revisión acotada en certificación global.
 
 ## Seguimiento autorizado — 2026-10-11
 

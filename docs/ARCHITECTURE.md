@@ -393,12 +393,15 @@ Ejemplos:
 
 Toda ruta privada debe validar sesión y autorización server-side.
 
-Las rutas de certificados están integradas en `development`: administración y
-configuración privadas, páginas de grupo ADMIN/INSTRUCTOR, detalle readonly del
-instructor, descargas autenticadas y verificación pública. La migración candidata
-no se ha aplicado a `master`/cloud; no implica release. Contrato, permisos y
-límites de estado en [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md) y
-[`PLAN.md`](PLAN.md).
+Las rutas de certificados incluyen administración y configuración privadas,
+páginas de grupo ADMIN/INSTRUCTOR, detalle readonly del instructor, descargas
+autenticadas y verificación pública. Fase 9 y la migración 0023 se liberaron por
+PR 299; mejoras posteriores están incluidas en los releases PR 447/452. La
+verificación pública dedicada permite código/QR o huella SHA-256 del PDF, nunca
+descarga anónima del documento. El historial de releases no acredita por sí solo
+el estado runtime actual. Contrato, permisos y evidencia en
+[`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md), [`PLAN.md`](PLAN.md) y
+[`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## LÓGICA DE NEGOCIO
 
@@ -465,8 +468,9 @@ Certificado:
 
 La lista definitiva debe mantenerse en el modelo de datos.
 
-Los estados de certificado anteriores son una enumeración conceptual pendiente
-de implementación, no estados persistidos actualmente. Ver
+Los estados de certificado anteriores son una enumeración conceptual histórica,
+no el enum persistido de la implementación liberada. La semántica vigente de
+documento generado/firmado/revocado e historial se describe en
 [`CERTIFICATES_CONTRACT.md`](CERTIFICATES_CONTRACT.md).
 
 ## ERRORES
@@ -478,6 +482,11 @@ No mostrar errores internos de PostgreSQL al usuario.
 Los mensajes públicos deben ser comprensibles.
 
 Los logs internos deben conservar contexto técnico suficiente sin incluir secretos.
+
+### Observaciones de mantenimiento opcionales — 2026-10-22
+
+- **Archivos por limpiar:** `cleanup_pending` es un registro persistente de archivos retirados o no asociados por limpiar, no datos académicos incompletos ni un certificado vigente roto. `ManageCertificates` intenta borrar inmediatamente después del commit o de abandonar una reserva; si falla, conserva el registro y las asociaciones vigentes. Existe `cleanup(actorId, before)` con corte mínimo de una hora, sin caller operativo identificado en el código actual. Un reintento operativo adicional sería una idea futura optativa, no un worker/cron comprometido ni evidencia de backlog real. Fuente: [`manage-certificates.ts`](../src/application/certificates/manage-certificates.ts).
+- **Diagnóstico de errores inesperados:** los adapters HTTP de [certificados](../src/server/certificates/http.ts), [asistencia](../src/server/attendance/http.ts), [evaluaciones](../src/server/evaluations/http.ts) y [cierre](../src/server/academic-closure/http.ts) responden 503 genérico para excepciones desconocidas sin emitir en ese fallback un evento saneado de aplicación. La privacidad de la respuesta es correcta. [`traceSlowOperation`](../src/server/observability/slow-operation.ts) avisa a partir de cinco segundos, no registra por ello todo error rápido. Evaluar un evento técnico saneado sería una mejora futura opcional; no se inspeccionaron logs del proveedor, no se infiere un incidente actual ni se declara resuelto mediante documentación.
 
 ## AUDITORÍA
 

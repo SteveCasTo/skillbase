@@ -1,5 +1,11 @@
 # DEPLOYMENT
 
+## Estado vigente y lectura del historial — 2026-10-22
+
+El responsable confirmó el 2026-10-22 el funcionamiento de Google OAuth y recuperación por correo, y que los datos locales y de producción están bien tras las restauraciones. Se registra esa aceptación en [`AUTHENTICATION.md`](AUTHENTICATION.md); no es un nuevo smoke, restore, inventario de datos ni prueba de proveedor ejecutada para esta conciliación.
+
+Los releases y operaciones descritos abajo son registros de su fecha. Sus reservas sobre AUTH-1 y confirmación de OAuth/recovery fueron supersedidas por el cierre bajo la regla aprobada de PR 342 y por la comunicación del responsable, respectivamente. No se convierten los conteos, PIDs o resultados históricos en estado runtime actual. La promoción sigue el flujo aprobado: PR a `development`, gate completo y release secuencial a `master`; este cambio documental no modifica workflows ni ejecuta deploy.
+
 ## OBJETIVO
 
 Definir CI/CD y despliegue de producción.
@@ -157,11 +163,11 @@ Las trazas posteriores confirmaron que el preflight de conexión introducido en 
 `.github/workflows/ci.yml` se ejecuta únicamente en:
 
 - push a `master`;
-- pull request cuyo destino sea `master`.
+- pull request cuyo destino sea `development` o `master`.
 
 El job `quality` instala con lockfile y ejecuta checks estáticos, unit tests y build sin levantar Docker. Sus valores públicos de Supabase y base de datos son placeholders de build, no credenciales.
 
-El job `integration-e2e` instala Chromium y ejecuta los runners aislados. `test:integration` y `test:e2e` crean cada uno su propio stack temporal, asignan puertos/credenciales temporales, aplican migraciones Drizzle y limpian el proyecto al terminar. El runner inyecta placeholders locales para las variables de proveedor Google requeridas por la configuración Supabase; no usa OAuth real. No se inyectan credenciales del stack de desarrollo ni se ejecuta `db:reset`. La salida de error de comandos Supabase se retiene para evitar que keys locales aparezcan en los logs.
+El job `integration` ejecuta una vez la integración de producto y, por separado, las demos comprehensive y certificados, cada una con su stack gestionado. Los dos jobs `e2e` instalan Chromium y ejecutan shards aislados. Los runners asignan puertos/credenciales temporales, aplican migraciones Drizzle y limpian su proyecto al terminar; no usan OAuth real, credenciales del stack de desarrollo ni `db:reset`. El job `integration-e2e` no es un runner monolítico: agrega los resultados de `quality`, `integration` y ambos shards, exige su éxito y verifica cohorte completa, tiempos, flakes y retries con `scripts/verify-e2e-shards.ts`. La salida de error de comandos Supabase se retiene para evitar que keys locales aparezcan en los logs.
 
 ### Shards E2E aislados — PR 279 integrado en development
 
@@ -592,8 +598,8 @@ El smoke productivo fue anónimo: GET `/`, `/cursos`, `/login` y
 probó en producción un cambio autenticado, recovery, primera contraseña Google,
 Google OAuth real ni entrega SMTP. El usuario había confirmado antes una
 asociación manual de recovery; no se repitió y no se usa como evidencia de
-compatibilidad con este release. AUTH-1 queda abierto/parcial por el boundary de
-primera contraseña Google y la ausencia de ejecución real de los flujos. Ver
+compatibilidad con este release. En ese momento AUTH-1 quedó abierto/parcial;
+el cierre posterior bajo la regla aprobada está registrado en PR 342. Ver
 [`AUTHENTICATION.md`](AUTHENTICATION.md) y el detalle de límites en
 [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md).
 
@@ -660,7 +666,7 @@ cold starts; ver [`validation/PRODUCTION-PERFORMANCE.md`](validation/PRODUCTION-
 La medición observada no garantiza p95/SLO ni que todas las rutas privadas o
 cold starts hayan quedado resueltos.
 
-## Launcher nativo Auth local (candidato; operación canónica pendiente)
+## Launcher nativo Auth local (candidato histórico; operación completada abajo)
 
 PR 337 integró en `development` el guard de identidad común como
 `2bd5d05244fb151501dfe8cda8249cb0d0b8fe40`; CI `38175262811` pasó quality,
