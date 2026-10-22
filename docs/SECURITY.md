@@ -1,5 +1,11 @@
 # SECURITY
 
+## Estado vigente — 2026-10-22
+
+AUTH-1 está **resuelto/aceptado bajo la regla de identidad aprobada**, con el guard común y cierre operacional de PR 342. DEP-1 está **resuelto para las dos versiones reportadas**: devalue 5.9.3 y Sharp 0.35.5 fijadas en manifest/lockfile. No se realizó un nuevo escaneo ni una auditoría global en esta conciliación. El [informe original y sus seguimientos](validation/SECURITY-AUDIT.md) conservan la evidencia y sus límites.
+
+El responsable confirmó el 2026-10-22 que Google OAuth y recuperación por correo funcionan y que los datos locales y productivos están bien tras las restauraciones. Es aceptación comunicada por el usuario, no una nueva prueba de producción o comparación de hashes del autor documental; ver [`AUTHENTICATION.md`](AUTHENTICATION.md). Los pendientes de esos flujos en los registros de releases siguientes son históricos, no solicitudes actuales de repetir la confirmación.
+
 ## OBJETIVO
 
 Definir requisitos mínimos de seguridad para autenticación, autorización, rutas, archivos, datos y certificados.
@@ -67,7 +73,7 @@ No confiar únicamente en ocultar botones.
 - El selector/servidor permite asignar perfiles `INSTRUCTOR` con estado `ACTIVE`. Publicar curso exige esa asignación; drafts pueden tenerla opcional. Instructor no obtiene acceso a formatos/interesados/participantes/settings/finanzas; Fase 6 limita asistencia a sus propios grupos con ownership validado en servidor y roster sin CI/email.
 - Asignaciones, fechas y grupos se validan bajo la misma barrera transaccional/advisory-lock, IDs de instructor anterior/nuevo en orden estable y luego bloqueo de curso. Las validaciones incluyen cursos con calendarios L–V que intersectan; la comprobación de grupos cuenta solo estados `PLANNED` (la cancelación libera intervalo). Cambio de instructor de curso iniciado y cambio de fechas de curso iniciado con asignación se rechazan server-side. Creación/edición de perfil y asignación tienen eventos no secretos e historial. Un password update exitoso intenta escribir `PASSWORD_CHANGED` con actor/target internos y sin metadata; como Auth y PostgreSQL no comparten transacción, el evento es posterior y un fallo solo genera `PASSWORD_CHANGE_AUDIT_WRITE_FAILED` con actor ID, sin revertir el cambio Auth confirmado.
 - El perfil profesional no recopila descripción; su nombre completo es la única proyección pública del instructor asignado. Correo y teléfono permanecen en vistas privadas autorizadas.
-- PRs 121–123 y el release PR 126 son antecedentes de Auth. SMTP cloud/local está configurado y la recepción de prueba local fue confirmada; recovery/cambio completo y entrega cloud aún requieren verificación. Google OAuth real y el callback local requieren su validación independiente. No inferirlos del estado de migraciones.
+- PRs 121–123 y el release PR 126 son antecedentes de Auth. SMTP cloud/local está configurado; recepción de prueba y aceptación posterior de recuperación/Google OAuth se distinguen en [`AUTHENTICATION.md`](AUTHENTICATION.md). No inferir funcionamiento externo del estado de migraciones ni de los fixtures de CI.
 
 #### Correcciones Auth/lifecycle integradas y liberadas (PR 211; perfil refinado en PR 228)
 
@@ -75,7 +81,7 @@ No confiar únicamente en ocultar botones.
 - La desactivación se bloquea server-side si la cuenta tiene cualquier asignación a curso no archivado (incluye drafts); se listan cursos con acción de resolver/asignar. Tras desactivar, guards de páginas y operaciones comprueban identidad/estado/rol vigentes y deniegan también sesiones existentes. Reactivación no recrea ni resetea la credencial.
 - Borrado cruza PostgreSQL y Supabase Auth sin transacción distribuida: se escribe primero la intención/bloqueo y estado pendiente, se elimina identidad con Admin API server-only y se finaliza conservando tombstone/auditoría para no romper FKs. Error en proveedor/finalización mantiene acceso bloqueado y permite reintentar, en lugar de reactivar ambiguamente. `0016` se aplicó localmente sin reset y quedó incluida antes del release Fase 5 que avanzó cloud al ledger 18.
 - La acción dedicada de crear password para cuenta Google-only exige claims firmados OAUTH y Google aprobado, sesión live/cuenta/actor revalidados en servidor y prueba reciente (menos de cinco minutos); no confía en metadata o identidad asociada histórica ni añade confirmación email a ese formulario. La prueba de recovery es una ruta separada. Password existente prueba contraseña actual server-side; password repetido da error específico seguro. PR 136 integró la fuente que pasó 178 unit, 98 integration y E2E 120/120.
-- Las pruebas locales del feature branch no son verificación de entrega real. Configurar y verificar SMTP/recovery es trabajo aprobado pendiente; Google OAuth real continúa pendiente de forma independiente.
+- Las pruebas locales del feature branch no son verificación de entrega real. La aceptación de funcionamiento SMTP/recovery y Google OAuth del responsable del 2026-10-22 es una fuente independiente, no un resultado de esas pruebas.
 - Fase 5 trata CI, email y roster como datos personales. No exponer CI públicamente; exportación CSV/PDF es solo ADMIN, debe neutralizar fórmula CSV y no constituye recibo/boleta. No hay pasarela de cobro ni upload de comprobantes.
 
 ### Lifecycle y UI de cuentas ADMIN (release PR 286)
@@ -452,13 +458,13 @@ Si un secreto se expone:
 
 La clave de idempotencia del curso se vincula en servidor al actor autenticado y al fingerprint de la carga validada; no se acepta identidad de actor del cliente y reutilizar la clave con datos distintos falla. Los metadatos no salen en DTOs. El artwork se asocia después de crear el borrador; ante fallo se ofrece recuperar/reintentar sobre ese borrador. No se sustituye silenciosamente la asociación existente ni se asume una transacción distribuida entre PostgreSQL y Storage. La migración aditiva 0010 no automatiza borrado de historial.
 
-### Contraseñas de cuentas internas (implementadas; recovery SMTP no verificado)
+### Contraseñas de cuentas internas (implementadas; aceptación vigente arriba)
 
 Las credenciales pertenecen exclusivamente a Supabase Auth. Crear cuenta y asignar contraseña inicial requiere API privilegiada exclusivamente server-side; no versionar secretos ni retornar/registrar la contraseña después de la respuesta inicial necesaria para entregarla al ADMIN. Nunca persistirla en PostgreSQL, auditarla, incluirla en telemetría, devolverla en cargas de navegación ni repoblar el formulario. Mantener signup público deshabilitado, protección CSRF/origen, cookies seguras, `Cache-Control: private, no-store`, redirects permitidos y rate limiting del proveedor/endpoint. Configurar y comprobar SMTP antes de prometer recuperación por correo en cloud.
 
 ## REVISIÓN DE SEGURIDAD (2026-10-09)
 
-La revisión estática de la base `f388327424b9010a0ec5e5c209fe46d09b960d9f` registró un riesgo potencial en el cambio de contraseña Auth y dos coincidencias de advisories con versiones fijadas en `bun.lock`. Son hallazgos pendientes de validación y decisión; no se confirmó una explotación end-to-end ni se aplicaron remediaciones en esa revisión. El detalle, evidencia, límites y estado se mantienen en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md). Esta evidencia no constituye certificación de seguridad ni verificación de configuración/uso en producción.
+La revisión estática de la base `f388327424b9010a0ec5e5c209fe46d09b960d9f` registró un riesgo potencial en el cambio de contraseña Auth y dos coincidencias de advisories con versiones fijadas en `bun.lock`. En aquel momento quedaron pendientes de validación y decisión; no se confirmó una explotación end-to-end ni se aplicaron remediaciones en esa revisión. Los seguimientos posteriores resolvieron las coincidencias DEP-1 y aceptaron AUTH-1 bajo la regla aprobada. El detalle, evidencia, límites y estado se mantienen en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md). Esta evidencia no constituye certificación de seguridad ni una nueva verificación de producción.
 
 El seguimiento inicial de 2026-10-11 mantuvo AUTH-1 abierto, pendiente de decisión y
 revisión específica autorizada de la frontera del proveedor. En aquel seguimiento no se modificaron
@@ -468,7 +474,7 @@ PR 332 fija únicamente las correcciones transitivas Sharp 0.35.5/devalue 5.9.3
 mediante overrides/lockfile, conservando Astro y el patch Sileo. Validaciones y
 límites están en el seguimiento del documento de auditoría.
 
-La implementación defensiva transmite `current_password` en el cambio normal después de la verificación server-side existente. Recovery validado y primera contraseña Google aprobada no transmiten contraseña actual. Tras el release de PR 335, el boolean nativo cloud `security_update_password_require_current_password` se cambió de `false` a `true` y se confirmó activo por lectura filtrada. No se cambiaron secretos, roles, sesiones, migraciones, provisioning, configuración local ni otros campos de configuración cloud. El envío del campo más el control nativo protegen el cambio normal con contraseña previa, pero el proveedor exime cuentas sin password y no conoce la aprobación Google interna. No se probaron en producción cambios autenticados, recovery, primera contraseña Google ni OAuth/SMTP real; AUTH-1 sigue **abierto/parcial**, no completamente remediado. Evidencia y límites constan en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md) y [`AUTHENTICATION.md`](AUTHENTICATION.md).
+La implementación defensiva transmite `current_password` en el cambio normal después de la verificación server-side existente. Recovery validado y primera contraseña Google aprobada no transmiten contraseña actual. Tras el release de PR 335, el boolean nativo cloud `security_update_password_require_current_password` se cambió de `false` a `true` y se confirmó activo por lectura filtrada. No se cambiaron secretos, roles, sesiones, migraciones, provisioning, configuración local ni otros campos de configuración cloud. El envío del campo más el control nativo protegen el cambio normal con contraseña previa, pero el proveedor exime cuentas sin password y no conoce la aprobación Google interna. En ese release no se probaron en producción cambios autenticados, recovery, primera contraseña Google ni OAuth/SMTP real; AUTH-1 quedó entonces abierto/parcial. Ese estado fue supersedido por la regla aprobada y el cierre PR 342 descritos abajo. Evidencia y límites constan en [`validation/SECURITY-AUDIT.md`](validation/SECURITY-AUDIT.md) y [`AUTHENTICATION.md`](AUTHENTICATION.md).
 
 El seguimiento de identidad autorizada acepta explícitamente que una primera
 contraseña de la misma cuenta Google legítima pueda establecerse por el mecanismo
@@ -481,8 +487,8 @@ cuenta verificada aun con unlink nativo de la identidad email, y OAuth
 sigue requiriendo asociación Google aprobada. La app mantiene prueba Google
 reciente para su propio formulario y prueba recovery ligada a sesión. La
 excepción del proveedor no se describe como una garantía de prueba OAuth de cinco
-minutos fuera de la app. Esta decisión y el fix no son certificación global ni
-cierre operacional: faltan los gates coordinados descritos en la auditoría.
+minutos fuera de la app. Esta decisión y el fix no son certificación global; el
+cierre operacional posterior se registró en PR 342, descrito abajo.
 
 El 2026-10-12 se completó la aceptación operacional **local** autorizada de
 PR337/340 con el helper exacto revisado: control nativo true sobre el mismo
@@ -498,10 +504,11 @@ bypass/conversión. El proveedor retornó el código oficial
 `current_password_invalid`, que el script inicial había confundido con el nombre
 del enum; se preservó esa incidencia sin presentar una primera corrida limpia.
 
-La evidencia local no cierra el estado productivo AUTH-1: master sigue en PR335,
-la promoción combinada corresponde al orquestador y cloud quedó sin cambios.
-Google OAuth/SMTP real y recovery canónico no se verificaron de nuevo; permanecen
-separados de los ocho E2E controlados con enforcement activo. Se conservan los
+En aquel boundary local, master seguía en PR335 y la promoción combinada aún no
+se había realizado; PR 342 cerró después la aceptación productiva bajo la regla
+aprobada. Google OAuth/SMTP real y recovery canónico no se verificaron en esa QA;
+se distinguen de los ocho E2E controlados con enforcement activo y de la aceptación
+del responsable del 2026-10-22. Se conservan los
 límites de operador exclusivo/sin CAS externo, file owner1000/readonly no inmune
 a chmod, rollback false sin restaurar ausencia física y falta de vigilancia
 continua de CLI alternativo. No es una certificación global de seguridad.
@@ -521,7 +528,7 @@ globalmente el sistema.
 No se probaron en este release Google OAuth real, recovery/cambio autenticado,
 primera contraseña Google ni entrega SMTP. No afirmar que todo riesgo de
 seguridad está eliminado; la auditoría estática acotada conserva sus límites y
-los hallazgos de dependencias requieren su propio estado. La aceptación local
+DEP-1 quedó corregido para las dos versiones reportadas, según el informe. La aceptación local
 del helper mantiene además sus límites de ventana exclusiva Docker, ownership
 UID 1000 no resistente a chmod del servicio/host, rollback al literal `false`
 (no ausencia física original) y falta de monitorización de recreaciones por CLI

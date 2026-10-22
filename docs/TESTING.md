@@ -1,5 +1,12 @@
 # TESTING
 
+## Lectura de evidencia y aceptación vigente — 2026-10-22
+
+- **Aceptación del responsable:** el usuario confirmó el 2026-10-22 que Google OAuth y recuperación por correo funcionan y que los datos locales y de producción están bien tras las restauraciones. Cierra el pendiente de confirmación, pero no es una ejecución de CI, una prueba externa del autor de esta conciliación ni un inventario/hash fresco de datos. Detalle en [`AUTHENTICATION.md`](AUTHENTICATION.md).
+- **Ejecuciones históricas:** los conteos, fallos, skips, retries y resultados de abajo pertenecen al SHA/PR/run que los acompaña; no se convierten en el gate del HEAD actual ni se borran por un resultado posterior. Las notas de «candidata», «en curso» o proveedores externos «pendientes» conservan el boundary original, no un bloqueo actual por falta de confirmación.
+- **Inspección y medición:** [`SILEO_AUDIT.md`](SILEO_AUDIT.md) y PR 426 documentan inventario/correcciones de feedback; [`validation/SILEO.md`](validation/SILEO.md) conserva pasadas previas. [`PERFORMANCE_20261016.md`](PERFORMANCE_20261016.md) y su [matriz de 72 pares](PERFORMANCE_20261016_MATRIX.md) contienen Lighthouse de preview local antes/después, una muestra por ruta/dispositivo/build; [`validation/PERFORMANCE.md`](validation/PERFORMANCE.md) conserva el baseline anterior. No son scores actuales de producción ni pruebas de todas las mutaciones del producto.
+- **Gate del cambio actual:** se consulta el CI del SHA exacto en su PR; `quality` cubre lint/formato/typecheck, unit y build; `integration` cubre producto y ambas demos en stacks propios; dos shards E2E y el agregador validan la cohorte completa y reportan flakes/retries. La existencia de código/assertions no acredita PASS y los proveedores controlados no sustituyen aceptación externa.
+
 ## Preinscripciones históricas y revalidación de eliminación de grupos (2026-10-19)
 
 - Se adaptó el caso E2E existente de preinscripciones para filtrar un curso archivado con curso/estado/búsqueda, comprobar etiquetas reales y verificar que CSV/PDF exportan exactamente ese alcance; las opciones de alta siguen excluyendo cursos archivados.
