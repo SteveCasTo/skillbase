@@ -163,7 +163,7 @@ Los detalles y responsabilidades de cada tecnología se documentan en `docs/ARCH
 Requisitos: Git, Bun `1.4.2`, Node.js `24.x` y Docker con el daemon activo. En un equipo nuevo, clonar la rama `development`, instalar las dependencias y preparar `.env` antes del setup:
 
 ```sh
-git clone -b development https://github.com/SteveCasTo/skillbase.git
+git clone -b development https://github.com/SteveCasTo/skillbase.git SkillBase
 cd SkillBase
 bun install --frozen-lockfile
 bun -e "await Bun.write('.env', Bun.file('.env.example'))"
