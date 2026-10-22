@@ -628,335 +628,383 @@ test("creates canonical date-only courses and rejects forged date bounds", async
   expect(group.endsAt).toEqual(new Date("2027-03-17T16:30:00.000Z"));
 });
 
+const rollbackGroupedCourseFixture = new Error(
+  "Rollback grouped-course fixture",
+);
+
 test("grouped courses replan ordinary future calendars atomically and require an active format to republish", async () => {
-  const morning = await createGroup(repo, admin, courseId, "08:00", 2);
-  const retiredPlan = await createGroup(repo, admin, courseId, "11:00", 2);
-  const retired = await cancelGroup(
-    repo,
-    admin,
-    retiredPlan.id,
-    retiredPlan.updatedAt.toISOString(),
-  );
-  const retiredSessions = await database.db
-    .select()
-    .from(groupSessions)
-    .where(eq(groupSessions.groupId, retired.id))
-    .orderBy(groupSessions.id);
-  const existing = await courseRepo.getAdmin(courseId);
-  if (!existing) throw new Error("Missing course");
-  const registrations = new DrizzleRegistrationRepository(database.db);
-  const registration = await registrations.create(
-    {
-      requestKey: crypto.randomUUID(),
-      courseId,
-      groupId: morning.id,
-      courseRevision: existing.updatedAt.toISOString(),
-      settingsRevision: (await registrations.settings(admin.id)).revision,
-      firstDayException: false,
-      sourceInterestId: null,
-      participantType: "STUDENT",
-      participant: {
-        ci: crypto.randomUUID().toUpperCase(),
-        firstName: "Synthetic",
-        paternalSurname: "Calendar",
-        maternalSurname: "Fixture",
-        email: "calendar@test.invalid",
-        phone: null,
-      },
-      initialPayment: {
-        amountCents: 8000,
-        effectiveDate: null,
-        paymentMethod: "CASH",
-        reason: null,
-      },
-    },
-    admin.id,
-  );
-  const financialSnapshot = async () => ({
-    registrations: await database.db
-      .select()
-      .from(schema.preRegistrations)
-      .where(eq(schema.preRegistrations.courseId, courseId)),
-    ledger: await database.db
-      .select()
-      .from(schema.registrationLedger)
-      .where(eq(schema.registrationLedger.registrationId, registration.id)),
-    receipts: await database.db
-      .select()
-      .from(schema.registrationCommandReceipts)
-      .where(eq(schema.registrationCommandReceipts.actorId, admin.id)),
-  });
-  const money = await financialSnapshot();
-  expect(money.ledger).toHaveLength(1);
-  expect(existing.editability).toMatchObject({
-    dates: true,
-    format: false,
-    schedule: false,
-    content: true,
-  });
-  const data = (start: string) =>
-    validateCourseData({
-      ...COURSE_FIXTURES.publishedOpenRegistration,
-      name: existing.name,
-      courseTypeId: existing.courseTypeId,
-      instructorId: existing.instructorId ?? "",
-      startsAt: `${start}T18:00`,
-      endsAt: instantToBoliviaCivil(
-        planWeekdaySchedule({
+  try {
+    await database.db.transaction(async (tx) => {
+      const repo = new DrizzleGroupRepository(tx);
+      const courseRepo = new DrizzleCourseRepository(tx);
+      const formats = new DrizzleFormatRepository(tx);
+      const morning = await createGroup(repo, admin, courseId, "08:00", 2);
+      const retiredPlan = await createGroup(repo, admin, courseId, "11:00", 2);
+      const retired = await cancelGroup(
+        repo,
+        admin,
+        retiredPlan.id,
+        retiredPlan.updatedAt.toISOString(),
+      );
+      const retiredSessions = await tx
+        .select()
+        .from(groupSessions)
+        .where(eq(groupSessions.groupId, retired.id))
+        .orderBy(groupSessions.id);
+      const existing = await courseRepo.getAdmin(courseId);
+      if (!existing) throw new Error("Missing course");
+      const registrations = new DrizzleRegistrationRepository(tx);
+      const registration = await registrations.create(
+        {
+          requestKey: crypto.randomUUID(),
+          courseId,
+          groupId: morning.id,
+          courseRevision: existing.updatedAt.toISOString(),
+          settingsRevision: (await registrations.settings(admin.id)).revision,
+          firstDayException: false,
+          sourceInterestId: null,
+          participantType: "STUDENT",
+          participant: {
+            ci: crypto.randomUUID().toUpperCase(),
+            firstName: "Synthetic",
+            paternalSurname: "Calendar",
+            maternalSurname: "Fixture",
+            email: "calendar@test.invalid",
+            phone: null,
+          },
+          initialPayment: {
+            amountCents: 8000,
+            effectiveDate: null,
+            paymentMethod: "CASH",
+            reason: null,
+          },
+        },
+        admin.id,
+      );
+      const financialSnapshot = async () => ({
+        registrations: await tx
+          .select()
+          .from(schema.preRegistrations)
+          .where(eq(schema.preRegistrations.courseId, courseId)),
+        ledger: await tx
+          .select()
+          .from(schema.registrationLedger)
+          .where(eq(schema.registrationLedger.registrationId, registration.id)),
+        receipts: await tx
+          .select()
+          .from(schema.registrationCommandReceipts)
+          .where(eq(schema.registrationCommandReceipts.actorId, admin.id)),
+      });
+      const money = await financialSnapshot();
+      expect(money.ledger).toHaveLength(1);
+      expect(existing.editability).toMatchObject({
+        dates: true,
+        format: false,
+        schedule: false,
+        content: true,
+      });
+      const data = (start: string) =>
+        validateCourseData({
+          ...COURSE_FIXTURES.publishedOpenRegistration,
+          name: existing.name,
+          courseTypeId: existing.courseTypeId,
+          instructorId: existing.instructorId ?? "",
           startsAt: `${start}T18:00`,
+          endsAt: instantToBoliviaCivil(
+            planWeekdaySchedule({
+              startsAt: `${start}T18:00`,
+              weekdaysMask: 31,
+              totalHours: existing.totalHours,
+              sessionMinutes: existing.sessionMinutes!,
+            }).endsAt,
+          ),
+          schedule: "Lunes a viernes, 18:00–19:30",
+          registrationStartAt: "2027-01-01T08:00",
+          registrationEndAt: "2027-02-01T12:00",
+        });
+      const originals = await tx
+        .select()
+        .from(groupSessions)
+        .where(
+          sql`${groupSessions.groupId} in (select id from groups where course_id = ${courseId})`,
+        )
+        .orderBy(groupSessions.id);
+      const moved = await courseRepo.update(
+        courseId,
+        data("2027-02-22"),
+        admin.id,
+        existing.updatedAt,
+      );
+      expect(moved.startsAt).toEqual(data("2027-02-22").startsAt);
+      expect(moved.slug).toBe(existing.slug);
+      expect(moved.courseTypeRevisionId).toBe(existing.courseTypeRevisionId);
+      expect(moved.prices).toEqual(existing.prices);
+      expect(await financialSnapshot()).toEqual(money);
+      const stored = await repo.list(courseId);
+      expect(stored).toHaveLength(3);
+      for (const group of stored) {
+        if (group.id === retired.id) {
+          expect(group).toEqual(retired);
+          expect(
+            await tx
+              .select()
+              .from(groupSessions)
+              .where(eq(groupSessions.groupId, retired.id))
+              .orderBy(groupSessions.id),
+          ).toEqual(retiredSessions);
+          continue;
+        }
+        const hour = group.id === morning.id ? "08:00" : "18:00";
+        const plan = planWeekdaySchedule({
+          startsAt: `2027-02-22T${hour}`,
           weekdaysMask: 31,
           totalHours: existing.totalHours,
           sessionMinutes: existing.sessionMinutes!,
-        }).endsAt,
-      ),
-      schedule: "Lunes a viernes, 18:00–19:30",
-      registrationStartAt: "2027-01-01T08:00",
-      registrationEndAt: "2027-02-01T12:00",
-    });
-  const originals = await database.db
-    .select()
-    .from(groupSessions)
-    .where(
-      sql`${groupSessions.groupId} in (select id from groups where course_id = ${courseId})`,
-    )
-    .orderBy(groupSessions.id);
-  const moved = await courseRepo.update(
-    courseId,
-    data("2027-02-22"),
-    admin.id,
-    existing.updatedAt,
-  );
-  expect(moved.startsAt).toEqual(data("2027-02-22").startsAt);
-  expect(moved.slug).toBe(existing.slug);
-  expect(moved.courseTypeRevisionId).toBe(existing.courseTypeRevisionId);
-  expect(moved.prices).toEqual(existing.prices);
-  expect(await financialSnapshot()).toEqual(money);
-  const stored = await repo.list(courseId);
-  expect(stored).toHaveLength(3);
-  for (const group of stored) {
-    if (group.id === retired.id) {
-      expect(group).toEqual(retired);
-      expect(
-        await database.db
+        });
+        expect(group.startsAt).toEqual(plan.sessions[0]!.startsAt);
+        expect(group.endsAt).toEqual(plan.endsAt);
+        const sessions = await tx
           .select()
           .from(groupSessions)
-          .where(eq(groupSessions.groupId, retired.id))
-          .orderBy(groupSessions.id),
-      ).toEqual(retiredSessions);
-      continue;
-    }
-    const hour = group.id === morning.id ? "08:00" : "18:00";
-    const plan = planWeekdaySchedule({
-      startsAt: `2027-02-22T${hour}`,
-      weekdaysMask: 31,
-      totalHours: existing.totalHours,
-      sessionMinutes: existing.sessionMinutes!,
-    });
-    expect(group.startsAt).toEqual(plan.sessions[0]!.startsAt);
-    expect(group.endsAt).toEqual(plan.endsAt);
-    const sessions = await database.db
-      .select()
-      .from(groupSessions)
-      .where(eq(groupSessions.groupId, group.id))
-      .orderBy(groupSessions.startsAt);
-    expect(
-      sessions
-        .filter((session) => !session.cancelledAt)
-        .map(({ startsAt, endsAt }) => ({ startsAt, endsAt })),
-    ).toEqual(plan.sessions);
-    for (const original of originals.filter(
-      (session) => session.groupId === group.id,
-    )) {
-      const cancelled = sessions.find((session) => session.id === original.id)!;
-      expect(cancelled.startsAt).toEqual(original.startsAt);
-      expect(cancelled.endsAt).toEqual(original.endsAt);
-      expect(cancelled.cancelledBy).toBe(admin.id);
+          .where(eq(groupSessions.groupId, group.id))
+          .orderBy(groupSessions.startsAt);
+        expect(
+          sessions
+            .filter((session) => !session.cancelledAt)
+            .map(({ startsAt, endsAt }) => ({ startsAt, endsAt })),
+        ).toEqual(plan.sessions);
+        for (const original of originals.filter(
+          (session) => session.groupId === group.id,
+        )) {
+          const cancelled = sessions.find(
+            (session) => session.id === original.id,
+          )!;
+          expect(cancelled.startsAt).toEqual(original.startsAt);
+          expect(cancelled.endsAt).toEqual(original.endsAt);
+          expect(cancelled.cancelledBy).toBe(admin.id);
+          expect(
+            sessions.some(
+              (session) => session.replacementForSessionId === original.id,
+            ),
+          ).toBe(true);
+        }
+      }
+      // Bulk-generated replacement ancestry is ordinary: a second valid edit works.
+      expect((await courseRepo.getAdmin(courseId))?.editability?.dates).toBe(
+        true,
+      );
+      const again = await courseRepo.update(
+        courseId,
+        data("2027-02-23"),
+        admin.id,
+        moved.updatedAt,
+      );
+      expect(again.startsAt).toEqual(data("2027-02-23").startsAt);
+      expect(await financialSnapshot()).toEqual(money);
+      await expect(
+        reactivateGroup(
+          repo,
+          admin,
+          retired.id,
+          retired.updatedAt.toISOString(),
+        ),
+      ).rejects.toMatchObject({ code: "COURSE_UNAVAILABLE" });
       expect(
-        sessions.some(
-          (session) => session.replacementForSessionId === original.id,
+        (await repo.list(courseId)).find((group) => group.id === retired.id),
+      ).toEqual(retired);
+      await expect(
+        courseRepo.update(
+          courseId,
+          data("2027-02-22"),
+          admin.id,
+          moved.updatedAt,
+        ),
+      ).rejects.toMatchObject({ code: "STALE_COURSE" });
+      const unchanged = async () => ({
+        course: await courseRepo.getAdmin(courseId),
+        groups: await repo.list(courseId),
+        sessions: await tx
+          .select()
+          .from(groupSessions)
+          .where(
+            sql`${groupSessions.groupId} in (select id from groups where course_id = ${courseId})`,
+          )
+          .orderBy(groupSessions.id),
+        audit: await tx
+          .select()
+          .from(auditEvents)
+          .where(eq(auditEvents.actorId, admin.id))
+          .orderBy(auditEvents.id),
+      });
+      const snapshot = await unchanged();
+      expect(
+        snapshot.audit.some(
+          (event) =>
+            event.entityId === courseId &&
+            event.action === "COURSE_UPDATED" &&
+            event.metadata?.oldStartsAt === existing.startsAt.toISOString() &&
+            event.metadata?.cascade === "GROUP_CALENDARS",
         ),
       ).toBe(true);
-    }
+      // Force a final course CHECK failure after replacement/group writes. Every
+      // calendar row, revision and audit event must roll back with the course.
+      await expect(
+        courseRepo.update(
+          courseId,
+          { ...data("2027-02-22"), minimumGrade: 101 },
+          admin.id,
+          again.updatedAt,
+        ),
+      ).rejects.toThrow();
+      expect(await unchanged()).toEqual(snapshot);
+      expect(await financialSnapshot()).toEqual(money);
+      await expect(
+        courseRepo.update(
+          courseId,
+          { ...data("2027-02-22"), schedule: "Other" },
+          admin.id,
+          again.updatedAt,
+        ),
+      ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+      expect(await unchanged()).toEqual(snapshot);
+      // Historical closure state must block even after reopening.
+      await tx
+        .insert(schema.academicGroupStates)
+        .values({ groupId: morning.id, closed: true, lastVersion: 1 });
+      const closed = await unchanged();
+      expect(closed.course?.editability?.dates).toBe(false);
+      await expect(
+        courseRepo.update(
+          courseId,
+          data("2027-02-22"),
+          admin.id,
+          again.updatedAt,
+        ),
+      ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+      expect(await unchanged()).toEqual(closed);
+      await tx
+        .update(schema.academicGroupStates)
+        .set({ closed: false })
+        .where(eq(schema.academicGroupStates.groupId, morning.id));
+      const reopened = await unchanged();
+      expect(reopened.course?.editability?.dates).toBe(false);
+      await expect(
+        courseRepo.update(
+          courseId,
+          data("2027-02-22"),
+          admin.id,
+          again.updatedAt,
+        ),
+      ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+      expect(await unchanged()).toEqual(reopened);
+      // Restore only this synthetic state setup; real closure history is immutable.
+      await tx
+        .update(schema.academicGroupStates)
+        .set({ lastVersion: 0 })
+        .where(eq(schema.academicGroupStates.groupId, morning.id));
+      const active = (await unchanged()).sessions.find(
+        (session) => session.groupId === morning.id && !session.cancelledAt,
+      )!;
+      await tx.insert(schema.instructorAttendance).values({
+        sessionId: active.id,
+        instructorId: existing.instructorId!,
+        status: "PRESENT",
+        markedBy: admin.id,
+        markedAt: new Date(),
+      });
+      const activity = await unchanged();
+      expect(activity.course?.editability?.dates).toBe(false);
+      await expect(
+        courseRepo.update(
+          courseId,
+          data("2027-02-22"),
+          admin.id,
+          again.updatedAt,
+        ),
+      ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+      expect(await unchanged()).toEqual(activity);
+      // Remove only the synthetic mark setup, then create an actual individual cancellation.
+      await tx
+        .delete(schema.instructorAttendance)
+        .where(eq(schema.instructorAttendance.sessionId, active.id));
+      await new DrizzleAttendanceRepository(tx).cancel(admin.id, {
+        requestKey: crypto.randomUUID(),
+        courseId,
+        groupId: morning.id,
+        sessionId: active.id,
+        revision: active.revision,
+        reason: "Individual fixture cancellation",
+      });
+      const special = await unchanged();
+      expect(special.course?.editability).toMatchObject({
+        dates: false,
+        content: true,
+      });
+      await expect(
+        courseRepo.update(
+          courseId,
+          data("2027-02-22"),
+          admin.id,
+          again.updatedAt,
+        ),
+      ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+      expect(await unchanged()).toEqual(special);
+      const content = await courseRepo.update(
+        courseId,
+        { ...data("2027-02-23"), description: "Content remains editable" },
+        admin.id,
+        again.updatedAt,
+      );
+      expect(content.description).toBe("Content remains editable");
+      expect((await unchanged()).sessions).toEqual(special.sessions);
+      expect(await financialSnapshot()).toEqual(money);
+      const pastPlan = planWeekdaySchedule({
+        startsAt: "2025-03-03T18:00",
+        weekdaysMask: 31,
+        totalHours: existing.totalHours,
+        sessionMinutes: existing.sessionMinutes!,
+      });
+      const past = await courseRepo.create(
+        {
+          ...existing,
+          name: `Started ${crypto.randomUUID()}`,
+          startsAt: pastPlan.sessions[0]!.startsAt,
+          endsAt: pastPlan.endsAt,
+          registrationStartAt: null,
+          registrationEndAt: null,
+        },
+        admin.id,
+      );
+      await repo.create(past.id, "08:00", 2, admin.id);
+      const beforeLateEdit = await courseRepo.getAdmin(past.id);
+      expect(beforeLateEdit?.editability).toMatchObject({
+        dates: false,
+        instructor: false,
+        content: true,
+      });
+      await expect(
+        courseRepo.update(
+          past.id,
+          { ...data("2027-02-22"), name: past.name },
+          admin.id,
+          past.updatedAt,
+        ),
+      ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+      expect(await courseRepo.getAdmin(past.id)).toEqual(beforeLateEdit);
+      await courseRepo.transition(courseId, "DRAFT", admin.id);
+      const [revision] = await tx
+        .select()
+        .from(courseTypeRevisions)
+        .where(eq(courseTypeRevisions.id, existing.courseTypeRevisionId));
+      await formats.setActive(revision!.courseTypeId, false, admin.id);
+      await expect(
+        courseRepo.transition(courseId, "PUBLISHED", admin.id),
+      ).rejects.toMatchObject({ code: "FORMAT_INACTIVE" });
+      throw rollbackGroupedCourseFixture;
+    });
+  } catch (error) {
+    if (error !== rollbackGroupedCourseFixture) throw error;
   }
-  // Bulk-generated replacement ancestry is ordinary: a second valid edit works.
-  expect((await courseRepo.getAdmin(courseId))?.editability?.dates).toBe(true);
-  const again = await courseRepo.update(
-    courseId,
-    data("2027-02-23"),
-    admin.id,
-    moved.updatedAt,
-  );
-  expect(again.startsAt).toEqual(data("2027-02-23").startsAt);
-  expect(await financialSnapshot()).toEqual(money);
-  await expect(
-    reactivateGroup(repo, admin, retired.id, retired.updatedAt.toISOString()),
-  ).rejects.toMatchObject({ code: "COURSE_UNAVAILABLE" });
-  expect(
-    (await repo.list(courseId)).find((group) => group.id === retired.id),
-  ).toEqual(retired);
-  await expect(
-    courseRepo.update(courseId, data("2027-02-22"), admin.id, moved.updatedAt),
-  ).rejects.toMatchObject({ code: "STALE_COURSE" });
-  const unchanged = async () => ({
-    course: await courseRepo.getAdmin(courseId),
-    groups: await repo.list(courseId),
-    sessions: await database.db
-      .select()
-      .from(groupSessions)
-      .where(
-        sql`${groupSessions.groupId} in (select id from groups where course_id = ${courseId})`,
-      )
-      .orderBy(groupSessions.id),
-    audit: await database.db
-      .select()
-      .from(auditEvents)
-      .where(eq(auditEvents.actorId, admin.id))
-      .orderBy(auditEvents.id),
-  });
-  const snapshot = await unchanged();
-  expect(
-    snapshot.audit.some(
-      (event) =>
-        event.entityId === courseId &&
-        event.action === "COURSE_UPDATED" &&
-        event.metadata?.oldStartsAt === existing.startsAt.toISOString() &&
-        event.metadata?.cascade === "GROUP_CALENDARS",
-    ),
-  ).toBe(true);
-  // Force a final course CHECK failure after replacement/group writes. Every
-  // calendar row, revision and audit event must roll back with the course.
-  await expect(
-    courseRepo.update(
-      courseId,
-      { ...data("2027-02-22"), minimumGrade: 101 },
-      admin.id,
-      again.updatedAt,
-    ),
-  ).rejects.toThrow();
-  expect(await unchanged()).toEqual(snapshot);
-  expect(await financialSnapshot()).toEqual(money);
-  await expect(
-    courseRepo.update(
-      courseId,
-      { ...data("2027-02-22"), schedule: "Other" },
-      admin.id,
-      again.updatedAt,
-    ),
-  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
-  expect(await unchanged()).toEqual(snapshot);
-  // Historical closure state must block even after reopening.
-  await database.db
-    .insert(schema.academicGroupStates)
-    .values({ groupId: morning.id, closed: true, lastVersion: 1 });
-  const closed = await unchanged();
-  expect(closed.course?.editability?.dates).toBe(false);
-  await expect(
-    courseRepo.update(courseId, data("2027-02-22"), admin.id, again.updatedAt),
-  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
-  expect(await unchanged()).toEqual(closed);
-  await database.db
-    .update(schema.academicGroupStates)
-    .set({ closed: false })
-    .where(eq(schema.academicGroupStates.groupId, morning.id));
-  const reopened = await unchanged();
-  expect(reopened.course?.editability?.dates).toBe(false);
-  await expect(
-    courseRepo.update(courseId, data("2027-02-22"), admin.id, again.updatedAt),
-  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
-  expect(await unchanged()).toEqual(reopened);
-  // Restore only this synthetic state setup; real closure history is immutable.
-  await database.db
-    .update(schema.academicGroupStates)
-    .set({ lastVersion: 0 })
-    .where(eq(schema.academicGroupStates.groupId, morning.id));
-  const active = (await unchanged()).sessions.find(
-    (session) => session.groupId === morning.id && !session.cancelledAt,
-  )!;
-  await database.db.insert(schema.instructorAttendance).values({
-    sessionId: active.id,
-    instructorId: existing.instructorId!,
-    status: "PRESENT",
-    markedBy: admin.id,
-    markedAt: new Date(),
-  });
-  const activity = await unchanged();
-  expect(activity.course?.editability?.dates).toBe(false);
-  await expect(
-    courseRepo.update(courseId, data("2027-02-22"), admin.id, again.updatedAt),
-  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
-  expect(await unchanged()).toEqual(activity);
-  // Remove only the synthetic mark setup, then create an actual individual cancellation.
-  await database.db
-    .delete(schema.instructorAttendance)
-    .where(eq(schema.instructorAttendance.sessionId, active.id));
-  await new DrizzleAttendanceRepository(database.db).cancel(admin.id, {
-    requestKey: crypto.randomUUID(),
-    courseId,
-    groupId: morning.id,
-    sessionId: active.id,
-    revision: active.revision,
-    reason: "Individual fixture cancellation",
-  });
-  const special = await unchanged();
-  expect(special.course?.editability).toMatchObject({
-    dates: false,
-    content: true,
-  });
-  await expect(
-    courseRepo.update(courseId, data("2027-02-22"), admin.id, again.updatedAt),
-  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
-  expect(await unchanged()).toEqual(special);
-  const content = await courseRepo.update(
-    courseId,
-    { ...data("2027-02-23"), description: "Content remains editable" },
-    admin.id,
-    again.updatedAt,
-  );
-  expect(content.description).toBe("Content remains editable");
-  expect((await unchanged()).sessions).toEqual(special.sessions);
-  expect(await financialSnapshot()).toEqual(money);
-  const pastPlan = planWeekdaySchedule({
-    startsAt: "2025-03-03T18:00",
-    weekdaysMask: 31,
-    totalHours: existing.totalHours,
-    sessionMinutes: existing.sessionMinutes!,
-  });
-  const past = await courseRepo.create(
-    {
-      ...existing,
-      name: `Started ${crypto.randomUUID()}`,
-      startsAt: pastPlan.sessions[0]!.startsAt,
-      endsAt: pastPlan.endsAt,
-      registrationStartAt: null,
-      registrationEndAt: null,
-    },
-    admin.id,
-  );
-  await repo.create(past.id, "08:00", 2, admin.id);
-  const beforeLateEdit = await courseRepo.getAdmin(past.id);
-  expect(beforeLateEdit?.editability).toMatchObject({
-    dates: false,
-    instructor: false,
-    content: true,
-  });
-  await expect(
-    courseRepo.update(
-      past.id,
-      { ...data("2027-02-22"), name: past.name },
-      admin.id,
-      past.updatedAt,
-    ),
-  ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
-  expect(await courseRepo.getAdmin(past.id)).toEqual(beforeLateEdit);
-  await courseRepo.transition(courseId, "DRAFT", admin.id);
-  const [revision] = await database.db
-    .select()
-    .from(courseTypeRevisions)
-    .where(eq(courseTypeRevisions.id, existing.courseTypeRevisionId));
-  await formats.setActive(revision!.courseTypeId, false, admin.id);
-  await expect(
-    courseRepo.transition(courseId, "PUBLISHED", admin.id),
-  ).rejects.toMatchObject({ code: "FORMAT_INACTIVE" });
 });
 
 test("different instructors may have the same daily start across courses", async () => {
