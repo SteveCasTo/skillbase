@@ -1,0 +1,57 @@
+name: "Historia de Usuario (User Story)"
+description: "Plantilla oficial para definir historias de usuario con criterios de aceptación y alcance."
+title: "[US] Como [rol] quiero [acción] para [beneficio]"
+labels: ["user-story"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Completa los campos para definir una historia de usuario siguiendo las convenciones del proyecto SkillBase.
+  - type: textarea
+    id: user_story
+    attributes:
+      label: Estructura de la Historia de Usuario
+      description: Redacta la historia en formato estándar (Como... quiero... para...).
+      placeholder: |
+        **Como** [rol: administrador / instructor / participante / operador técnico],
+        **quiero** [acción o capacidad requerida],
+        **para** [beneficio o valor que aporta al sistema].
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Criterios de Aceptación
+      description: Lista verificable de condiciones necesarias para considerar completada la historia.
+      placeholder: |
+        - [ ] Criterio 1: Comportamiento verificable...
+        - [ ] Criterio 2: Validación en servidor y feedback al usuario...
+        - [ ] Criterio 3: Cobertura de pruebas unitarias, integración y/o E2E...
+    validations:
+      required: true
+  - type: dropdown
+    id: domain_area
+    attributes:
+      label: Módulo o Dominio Principal
+      description: Selecciona el área principal del sistema involucrada.
+      options:
+        - "Cursos y Catálogo (courses)"
+        - "Preinscripciones y Participantes (registrations)"
+        - "Asistencia y Calendario (attendance)"
+        - "Evaluaciones y Calificaciones (evaluations)"
+        - "Cierre Académico (academic-closure)"
+        - "Certificados y Verificación QR (certificates)"
+        - "Autenticación y Sesiones (auth)"
+        - "Portal Público / Landing (landing)"
+        - "Core / Layout / Arquitectura Base (core)"
+        - "DevOps / CI/CD (devops)"
+    validations:
+      required: true
+  - type: textarea
+    id: technical_context
+    attributes:
+      label: Contexto Técnico o Dependencias
+      description: Migraciones requeridas, dependencias con otras historias o notas de arquitectura.
+      placeholder: "Requiere migración de esquema / Afecta endpoints de la API / PRs relacionados..."
+    validations:
+      required: false

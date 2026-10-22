@@ -1,5 +1,11 @@
 # Auditoría y corrección de feedback Sileo
 
+> Registro histórico de las pasadas de octubre de 2026 y sus respectivos gates,
+> incluidos fallos y verificaciones dirigidas. «Vigente» en sus apartados se refiere
+> al boundary de cada pasada, no al HEAD actual. La auditoría transversal posterior
+> y las correcciones de PR 426 están en [`../SILEO_AUDIT.md`](../SILEO_AUDIT.md);
+> la conciliación actual y los límites de evidencia están en [`../TESTING.md`](../TESTING.md).
+
 ## Alineación del gate CI tras integrar development
 
 PR329 se actualizó por fast-forward desde `9fea484` al remoto `76356cf8d4e61a9ad8ef9fd87638a7a3cebce6dd`, que incorpora `development` `586a1d9eca15921986e8492a49648541718ce0e5` y PR330/326/327/328. **El bloqueo histórico de weekday ya no es el estado vigente.** El run completado `38087855012` acreditó quality/integration/e2e 2/2 y reportó **13 FAIL / 63 PASS** en e2e 1/2; se revisaron sus logs una vez, sin reintentar el run.

@@ -136,7 +136,7 @@ por mensaje e icono; una coincidencia inválida nunca se presenta como éxito.
 La selección nueva o «Quitar archivo» limpia el resultado anterior y conserva
 la protección contra lecturas locales fuera de orden. Los hashes visibles de
 ADMIN no cambian.
-La comprobación conserva MIME/extensión PDF, límite de 10 MiB y SHA-256 de todos
+La comprobación conserva MIME/extensión PDF, límite de 4 MiB y SHA-256 de todos
 los bytes en el navegador: no transmite ni persiste el archivo ni habilita una
 descarga pública. Una coincidencia no cambia el estado oficial de la credencial.
 

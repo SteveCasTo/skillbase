@@ -1,5 +1,11 @@
 # Landing performance audit
 
+> Historical measurement from 2026-10-10, not a current production score. The later
+> local production-build audit and its 72 before/after report pairs are documented
+> in [`../PERFORMANCE_20261016.md`](../PERFORMANCE_20261016.md) and
+> [`../PERFORMANCE_20261016_MATRIX.md`](../PERFORMANCE_20261016_MATRIX.md).
+> Both measurements retain their original methods, results and limitations.
+
 ## Scope and environment
 
 Measured on 2026-10-10 UTC from `origin/development` base

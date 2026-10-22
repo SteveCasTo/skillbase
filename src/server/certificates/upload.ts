@@ -1,6 +1,8 @@
 import { PDFDocument } from "pdf-lib";
 import { CertificateError } from "@/domain/certificates/rules";
-export const CERTIFICATE_PDF_MAX_BYTES = 10 * 1024 * 1024;
+import { CERTIFICATE_PDF_MAX_BYTES } from "@/domain/certificates/constants";
+
+export { CERTIFICATE_PDF_MAX_BYTES } from "@/domain/certificates/constants";
 export async function validateCertificatePdf(
   bytes: Uint8Array,
   filename: string,
@@ -16,7 +18,7 @@ export async function validateCertificatePdf(
   )
     throw new CertificateError(
       "VALIDATION_FAILED",
-      "Archivo PDF no válido (máximo 10 MiB).",
+      "Archivo PDF no válido (máximo 4 MiB).",
       { file: "Comprueba formato y tamaño." },
     );
   const header = new TextDecoder().decode(bytes.subarray(0, 8));

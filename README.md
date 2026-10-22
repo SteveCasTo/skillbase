@@ -1,3 +1,39 @@
+<div align="center">
+  <img src="assets/branding/skillbase-horizontal.png" alt="SkillBase Logo" width="460" />
+  <p><strong>Plataforma web para la gestión integral de cursos de formación continua, asistencia, evaluaciones y certificación pública verificable.</strong></p>
+
+  <p>
+    <a href="https://github.com/SteveCasTo/skillbase/actions/workflows/ci.yml"><img src="https://github.com/SteveCasTo/skillbase/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
+    <a href="https://skillbase-alpha.vercel.app/"><img src="https://img.shields.io/badge/Demo-Vercel_Live-000000?style=flat&logo=vercel" alt="Vercel Live Demo" /></a>
+    <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-1.4.2-fbf0df?style=flat&logo=bun&logoColor=black" alt="Bun" /></a>
+    <a href="https://astro.build"><img src="https://img.shields.io/badge/Astro-7.3-BC52EE?style=flat&logo=astro&logoColor=white" alt="Astro" /></a>
+    <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-20232a?style=flat&logo=react&logoColor=61dafb" alt="React" /></a>
+    <a href="https://supabase.com"><img src="https://img.shields.io/badge/Supabase-PostgreSQL-1c1c1c?style=flat&logo=supabase&logoColor=3ECF8E" alt="Supabase" /></a>
+    <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind_CSS-4.3-38bdf8?style=flat&logo=tailwindcss&logoColor=white" alt="Tailwind CSS" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat" alt="License: MIT" /></a>
+  </p>
+
+  <p>
+    <a href="https://skillbase-alpha.vercel.app/"><strong>🚀 Explorar Demo en Producción »</strong></a>
+  </p>
+</div>
+
+---
+
+## VISTA PREVIA
+
+<div align="center">
+  <h3>Catálogo Público y Landing</h3>
+  <img src="assets/branding/skillbase-landing-preview.png" alt="Catálogo público y landing de SkillBase" width="90%" />
+
+<br/><br/>
+
+  <h3>Portal de Verificación Pública de Certificados</h3>
+  <img src="assets/branding/skillbase-verifier-preview.png" alt="Portal de verificación pública con QR y hash SHA-256" width="90%" />
+</div>
+
+---
+
 # PLATAFORMA DE FORMACIÓN CONTINUA Y CERTIFICACIÓN
 
 Plataforma web para gestionar el ciclo administrativo y académico de cursos de formación continua, desde su publicación y preinscripción hasta la evaluación, cierre del grupo, emisión de certificados y verificación pública de credenciales.
@@ -127,7 +163,7 @@ Los detalles y responsabilidades de cada tecnología se documentan en `docs/ARCH
 Requisitos: Git, Bun `1.4.2`, Node.js `24.x` y Docker con el daemon activo. En un equipo nuevo, clonar la rama `development`, instalar las dependencias y preparar `.env` antes del setup:
 
 ```sh
-git clone -b development <URL_DEL_REPOSITORIO>
+git clone -b development https://github.com/SteveCasTo/skillbase.git SkillBase
 cd SkillBase
 bun install --frozen-lockfile
 bun -e "await Bun.write('.env', Bun.file('.env.example'))"
@@ -223,3 +259,10 @@ No leer toda la documentación indiscriminadamente. Consultar únicamente lo nec
 - Mantener lógica de negocio fuera de componentes UI y endpoints.
 - Tratar la accesibilidad, seguridad, responsive y testing como requisitos, no como trabajo posterior.
 - Mantener el entorno reproducible para cualquier integrante del equipo.
+
+## CONTRIBUCIONES, SEGURIDAD Y LICENCIA
+
+- Consulta la [guía de contribución](.github/CONTRIBUTING.md) y `AGENTS.md` antes de colaborar.
+- Reporta vulnerabilidades mediante el [canal privado de GitHub](.github/SECURITY.md), no en issues públicos.
+- Proyecto académico y de portafolio bajo [licencia MIT](LICENSE), © 2026 Steve (SteveCasTo). La licencia no sustituye las licencias de las dependencias ni concede derechos sobre marcas institucionales de terceros.
+- Los [activos de presentación](assets/branding/README.md) son propios; las capturas muestran la interfaz pública, no acreditan oferta académica ni respaldo institucional.

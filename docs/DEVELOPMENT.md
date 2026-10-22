@@ -177,15 +177,17 @@ Los puertos canónicos son API `55321` y PostgreSQL `55322`, definidos en `supab
 
 Utilizar Supabase CLI del proyecto.
 
-### Launcher local de enforcement Auth (candidato coordinado)
+### Launcher local de enforcement Auth (integrado; operación local histórica registrada)
 
 El start controlado usa `scripts/start-local-supabase.ts`: conserva Supabase CLI y
 sus servicios existentes, captura su salida sin imprimir claves y aplica/verifica
 el helper de configuración nativa **antes** de habilitar QA. Las entradas de
 `package.json` `supabase:start` y `supabase:auth:local` están integradas como
 dos entradas exclusivamente; la rama PERF inspeccionada no modifica package.
-Esta candidata no afirma que el apply
-canónico se haya realizado. `setup` ya usa `supabase:start`; no ejecutar setup
+La implementación candidata no acreditaba apply canónico; la operación local
+autorizada posterior del 2026-10-12 se registra en
+[`AUTHENTICATION.md`](AUTHENTICATION.md), separada de la aceptación del responsable
+del 2026-10-22. `setup` ya usa `supabase:start`; no ejecutar setup
 para activar el control sobre una DB existente, pues hace reset destructivo.
 
 El helper se ejecuta con `bun --no-env-file scripts/local-auth-config.ts`:
