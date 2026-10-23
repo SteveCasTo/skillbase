@@ -250,6 +250,8 @@ No leer toda la documentación indiscriminadamente. Consultar únicamente lo nec
 - `docs/CERTIFICATES.md`: emisión y verificación de certificados.
 - `docs/DEPLOYMENT.md`: CI/CD, Vercel, Supabase Cloud y migraciones.
 
+También puedes consultar la documentación externa generada automáticamente en [DeepWiki](https://deepwiki.com/SteveCasTo/skillbase) y [Mintlify Wiki](https://mintlify.wiki/SteveCasTo/skillbase). La documentación versionada en `docs/` es la referencia del proyecto.
+
 ## PRINCIPIOS DEL PROYECTO
 
 - Mantener una arquitectura modular.
